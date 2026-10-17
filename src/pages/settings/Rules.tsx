@@ -52,7 +52,7 @@ function RuleForm({ initial, categories, onClose }: { initial: Rule; categories:
             ) : rule.isRegex ? (
               'Appliquée au libellé en minuscules, sans accents, ponctuation remplacée par des espaces.'
             ) : (
-              'Insensible à la casse et aux accents. Le libellé doit contenir ce texte.'
+              'Insensible à la casse et aux accents. Le libellé doit contenir ce texte (ou tous ses mots).'
             )
           }
         >

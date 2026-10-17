@@ -42,7 +42,10 @@ function compileOne(rule: Rule): CompiledRule | null {
   }
   const kw = normalizeText(rule.pattern);
   if (!kw) return null;
-  return { rule, test: (t) => t.includes(kw) };
+  // Mot-clé : la phrase exacte, ou à défaut tous ses mots (≥ 2 lettres) présents dans le libellé,
+  // dans n'importe quel ordre ("boulangerie cours" reconnaît "BOULANGERIE DU COURS").
+  const tokens = kw.split(' ').filter((w) => w.length > 1);
+  return { rule, test: (t) => t.includes(kw) || (tokens.length > 1 && tokens.every((w) => t.includes(w))) };
 }
 
 /** Trie les règles actives : priorité décroissante, puis motif le plus long (plus spécifique) d'abord. */

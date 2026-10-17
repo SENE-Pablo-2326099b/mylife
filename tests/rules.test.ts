@@ -130,3 +130,13 @@ describe('moteur de règles', () => {
     expect(suggestKeyword('Kiosque')).toBe('kiosque');
   });
 });
+
+describe('mots-clés à plusieurs mots', () => {
+  const base = { isRegex: false, direction: 'any' as const, minAmount: null, maxAmount: null, person: null, priority: 0, label: '', enabled: true, createdAt: 0 };
+  it('tous les mots présents, dans n’importe quel ordre', () => {
+    const c = compileRules([{ ...base, id: '1', pattern: 'boulangerie cours', categoryId: 'x' }]);
+    expect(findMatchingRule(c, { label: 'BOULANGERIE DU COURS', rawText: '', amount: -1 })).not.toBeNull();
+    expect(findMatchingRule(c, { label: 'COURS BOULANGERIE', rawText: '', amount: -1 })).not.toBeNull();
+    expect(findMatchingRule(c, { label: 'BOULANGERIE PAUL', rawText: '', amount: -1 })).toBeNull();
+  });
+});
