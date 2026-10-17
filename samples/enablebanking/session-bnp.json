@@ -1,0 +1,19 @@
+{
+  "session_id": "4b9d3c1e-2f6a-4c8e-9b1d-7e5f3a2c1b0d",
+  "accounts": [
+    {
+      "account_id": { "iban": "FR7630004000031234567890143" },
+      "name": "M PABLO SENE",
+      "details": "Compte de chèques",
+      "product": "Compte de chèques",
+      "cash_account_type": "CACC",
+      "currency": "EUR",
+      "uid": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+      "identification_hash": "BNPHASH-WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQi",
+      "identification_hashes": ["BNPHASH-WwpbCiJhY2NvdW50IiwKImFjY291bnRfaWQi"]
+    }
+  ],
+  "aspsp": { "name": "BNP Paribas", "country": "FR" },
+  "psu_type": "personal",
+  "access": { "valid_until": "2027-04-15T10:00:00.000000+00:00" }
+}

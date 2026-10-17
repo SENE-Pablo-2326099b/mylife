@@ -1,0 +1,99 @@
+{
+  "transactions": [
+    {
+      "entry_reference": "BNP-20260926-0001",
+      "transaction_amount": { "currency": "EUR", "amount": "1537.00" },
+      "debtor": { "name": "CEA CADARACHE" },
+      "credit_debit_indicator": "CRDT",
+      "status": "BOOK",
+      "booking_date": "2026-09-26",
+      "value_date": "2026-09-26",
+      "remittance_information": ["VIR SEPA RECU /DE CEA CADARACHE /MOTIF SALAIRE SEPTEMBRE 2026"],
+      "bank_transaction_code": { "description": "Virement reçu" },
+      "balance_after_transaction": { "currency": "EUR", "amount": "1702.31" }
+    },
+    {
+      "entry_reference": "BNP-20260927-0002",
+      "transaction_amount": { "currency": "EUR", "amount": "450.00" },
+      "creditor": { "name": "TRADE REPUBLIC BANK GMBH" },
+      "creditor_account": { "iban": "DE00100123450123456789" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-09-28",
+      "transaction_date": "2026-09-27",
+      "remittance_information": ["VIR SEPA EMIS /MOTIF INVESTISSEMENT /BEN TRADE REPUBLIC"]
+    },
+    {
+      "entry_reference": "BNP-20260928-0003",
+      "transaction_amount": { "currency": "EUR", "amount": "200.00" },
+      "creditor": { "name": "M PABLO SENE" },
+      "creditor_account": { "iban": "FR7628233000011234567890123" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-09-28",
+      "remittance_information": ["VIR SEPA INST EMIS /MOTIF Paiement envoyé par M PABLO SENE /BEN M PABLO SENE"]
+    },
+    {
+      "entry_reference": "BNP-20261005-0004",
+      "transaction_amount": { "currency": "EUR", "amount": "253.40" },
+      "creditor": { "name": "CROUS AIX MARSEILLE AVIGNON" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-10-05",
+      "remittance_information": ["PRLV SEPA CROUS AIX MARSEILLE AVIGNON LOYER OCTOBRE"]
+    },
+    {
+      "entry_reference": "BNP-20261005-0005",
+      "transaction_amount": { "currency": "EUR", "amount": "170.00" },
+      "debtor": { "name": "CAF DES BOUCHES DU RHONE" },
+      "credit_debit_indicator": "CRDT",
+      "status": "BOOK",
+      "booking_date": "2026-10-05",
+      "remittance_information": ["VIR SEPA RECU /DE CAF DES BOUCHES DU RHONE /MOTIF APL 102026"]
+    },
+    {
+      "entry_reference": "BNP-20261008-0006",
+      "transaction_amount": { "currency": "EUR", "amount": "15.99" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-10-09",
+      "transaction_date": "2026-10-08",
+      "remittance_information": ["FACTURE CARTE DU 081026 FREE MOBILE 75 PARIS CARTE 4974XXXXXXXX1234"]
+    },
+    {
+      "entry_reference": "BNP-20261010-0007",
+      "transaction_amount": { "currency": "EUR", "amount": "-8.20" },
+      "status": "BOOK",
+      "booking_date": "2026-10-11",
+      "transaction_date": "2026-10-10",
+      "remittance_information": ["FACTURE CARTE DU 101026 CAFETERIA IUT AIX EN PROVENC CARTE 4974XXXXXXXX1234"]
+    },
+    {
+      "entry_reference": "BNP-20261012-0008",
+      "transaction_amount": { "currency": "EUR", "amount": "20.00" },
+      "debtor": { "name": "M LANCELOT SIMON" },
+      "credit_debit_indicator": "CRDT",
+      "status": "BOOK",
+      "booking_date": "2026-10-12",
+      "remittance_information": ["VIR SEPA INST RECU /DE M LANCELOT SIMON /MOTIF resto"]
+    },
+    {
+      "entry_reference": "BNP-20261014-0009",
+      "transaction_amount": { "currency": "EUR", "amount": "150.00" },
+      "creditor": { "name": "Revolut" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-10-14",
+      "remittance_information": ["VIR SEPA INST EMIS /BEN Revolut Bank UAB /REF Top up"]
+    },
+    {
+      "entry_reference": "BNP-20261014-0010",
+      "transaction_amount": { "currency": "EUR", "amount": "3.50" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "booking_date": "2026-10-14",
+      "remittance_information": ["FACTURE CARTE DU 141026 BOULANGERIE DU COURS AIX EN PROV CARTE 4974XXXXXXXX1234"]
+    }
+  ],
+  "continuation_key": null
+}

@@ -4,6 +4,8 @@ import { Layout } from './components/Layout';
 import { ensureSeeded } from './db/seed';
 import SettingsPage from './pages/Settings';
 import Placeholder from './pages/Placeholder';
+import SyncPage from './pages/Sync';
+import CallbackPage from './pages/Callback';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -25,7 +27,8 @@ export default function App() {
         <Route path="/cycle" element={<Placeholder title="Cycle en cours" />} />
         <Route path="/transactions" element={<Placeholder title="Opérations" />} />
         <Route path="/alertes" element={<Placeholder title="Alertes" />} />
-        <Route path="/synchro" element={<Placeholder title="Synchronisation" />} />
+        <Route path="/synchro" element={<SyncPage />} />
+        <Route path="/connexion/retour" element={<CallbackPage />} />
         <Route path="/reglages/*" element={<SettingsPage />} />
         <Route path="*" element={<Placeholder title="Page introuvable" />} />
       </Routes>

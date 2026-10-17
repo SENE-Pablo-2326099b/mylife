@@ -1,0 +1,6 @@
+{
+  "balances": [
+    { "name": "Solde comptable", "balance_amount": { "currency": "EUR", "amount": "812.40" }, "balance_type": "CLBD", "reference_date": "2026-10-16" },
+    { "name": "Solde disponible", "balance_amount": { "currency": "EUR", "amount": "797.15" }, "balance_type": "ITAV", "last_change_date_time": "2026-10-17T08:12:00Z" }
+  ]
+}
