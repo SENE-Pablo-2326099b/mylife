@@ -59,7 +59,7 @@ export default function TodayPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold capitalize">{formatDay(today)}</h1>
+        <h1 className="text-2xl font-bold first-letter:uppercase">{formatDay(today)}</h1>
         <span className="text-xs text-muted">synchro {relativeTime(lastSync)}</span>
       </div>
 

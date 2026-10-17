@@ -151,7 +151,11 @@ export function generateDemo(settings: Pick<Settings, 'payday'>, today: ISODate 
   add({ account: 'rev', date: inCycle(4), amount: -3490, label: 'DistriProt' });
   add({ account: 'bnp', date: inCycle(11), amount: 2000, label: 'M LANCELOT SIMON', raw: 'VIR SEPA INST RECU /DE M LANCELOT SIMON /MOTIF resto' });
   add({ account: 'rev', date: inCycle(2), amount: -1500, label: 'Lancelot Simon', raw: 'Transfer to Lancelot Simon' });
-  add({ account: 'rev', date: today, amount: -1650, label: 'Amazon', raw: 'AMZN Mktp FR', pending: true });
+  add({ account: 'rev', date: addDays(today, -1), amount: -1650, label: 'Amazon', raw: 'AMZN Mktp FR', pending: true });
+  // Commerces inconnus garantis, pour montrer la file « à classer »
+  add({ account: 'rev', date: inCycle(7), amount: -385, label: 'Boulangerie du Cours' });
+  add({ account: 'rev', date: inCycle(13), amount: -420, label: 'Boulangerie du Cours' });
+  add({ account: 'rev', date: inCycle(15), amount: -650, label: 'Kiosque Rotonde' });
 
   const toIncoming = (x: Draft): IncomingTransaction => ({
     date: x.date,

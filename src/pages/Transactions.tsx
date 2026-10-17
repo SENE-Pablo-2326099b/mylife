@@ -8,6 +8,7 @@ import { db } from '../db/db';
 import type { Transaction } from '../db/types';
 import { useAccounts, useCategories, useSettings } from '../hooks';
 import { addDays, cycleFor, formatDay, previousCycle, todayISO } from '../lib/dates';
+import { formatCents } from '../lib/money';
 import { normalizeText } from '../lib/text';
 
 const PERIODS = {
@@ -77,11 +78,11 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-4">
-      <PageTitle sub={`${filtered.length} opération${filtered.length > 1 ? 's' : ''} · solde ${total >= 0 ? '+' : ''}${(total / 100).toFixed(2).replace('.', ',')} €`}>Opérations</PageTitle>
+      <PageTitle sub={`${filtered.length} opération${filtered.length > 1 ? 's' : ''} · solde ${formatCents(total, { sign: true })}`}>Opérations</PageTitle>
 
       <div className="space-y-2">
         <input type="search" className={inputClass} placeholder="Rechercher un libellé, une note…" value={q} onChange={(e) => setParam('q', e.target.value)} aria-label="Rechercher" />
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <select className={inputClass} value={period} onChange={(e) => setParam('periode', e.target.value === 'cycle' ? '' : e.target.value)} aria-label="Période">
             {Object.entries(PERIODS).map(([k, v]) => (
               <option key={k} value={k}>
@@ -97,7 +98,7 @@ export default function TransactionsPage() {
               </option>
             ))}
           </select>
-          <select className={inputClass} value={cat} onChange={(e) => setParam('cat', e.target.value)} aria-label="Catégorie">
+          <select className={`${inputClass} col-span-2`} value={cat} onChange={(e) => setParam('cat', e.target.value)} aria-label="Catégorie">
             <option value="">Toutes catégories</option>
             <option value="_none">❔ À classer</option>
             {categories.map((c) => (

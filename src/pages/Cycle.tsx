@@ -179,10 +179,10 @@ export default function CyclePage() {
         </ul>
         <div className="h-56" role="img" aria-label={`Dépenses courantes cumulées : ${formatCents(summary.variable)} au jour ${summary.daysElapsed}, trajectoire idéale ${formatCents(expectedNow)}.`}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
+            <LineChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: -4 }}>
               <CartesianGrid stroke="rgb(var(--line))" strokeOpacity={0.5} vertical={false} />
               <XAxis dataKey="day" tickLine={false} axisLine={false} tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} interval={6} tickFormatter={(d: number) => `J${d}`} />
-              <YAxis tickLine={false} axisLine={false} width={44} tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(v / 100)}€`} />
+              <YAxis tickLine={false} axisLine={false} width={54} tick={{ fill: 'rgb(var(--muted))', fontSize: 11 }} tickFormatter={(v: number) => `${Math.round(v / 100)}€`} />
               <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'rgb(var(--muted))', strokeWidth: 1 }} />
               <Line type="monotone" dataKey="ideal" stroke={COLORS.ideal} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false} />
               <Line type="monotone" dataKey="previous" stroke={COLORS.previous} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls={false} />
