@@ -16,6 +16,7 @@ import TransactionsPage from './pages/Transactions';
 import QueuePage from './pages/Queue';
 import RulesPage from './pages/settings/Rules';
 import CategoriesPage from './pages/settings/Categories';
+import DataPage from './pages/settings/Data';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -53,6 +54,7 @@ function Shell() {
         <Route path="/reglages/regles" element={<RulesPage />} />
         <Route path="/reglages/categories" element={<CategoriesPage />} />
         <Route path="/reglages/alertes" element={<AlertsSettingsPage />} />
+        <Route path="/reglages/donnees" element={<DataPage />} />
         <Route path="*" element={<Placeholder title="Page introuvable" />} />
       </Routes>
     </Layout>
