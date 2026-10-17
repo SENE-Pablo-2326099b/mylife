@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 import { ensureSeeded } from './db/seed';
 import SettingsPage from './pages/Settings';
 import Placeholder from './pages/Placeholder';
+import TodayPage from './pages/Today';
 import SyncPage from './pages/Sync';
 import CallbackPage from './pages/Callback';
 import TransactionsPage from './pages/Transactions';
@@ -27,7 +28,7 @@ export default function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<Placeholder title="Aujourd’hui" />} />
+        <Route path="/" element={<TodayPage />} />
         <Route path="/cycle" element={<Placeholder title="Cycle en cours" />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/a-classer" element={<QueuePage />} />
