@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { IconChevron } from '../components/icons';
 import { Card, MoneyField, NumberField, PageTitle, Money, Field, inputClass } from '../components/ui';
 import { updateSettings } from '../db/seed';
 import { computeEnvelope, defaultEnvelope, totalIncome } from '../domain/defaults';
@@ -11,6 +13,27 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <PageTitle>Réglages</PageTitle>
+
+      <nav aria-label="Sections des réglages" className="overflow-hidden rounded-2xl border border-line/60 bg-surface">
+        {[
+          ['/reglages/categories', '🏷️', 'Catégories et objectifs', 'Types, objectifs par cycle, part nourriture'],
+          ['/reglages/regles', '🧭', 'Règles de classement', 'Commerçants, mots-clés, regex'],
+          ['/reglages/alertes', '🔔', 'Alertes d’optimisation', 'Seuils et règles d’alerte'],
+          ['/synchro', '🏦', 'Connexion bancaire', 'Enable Banking, BNP, Revolut'],
+          ['/reglages/donnees', '💾', 'Sauvegarde et données', 'Export / import JSON, démo, effacement'],
+        ].map(([to, emoji, title, sub]) => (
+          <Link key={to} to={to} className="flex min-h-[60px] items-center gap-3 border-b border-line/60 px-4 py-2 last:border-b-0 hover:bg-raised">
+            <span aria-hidden className="text-xl">
+              {emoji}
+            </span>
+            <span className="flex-1">
+              <span className="block font-medium">{title}</span>
+              <span className="block text-xs text-muted">{sub}</span>
+            </span>
+            <IconChevron size={18} className="text-muted" />
+          </Link>
+        ))}
+      </nav>
 
       <Card title="Cycle budgétaire">
         <NumberField

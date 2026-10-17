@@ -6,6 +6,10 @@ import SettingsPage from './pages/Settings';
 import Placeholder from './pages/Placeholder';
 import SyncPage from './pages/Sync';
 import CallbackPage from './pages/Callback';
+import TransactionsPage from './pages/Transactions';
+import QueuePage from './pages/Queue';
+import RulesPage from './pages/settings/Rules';
+import CategoriesPage from './pages/settings/Categories';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -25,11 +29,14 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Placeholder title="Aujourd’hui" />} />
         <Route path="/cycle" element={<Placeholder title="Cycle en cours" />} />
-        <Route path="/transactions" element={<Placeholder title="Opérations" />} />
+        <Route path="/transactions" element={<TransactionsPage />} />
+        <Route path="/a-classer" element={<QueuePage />} />
         <Route path="/alertes" element={<Placeholder title="Alertes" />} />
         <Route path="/synchro" element={<SyncPage />} />
         <Route path="/connexion/retour" element={<CallbackPage />} />
-        <Route path="/reglages/*" element={<SettingsPage />} />
+        <Route path="/reglages" element={<SettingsPage />} />
+        <Route path="/reglages/regles" element={<RulesPage />} />
+        <Route path="/reglages/categories" element={<CategoriesPage />} />
         <Route path="*" element={<Placeholder title="Page introuvable" />} />
       </Routes>
     </Layout>
