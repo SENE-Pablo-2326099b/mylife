@@ -5,6 +5,7 @@ import { ensureSeeded } from './db/seed';
 import SettingsPage from './pages/Settings';
 import Placeholder from './pages/Placeholder';
 import TodayPage from './pages/Today';
+import CyclePage from './pages/Cycle';
 import SyncPage from './pages/Sync';
 import CallbackPage from './pages/Callback';
 import TransactionsPage from './pages/Transactions';
@@ -29,7 +30,7 @@ export default function App() {
     <Layout>
       <Routes>
         <Route path="/" element={<TodayPage />} />
-        <Route path="/cycle" element={<Placeholder title="Cycle en cours" />} />
+        <Route path="/cycle" element={<CyclePage />} />
         <Route path="/transactions" element={<TransactionsPage />} />
         <Route path="/a-classer" element={<QueuePage />} />
         <Route path="/alertes" element={<Placeholder title="Alertes" />} />
