@@ -1,67 +1,46 @@
-# Rapport de livraison : Budget Dodge
+# Rapport de livraison : MyFinances (V2)
 
-État au 17/10/2026. Vérifié en fin de travail : `npm run typecheck`, `npm run lint`, `npm test` (**168 tests, 14 fichiers**), `npm run build`, `npm run preview` (pages et manifeste servis en 200) et `npm run screenshots` (16 captures à 390 px, **aucune erreur console, aucun débordement horizontal**, rechargement hors ligne OK).
+État au 19/10/2026. Le détail des changements, leur raison et les notes des 5 idées issues de la recherche sont dans **[V2.md](V2.md)**. Les hypothèses (65) sont dans [ASSUMPTIONS.md](ASSUMPTIONS.md).
 
-## Changement de cap en cours de route
+## Vérifié en fin de travail
 
-Après le lancement, tu as demandé de **tout faire passer par Enable Banking** au lieu de l'import manuel. Conséquences :
-
-- l'import CSV, l'écran de mapping manuel des colonnes et PapaParse ont été abandonnés ;
-- l'API Enable Banking refuse les appels directs depuis un navigateur (pas de CORS, signature RSA obligatoire). Tu as validé l'option **fonction serverless sans état**, qui garde la clé privée et relaie les requêtes ;
-- tu n'as pas encore de compte Enable Banking : l'intégration est codée d'après la référence officielle de l'API et testée sur des réponses simulées. Ni la connexion réelle à BNP / Revolut ni le déploiement n'ont pu être essayés (voir « Ce qui n'est pas fait »).
+| Commande | Résultat |
+|---|---|
+| `npm run typecheck` | OK |
+| `npm run lint` | 0 erreur, 0 avertissement |
+| `npm test` | **224 tests, 19 fichiers**, tous verts |
+| `npm run build` | OK (JS 685 Ko, 222 Ko gzip ; polices et icônes en cache hors ligne) |
+| `npm run screenshots` | Accueil guidé et tous les écrans avec la démo, thèmes **Nuit** et **Perle**, **320 / 390 / 430 px** + 1 280 px : aucune erreur console, aucun débordement horizontal ; lien d'évitement en premier au clavier ; rechargement hors ligne OK |
 
 ## Ce qui est fait
 
-| Étape | Commit | Contenu |
-|---|---|---|
-| a | `(a) Squelette…` | React + Vite + TS + Tailwind, base Dexie, réglages du cycle et de l'enveloppe |
-| b | `(b) Relais Enable Banking…` | relais sans état (Vercel, Netlify, middleware Vite), JWT RS256, liste blanche d'opérations, mot de passe |
-| c | `(c) Synchro Enable Banking…` | couche `DataSource`, mapping, déduplication, opérations en attente, écrans Synchro et retour de banque |
-| d | `(d) Catégories, règles…` | moteur de règles, transferts internes appariés, file « à classer » (raccourcis clavier), correction → règle, écran Opérations, soldes entre amis |
-| e | `(e) Écran « Aujourd'hui »…` | budget du jour, jauge vert / orange / rouge, opérations du jour, bannières |
-| f | `(f) Écran Cycle…` | courbe cumulée vs trajectoire et cycle précédent, catégories avec objectifs, part de la nourriture |
-| g | `(g) Alertes…` | les 5 alertes demandées, toutes réglables, badge dans la navigation |
-| h | `(h) PWA…` | PWA installable et hors ligne, export / import JSON, données de démo, CSP `connect-src 'self'` |
-| i | `(i) …` | captures automatisées, corrections de mise en page, README, ASSUMPTIONS, REPORT |
-
-Points clés :
-- **Montants en centimes entiers** partout. La conversion texte ↔ centimes ne passe jamais par un calcul en flottant.
-- **Tests** : relais (signature JWT vérifiée avec la clé publique, mot de passe, injection de chemin), mapping Enable Banking sur les échantillons, déduplication et chevauchement, opérations en attente remplacées, transferts internes, moteur de règles (40+ commerçants réels), cycle 26→25 (mois de 28 / 29 / 30 / 31 jours, changement d'année, jour de paie 30 / 31), budget du jour, alertes, sauvegarde, synchro de bout en bout sur une base IndexedDB simulée.
-- **Accessibilité** : lien d'évitement (vérifié au clavier par le script de captures), cibles tactiles de 44 px minimum, statut de la jauge donné en texte et en icône, table de données sous le graphique, focus visible, `aria` sur les boutons, interrupteurs et la boîte de dialogue.
+1. **Design system Lumen** repris de MyPerf (jetons, 8 thèmes, verre en 4 niveaux, fond animé à halos, ressorts, composants, graphiques), appliqué à tous les écrans. Thème choisi dans Réglages → Apparence, avec aperçus et « Suivre le téléphone ». Contrastes testés.
+2. **Personnalisation complète** : accueil guidé, revenus et charges en listes, titulaires, épargne calculée, règles génériques, n'importe quelle banque, démo fictive. Migration automatique de la V1 sans perte.
+3. **Patrimoine et placements** : patrimoine net et historique, portefeuilles (Trade Republic, Bitstack, PEA…), PRU, plus-values, investissements programmés, cours automatiques via le relais, biens et dettes.
+4. **Les 5 idées** : prévision de trésorerie, abonnements et récurrents, objectifs d'épargne, patrimoine unifié, indépendance financière.
 
 ## Ce qui n'est pas fait / limites
 
-1. **Aucun test contre une vraie banque.** Les libellés BNP / Revolut renvoyés par Enable Banking sont devinés. Le seul contact réel avec l'API a confirmé que le JWT est accepté (réponse « application inconnue »). Il faudra sans doute ajuster quelques règles et le nettoyage des libellés après ta première synchro.
-2. **Déploiement Vercel / Netlify non testé.** Le relais tourne en local (`npm run dev` / `npm run preview`), mais les adaptateurs serverless n'ont jamais été déployés.
-3. **Import CSV et mapping manuel** : abandonnés à ta demande. L'architecture `DataSource` permettrait de les remettre comme source de secours.
-4. **Pas de thème clair**, pas de notifications.
-5. Les emoji des catégories n'apparaissent pas sur les captures (pas de police emoji sous WSL). Sur téléphone, ils s'affichent normalement.
-
-Les hypothèses prises (46) sont détaillées dans [ASSUMPTIONS.md](ASSUMPTIONS.md). Les plus structurantes :
-- Logement et Abonnements sont des charges fixes : hors budget du jour, mais visibles dans le Cycle.
-- Le budget du jour se calcule sur les dépenses jusqu'à hier.
-- Un débit non classé compte comme une dépense.
-- « Amazon hors budget » = objectif Shopping déjà dépassé.
-- Les objectifs de catégorie de départ sont inventés.
+1. **Aucun essai avec une vraie banque ni de déploiement réel** (comme en V1 : il faut ton compte Enable Banking).
+2. **Trade Republic et Bitstack** se suivent par saisie des positions et des plans programmés : aucune des deux n'a d'API publique.
+3. **Cours** : les endpoints Yahoo Finance sont non officiels et peuvent changer ; la saisie manuelle reste possible.
+4. Pas de verrouillage de l'app ni de chiffrement local, pas de notifications.
+5. JavaScript non découpé par écran (685 Ko).
 
 ## Lancer l'app
 
 ```bash
 npm install
-npm run dev                  # http://localhost:5173
-# Réglages → Sauvegarde et données → « Charger des données de démo »
-
-npm test                     # 168 tests
-npm run build && npm run preview   # build de production sur http://localhost:4173
-npm run screenshots          # captures 390 px dans screenshots/ (après build)
+npm run dev                  # http://localhost:5173 → accueil guidé → « Essayer avec la démo »
+npm test                     # 224 tests
+npm run build && npm run preview
+npm run screenshots          # captures dans screenshots/ (après build)
 ```
-
-Pour la synchro réelle : créer l'application Enable Banking, remplir `.env.local` (`EB_APP_ID`, `EB_PRIVATE_KEY` ou `EB_PRIVATE_KEY_PATH`, `BRIDGE_PASSWORD`), puis *Synchro* dans l'app. Le pas-à-pas complet et le déploiement Vercel sont dans le [README](README.md).
 
 ## Les 5 améliorations que je ferais ensuite
 
-1. **Caler l'app sur tes vraies données** : faire une première synchro en *restricted production*, remplacer les échantillons de `samples/enablebanking/` par de vraies réponses anonymisées, puis ajuster `prettifyLabel` et les règles.
-2. **Déployer sur Vercel et ajouter des tests de bout en bout en CI** (GitHub Actions + Playwright) contre le déploiement de prévisualisation, relais compris (en mode *sandbox* Enable Banking).
-3. **Projection de fin de cycle et détection des récurrences** : estimer le reste au 25 au rythme actuel, et repérer automatiquement abonnements et charges fixes réels pour les comparer aux 359 € prévus.
-4. **Verrouiller les données locales** : chiffrer IndexedDB avec une phrase secrète (WebCrypto) et ajouter un déverrouillage biométrique (WebAuthn). Un téléphone perdu ne donnerait alors pas accès à l'historique.
-5. **Rappel quotidien** : notification locale (Periodic Background Sync / Notification API) en fin de journée, « il te reste X € aujourd'hui », et bilan hebdomadaire des catégories qui dérivent.
+1. **Premier essai réel** : synchro BNP / Revolut en *restricted production* ; ajuster le nettoyage des libellés et les règles.
+2. **Import des relevés Trade Republic (PDF / CSV) et de l'export fiscal Bitstack**, pour remplacer la saisie des placements.
+3. **Verrouillage** : code ou biométrie (WebAuthn) et chiffrement d'IndexedDB.
+4. **Prévision avec fourchette** (dépenses quotidiennes basse / haute) et alerte « découvert probable avant la paie ».
+5. **Découpage du JavaScript par écran** (chargement à la demande des écrans Patrimoine et Réglages).

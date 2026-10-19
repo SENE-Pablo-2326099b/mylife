@@ -1,15 +1,13 @@
-# Budget Dodge
+# MyFinances
 
-Suivi de dépenses personnelles **au jour près**, pensé pour le téléphone (PWA installable, hors ligne, thème sombre).
-Les opérations BNP Paribas et Revolut arrivent automatiquement via **Enable Banking** (API bancaire DSP2 en lecture seule),
-sont classées par des règles de commerçants, et l'écran d'accueil répond à une seule question : *combien je peux encore dépenser aujourd'hui ?*
+Gestion de finances personnelles **pour tout le monde**, pensée pour le téléphone (PWA installable, hors ligne), au design **Lumen** (verre et lumière, 8 thèmes clairs et sombres).
+Les opérations bancaires arrivent automatiquement via **Enable Banking** (API DSP2 en lecture seule) ; tout le reste (revenus, charges, catégories, règles, placements, objectifs) se règle dans l'app. Nouveautés et choix de la V2 : voir **[V2.md](V2.md)**.
 
-- **Aujourd'hui** : budget du jour = (enveloppe vie courante − dépenses du cycle) ÷ jours restants jusqu'au 25, jauge verte / orange / rouge.
-- **Cycle** (26 → 25) : dépenses par catégorie, courbe cumulée vs trajectoire idéale, comparaison avec le cycle précédent, part de la nourriture, soldes entre amis.
-- **Opérations** : liste filtrable, correction rapide de la catégorie (avec création / mise à jour de règle).
-- **À classer** : file des opérations inconnues, boutons rapides et raccourcis clavier.
-- **Alertes** : livraisons, Amazon hors budget, budget du jour dépassé plusieurs jours de suite, tickets de bus vs pass annuel, objectifs par catégorie.
-- **Réglages** : cycle, revenus et enveloppe, catégories et objectifs, règles, alertes, sauvegarde JSON, données de démo.
+- **Aujourd'hui** : combien je peux encore dépenser aujourd'hui (enveloppe vie courante ÷ jours restants jusqu'à la paie), anneau vert / orange / rouge.
+- **Budget** : le cycle de paie à paie, courbe cumulée vs trajectoire et cycle précédent, catégories et objectifs ; **prévision de trésorerie** et **abonnements / récurrents détectés**.
+- **Opérations** : recherche, filtres, correction de catégorie avec création de règle, file « à classer » au clavier.
+- **Patrimoine** : patrimoine net et son historique, comptes, **placements** (Trade Republic, Bitstack, PEA, assurance vie…) avec PRU, plus-values, **investissements programmés** et cours automatiques, **objectifs d'épargne**, biens et dettes, **indépendance financière**.
+- **Réglages** : accueil guidé au premier lancement, profil, revenus / charges / épargne en listes, catégories, règles, alertes, banques, apparence (thèmes, suivre le téléphone), sauvegarde JSON, démo.
 
 ---
 
@@ -26,7 +24,8 @@ sont classées par des règles de commerçants, et l'écran d'accueil répond à
 - L'API Enable Banking refuse les appels directs depuis un navigateur (pas de CORS, signature RSA obligatoire). Un **relais sans état** est donc nécessaire :
   une fonction serverless *à toi* (Vercel ou Netlify), sur le **même domaine** que l'app. Elle garde la clé privée, signe les requêtes, relaie les réponses et ne stocke ni ne journalise rien.
 - Le relais n'accepte qu'une **liste fermée** d'opérations en lecture (liste des banques, autorisation, session, soldes, transactions) et exige un mot de passe (`BRIDGE_PASSWORD`).
-- Aucune analytics, aucun tracking, aucune police ou script externe. En production, la CSP impose `connect-src 'self'` : le navigateur ne peut parler qu'à ton propre domaine.
+- Aucune analytics, aucun tracking, aucune police ou script externe (Sora et Inter sont embarquées). En production, la CSP impose `connect-src 'self'` : le navigateur ne peut parler qu'à ton propre domaine.
+- **Cours des placements** : le relais interroge Yahoo Finance (ETF, actions) et CoinGecko (crypto) avec les seuls **symboles** (ex. `CW8.PA`, `bitcoin`), jamais de montant. Ces deux opérations ne demandent que `BRIDGE_PASSWORD` (pas la configuration Enable Banking). Sans relais, les cours se saisissent à la main.
 
 ---
 
@@ -39,7 +38,7 @@ npm install
 npm run dev          # http://localhost:5173 (le relais est monté sur /api/eb)
 ```
 
-Pour essayer sans banque : **Réglages → Sauvegarde et données → Charger des données de démo** (≈ 6 semaines d'opérations fictives).
+Au premier lancement, l'accueil guidé propose « Essayer avec la démo » (6 mois de la vie de Camille Martin, personne fictive : deux banques, un livret, un PEA, du bitcoin programmé, des objectifs). Ensuite : **Réglages → Sauvegarde et données → Charger la démo**.
 
 | Commande | Rôle |
 |---|---|
@@ -48,7 +47,7 @@ Pour essayer sans banque : **Réglages → Sauvegarde et données → Charger de
 | `npm run preview` | sert le build de production (relais inclus) sur http://localhost:4173 |
 | `npm test` | tests unitaires (Vitest) |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
-| `npm run screenshots` | captures mobiles 390 px de chaque écran avec la démo + contrôle des erreurs console (nécessite `npm run build` et Chrome ; `CHROME_PATH` pour un autre binaire) |
+| `npm run screenshots` | captures de chaque écran avec la démo, thèmes Nuit et Perle, 320 / 390 / 430 / 1 280 px, + contrôle des erreurs console, des débordements, du clavier et du hors-ligne (nécessite `npm run build` et Chrome ; `CHROME_PATH` pour un autre binaire) |
 | `node scripts/make-icons.mjs` | régénère les icônes PNG de la PWA à partir de `public/favicon.svg` |
 
 ---
@@ -77,7 +76,7 @@ Enable Banking propose un mode **« restricted production »** gratuit : une app
    | `EB_REDIRECT_URLS` | *(facultatif, recommandé)* liste blanche des URL de retour, séparées par des virgules |
 
    En local : copie `.env.example` en `.env.local` et remplis-le.
-5. **Dans l'app** : *Synchro* (icône ⟳ en haut à droite) → saisis le mot de passe du relais → **BNP Paribas** → authentification sur le site de la banque → retour automatique dans l'app → recommence avec **Revolut**.
+5. **Dans l'app** : *Banques* (icône ⟳ en haut à droite, ou Réglages → Banques) → saisis le mot de passe du relais → **Ajouter une banque** → choisis le pays et ta banque → authentification sur son site → retour automatique dans l'app. Recommence pour chaque banque.
 
 La synchro se fait ensuite toute seule à l'ouverture de l'app (au plus toutes les 6 h, réglable : la DSP2 limite à 4 accès automatiques par jour et par compte), ou à la demande. L'accès bancaire expire au bout de 90 à 180 jours selon la banque : l'app affiche « Expire dans N j », puis « Reconnecter ».
 
@@ -135,14 +134,19 @@ api/eb.ts                    fonction Vercel (relais)
 netlify/functions/eb.ts      fonction Netlify (relais)
 server/bridge.ts             cœur du relais : JWT RS256, liste blanche d'opérations, validation
 server/vitePlugin.ts         relais monté dans `vite dev` / `vite preview`
+server/market.ts             cours de bourse / crypto (Yahoo Finance, CoinGecko) via le relais
+src/ui/                      design system Lumen : jetons et 8 thèmes (theme.ts, themes.ts), verre,
+                             fond animé, Screen, navigation, feuilles, toasts « Annuler », graphiques
 src/sync/                    couche « source de données » (DataSource), client du relais,
                              mapping Enable Banking, moteur de synchro, connexion bancaire
 src/domain/                  logique métier pure et testée : cycle, budget du jour, règles,
-                             transferts internes, déduplication, alertes, sauvegarde, démo
+                             transferts internes, déduplication, alertes, réglages (migration v1),
+                             patrimoine (PRU, historique), plans programmés, récurrences,
+                             prévision de trésorerie, indépendance financière, sauvegarde, démo
 src/db/                      schéma Dexie (IndexedDB) et initialisation
 src/pages/, src/components/  écrans React
 samples/enablebanking/       réponses API anonymisées utilisées par les tests
-tests/                       tests Vitest (168)
+tests/                       tests Vitest (224), dont les contrastes des 8 thèmes
 scripts/                     captures d'écran, génération des icônes
 ```
 
@@ -152,5 +156,5 @@ scripts/                     captures d'écran, génération des icônes
 
 ## Sauvegarde
 
-*Réglages → Sauvegarde et données → Exporter* télécharge un fichier JSON avec toute la base (opérations, catégories, règles, réglages), **sans** le mot de passe du relais. *Importer* remplace toutes les données de l'appareil par celles du fichier (après confirmation).
+*Réglages → Sauvegarde et données → Exporter* télécharge un fichier JSON avec toute la base (opérations, patrimoine, objectifs, catégories, règles, réglages), **sans** le mot de passe du relais. *Importer* remplace toutes les données de l'appareil par celles du fichier (« Annuler » pendant quelques secondes). Les sauvegardes de la V1 (Budget Dodge) se réimportent : les réglages sont migrés.
 Comme les données ne vivent que sur l'appareil, fais un export de temps en temps.

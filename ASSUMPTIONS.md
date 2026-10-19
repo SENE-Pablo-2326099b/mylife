@@ -48,7 +48,7 @@ Tout ce qui est marqué ⚙️ est modifiable dans l'app.
 31. **« Google »** est rangé en Abonnements comme demandé : un achat Google Play ponctuel le sera aussi.
 32. **Transferts internes** reconnus de trois façons : (a) IBAN de la contrepartie = un de tes comptes connectés ; (b) règles « Top up », « Virement … Revolut », « Paiement envoyé par / Payment from M PABLO SENE » (nom du titulaire ⚙️) ; (c) **appariement** : un débit et un crédit de même montant, sur deux de tes comptes, à 4 jours d'écart au plus, dont l'un est déjà reconnu comme transfert. L'autre jambe passe alors en transfert. Elle n'est jamais comptée deux fois.
 33. **Remboursements entre amis** : la personne vient de la règle (Lancelot Simon) ou, à défaut, du nom de la contrepartie. Solde net = somme des flux (positif = tu as reçu plus que versé).
-34. **Objectifs de départ par cycle** (inventés, à ajuster ⚙️) : Courses 150 €, Restos 80 €, Cantines 60 €, Sorties 60 €, Shopping 50 €, Livraison 40 €, Sport 40 €, Transport 30 €, Tabac 30 €.
+34. **Objectifs de départ par cycle** (V1, inventés ; en V2 les nouvelles installations n'ont aucun objectif par défaut ⚙️) : Courses 150 €, Restos 80 €, Cantines 60 €, Sorties 60 €, Shopping 50 €, Livraison 40 €, Sport 40 €, Transport 30 €, Tabac 30 €.
 
 ## Alertes ⚙️
 
@@ -60,10 +60,32 @@ Tout ce qui est marqué ⚙️ est modifiable dans l'app.
 
 ## Interface et technique
 
-40. **Thème sombre uniquement** (pas de thème clair).
+40. ~~Thème sombre uniquement~~ → remplacé en V2 par les 8 thèmes Lumen (voir 47).
 41. **iPhone** : la page de retour de banque ne consomme pas le code d'autorisation si elle s'ouvre hors du contexte qui a lancé la connexion (Safari au lieu de l'app installée). Elle propose de copier le lien à coller dans l'app.
 42. **Sauvegarde JSON** : remplace toute la base à l'import, conserve le mot de passe du relais de l'appareil, refuse les montants non entiers.
 43. **Déploiement non testé** : les fonctions Vercel (`api/eb.ts`) et Netlify (`netlify/functions/eb.ts`) sont écrites d'après la documentation de ces plateformes. Le même code de relais tourne et est testé localement via `vite dev` / `vite preview`. Les imports `../server/bridge.js` (extension `.js` vers un fichier `.ts`) suivent la convention ESM de Vercel.
 44. **Captures d'écran** : Chrome sous WSL n'a pas de police emoji, d'où les carrés vides à la place des icônes de catégorie sur les captures. Sur téléphone, les emoji s'affichent normalement.
 45. **Versions figées** sur des versions éprouvées (React 18, Vite 5, Tailwind 3, Dexie 4, Recharts 2, Vitest 2) plutôt que les toutes dernières majeures.
 46. **PapaParse** (demandé pour le CSV) n'est plus utilisé, faute d'import CSV.
+
+## V2 : design Lumen, personnalisation, patrimoine (détails dans V2.md)
+
+47. **Lumen porté de React Native vers le web** à partir du code de MyPerfV2 : mêmes palettes (Nuit et Perle à l'identique, 6 thèmes dérivés d'une graine), mêmes niveaux de verre, mêmes ressorts (framer-motion avec les constantes de Reanimated), même typographie (Sora / Inter embarquées). Thème par défaut : **Nuit** ; « Suivre le téléphone » désactivé par défaut ⚙️.
+48. **Flou réel** seulement sur la barre d'onglets, la barre condensée, les feuilles et les toasts ; ailleurs, et sur Android ou sans `backdrop-filter`, le verre est simulé (remplissage plus dense). Sur Android, les halos du fond ne dérivent pas et les blocs n'apparaissent pas en fondu, pour la fluidité.
+49. **Plafond du grossissement des polices** : tailles en `min(rem, px)`, ce qui suit la taille de police du navigateur jusqu'à ×1,3 (×1,2 pour les étiquettes et contrôles). Le Dynamic Type d'iOS ne s'applique pas aux pages web.
+50. **Retour haptique** = Vibration API (Android). Safari iOS n'en expose pas : pas de vibration sur iPhone.
+51. **Suppressions** : jamais de popup ; toast « Annuler » pendant 6 s. La déconnexion d'une banque (irréversible côté banque) n'est envoyée qu'à la disparition du toast.
+52. **Nom de l'app : « MyFinances »** (constante `APP_NAME`), dans la lignée de MyPerf. La base IndexedDB garde son nom `budget-dodge` pour conserver les données de la V1.
+53. **Migration v1 → v2** : salaire, APL et prime d'activité → lignes de revenus (jour = jour de paie pour le salaire, le 5 pour les aides) ; charges fixes → une ligne « Charges fixes » sans jour ; investissement → épargne en mode « montant fixe » ; nom → titulaire. Une base v1 est considérée comme déjà configurée (pas d'accueil).
+54. **Règles par défaut génériques** : enseignes nationales françaises. Lydia / Wero / Paylib sont classés « Entre amis » par défaut (c'est leur usage le plus courant), avec la contrepartie comme personne. Les règles personnelles de la V1 ne sont plus livrées, mais restent dans une base existante.
+55. **Épargne prévue en mode auto** = somme des plans d'investissement actifs (ramenés au mois : 52 semaines / 12) + contributions mensuelles des objectifs cochés « compter dans le budget ». Elle est retirée de l'enveloppe.
+56. **Placements** : PRU = prix de revient moyen pondéré (une vente retire du capital investi au PRU), comme les courtiers français. Une ligne sans cours est comptée à son prix de revient dans les totaux (signalé à l'écran).
+57. **Plans programmés** : chaque échéance passée crée un achat du montant prévu ; la quantité est estimée au dernier cours connu et marquée « estimé ». Un nouveau plan n'est jamais rétroactif. Rattrapage limité à 400 jours.
+58. **Cours** : Yahoo Finance `v8/finance/chart` et `v1/finance/search` (non officiels, sans clé), CoinGecko `simple/price` et `search` (publics). Conversion en euros au taux Yahoo du jour ; les cotations en pence (GBp) sont divisées par 100. Mise à jour au plus toutes les 6 h à l'ouverture, ou à la demande.
+59. **Trade Republic / Bitstack** : pas d'API publique pour les particuliers (vérifié) ; suivi par saisie des positions + plans programmés + cours automatiques. Si Trade Republic apparaît dans la liste Enable Banking de ton pays, son compte espèces peut aussi être connecté comme une banque.
+60. **Historique du patrimoine** : une photo par jour (à l'ouverture et à chaque modification). Avant la première, estimation = solde bancaire reconstitué à rebours + capital investi à la date + biens − dettes actuels, signalée « estimée ».
+61. **Récurrences** : même commerçant (libellé normalisé sans chiffres ni mots bancaires, 3 premiers mots), au moins 3 échéances (2 si mensuel au montant identique, 4 si hebdomadaire), 75 % des intervalles dans la plage de la cadence, montants à ±30 % (±40 % pour un revenu). « Abonnement » = catégorie Abonnements, ou petit montant (≤ 100 €) identique chaque mois hors logement et épargne. Hausse de prix = dernier montant différent d'un montant des 3 échéances précédentes (≥ 0,50 € et ≥ 2 %).
+62. **Prévision de trésorerie** : comptes courants visibles (pas l'épargne) ; récurrences détectées actives, hors dépenses courantes (déjà dans la moyenne quotidienne) ; puis lignes de réglages avec un jour, si aucune récurrence de montant proche (±10 %) au même jour (±5) ne les représente déjà ; puis plans programmés, sauf si un versement récurrent vers l'épargne du même montant existe. Dépense courante = moyenne des 8 dernières semaines. Horizon par défaut : veille de la prochaine paie.
+63. **Indépendance financière** : capital actuel = placements + comptes épargne ; capital visé = dépenses annuelles ÷ taux de retrait (4 %) ; rendement 5 %, inflation 2 % ⚙️ ; dépenses = 12 derniers mois ramenés à l'année (au moins 60 jours d'historique), sinon (charges fixes + enveloppe) × 12.
+64. **Objectifs** : versement nécessaire = reste ÷ mois restants (au moins 1) ; l'objectif passe en or (« atteint ») quand le montant est atteint, l'orbe s'allume au versement qui le complète.
+65. **Démo** : personne fictive « Camille Martin » ; ses réglages ne s'appliquent que si aucun revenu ni charge n'est saisi, et sont retirés avec la démo.
