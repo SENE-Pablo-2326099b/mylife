@@ -2,30 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Lumen sur le web. Les variables de couleur sont posées sur <html> par le thème (src/ui/ThemeProvider.tsx).
+ * Valeurs de secours = thème Nuit, pour la toute première image avant le JavaScript.
+ */
 :root {
   color-scheme: dark;
-  --bg: 17 17 16;
-  --surface: 26 26 25;
-  --raised: 36 36 34;
-  --line: 52 52 48;
-  --ink: 240 239 236;
-  --muted: 168 167 158;
-  --accent: 87 152 231;
-  --good: 61 201 125;
-  --warn: 240 165 40;
-  --bad: 240 104 104;
+  --bg: #0b0719;
+  --text: #f6f3ff;
+  --field-0: #130c2a;
+  --field-1: #0b0719;
+  --field-2: #07050f;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-html,
-body {
-  background: rgb(var(--bg));
-  color: rgb(var(--ink));
-  -webkit-tap-highlight-color: transparent;
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--bg);
 }
 
 body {
   min-height: 100dvh;
-  font-feature-settings: 'tnum' 1;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: min(0.9375rem, 19.5px);
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 
 .num {
@@ -33,17 +48,8 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid rgb(var(--accent));
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
-  border-radius: 6px;
-}
-
-.pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom), 0.5rem);
-}
-
-.pt-safe {
-  padding-top: env(safe-area-inset-top);
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -52,9 +58,325 @@ input[type='number']::-webkit-outer-spin-button {
   margin: 0;
 }
 
+::selection {
+  background: var(--accent-soft);
+}
+
+/* ------------------------------------------------------------------ Verre */
+
+/*
+ * Une plaque de verre : remplissage translucide + reflet en haut + lavis de teinte (option) +
+ * bord fin + liseré spéculaire (ombre interne d'1 px) + ombre portée. Le vrai flou n'est utilisé
+ * que pour float / lens ; ailleurs (et sur Android) le verre est simulé par un remplissage plus dense.
+ */
+.glass {
+  --g-fill: var(--glass-pane-fill);
+  --g-sheen0: var(--glass-pane-sheen0);
+  --g-sheen1: var(--glass-pane-sheen1);
+  --g-rim: var(--glass-pane-rim);
+  --g-spec: var(--glass-pane-spec);
+  --g-shadow: var(--glass-pane-shadow);
+  --g-wash0: transparent;
+  --g-wash1: transparent;
+  --g-glow: 0 0 0 transparent;
+  position: relative;
+  background:
+    linear-gradient(135deg, var(--g-wash0), var(--g-wash1)),
+    linear-gradient(180deg, var(--g-sheen0) 0%, var(--g-sheen1) 60%),
+    linear-gradient(var(--g-fill), var(--g-fill));
+  border: 1px solid var(--g-rim);
+  box-shadow:
+    inset 0 1px 0 var(--g-spec),
+    var(--g-shadow),
+    var(--g-glow);
+}
+.glass-raised {
+  --g-fill: var(--glass-raised-fill);
+  --g-sheen0: var(--glass-raised-sheen0);
+  --g-sheen1: var(--glass-raised-sheen1);
+  --g-rim: var(--glass-raised-rim);
+  --g-spec: var(--glass-raised-spec);
+  --g-shadow: var(--glass-raised-shadow);
+}
+.glass-float {
+  --g-fill: var(--glass-float-fill);
+  --g-sheen0: var(--glass-float-sheen0);
+  --g-sheen1: var(--glass-float-sheen1);
+  --g-rim: var(--glass-float-rim);
+  --g-spec: var(--glass-float-spec);
+  --g-shadow: var(--glass-float-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-float-blur)) saturate(170%);
+  backdrop-filter: blur(var(--glass-float-blur)) saturate(170%);
+}
+.glass-lens {
+  --g-fill: var(--glass-lens-fill);
+  --g-sheen0: var(--glass-lens-sheen0);
+  --g-sheen1: var(--glass-lens-sheen1);
+  --g-rim: var(--glass-lens-rim);
+  --g-spec: var(--glass-lens-spec);
+  --g-shadow: var(--glass-lens-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-lens-blur)) saturate(170%);
+  backdrop-filter: blur(var(--glass-lens-blur)) saturate(170%);
+}
+/* Sans flou réel (Android, ou navigateur sans backdrop-filter) : verre dense. */
+.no-live-blur .glass-float {
+  --g-fill: var(--glass-float-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.no-live-blur .glass-lens {
+  --g-fill: var(--glass-lens-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.glass-solid {
+  --g-fill: var(--glass-raised-solid);
+}
+/* Android : pas d'ombre floue sur les plaques répétées (cartes, lignes), seulement sur ce qui flotte. */
+.android .glass:not(.glass-float):not(.glass-lens) {
+  box-shadow: inset 0 1px 0 var(--g-spec), var(--g-glow);
+}
+
+.tone-accent {
+  --g-wash0: var(--accent-wash0);
+  --g-wash1: var(--accent-wash1);
+  --g-rim: var(--accent-rim);
+}
+.tone-gold {
+  --g-wash0: var(--gold-wash0);
+  --g-wash1: var(--gold-wash1);
+  --g-rim: var(--gold-rim);
+}
+.tone-success {
+  --g-wash0: var(--success-wash0);
+  --g-wash1: var(--success-wash1);
+  --g-rim: var(--success-rim);
+}
+.tone-danger {
+  --g-wash0: var(--danger-wash0);
+  --g-wash1: var(--danger-wash1);
+  --g-rim: var(--danger-rim);
+}
+.tone-warning {
+  --g-wash0: var(--warning-wash0);
+  --g-wash1: var(--warning-wash1);
+  --g-rim: var(--warning-rim);
+}
+.tone-info {
+  --g-wash0: var(--info-wash0);
+  --g-wash1: var(--info-wash1);
+  --g-rim: var(--info-rim);
+}
+/* Il émet de la lumière : actif, principal. */
+.glass-glow {
+  --g-rim: var(--accent-rim-strong);
+  --g-glow: 0 0 32px var(--accent-glow);
+}
+
+/* ------------------------------------------------------------------ Lumière liquide (boutons principaux) */
+
+.liquid {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(135deg, var(--accent-g0), var(--accent-g1));
+  color: var(--on-accent);
+  box-shadow:
+    0 10px 28px var(--accent-glow),
+    inset 0 1px 0 var(--highlight);
+}
+.liquid-gold {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(135deg, var(--gold-g0), var(--gold-g1));
+}
+.bead {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-rim);
+  box-shadow:
+    0 0 22px var(--accent-glow),
+    inset 0 1px 0 var(--highlight);
+}
+.etched {
+  background: var(--well);
+  border: 1px solid var(--glass-pane-rim);
+  box-shadow: inset 0 1px 3px var(--well-shade);
+}
+
+/* Survol (pointeur fin) : la surface s'éclaire. */
+.hl {
+  position: relative;
+}
+.hl::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--surface-pressed);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease-out;
+}
+@media (hover: hover) {
+  .hl:hover::after {
+    opacity: 1;
+  }
+}
+.hl:active::after {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ Champ de lumière */
+
+.halo-drift {
+  animation: halo-drift var(--period, 24s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes halo-drift {
+  0% {
+    transform: translate3d(calc(var(--drift) * 0.84), calc(var(--drift) * 0.54), 0) scale(1);
+  }
+  25% {
+    transform: translate3d(calc(var(--drift) * 0.1), calc(var(--drift) * -0.99), 0) scale(1.03);
+  }
+  50% {
+    transform: translate3d(calc(var(--drift) * -0.91), calc(var(--drift) * -0.41), 0) scale(1.06);
+  }
+  75% {
+    transform: translate3d(calc(var(--drift) * -0.28), calc(var(--drift) * 0.96), 0) scale(1.09);
+  }
+  100% {
+    transform: translate3d(calc(var(--drift) * 0.66), calc(var(--drift) * 0.75), 0) scale(1.12);
+  }
+}
+
+/* Balayage lumineux des squelettes. */
+.shimmer {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-alt);
+}
+.shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--shine), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* Point vivant (synchro en cours). */
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: inherit;
+  animation: live 1.8s ease-in-out infinite;
+}
+@keyframes live {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.pt-safe {
+  padding-top: var(--safe-top);
+}
+.pb-safe {
+  padding-bottom: max(var(--safe-bottom), 8px);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
+  .halo-drift,
+  .shimmer::after,
+  .live-dot::before {
     animation: none !important;
   }
+}
+.reduce-motion .halo-drift,
+.reduce-motion .shimmer::after,
+.reduce-motion .live-dot::before {
+  animation: none !important;
+}
+
+/* ------------------------------------------------------------------ Champs */
+
+@layer components {
+  .field-input {
+    width: 100%;
+    min-height: 50px;
+    border-radius: 16px;
+    background: var(--glass-pane-fill);
+    border: 1px solid var(--glass-pane-rim);
+    box-shadow: inset 0 1px 0 var(--glass-pane-spec);
+    padding: 0 14px;
+    color: var(--text);
+    font-weight: 500;
+    font-size: min(0.9375rem, 19.5px);
+    outline: none;
+    transition:
+      border-color 0.18s ease-out,
+      box-shadow 0.18s ease-out;
+  }
+  .field-input::placeholder {
+    color: var(--text-muted);
+  }
+  .field-input:focus,
+  .field-input:focus-visible {
+    border-color: var(--accent-rim-strong);
+    box-shadow:
+      0 0 0 4px var(--accent-soft),
+      inset 0 1px 0 var(--glass-pane-spec);
+    outline: none;
+  }
+  .field-input[aria-invalid='true'] {
+    border-color: var(--danger-rim-strong);
+  }
+  select.field-input {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 40px;
+    cursor: pointer;
+  }
+  select.field-input option {
+    background: var(--bg);
+    color: var(--text);
+  }
+  textarea.field-input {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    min-height: 88px;
+  }
+}
+
+/* Android : halos figés (la dérive redessine tout l'écran sous chaque couche de verre). */
+.android .halo-drift {
+  animation: none !important;
 }
