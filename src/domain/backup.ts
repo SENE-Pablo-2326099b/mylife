@@ -3,7 +3,8 @@ import { ensureSeeded } from '../db/seed';
 import type { Settings } from '../db/types';
 
 export const BACKUP_FORMAT = 'budget-dodge-backup';
-export const BACKUP_VERSION = 1;
+/** v2 : patrimoine, objectifs, récurrences. Les sauvegardes v1 restent lisibles (réglages migrés à l'import). */
+export const BACKUP_VERSION = 2;
 
 export interface Backup {
   format: typeof BACKUP_FORMAT;
@@ -28,7 +29,7 @@ export class BackupError extends Error {}
 export function validateBackup(data: unknown): Backup {
   if (!data || typeof data !== 'object') throw new BackupError('Fichier illisible : ce n’est pas un objet JSON.');
   const b = data as Partial<Backup>;
-  if (b.format !== BACKUP_FORMAT) throw new BackupError('Ce fichier n’est pas une sauvegarde Budget Dodge.');
+  if (b.format !== BACKUP_FORMAT) throw new BackupError('Ce fichier n’est pas une sauvegarde MyFinances (ni Budget Dodge).');
   if (typeof b.version !== 'number' || b.version > BACKUP_VERSION) throw new BackupError('Sauvegarde créée par une version plus récente de l’app.');
   if (!b.tables || typeof b.tables !== 'object') throw new BackupError('Sauvegarde incomplète.');
   for (const name of TABLE_NAMES) {
@@ -71,5 +72,5 @@ export async function wipeAll(database: BudgetDB = db): Promise<void> {
 
 export function backupFileName(now = new Date()): string {
   const d = now.toISOString().slice(0, 10);
-  return `budget-dodge-${d}.json`;
+  return `myfinances-${d}.json`;
 }

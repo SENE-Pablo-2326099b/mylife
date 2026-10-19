@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { classifyBatch } from '../src/domain/classify';
-import { buildDefaultRules, CAT } from '../src/domain/defaults';
+import { CAT } from '../src/domain/defaults';
+import { PROFILE_RULES } from './profile';
 import { pairTransfers } from '../src/domain/transfers';
 import { tx } from './helpers';
 
-const rules = buildDefaultRules('PABLO SENE');
+const rules = PROFILE_RULES;
 const ctx = { rules, ownIbans: new Set(['FR7630004000031234567890143', 'FR7628233000011234567890123']) };
 
 describe('transferts internes', () => {
@@ -62,6 +63,12 @@ describe('classifyBatch', () => {
     const t = tx({ id: '1', amount: 2000, date: '2026-10-12', label: 'M LANCELOT SIMON', counterparty: 'M LANCELOT SIMON' });
     const [out] = classifyBatch([t], [t], ctx);
     expect(out).toMatchObject({ categoryId: CAT.remboursements, person: 'Lancelot Simon', categorySource: 'rule' });
+  });
+
+  it('Lydia / Wero : entre amis, avec le nom de la contrepartie', () => {
+    const t = tx({ id: '1', amount: -1500, date: '2026-10-12', label: 'Lydia Julie B', counterparty: 'Julie B', rawText: 'LYDIA Julie B' });
+    const [out] = classifyBatch([t], [t], ctx);
+    expect(out).toMatchObject({ categoryId: CAT.remboursements, person: 'Julie B' });
   });
 
   it('n’émet que les opérations modifiées', () => {

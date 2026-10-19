@@ -1,94 +1,62 @@
-import { Link } from 'react-router-dom';
-import { IconChevron } from '../components/icons';
-import { Card, MoneyField, NumberField, PageTitle, Money, Field, inputClass } from '../components/ui';
-import { updateSettings } from '../db/seed';
-import { computeEnvelope, defaultEnvelope, totalIncome } from '../domain/defaults';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../db/db';
+import { computeEnvelope, totalIncome } from '../domain/defaults';
 import { useSettings } from '../hooks';
+import { APP_NAME } from '../lib/app';
+import { formatCents } from '../lib/money';
+import { themeInfo, isThemeId } from '../ui/themes';
+import { Card, Group, Icon, Reveal, Row, SectionTitle } from '../ui/index';
+import { Screen } from '../ui/Screen';
 
 export default function SettingsPage() {
   const s = useSettings();
-  const save = (patch: Parameters<typeof updateSettings>[0]) => void updateSettings(patch);
-  const envelope = computeEnvelope(s);
+  const counts = useLiveQuery(async () => ({ banks: await db.connections.where('status').equals('active').count(), rules: await db.rules.count(), cats: await db.categories.count() }), []);
+  const theme = themeInfo(isThemeId(s.theme) ? s.theme : 'nuit');
+  const initial = (s.firstName.trim()[0] ?? '').toUpperCase();
 
   return (
-    <div className="space-y-4">
-      <PageTitle>Réglages</PageTitle>
-
-      <nav aria-label="Sections des réglages" className="overflow-hidden rounded-2xl border border-line/60 bg-surface">
-        {[
-          ['/reglages/categories', '🏷️', 'Catégories et objectifs', 'Types, objectifs par cycle, part nourriture'],
-          ['/reglages/regles', '🧭', 'Règles de classement', 'Commerçants, mots-clés, regex'],
-          ['/reglages/alertes', '🔔', 'Alertes d’optimisation', 'Seuils et règles d’alerte'],
-          ['/synchro', '🏦', 'Connexion bancaire', 'Enable Banking, BNP, Revolut'],
-          ['/reglages/donnees', '💾', 'Sauvegarde et données', 'Export / import JSON, démo, effacement'],
-        ].map(([to, emoji, title, sub]) => (
-          <Link key={to} to={to} className="flex min-h-[60px] items-center gap-3 border-b border-line/60 px-4 py-2 last:border-b-0 hover:bg-raised">
-            <span aria-hidden className="text-xl">
-              {emoji}
+    <Screen title="Réglages" kicker="Ton app, à ta façon" mood="settings">
+      <Reveal index={0}>
+        <Card to="/reglages/profil" level="raised" className="flex items-center gap-3">
+          <span className="liquid flex h-12 w-12 shrink-0 items-center justify-center rounded-full font-display text-[20px] font-bold">{initial || <Icon name="person" size={22} />}</span>
+          <span className="min-w-0 flex-1">
+            <span className="t-headline block truncate">{s.firstName.trim() || 'Ton profil'}</span>
+            <span className="t-small block truncate text-secondary">
+              {s.holderNames.length ? `Titulaire : ${s.holderNames.join(', ')}` : 'Prénom, noms sur tes virements'}
             </span>
-            <span className="flex-1">
-              <span className="block font-medium">{title}</span>
-              <span className="block text-xs text-muted">{sub}</span>
-            </span>
-            <IconChevron size={18} className="text-muted" />
-          </Link>
-        ))}
-      </nav>
+          </span>
+          <Icon name="chevron-forward" size={17} className="text-muted" />
+        </Card>
+      </Reveal>
 
-      <Card title="Cycle budgétaire">
-        <NumberField
-          label="Jour de paie"
-          min={1}
-          max={31}
-          value={s.payday}
-          onCommit={(payday) => save({ payday })}
-          hint={`Le cycle va du ${s.payday} au ${s.payday === 1 ? 'dernier jour du mois' : s.payday - 1 + ' du mois suivant'}. Si le jour n’existe pas (ex. 31 février), le dernier jour du mois est utilisé.`}
-        />
-      </Card>
+      <Reveal index={1}>
+        <SectionTitle>Budget</SectionTitle>
+        <Group>
+          <Row icon="cash" title="Revenus, charges et épargne" subtitle={`Paie le ${s.payday} · ${formatCents(totalIncome(s), { compact: true })} de revenus · enveloppe ${formatCents(computeEnvelope(s), { compact: true })}`} to="/reglages/budget" />
+          <Row icon="tag" title="Catégories et objectifs" subtitle={`${counts?.cats ?? '…'} catégories`} to="/reglages/categories" />
+          <Row icon="rules" title="Règles de classement" subtitle={`${counts?.rules ?? '…'} règles · commerçants, mots-clés`} to="/reglages/regles" />
+          <Row icon="bell" title="Alertes" subtitle="Seuils et règles d’alerte" to="/reglages/alertes" />
+        </Group>
+      </Reveal>
 
-      <Card title="Revenus et enveloppe">
-        <div className="grid grid-cols-2 gap-3">
-          <MoneyField label="Salaire net" value={s.salary} onCommit={(v) => save({ salary: v ?? 0 })} />
-          <MoneyField label="APL" value={s.apl} onCommit={(v) => save({ apl: v ?? 0 })} />
-          <MoneyField label="Prime d’activité" value={s.activityBonus} onCommit={(v) => save({ activityBonus: v ?? 0 })} hint="Optionnelle" />
-          <MoneyField label="Charges fixes" value={s.fixedCharges} onCommit={(v) => save({ fixedCharges: v ?? 0 })} hint="Loyer, abonnements…" />
-          <MoneyField label="Épargne / investissement" value={s.investment} onCommit={(v) => save({ investment: v ?? 0 })} />
-          <MoneyField
-            label="Enveloppe vie courante"
-            value={s.envelopeOverride}
-            allowEmpty
-            placeholder={String(defaultEnvelope(s) / 100).replace('.', ',')}
-            onCommit={(v) => save({ envelopeOverride: v })}
-            hint="Vide = calculée automatiquement"
-          />
-        </div>
-        <dl className="mt-4 space-y-1 rounded-xl bg-raised p-3 text-sm">
-          <div className="flex justify-between">
-            <dt className="text-muted">Revenus du cycle</dt>
-            <dd><Money cents={totalIncome(s)} /></dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">− Charges fixes</dt>
-            <dd><Money cents={-s.fixedCharges} /></dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">− Épargne / investissement</dt>
-            <dd><Money cents={-s.investment} /></dd>
-          </div>
-          <div className="flex justify-between border-t border-line pt-1 font-semibold">
-            <dt>Enveloppe vie courante {s.envelopeOverride !== null && <span className="font-normal text-muted">(manuelle)</span>}</dt>
-            <dd><Money cents={envelope} /></dd>
-          </div>
-        </dl>
-      </Card>
+      <Reveal index={2}>
+        <SectionTitle>Comptes</SectionTitle>
+        <Group>
+          <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
+          <Row icon="diamond" title="Patrimoine et placements" subtitle="Portefeuilles, objectifs, autres actifs" to="/patrimoine" />
+        </Group>
+      </Reveal>
 
-      <Card title="Identité">
-        <Field label="Ton nom tel qu’il apparaît sur les virements" hint="Sert à reconnaître les virements entre tes propres comptes (BNP → Revolut).">
-          {(id) => (
-            <input id={id} className={inputClass} defaultValue={s.ownerName} onBlur={(e) => e.target.value !== s.ownerName && save({ ownerName: e.target.value.trim() })} />
-          )}
-        </Field>
-      </Card>
-    </div>
+      <Reveal index={3}>
+        <SectionTitle>App</SectionTitle>
+        <Group>
+          <Row icon="palette" title="Apparence" subtitle={`${theme.name}${s.followSystem ? ' · suit le téléphone' : ''}`} to="/reglages/apparence" />
+          <Row icon="shield" title="Sauvegarde et données" subtitle="Export, import, démo, effacement" to="/reglages/donnees" />
+        </Group>
+        <p className="t-caption mt-6 text-center text-muted">
+          {APP_NAME} · tes données restent sur cet appareil. Aucune publicité, aucun traceur.
+        </p>
+      </Reveal>
+    </Screen>
   );
 }

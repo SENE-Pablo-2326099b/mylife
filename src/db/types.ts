@@ -101,7 +101,13 @@ export interface Account {
   lastSyncError: string | null;
   /** Masquer le compte dans les statistiques. */
   hidden: boolean;
+  /** Compte courant, épargne… (cash_account_type Enable Banking). */
+  kind?: AccountKind;
+  /** Nom donné par l'utilisateur. */
+  nickname?: string | null;
 }
+
+export type AccountKind = 'current' | 'savings' | 'card' | 'other';
 
 export type ConnectionStatus = 'active' | 'expired' | 'revoked' | 'error';
 
@@ -124,25 +130,187 @@ export interface AlertSettings {
   categoryTarget: { enabled: boolean; warnPercent: number };
 }
 
+/** Une ligne de budget mensuelle (revenu ou charge fixe), saisie par l'utilisateur. */
+export interface BudgetLine {
+  id: string;
+  label: string;
+  /** Montant mensuel positif, en centimes. */
+  amount: number;
+  /** Jour du mois où il tombe (1-31), null = inconnu. Sert aux prévisions de trésorerie. */
+  day: number | null;
+}
+
+/** Hypothèses de la projection d'indépendance financière (en points de base : 500 = 5 %). */
+export interface FireSettings {
+  annualReturnBp: number;
+  inflationBp: number;
+  /** Taux de retrait soutenable (règle des 4 % = 400). */
+  withdrawalBp: number;
+  /** Dépenses annuelles visées (null = estimées à partir des dépenses réelles). */
+  annualSpendingOverride: number | null;
+}
+
 export interface Settings {
   id: 'main';
+  /** Prénom affiché (facultatif). */
+  firstName: string;
+  /** Noms des titulaires tels qu'ils apparaissent sur les virements (détection des transferts internes). */
+  holderNames: string[];
+  /** L'accueil (premier lancement) a été fait. */
+  onboarded: boolean;
+  /** Jour de paie : début du cycle budgétaire. */
   payday: number;
-  salary: number;
-  apl: number;
-  activityBonus: number;
-  fixedCharges: number;
-  investment: number;
+  incomes: BudgetLine[];
+  fixedCharges: BudgetLine[];
+  /** Épargne / investissement mensuel prévu : calculé (plans + objectifs) ou saisi. */
+  savings: { mode: 'auto' | 'manual'; manual: number };
+  /** Somme mensuelle des plans d'investissement actifs et des objectifs (tenue à jour par l'app). */
+  plannedSavingsAuto: number;
   /** Enveloppe vie courante saisie à la main (null = calculée). */
   envelopeOverride: number | null;
-  /** Nom du titulaire tel qu'il apparaît dans les virements (détection des transferts internes). */
-  ownerName: string;
   alerts: AlertSettings;
-  /** Mot de passe du relais Enable Banking (stocké uniquement sur l'appareil). */
+  /** Mot de passe du relais (stocké uniquement sur l'appareil). */
   bridgePassword: string;
   /** Nombre de jours récupérés lors de la première synchro d'un compte. */
   initialSyncDays: number;
   /** Synchro automatique à l'ouverture si la dernière date de plus de N heures (0 = jamais). */
   autoSyncHours: number;
+  /** Pays des banques proposées (code ISO). */
+  bankCountry: string;
+  /** Apparence : thème Lumen (voir src/ui/themes.ts), suivi du mode clair / sombre du téléphone. */
+  theme: string;
+  followSystem: boolean;
+  haptics: boolean;
+  reduceMotion: boolean;
+  fire: FireSettings;
+}
+
+// ---------------------------------------------------------------- patrimoine
+
+export type PortfolioKind = 'broker' | 'crypto' | 'savings' | 'retirement' | 'other';
+
+/** Un portefeuille / une enveloppe de placement (Trade Republic CTO, PEA, Bitstack, Livret A…). */
+export interface Portfolio {
+  id: string;
+  name: string;
+  /** Établissement (texte libre) : aussi utilisé pour reconnaître les virements vers ce placement. */
+  provider: string;
+  kind: PortfolioKind;
+  /** Enveloppe fiscale (CTO, PEA, AV, PER, livret…), texte libre. */
+  wrapper: string;
+  order: number;
+  createdAt: number;
+}
+
+export type AssetClass = 'etf' | 'stock' | 'crypto' | 'bond' | 'fund' | 'cash' | 'other';
+export type QuoteSource = 'yahoo' | 'coingecko' | 'manual';
+
+/** Une ligne d'un portefeuille. Quantité et coût viennent des mouvements (InvestmentOp). */
+export interface Holding {
+  id: string;
+  portfolioId: string;
+  name: string;
+  assetClass: AssetClass;
+  /** Symbole du cours : ticker Yahoo (CW8.PA) ou identifiant CoinGecko (bitcoin). */
+  symbol: string | null;
+  quoteSource: QuoteSource;
+  isin: string | null;
+  /** Dernier cours unitaire connu, en centimes (peut avoir des décimales pour les très petits prix). */
+  price: number | null;
+  priceAt: number | null;
+  order: number;
+  createdAt: number;
+}
+
+export type InvestmentOpType = 'buy' | 'sell' | 'dividend' | 'fee' | 'interest';
+
+export interface InvestmentOp {
+  id: string;
+  holdingId: string;
+  date: string;
+  type: InvestmentOpType;
+  /** Quantité (parts, BTC…). 0 pour dividendes, frais, intérêts. */
+  quantity: number;
+  /** Montant en centimes, positif (achat = sorti de ta poche ; vente / dividende = reçu). */
+  amount: number;
+  /** Généré par un plan d'investissement programmé. */
+  planId: string | null;
+  /** Quantité estimée au dernier cours connu (plan exécuté sans cours exact) : à vérifier. */
+  estimated: boolean;
+  note: string;
+  createdAt: number;
+}
+
+export type PlanFrequency = 'weekly' | 'biweekly' | 'monthly';
+
+/** Investissement programmé (DCA) : Trade Republic « plan d'épargne », Bitstack récurrent… */
+export interface InvestmentPlan {
+  id: string;
+  holdingId: string;
+  amount: number;
+  frequency: PlanFrequency;
+  /** Mensuel : jour du mois (1-31) ; hebdo : jour de la semaine (0 = dimanche). */
+  day: number;
+  startDate: string;
+  active: boolean;
+  /** Dernière échéance enregistrée (les suivantes sont créées au lancement de l'app). */
+  lastRunDate: string | null;
+  createdAt: number;
+}
+
+/** Objectif d'épargne : un montant, une date, une contribution mensuelle. */
+export interface Goal {
+  id: string;
+  name: string;
+  emoji: string;
+  target: number;
+  deadline: string | null;
+  /** Contribution mensuelle prévue (comptée dans l'épargne du budget si includeInBudget). */
+  monthly: number;
+  includeInBudget: boolean;
+  /** Suivi : versements saisis, ou solde d'un compte / valeur d'un portefeuille. */
+  linkKind: 'manual' | 'account' | 'portfolio';
+  linkId: string | null;
+  achievedAt: number | null;
+  order: number;
+  createdAt: number;
+}
+
+export interface GoalMove {
+  id: string;
+  goalId: string;
+  date: string;
+  /** Positif = versement, négatif = retrait. */
+  amount: number;
+  note: string;
+  createdAt: number;
+}
+
+/** Autre actif (immobilier, véhicule…) ou dette (prêt étudiant, crédit…), valeur saisie. */
+export interface ManualAsset {
+  id: string;
+  name: string;
+  kind: 'asset' | 'debt';
+  emoji: string;
+  value: number;
+  updatedAt: number;
+}
+
+/** Photo quotidienne du patrimoine (historique). */
+export interface Snapshot {
+  date: string;
+  cash: number;
+  investments: number;
+  invested: number;
+  other: number;
+  debts: number;
+}
+
+/** Choix de l'utilisateur sur une récurrence détectée. */
+export interface RecurringOverride {
+  key: string;
+  status: 'confirmed' | 'ignored';
+  label: string | null;
 }
 
 export interface MetaEntry {

@@ -1,16 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings } from '../src/db/types';
 import { computeDailyBudget, dailySeries, isVariable, overrunStreaks, spent, statusFor } from '../src/domain/budget';
-import { CAT, DEFAULT_CATEGORIES, DEFAULT_SETTINGS, computeEnvelope } from '../src/domain/defaults';
+import { CAT, DEFAULT_SETTINGS, computeEnvelope } from '../src/domain/defaults';
+import { PROFILE, PROFILE_CATEGORIES } from './profile';
 import { tx } from './helpers';
 
-const cats = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c]));
-const settings: Settings = { ...DEFAULT_SETTINGS };
+const cats = new Map(PROFILE_CATEGORIES.map((c) => [c.id, c]));
+const settings: Settings = { ...PROFILE };
 
 describe('enveloppe', () => {
   it('par défaut = revenus − charges fixes − investissement', () => {
     expect(computeEnvelope(settings)).toBe(153700 + 17000 - 35900 - 45000);
-    expect(computeEnvelope({ ...settings, activityBonus: 10000 })).toBe(99800);
+    expect(computeEnvelope({ ...settings, incomes: [...settings.incomes, { id: 'b', label: 'Prime', amount: 10000, day: null }] })).toBe(99800);
+    // Épargne calculée à partir des plans et objectifs
+    expect(computeEnvelope({ ...settings, savings: { mode: 'auto', manual: 45000 }, plannedSavingsAuto: 20000 })).toBe(153700 + 17000 - 35900 - 20000);
+    // Nouvel utilisateur : rien de saisi, enveloppe nulle
+    expect(computeEnvelope(DEFAULT_SETTINGS)).toBe(0);
     expect(computeEnvelope({ ...settings, envelopeOverride: 70000 })).toBe(70000);
   });
 });

@@ -1,20 +1,47 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link } from 'react-router-dom';
-import { Gauge, StatusPill } from '../components/Gauge';
 import { TxEditor } from '../components/TxEditor';
 import { TxRow } from '../components/TxRow';
-import { Card, EmptyState, Money } from '../components/ui';
 import { db, getMeta } from '../db/db';
 import type { Transaction } from '../db/types';
-import { computeDailyBudget, isVariable } from '../domain/budget';
+import { computeDailyBudget, isVariable, type Status } from '../domain/budget';
+import { useAlerts } from '../domain/useAlerts';
 import { useAccounts, useCategories, useCategoryMap, useSettings } from '../hooks';
 import { cycleFor, formatCycle, formatDay, todayISO } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { relativeTime } from '../lib/relative';
-import { useAlerts } from '../domain/useAlerts';
+import { useSyncState } from '../sync/store';
+import { Ring } from '../ui/charts';
+import { Icon } from '../ui/icons';
+import { Badge, Button, Card, EmptyState, Group, IconButton, Money, Reveal, SectionTitle, StatTile } from '../ui/index';
+import { Screen } from '../ui/Screen';
 
 const NO_TX: Transaction[] = [];
+
+const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'danger'; icon: 'check-circle' | 'warning' }> = {
+  good: { label: 'Dans le budget', tone: 'success', icon: 'check-circle' },
+  warn: { label: 'Presque atteint', tone: 'warning', icon: 'warning' },
+  bad: { label: 'Dépassé', tone: 'danger', icon: 'warning' },
+};
+
+/** Actions de l'en-tête des écrans principaux : alertes et synchro. */
+export function HeaderActions() {
+  const alerts = useAlerts();
+  const sync = useSyncState();
+  const serious = alerts.filter((a) => a.level !== 'info').length;
+  return (
+    <>
+      <IconButton
+        icon="bell"
+        label={serious ? `Alertes (${serious})` : 'Alertes'}
+        to="/alertes"
+        glass
+        badge={serious > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full" style={{ background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }} /> : undefined}
+      />
+      <IconButton icon="sync" label="Synchronisation bancaire" to="/synchro" glass className={sync.syncing ? '[&>svg]:animate-spin' : ''} />
+    </>
+  );
+}
 
 export default function TodayPage() {
   const settings = useSettings();
@@ -31,109 +58,114 @@ export default function TodayPage() {
   const [editing, setEditing] = useState<Transaction | null>(null);
 
   const b = useMemo(() => computeDailyBudget(txs, cats, settings, today), [txs, cats, settings, today]);
-  const todayTxs = txs.filter((t) => t.date === today).sort((a, b2) => a.amount - b2.amount);
+  const todayTxs = txs.filter((t) => t.date === today).sort((x, y) => x.amount - y.amount);
   const accMap = new Map(accounts.map((a) => [a.id, a]));
   const serious = alerts.filter((a) => a.level !== 'info');
+  const status = STATUS[b.status];
 
   if (total === 0) {
     return (
-      <div className="space-y-4 pt-4">
-        <h1 className="text-2xl font-bold">Bienvenue 👋</h1>
-        <EmptyState title="Aucune opération pour l’instant">
-          <p>Connecte BNP Paribas et Revolut via Enable Banking pour suivre tes dépenses au jour près.</p>
-          <div className="mt-4 flex flex-col gap-2">
-            <Link to="/synchro" className="rounded-xl bg-accent px-4 py-3 font-semibold text-black">
-              Connecter ma banque
-            </Link>
-            <Link to="/reglages/donnees" className="rounded-xl border border-line px-4 py-3">
-              Essayer avec des données de démo
-            </Link>
-          </div>
-        </EmptyState>
-      </div>
+      <Screen title="Bienvenue" kicker="Aujourd’hui" mood="today">
+        <Reveal>
+          <Card level="raised" glow>
+            <EmptyState
+              icon="sparkles"
+              title="Aucune opération pour l’instant"
+              body="Connecte ta banque via Enable Banking pour suivre tes dépenses au jour près, ou essaie l’app avec des données fictives."
+              action={
+                <>
+                  <Button to="/synchro" icon="bank">
+                    Connecter ma banque
+                  </Button>
+                  <Button to="/reglages/donnees" variant="secondary">
+                    Essayer la démo
+                  </Button>
+                </>
+              }
+            />
+          </Card>
+        </Reveal>
+      </Screen>
     );
   }
 
   const remaining = b.remainingToday;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-bold first-letter:uppercase">{formatDay(today)}</h1>
-        <span className="text-xs text-muted">synchro {relativeTime(lastSync)}</span>
-      </div>
-
-      <section aria-labelledby="reste" className="rounded-3xl border border-line/60 bg-surface p-5">
-        <Gauge percent={b.usedPercent} status={b.status}>
-          <span id="reste" className="text-sm text-muted">
-            {remaining >= 0 ? 'Reste aujourd’hui' : 'Dépassement'}
-          </span>
-          <span className={`num text-4xl font-bold tracking-tight ${remaining < 0 ? 'text-bad' : ''}`}>{formatCents(Math.abs(remaining))}</span>
-          <span className="mt-2">
-            <StatusPill status={b.status} />
-          </span>
-        </Gauge>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-center">
-          <div className="rounded-2xl bg-raised p-3">
-            <dt className="text-xs text-muted">Budget du jour</dt>
-            <dd className="num text-lg font-semibold">{formatCents(b.dailyBudget)}</dd>
+    <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />}>
+      <Reveal index={0}>
+        <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5">
+          <Ring value={b.usedPercent / 100} tone={status.tone} size={232} label={`${status.label} : ${b.usedPercent} % du budget du jour utilisé`}>
+            <span className="t-label text-muted">{remaining >= 0 ? 'Reste aujourd’hui' : 'Dépassement'}</span>
+            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${remaining < 0 ? 'text-danger' : ''}`}>{formatCents(Math.abs(remaining))}</span>
+            <span className="mt-2">
+              <Badge tone={status.tone} icon={status.icon}>
+                {status.label}
+              </Badge>
+            </span>
+          </Ring>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="t-label text-muted">Budget du jour</p>
+              <Money cents={b.dailyBudget} className="text-[18px]" />
+            </div>
+            <div>
+              <p className="t-label text-muted">Dépensé</p>
+              <Money cents={b.spentToday} className="text-[18px]" />
+            </div>
           </div>
-          <div className="rounded-2xl bg-raised p-3">
-            <dt className="text-xs text-muted">Dépensé aujourd’hui</dt>
-            <dd className="num text-lg font-semibold">{formatCents(b.spentToday)}</dd>
-          </div>
-        </dl>
-      </section>
+        </Card>
+      </Reveal>
 
-      <dl className="grid grid-cols-3 gap-2 text-center">
-        <div className="rounded-2xl border border-line/60 bg-surface p-3">
-          <dt className="text-[11px] text-muted">Reste du cycle</dt>
-          <dd className={`num font-semibold ${b.remainingCycle < 0 ? 'text-bad' : ''}`}>{formatCents(b.remainingCycle, { compact: true })}</dd>
-        </div>
-        <div className="rounded-2xl border border-line/60 bg-surface p-3">
-          <dt className="text-[11px] text-muted">Jours restants</dt>
-          <dd className="num font-semibold">{b.daysLeft}</dd>
-        </div>
-        <div className="rounded-2xl border border-line/60 bg-surface p-3">
-          <dt className="text-[11px] text-muted">Demain</dt>
-          <dd className="num font-semibold">{formatCents(b.nextDailyBudget, { compact: true })}/j</dd>
-        </div>
-      </dl>
+      <Reveal index={1} className="mt-3 grid grid-cols-3 gap-2">
+        <StatTile label="Reste du cycle" value={formatCents(b.remainingCycle, { short: true })} tone={b.remainingCycle < 0 ? 'danger' : undefined} to="/budget" />
+        <StatTile label="Jours restants" value={b.daysLeft} />
+        <StatTile label="Demain" value={formatCents(b.nextDailyBudget, { short: true })} hint="par jour" />
+      </Reveal>
 
-      {toClassify > 0 && (
-        <Link to="/a-classer" className="flex items-center justify-between rounded-2xl border border-warn/40 bg-warn/10 p-3 text-sm">
-          <span>
-            <strong>{toClassify}</strong> opération{toClassify > 1 ? 's' : ''} à classer
-          </span>
-          <span aria-hidden>→</span>
-        </Link>
-      )}
-      {serious.length > 0 && (
-        <Link to="/alertes" className="flex items-center justify-between rounded-2xl border border-bad/40 bg-bad/10 p-3 text-sm">
-          <span>
-            <strong>{serious.length}</strong> alerte{serious.length > 1 ? 's' : ''} : {serious[0].title}
-          </span>
-          <span aria-hidden>→</span>
-        </Link>
+      {(toClassify > 0 || serious.length > 0) && (
+        <Reveal index={2} className="mt-3 space-y-2">
+          {toClassify > 0 && (
+            <Card to="/a-classer" tone="warning" className="flex items-center gap-3">
+              <Icon name="tag" className="text-warning" />
+              <span className="t-body min-w-0 flex-1">
+                <strong className="font-semibold">{toClassify}</strong> opération{toClassify > 1 ? 's' : ''} à classer
+              </span>
+              <Icon name="chevron-forward" size={17} className="text-muted" />
+            </Card>
+          )}
+          {serious.length > 0 && (
+            <Card to="/alertes" tone="danger" className="flex items-center gap-3">
+              <Icon name="warning" className="text-danger" />
+              <span className="t-body min-w-0 flex-1 truncate">
+                <strong className="font-semibold">{serious.length}</strong> alerte{serious.length > 1 ? 's' : ''} · {serious[0]?.title}
+              </span>
+              <Icon name="chevron-forward" size={17} className="text-muted" />
+            </Card>
+          )}
+        </Reveal>
       )}
 
-      <Card title="Aujourd’hui" action={<span className="text-xs text-muted">{formatCycle(cycle)}</span>}>
+      <Reveal index={3}>
+        <SectionTitle action={<span className="t-caption text-muted">{formatCycle(cycle)}</span>}>Aujourd’hui</SectionTitle>
         {todayTxs.length === 0 ? (
-          <p className="text-sm text-muted">Aucune dépense aujourd’hui.</p>
+          <Card>
+            <p className="t-body text-secondary">Aucune dépense aujourd’hui.</p>
+          </Card>
         ) : (
-          <ul className="-mx-2">
+          <Group>
             {todayTxs.map((t) => (
-              <TxRow key={t.id} tx={t} category={t.categoryId ? cats.get(t.categoryId) : undefined} account={accMap.get(t.accountId)} onClick={() => setEditing(t)} />
+              <TxRow key={t.id} tx={t} category={t.categoryId ? cats.get(t.categoryId) : undefined} account={accMap.get(t.accountId)} onClick={() => setEditing(t)} showDate={false} />
             ))}
-          </ul>
+          </Group>
         )}
-        {todayTxs.some((t) => !isVariable(t, cats)) && <p className="mt-2 text-xs text-muted">Les transferts, l’épargne et les charges fixes ne comptent pas dans le budget du jour.</p>}
-      </Card>
+        {todayTxs.some((t) => !isVariable(t, cats)) && <p className="t-caption mt-2 px-1 text-muted">Les transferts, l’épargne et les charges fixes ne comptent pas dans le budget du jour.</p>}
+      </Reveal>
 
-      <p className="text-center text-xs text-muted">
-        Enveloppe vie courante : <Money cents={b.envelope} compact /> · déjà dépensé <Money cents={b.spentBefore + b.spentToday} compact />
+      <p className="t-caption mt-6 text-center text-muted">
+        Enveloppe vie courante <Money cents={b.envelope} compact className="text-secondary" /> · dépensé <Money cents={b.spentBefore + b.spentToday} compact className="text-secondary" /> · synchro {relativeTime(lastSync)}
       </p>
-      {editing && <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />}
-    </div>
+      <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />
+    </Screen>
   );
 }

@@ -8,6 +8,7 @@ import { mapEbAccount } from '../src/sync/ebMapping';
 import type { EbSession, EbTransactionsPage } from '../src/sync/ebTypes';
 import { computeSince, syncAll } from '../src/sync/syncEngine';
 import { freshDb, sample } from './helpers';
+import { PROFILE_RULES } from './profile';
 
 /** Simule le relais : renvoie les échantillons selon l'opération demandée. */
 function fakeBridge(pages: Record<string, EbTransactionsPage>, opts: { expired?: boolean } = {}) {
@@ -38,6 +39,9 @@ const REV_UID = '1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e';
 describe('synchronisation de bout en bout', () => {
   it('importe, classe, apparie les transferts et ne duplique rien à la 2e synchro', async () => {
     const database = await freshDb();
+    // Règles d'un utilisateur qui a renseigné son nom et ses contacts.
+    await database.rules.clear();
+    await database.rules.bulkPut(PROFILE_RULES);
     await connect(database);
     const settings = await getSettings(database);
     const { client } = fakeBridge({ [BNP_UID]: sample('bnp-transactions.json'), [REV_UID]: sample('revolut-transactions.json') });

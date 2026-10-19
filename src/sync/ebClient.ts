@@ -86,4 +86,23 @@ export class EbClient {
   transactionsPage(accountUid: string, dateFrom: string, dateTo: string, continuationKey?: string) {
     return this.call<EbTransactionsPage>('transactions', { accountUid, dateFrom, dateTo, continuationKey });
   }
+
+  /** Cours en euros (Yahoo Finance / CoinGecko via le relais). Clé : "source:symbole". */
+  async quotes(items: { source: 'yahoo' | 'coingecko'; symbol: string }[]): Promise<Record<string, { price: number; at: number } | { error: string }>> {
+    const r = await this.call<{ quotes: Record<string, { price: number; at: number } | { error: string }> }>('quotes', { items });
+    return r.quotes ?? {};
+  }
+
+  async searchAsset(query: string): Promise<AssetHit[]> {
+    const r = await this.call<{ results: AssetHit[] }>('searchAsset', { query });
+    return r.results ?? [];
+  }
+}
+
+export interface AssetHit {
+  source: 'yahoo' | 'coingecko';
+  symbol: string;
+  name: string;
+  assetClass: 'etf' | 'stock' | 'crypto' | 'fund' | 'other';
+  exchange: string | null;
 }

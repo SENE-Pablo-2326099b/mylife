@@ -24,12 +24,12 @@ describe('correction manuelle → règle', () => {
   it('met à jour la règle existante', async () => {
     const database = await freshDb();
     await database.transactions.bulkPut([
-      tx({ id: '1', amount: -900, date: '2026-10-01', label: 'TABAC PRESSE' }),
-      tx({ id: '2', amount: -1200, date: '2026-10-02', label: 'TABAC PRESSE' }),
+      tx({ id: '1', amount: -1349, date: '2026-10-01', label: 'NETFLIX.COM' }),
+      tx({ id: '2', amount: -1349, date: '2026-11-01', label: 'NETFLIX.COM' }),
     ]);
     await classifyTransactions(database);
     const before = await database.transactions.get('1');
-    expect(before?.categoryId).toBe(CAT.tabac);
+    expect(before?.categoryId).toBe(CAT.abonnements);
     await learnFromCorrection({ txId: '1', categoryId: CAT.sorties, mode: 'update' }, database);
     expect((await database.rules.get(before!.ruleId!))?.categoryId).toBe(CAT.sorties);
     expect((await database.transactions.get('2'))?.categoryId).toBe(CAT.sorties);

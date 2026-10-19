@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings, Transaction } from '../src/db/types';
 import { computeAlerts } from '../src/domain/alerts';
-import { CAT, DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from '../src/domain/defaults';
+import { CAT } from '../src/domain/defaults';
+import { PROFILE, PROFILE_CATEGORIES } from './profile';
 import { tx } from './helpers';
 
-const cats = new Map(DEFAULT_CATEGORIES.map((c) => [c.id, c]));
-const settings: Settings = DEFAULT_SETTINGS;
+const cats = new Map(PROFILE_CATEGORIES.map((c) => [c.id, c]));
+const settings: Settings = PROFILE;
 const today = '2026-10-17';
 let n = 0;
 const t = (date: string, amount: number, categoryId: string | null, label = 'x'): Transaction => tx({ id: String(n++), date, amount, categoryId, label });

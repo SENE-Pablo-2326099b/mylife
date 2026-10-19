@@ -67,3 +67,18 @@ export async function countRuleMatches(rule: Rule, database: BudgetDB = db): Pro
   const all = await database.transactions.toArray();
   return all.filter((t) => findMatchingRule(compiled, t)).length;
 }
+
+/**
+ * Règles « virement entre mes comptes » : une par titulaire déclaré (Réglages → Profil).
+ * Les anciennes sont retirées, puis tout l'historique est reclassé.
+ */
+export async function syncHolderRules(names: readonly string[], database: BudgetDB = db): Promise<void> {
+  const { holderRule } = await import('./defaults');
+  const wanted = names.map((n) => holderRule(n)).filter((r): r is Rule => r !== null);
+  await database.transaction('rw', database.rules, async () => {
+    const existing = await database.rules.filter((r) => r.id.startsWith('holder-')).toArray();
+    await database.rules.bulkDelete(existing.filter((r) => !wanted.some((w) => w.id === r.id)).map((r) => r.id));
+    await database.rules.bulkPut(wanted);
+  });
+  await classifyTransactions(database);
+}

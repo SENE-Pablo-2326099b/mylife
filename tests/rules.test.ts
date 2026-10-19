@@ -1,80 +1,92 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultRules, CAT } from '../src/domain/defaults';
+import { buildDefaultRules, CAT, holderRule } from '../src/domain/defaults';
 import { compileRules, findMatchingRule, suggestKeyword, validatePattern } from '../src/domain/rules';
 import type { Rule } from '../src/db/types';
 
-const rules = compileRules(buildDefaultRules('PABLO SENE'));
+const rules = compileRules(buildDefaultRules(['CAMILLE MARTIN']));
 const cat = (label: string, amount = -1000, rawText = label) => findMatchingRule(rules, { label, rawText, amount })?.categoryId ?? null;
 
-describe('règles par défaut (commerçants réels)', () => {
+describe('règles par défaut (enseignes nationales, pour tout le monde)', () => {
   it.each([
-    ['INTERMARCHE SUPER AIX', CAT.courses],
+    ['CARREFOUR CITY PARIS 11', CAT.courses],
+    ['E.LECLERC', CAT.courses],
+    ['LIDL 1234', CAT.courses],
     ['Intermarché', CAT.courses],
-    ['ALBERT HEIJN 1234', CAT.courses],
-    ['HUILE PROVENCALE', CAT.courses],
-    ['EUREST CEA CADARACHE', CAT.cantines],
-    ['CAFETERIA IUT AIX', CAT.cantines],
-    ['Le Tropical', CAT.cantines],
+    ['MONOPRIX', CAT.courses],
+    ['BOULANGERIE DU COIN', CAT.courses],
+    ["McDonald's Lyon", CAT.restos],
+    ['MCDONALDS', CAT.restos],
     ["O'Tacos Aix", CAT.restos],
-    ['OTACOS MARSEILLE', CAT.restos],
-    ['PORZIONE FABROT', CAT.restos],
-    ["L'ESTELLO", CAT.restos],
-    ['SB AIX', CAT.restos],
+    ['STARBUCKS COFFEE', CAT.restos],
+    ['PIZZERIA NAPOLI', CAT.restos],
     ['Deliveroo', CAT.livraison],
     ['UBER *EATS', CAT.livraison],
     ['UBEREATS', CAT.livraison],
-    ['BAR DES PTT', CAT.sorties],
-    ["BEL'RENCONTRE", CAT.sorties],
-    ['Métropole Aix-Marseille-Provence', CAT.transport],
-    ['SUD MOBILITES', CAT.transport],
+    ['JUST EAT', CAT.livraison],
+    ['UGC CINE CITE', CAT.sorties],
+    ['SNCF CONNECT', CAT.transport],
+    ['RATP', CAT.transport],
+    ['UBER *TRIP', CAT.transport],
+    ['TOTALENERGIES STATION', CAT.transport],
     ['AMZN Mktp FR', CAT.shopping],
     ['AMAZON PAYMENTS', CAT.shopping],
-    ['SUPERDRY AIX', CAT.shopping],
-    ['TABAC PRESSE DU COURS', CAT.tabac],
-    ['GETLEVERAGED.COM', CAT.trading],
-    ['ANTHROPIC', CAT.abonnements],
-    ['CLAUDE.AI SUBSCRIPTION', CAT.abonnements],
-    ['SOUNDCLOUD', CAT.abonnements],
-    ['GOOGLE *YouTube', CAT.abonnements],
-    ['CARDIF ASSURANCE', CAT.abonnements],
-    ['FREE MOBILE', CAT.abonnements],
+    ['DECATHLON', CAT.shopping],
+    ['ZARA FRANCE', CAT.shopping],
+    ['PHARMACIE DU CENTRE', CAT.sante],
+    ['DOCTOLIB', CAT.sante],
+    ['BASIC FIT FRANCE', CAT.sport],
     ['FITNESS PARK AIX', CAT.sport],
-    ['DISTRIPROT', CAT.sport],
-    ['INTERSPORT', CAT.sport],
+    ['NETFLIX.COM', CAT.abonnements],
+    ['SPOTIFY P2B3C', CAT.abonnements],
+    ['CLAUDE.AI SUBSCRIPTION', CAT.abonnements],
+    ['FREE MOBILE', CAT.abonnements],
+    ['PRLV SEPA MAIF ASSURANCE', CAT.abonnements],
+    ['PRLV SEPA EDF CLIENTS', CAT.logement],
+    ['PRLV SEPA FONCIA LOYER', CAT.logement],
     ['TRADE REPUBLIC BANK', CAT.epargne],
+    ['BITSTACK SAS', CAT.epargne],
     ['VERSEMENT LIVRET A', CAT.epargne],
     ['VIR PEA', CAT.epargne],
-    ['Achat Bitcoin', CAT.epargne],
+    ['COINBASE', CAT.epargne],
   ])('%s', (label, expected) => {
     expect(cat(label)).toBe(expected);
   });
 
-  it('CROUS : petit montant = cantine, gros prélèvement = loyer', () => {
-    expect(cat('CROUS AIX MARSEILLE', -330)).toBe(CAT.cantines);
+  it('CROUS : petit montant = restauration, gros prélèvement = loyer', () => {
+    expect(cat('CROUS AIX MARSEILLE', -330)).toBe(CAT.restos);
     expect(cat('PRLV SEPA CROUS AIX MARSEILLE', -25340)).toBe(CAT.logement);
   });
 
-  it('transferts internes BNP ↔ Revolut', () => {
-    expect(cat('Paiement envoyé par M PABLO SENE', -20000)).toBe(CAT.transferts);
-    expect(cat('Payment from M PABLO SENE', 20000)).toBe(CAT.transferts);
+  it('transferts entre ses propres comptes (nom du titulaire déclaré)', () => {
+    expect(cat('Paiement envoyé par M CAMILLE MARTIN', -20000)).toBe(CAT.transferts);
+    expect(cat('Payment from CAMILLE MARTIN', 20000)).toBe(CAT.transferts);
+    expect(cat('VIR SEPA INST EMIS /BEN M CAMILLE MARTIN', -15000)).toBe(CAT.transferts);
     expect(cat('Top-Up by *1234', 15000)).toBe(CAT.transferts);
     expect(cat('VIR SEPA INST EMIS /BEN Revolut Bank UAB', -15000)).toBe(CAT.transferts);
   });
 
-  it('remboursements entre amis avec la personne', () => {
-    const r = findMatchingRule(rules, { label: 'M LANCELOT SIMON', rawText: 'VIR SEPA INST RECU /DE M LANCELOT SIMON', amount: 2000 });
-    expect(r?.categoryId).toBe(CAT.remboursements);
-    expect(r?.person).toBe('Lancelot Simon');
+  it('sans nom déclaré, aucune règle personnelle', () => {
+    const generic = compileRules(buildDefaultRules([]));
+    expect(findMatchingRule(generic, { label: 'Payment from CAMILLE MARTIN', rawText: '', amount: 2000 })).toBeNull();
+    expect(holderRule('  ')).toBeNull();
+    expect(holderRule('Jean Dupont')?.id).toBe('holder-jean-dupont');
+  });
+
+  it('Lydia / Wero : entre amis', () => {
+    expect(cat('LYDIA Julie B', 1500)).toBe(CAT.remboursements);
+    expect(cat('WERO Thomas', -2500)).toBe(CAT.remboursements);
   });
 
   it('revenus : uniquement en crédit', () => {
     expect(cat('VIR SEPA RECU SALAIRE SEPTEMBRE', 153700)).toBe(CAT.revenus);
     expect(cat('CAF DES BOUCHES DU RHONE APL', 17000)).toBe(CAT.revenus);
+    expect(cat('FRANCE TRAVAIL ALLOCATION', 90000)).toBe(CAT.revenus);
     expect(cat('CAF', -500)).toBeNull();
   });
 
   it('inconnu → null', () => {
-    expect(cat('BOULANGERIE DU COURS')).toBeNull();
+    expect(cat('FROMAGERIE LEMOINE')).toBeNull();
+    expect(cat('ATELIER TERRE ET FEU')).toBeNull();
   });
 });
 

@@ -1,4 +1,10 @@
-import type { AlertSettings, Category, Rule, RuleDirection, Settings } from '../db/types';
+import type { AlertSettings, BudgetLine, Category, FireSettings, Rule, RuleDirection, Settings } from '../db/types';
+import { normalizeText } from '../lib/text';
+
+/**
+ * Valeurs de départ, pensées pour n'importe qui en France : catégories courantes, règles pour les
+ * enseignes nationales, aucun réglage personnel (revenus, charges, noms) — l'accueil les demande.
+ */
 
 export const CAT = {
   courses: 'courses',
@@ -12,6 +18,7 @@ export const CAT = {
   trading: 'trading',
   abonnements: 'abonnements',
   sport: 'sport',
+  sante: 'sante',
   logement: 'logement',
   autres: 'autres',
   revenus: 'revenus',
@@ -23,23 +30,21 @@ export const CAT = {
 type CatSeed = Omit<Category, 'order'>;
 
 const seeds: CatSeed[] = [
-  { id: CAT.courses, name: 'Courses', emoji: '🛒', color: '#3987e5', kind: 'variable', target: 15000, isFood: true },
-  { id: CAT.cantines, name: 'Cantines', emoji: '🍽️', color: '#199e70', kind: 'variable', target: 6000, isFood: true },
-  { id: CAT.restos, name: 'Restos & snacks', emoji: '🌮', color: '#d95926', kind: 'variable', target: 8000, isFood: true },
-  { id: CAT.livraison, name: 'Livraison', emoji: '🛵', color: '#e66767', kind: 'variable', target: 4000, isFood: true },
-  { id: CAT.sorties, name: 'Sorties', emoji: '🍻', color: '#9085e9', kind: 'variable', target: 6000, isFood: false },
-  { id: CAT.transport, name: 'Transport', emoji: '🚌', color: '#c98500', kind: 'variable', target: 3000, isFood: false },
-  { id: CAT.shopping, name: 'Shopping', emoji: '🛍️', color: '#d55181', kind: 'variable', target: 5000, isFood: false },
-  { id: CAT.tabac, name: 'Tabac / vape', emoji: '🚬', color: '#8a8a85', kind: 'variable', target: 3000, isFood: false },
-  { id: CAT.trading, name: 'Trading / prop firm', emoji: '📈', color: '#3987e5', kind: 'variable', target: null, isFood: false },
-  { id: CAT.abonnements, name: 'Abonnements', emoji: '🔁', color: '#9085e9', kind: 'fixed', target: null, isFood: false },
-  { id: CAT.sport, name: 'Sport & nutrition', emoji: '💪', color: '#199e70', kind: 'variable', target: 4000, isFood: false },
-  { id: CAT.logement, name: 'Logement', emoji: '🏠', color: '#c98500', kind: 'fixed', target: null, isFood: false },
-  { id: CAT.autres, name: 'Autres', emoji: '📦', color: '#8a8a85', kind: 'variable', target: null, isFood: false, system: true },
-  { id: CAT.revenus, name: 'Revenus', emoji: '💶', color: '#008300', kind: 'income', target: null, isFood: false, system: true },
-  { id: CAT.transferts, name: 'Transferts internes', emoji: '🔄', color: '#6f6e69', kind: 'excluded', target: null, isFood: false, system: true },
-  { id: CAT.epargne, name: 'Épargne / investissement', emoji: '🏦', color: '#6f6e69', kind: 'excluded', target: null, isFood: false, system: true },
-  { id: CAT.remboursements, name: 'Remboursements entre amis', emoji: '🤝', color: '#6f6e69', kind: 'excluded', target: null, isFood: false, system: true },
+  { id: CAT.courses, name: 'Courses', emoji: '🛒', color: '#2DD4BF', kind: 'variable', target: null, isFood: true },
+  { id: CAT.restos, name: 'Restos & cafés', emoji: '🍽️', color: '#FBBF24', kind: 'variable', target: null, isFood: true },
+  { id: CAT.livraison, name: 'Livraison', emoji: '🛵', color: '#F472B6', kind: 'variable', target: null, isFood: true },
+  { id: CAT.sorties, name: 'Sorties & loisirs', emoji: '🎟️', color: '#60A5FA', kind: 'variable', target: null, isFood: false },
+  { id: CAT.transport, name: 'Transport', emoji: '🚆', color: '#A3E635', kind: 'variable', target: null, isFood: false },
+  { id: CAT.shopping, name: 'Shopping', emoji: '🛍️', color: '#FB923C', kind: 'variable', target: null, isFood: false },
+  { id: CAT.sante, name: 'Santé', emoji: '🩺', color: '#C084FC', kind: 'variable', target: null, isFood: false },
+  { id: CAT.sport, name: 'Sport', emoji: '💪', color: '#2DD4BF', kind: 'variable', target: null, isFood: false },
+  { id: CAT.abonnements, name: 'Abonnements', emoji: '🔁', color: '#60A5FA', kind: 'fixed', target: null, isFood: false },
+  { id: CAT.logement, name: 'Logement & énergie', emoji: '🏠', color: '#FBBF24', kind: 'fixed', target: null, isFood: false },
+  { id: CAT.autres, name: 'Autres', emoji: '📦', color: '#94A3B8', kind: 'variable', target: null, isFood: false, system: true },
+  { id: CAT.revenus, name: 'Revenus', emoji: '💶', color: '#4ADE80', kind: 'income', target: null, isFood: false, system: true },
+  { id: CAT.transferts, name: 'Transferts internes', emoji: '🔄', color: '#94A3B8', kind: 'excluded', target: null, isFood: false, system: true },
+  { id: CAT.epargne, name: 'Épargne & investissement', emoji: '🏦', color: '#94A3B8', kind: 'excluded', target: null, isFood: false, system: true },
+  { id: CAT.remboursements, name: 'Entre amis', emoji: '🤝', color: '#94A3B8', kind: 'excluded', target: null, isFood: false, system: true },
 ];
 
 export const DEFAULT_CATEGORIES: Category[] = seeds.map((c, i) => ({ ...c, order: i }));
@@ -56,100 +61,122 @@ interface RuleSeed {
   priority?: number;
 }
 
-function ruleSeeds(ownerName: string): RuleSeed[] {
-  const owner = ownerName.trim();
-  const ownerRegex = owner
-    ? owner
-        .split(/\s+/)
-        .map((w) => w.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, ''))
-        .join('.{0,3}')
-    : '';
-  const seeds: RuleSeed[] = [
-    // Courses
-    { cat: CAT.courses, label: 'Intermarché', pattern: 'intermarche' },
-    { cat: CAT.courses, label: 'Albert Heijn', pattern: 'albert heijn' },
-    { cat: CAT.courses, label: 'Huile Provençale', pattern: 'huile provencale' },
-    // Cantines
-    { cat: CAT.cantines, label: 'Eurest (cantine CEA)', pattern: 'eurest' },
-    { cat: CAT.cantines, label: 'Crous', pattern: 'crous', max: 3000 },
-    { cat: CAT.cantines, label: 'Cafétéria IUT', pattern: 'cafeteria iut' },
-    { cat: CAT.cantines, label: 'Le Tropical', pattern: 'le tropical' },
-    { cat: CAT.cantines, label: 'Le Campus', pattern: 'le campus' },
-    // Restos & snacks
-    { cat: CAT.restos, label: 'Machou', pattern: 'machou' },
-    { cat: CAT.restos, label: "O'Tacos", pattern: 'o ?tacos', regex: true },
-    { cat: CAT.restos, label: 'Crouzzeria', pattern: 'crouzzeria' },
-    { cat: CAT.restos, label: 'Matefio', pattern: 'matefio' },
-    { cat: CAT.restos, label: 'Porzione Fabrot', pattern: 'porzione' },
-    { cat: CAT.restos, label: "L'Estello", pattern: 'estello' },
-    { cat: CAT.restos, label: 'Gazelle', pattern: 'gazelle' },
-    { cat: CAT.restos, label: 'Sb Aix', pattern: 'sb aix' },
-    // Livraison
-    { cat: CAT.livraison, label: 'Deliveroo', pattern: 'deliveroo' },
-    { cat: CAT.livraison, label: 'Uber Eats', pattern: 'uber ?eats', regex: true, priority: 5 },
-    // Sorties
-    { cat: CAT.sorties, label: 'Bar des PTT', pattern: 'bar des ptt' },
-    { cat: CAT.sorties, label: 'Les Chansons Du', pattern: 'les chansons du' },
-    { cat: CAT.sorties, label: "Bel'Rencontre", pattern: 'bel ?rencontre', regex: true },
-    // Transport
-    { cat: CAT.transport, label: 'Métropole Aix-Marseille-Provence', pattern: 'metropole aix marseille' },
-    { cat: CAT.transport, label: 'Métropole AMP', pattern: 'metropole amp' },
-    { cat: CAT.transport, label: 'Sud Mobilités', pattern: 'sud mobilites' },
-    // Shopping
-    { cat: CAT.shopping, label: 'Amazon', pattern: 'amazon|amzn', regex: true },
-    { cat: CAT.shopping, label: 'Bsa Shop', pattern: 'bsa shop' },
-    { cat: CAT.shopping, label: 'Superdry', pattern: 'superdry' },
-    // Tabac
-    { cat: CAT.tabac, label: 'Tabac Presse', pattern: 'tabac' },
-    // Trading
-    { cat: CAT.trading, label: 'GetLeveraged', pattern: 'leveraged' },
-    // Abonnements
-    { cat: CAT.abonnements, label: 'Anthropic / Claude', pattern: 'anthropic|claude\\.ai|claude ai', regex: true },
-    { cat: CAT.abonnements, label: 'SoundCloud', pattern: 'soundcloud' },
-    { cat: CAT.abonnements, label: 'Google', pattern: 'google' },
-    { cat: CAT.abonnements, label: 'Cardif', pattern: 'cardif' },
-    {
-      cat: CAT.abonnements,
-      label: 'Forfait téléphone',
-      pattern: 'free mobile|sosh|red by sfr|\\bsfr\\b|bouygues telecom|b and you|orange sa|prixtel|lebara|forfait',
-      regex: true,
-    },
-    // Sport
-    { cat: CAT.sport, label: 'Fitness Park', pattern: 'fitness park' },
-    { cat: CAT.sport, label: 'DistriProt', pattern: 'distriprot' },
-    { cat: CAT.sport, label: 'Intersport', pattern: 'intersport' },
-    // Logement : prélèvement CROUS supérieur à 100 € = loyer
-    { cat: CAT.logement, label: 'Loyer CROUS', pattern: 'crous', min: 10000, direction: 'debit', priority: 20 },
-    { cat: CAT.logement, label: 'Loyer', pattern: 'loyer', priority: 15 },
-    // Transferts internes
-    { cat: CAT.transferts, label: 'Top up Revolut', pattern: 'top.?up', regex: true, priority: 50 },
-    { cat: CAT.transferts, label: 'Virement vers Revolut', pattern: '\\b(vir|virement)\\b.*revolut', regex: true, direction: 'debit', priority: 45 },
-    // Épargne / investissement
-    { cat: CAT.epargne, label: 'Trade Republic', pattern: 'trade republic', priority: 40 },
-    { cat: CAT.epargne, label: 'Livret A', pattern: 'livret a', priority: 40 },
-    { cat: CAT.epargne, label: 'PEA', pattern: '\\bpea\\b', regex: true, priority: 40 },
-    { cat: CAT.epargne, label: 'PEE', pattern: '\\bpee\\b', regex: true, priority: 40 },
-    { cat: CAT.epargne, label: 'Bitcoin', pattern: 'bitcoin|\\bbtc\\b', regex: true, priority: 40 },
-    // Remboursements entre amis
-    { cat: CAT.remboursements, label: 'Lancelot Simon', pattern: 'lancelot simon', person: 'Lancelot Simon', priority: 30 },
-    // Revenus
-    { cat: CAT.revenus, label: 'Salaire', pattern: 'salaire|paie|remuneration', regex: true, direction: 'credit', priority: 10 },
-    { cat: CAT.revenus, label: 'CAF (APL, prime d’activité)', pattern: '\\bcaf\\b|\\bapl\\b|prime d.?activite', regex: true, direction: 'credit', priority: 10 },
-  ];
-  if (ownerRegex) {
-    seeds.push({
+/** Mots d'un nom propre, normalisés, pour une expression régulière tolérante (« M. », ponctuation). */
+function nameRegex(name: string): string {
+  return normalizeText(name)
+    .split(' ')
+    .filter(Boolean)
+    .join('.{0,3}');
+}
+
+/** Enseignes nationales : de quoi classer automatiquement la plupart des opérations dès la première synchro. */
+const MERCHANTS: RuleSeed[] = [
+  // Courses
+  {
+    cat: CAT.courses,
+    label: 'Supermarchés',
+    pattern:
+      '\\b(carrefour|e ?leclerc|leclerc|auchan|lidl|aldi|intermarche|monoprix|franprix|casino|super u|hyper u|u express|picard|grand frais|netto|biocoop|naturalia|la vie claire|cora|match|spar|vival|g20|leader price|bio c bon)\\b',
+    regex: true,
+  },
+  { cat: CAT.courses, label: 'Boulangerie', pattern: 'boulangerie' },
+  // Restos & cafés
+  {
+    cat: CAT.restos,
+    label: 'Restauration rapide',
+    pattern: '\\b(mc ?donald ?s?|mcdo|burger king|kfc|o ?tacos|quick|subway|five guys|domino s?|pizza hut|starbucks|columbus|paul|brioche doree|pret a manger|big fernand|bagelstein|cojean|sushi shop|planet sushi)\\b',
+    regex: true,
+  },
+  { cat: CAT.restos, label: 'Restaurant', pattern: '\\b(restaurant|resto|brasserie|pizzeria|creperie|cafe|bistrot|kebab|sushi)\\b', regex: true },
+  { cat: CAT.restos, label: 'Restauration collective', pattern: '\\b(crous|eurest|sodexo|elior|compass|cantine|self)\\b', regex: true, max: 3000 },
+  // Livraison
+  { cat: CAT.livraison, label: 'Deliveroo', pattern: 'deliveroo', priority: 5 },
+  { cat: CAT.livraison, label: 'Uber Eats', pattern: 'uber ?eats', regex: true, priority: 5 },
+  { cat: CAT.livraison, label: 'Just Eat', pattern: 'just ?eat', regex: true, priority: 5 },
+  // Sorties & loisirs
+  { cat: CAT.sorties, label: 'Cinéma', pattern: '\\b(ugc|pathe|gaumont|cgr|mk2|cinema|kinepolis)\\b', regex: true },
+  { cat: CAT.sorties, label: 'Billetterie', pattern: '\\b(fnac spectacles|ticketmaster|see tickets|shotgun|dice|weezevent|billetterie)\\b', regex: true },
+  { cat: CAT.sorties, label: 'Bar', pattern: '\\b(bar|pub)\\b', regex: true },
+  // Transport
+  { cat: CAT.transport, label: 'Train', pattern: '\\b(sncf|sncf connect|ouigo|tgv|ter|trenitalia|eurostar|thalys|db bahn)\\b', regex: true },
+  { cat: CAT.transport, label: 'Transports en commun', pattern: '\\b(ratp|navigo|tcl|tisseo|star|tan|tbm|rtm|metropole|keolis|transdev|ile de france mobilites)\\b', regex: true },
+  { cat: CAT.transport, label: 'VTC & mobilité', pattern: '\\b(uber|bolt|heetch|free now|lime|dott|tier|voi|blablacar|getaround|marcel)\\b', regex: true },
+  { cat: CAT.transport, label: 'Carburant & péage', pattern: '\\b(total ?energies|total access|esso|shell|bp|avia|station|carburant|vinci autoroutes|sanef|aprr|peage)\\b', regex: true },
+  // Shopping
+  { cat: CAT.shopping, label: 'Amazon', pattern: 'amazon|amzn', regex: true },
+  {
+    cat: CAT.shopping,
+    label: 'Enseignes',
+    pattern: '\\b(fnac|darty|boulanger|decathlon|zara|h ?m|uniqlo|kiabi|action|ikea|leroy merlin|castorama|sephora|nocibe|primark|celio|jules|shein|zalando|vinted|leboncoin|cdiscount|aliexpress|temu)\\b',
+    regex: true,
+  },
+  // Santé
+  { cat: CAT.sante, label: 'Pharmacie', pattern: 'pharmacie|pharma', regex: true },
+  { cat: CAT.sante, label: 'Soins', pattern: '\\b(docteur|dr|medecin|dentiste|kine|ophtalmo|laboratoire|doctolib|hopital|clinique|optic|opticien)\\b', regex: true },
+  { cat: CAT.sante, label: 'Assurance maladie', pattern: '\\b(cpam|ameli|assurance maladie|mutuelle|harmonie|mgen|alan|swiss ?life)\\b', regex: true, priority: 8 },
+  // Sport
+  { cat: CAT.sport, label: 'Salle de sport', pattern: '\\b(basic ?fit|fitness park|keep ?cool|on air|neoness|l orange bleue|cmg sports|club med gym|fitness)\\b', regex: true },
+  { cat: CAT.sport, label: 'Équipement sport', pattern: '\\b(intersport|go sport|decathlon pro)\\b', regex: true },
+  // Abonnements
+  {
+    cat: CAT.abonnements,
+    label: 'Streaming & logiciels',
+    pattern:
+      '\\b(netflix|spotify|deezer|disney|canal|prime video|amazon prime|youtube premium|apple com bill|apple music|icloud|google one|google storage|microsoft|office 365|adobe|dropbox|openai|chatgpt|anthropic|claude ai|notion|soundcloud|crunchyroll|paramount|playstation|xbox|nintendo|twitch)\\b',
+    regex: true,
+    priority: 6,
+  },
+  {
+    cat: CAT.abonnements,
+    label: 'Forfait téléphone & box',
+    pattern: '\\b(free mobile|free telecom|freebox|sosh|red by sfr|sfr|bouygues telecom|b and you|orange|prixtel|lebara|youprice|la poste mobile|nrj mobile|syma)\\b',
+    regex: true,
+    priority: 6,
+  },
+  { cat: CAT.abonnements, label: 'Assurances', pattern: '\\b(assurance|axa|maif|macif|matmut|groupama|allianz|gmf|maaf|mma|cardif|luko|lovys|leocare)\\b', regex: true, priority: 4 },
+  // Logement & énergie
+  { cat: CAT.logement, label: 'Loyer', pattern: 'loyer', priority: 15 },
+  { cat: CAT.logement, label: 'Loyer CROUS', pattern: 'crous', min: 10000, direction: 'debit', priority: 20 },
+  { cat: CAT.logement, label: 'Électricité & gaz', pattern: '\\b(edf|engie|total ?energies electricite|ekwateur|ohm energie|mint energie|vattenfall|eni|grdf|enedis|octopus energy)\\b', regex: true, priority: 12 },
+  { cat: CAT.logement, label: 'Eau', pattern: '\\b(veolia|suez|eau de paris|saur)\\b', regex: true, priority: 12 },
+  // Épargne & investissement
+  {
+    cat: CAT.epargne,
+    label: 'Courtiers & crypto',
+    pattern: '\\b(trade republic|bitstack|boursorama bourse|boursobank bourse|degiro|interactive brokers|bourse direct|fortuneo bourse|scalable|binance|coinbase|kraken|bitpanda|paymium|meria|yomoni|nalo|ramify|linxea|goodvest)\\b',
+    regex: true,
+    priority: 40,
+  },
+  { cat: CAT.epargne, label: 'Livrets & PEA', pattern: '\\b(livret a|ldds|lep|livret jeune|pea|pee|perco|per|assurance vie|epargne)\\b', regex: true, priority: 40 },
+  // Transferts internes génériques
+  { cat: CAT.transferts, label: 'Rechargement de compte', pattern: 'top.?up|rechargement|recharge compte', regex: true, priority: 50 },
+  { cat: CAT.transferts, label: 'Virement vers néobanque', pattern: '\\b(vir|virement)\\b.*\\b(revolut|n26|lydia sumeria|nickel|wise|qonto)\\b', regex: true, direction: 'debit', priority: 45 },
+  // Entre amis
+  { cat: CAT.remboursements, label: 'Lydia / Wero / Paylib', pattern: '\\b(lydia|wero|paylib|pumpkin|paypal friends)\\b', regex: true, priority: 30 },
+  // Revenus
+  { cat: CAT.revenus, label: 'Salaire', pattern: 'salaire|paie|remuneration|traitement', regex: true, direction: 'credit', priority: 10 },
+  { cat: CAT.revenus, label: 'Aides (CAF, France Travail)', pattern: '\\b(caf|apl|prime d.?activite|france travail|pole emploi|allocation)\\b', regex: true, direction: 'credit', priority: 10 },
+];
+
+function ruleSeeds(holderNames: readonly string[]): RuleSeed[] {
+  const out = [...MERCHANTS];
+  for (const name of holderNames) {
+    const re = nameRegex(name);
+    if (!re) continue;
+    out.push({
       cat: CAT.transferts,
-      label: `Virement entre mes comptes (${owner})`,
-      pattern: `(paiement envoye par|payment from|virement (de|a|vers)|vir( sepa)?( inst)?( recu)?( de| a)?)\\W+(m\\.?\\W+|mr\\W+)?${ownerRegex}`,
+      label: `Virement entre mes comptes (${name.trim()})`,
+      pattern: `(paiement envoye par|payment from|transfer (from|to)|virement (de|a|vers)|vir( sepa)?( inst)?( recu| emis)?( de| a| ben| vers)?)\\W+(m\\.?\\W+|mr\\W+|mme\\W+)?${re}`,
       regex: true,
       priority: 60,
     });
   }
-  return seeds;
+  return out;
 }
 
-export function buildDefaultRules(ownerName: string, now = Date.now()): Rule[] {
-  return ruleSeeds(ownerName).map((s, i) => ({
+export function buildDefaultRules(holderNames: readonly string[] | string, now = Date.now()): Rule[] {
+  const names = typeof holderNames === 'string' ? [holderNames] : holderNames;
+  return ruleSeeds(names).map((s, i) => ({
     id: `default-${String(i).padStart(3, '0')}`,
     categoryId: s.cat,
     pattern: s.pattern,
@@ -165,40 +192,85 @@ export function buildDefaultRules(ownerName: string, now = Date.now()): Rule[] {
   }));
 }
 
+/** Règle « virement entre mes comptes » d'un titulaire (ajoutée quand on renseigne son nom). */
+export function holderRule(name: string, now = Date.now()): Rule | null {
+  const [seed] = ruleSeeds([name]).slice(MERCHANTS.length);
+  if (!seed) return null;
+  return {
+    id: `holder-${normalizeText(name).replace(/ /g, '-')}`,
+    categoryId: seed.cat,
+    pattern: seed.pattern,
+    isRegex: true,
+    direction: 'any',
+    minAmount: null,
+    maxAmount: null,
+    person: null,
+    priority: seed.priority ?? 60,
+    label: seed.label,
+    enabled: true,
+    createdAt: now,
+  };
+}
+
 export const DEFAULT_ALERTS: AlertSettings = {
   deliveries: { enabled: true, maxCount: 4 },
   amazon: { enabled: true, minAmount: 0 },
   dailyOverrun: { enabled: true, days: 3 },
-  transportPass: { enabled: true, passPrice: 10000, keyword: 'metropole' },
+  transportPass: { enabled: false, passPrice: 0, keyword: '' },
   categoryTarget: { enabled: true, warnPercent: 80 },
+};
+
+export const DEFAULT_FIRE: FireSettings = {
+  annualReturnBp: 500,
+  inflationBp: 200,
+  withdrawalBp: 400,
+  annualSpendingOverride: null,
 };
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'main',
-  payday: 26,
-  salary: 153700,
-  apl: 17000,
-  activityBonus: 0,
-  fixedCharges: 35900,
-  investment: 45000,
+  firstName: '',
+  holderNames: [],
+  onboarded: false,
+  payday: 1,
+  incomes: [],
+  fixedCharges: [],
+  savings: { mode: 'auto', manual: 0 },
+  plannedSavingsAuto: 0,
   envelopeOverride: null,
-  ownerName: 'PABLO SENE',
   alerts: DEFAULT_ALERTS,
   bridgePassword: '',
   initialSyncDays: 90,
   autoSyncHours: 6,
+  bankCountry: 'FR',
+  theme: 'nuit',
+  followSystem: false,
+  haptics: true,
+  reduceMotion: false,
+  fire: DEFAULT_FIRE,
 };
 
-/** Enveloppe « vie courante » du cycle = revenus − charges fixes − investissement (sauf saisie manuelle). */
+export const sumLines = (lines: readonly BudgetLine[]): number => lines.reduce((s, l) => s + l.amount, 0);
+
+export function totalIncome(s: Pick<Settings, 'incomes'>): number {
+  return sumLines(s.incomes);
+}
+
+export function totalFixed(s: Pick<Settings, 'fixedCharges'>): number {
+  return sumLines(s.fixedCharges);
+}
+
+/** Épargne et investissement prévus par mois : plans + objectifs (auto) ou montant saisi. */
+export function plannedSavings(s: Pick<Settings, 'savings' | 'plannedSavingsAuto'>): number {
+  return s.savings.mode === 'auto' ? s.plannedSavingsAuto : s.savings.manual;
+}
+
+export function defaultEnvelope(s: Pick<Settings, 'incomes' | 'fixedCharges' | 'savings' | 'plannedSavingsAuto'>): number {
+  return totalIncome(s) - totalFixed(s) - plannedSavings(s);
+}
+
+/** Enveloppe « vie courante » du cycle = revenus − charges fixes − épargne prévue (sauf saisie manuelle). */
 export function computeEnvelope(s: Settings): number {
   if (s.envelopeOverride !== null) return s.envelopeOverride;
   return defaultEnvelope(s);
-}
-
-export function defaultEnvelope(s: Pick<Settings, 'salary' | 'apl' | 'activityBonus' | 'fixedCharges' | 'investment'>): number {
-  return s.salary + s.apl + s.activityBonus - s.fixedCharges - s.investment;
-}
-
-export function totalIncome(s: Settings): number {
-  return s.salary + s.apl + s.activityBonus;
 }

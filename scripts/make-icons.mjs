@@ -13,7 +13,7 @@ async function render(file, size, { maskable = false } = {}) {
   // Icône « maskable » : fond plein et logo dans la zone de sécurité (80 %).
   const inner = maskable ? Math.round(size * 0.72) : size;
   const radius = maskable ? 0 : Math.round(size * 0.22);
-  await page.setContent(`<html><body style="margin:0;background:${maskable ? '#111110' : 'transparent'};display:grid;place-items:center;width:${size}px;height:${size}px">
+  await page.setContent(`<html><body style="margin:0;background:${maskable ? '#0B0719' : 'transparent'};display:grid;place-items:center;width:${size}px;height:${size}px">
     <div style="width:${inner}px;height:${inner}px;border-radius:${radius}px;overflow:hidden">${svg.replace('<svg ', `<svg width="${inner}" height="${inner}" `)}</div></body></html>`);
   await page.screenshot({ path: `public/${file}`, omitBackground: !maskable });
   console.log('✓', file);

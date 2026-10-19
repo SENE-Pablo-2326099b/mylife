@@ -1,23 +1,25 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { TxEditor } from '../components/TxEditor';
 import { TxRow } from '../components/TxRow';
-import { Button, EmptyState, Money, PageTitle, inputClass } from '../components/ui';
 import { db } from '../db/db';
 import type { Transaction } from '../db/types';
 import { useAccounts, useCategories, useSettings } from '../hooks';
 import { addDays, cycleFor, formatDay, previousCycle, todayISO } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { normalizeText } from '../lib/text';
+import { Button, Card, Chip, EmptyState, Group, Icon, Money, Reveal, Segmented, SelectField, Sheet } from '../ui/index';
+import { Screen } from '../ui/Screen';
+import { HeaderActions } from './Today';
 
-const PERIODS = {
-  cycle: 'Cycle en cours',
-  previous: 'Cycle précédent',
-  '30d': '30 derniers jours',
-  all: 'Tout',
-} as const;
-type Period = keyof typeof PERIODS;
+const PERIODS = [
+  { value: 'cycle', label: 'Cycle' },
+  { value: 'previous', label: 'Précédent' },
+  { value: '30d', label: '30 jours' },
+  { value: 'all', label: 'Tout' },
+] as const;
+type Period = (typeof PERIODS)[number]['value'];
 const NO_TX: Transaction[] = [];
 
 export default function TransactionsPage() {
@@ -26,12 +28,13 @@ export default function TransactionsPage() {
   const categories = useCategories();
   const accounts = useAccounts();
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [limit, setLimit] = useState(150);
 
   const q = params.get('q') ?? '';
   const account = params.get('compte') ?? '';
   const cat = params.get('cat') ?? '';
-  const period = (params.get('periode') as Period) || 'cycle';
+  const period = (PERIODS.some((p) => p.value === params.get('periode')) ? params.get('periode') : 'cycle') as Period;
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -75,84 +78,117 @@ export default function TransactionsPage() {
     else groups.push([t.date, [t]]);
   }
   const unclassified = all.filter((t) => t.categoryId === null).length;
+  const catLabel = cat === '_none' ? '❔ À classer' : cat ? `${catMap.get(cat)?.emoji ?? ''} ${catMap.get(cat)?.name ?? cat}` : null;
+  const accLabel = account ? `${accMap.get(account)?.bank ?? ''} ${accMap.get(account)?.nickname ?? accMap.get(account)?.name ?? ''}` : null;
 
   return (
-    <div className="space-y-4">
-      <PageTitle sub={`${filtered.length} opération${filtered.length > 1 ? 's' : ''} · solde ${formatCents(total, { sign: true })}`}>Opérations</PageTitle>
-
-      <div className="space-y-2">
-        <input type="search" className={inputClass} placeholder="Rechercher un libellé, une note…" value={q} onChange={(e) => setParam('q', e.target.value)} aria-label="Rechercher" />
-        <div className="grid grid-cols-2 gap-2">
-          <select className={inputClass} value={period} onChange={(e) => setParam('periode', e.target.value === 'cycle' ? '' : e.target.value)} aria-label="Période">
-            {Object.entries(PERIODS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          <select className={inputClass} value={account} onChange={(e) => setParam('compte', e.target.value)} aria-label="Compte">
-            <option value="">Tous comptes</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.bank} {a.name}
-              </option>
-            ))}
-          </select>
-          <select className={`${inputClass} col-span-2`} value={cat} onChange={(e) => setParam('cat', e.target.value)} aria-label="Catégorie">
-            <option value="">Toutes catégories</option>
-            <option value="_none">❔ À classer</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.emoji} {c.name}
-              </option>
-            ))}
-          </select>
+    <Screen title="Opérations" kicker="Dépenses et revenus" mood="activity" right={<HeaderActions />}>
+      <Reveal index={0} className="space-y-3">
+        <div className="relative">
+          <Icon name="search" size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
+          <input type="search" className="field-input pl-10" placeholder="Libellé, note…" value={q} onChange={(e) => setParam('q', e.target.value)} aria-label="Rechercher" />
         </div>
-      </div>
+        <Segmented options={PERIODS} value={period} onChange={(v) => setParam('periode', v === 'cycle' ? '' : v)} label="Période" />
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+          <Chip icon="options" onClick={() => setFiltersOpen(true)} selected={!!(cat || account)}>
+            Filtres
+          </Chip>
+          {catLabel && (
+            <Chip selected onClick={() => setParam('cat', '')} label="Retirer le filtre catégorie">
+              {catLabel} ✕
+            </Chip>
+          )}
+          {accLabel && (
+            <Chip selected onClick={() => setParam('compte', '')} label="Retirer le filtre compte">
+              {accLabel} ✕
+            </Chip>
+          )}
+          {unclassified > 0 && cat !== '_none' && (
+            <Chip tone="warning" selected onClick={() => setParam('cat', '_none')}>
+              {unclassified} à classer
+            </Chip>
+          )}
+        </div>
+        <p className="t-small px-0.5 text-secondary">
+          {filtered.length} opération{filtered.length > 1 ? 's' : ''} · solde <Money cents={total} sign tone="auto" className="text-[13px]" />
+        </p>
+      </Reveal>
 
-      {unclassified > 0 && cat !== '_none' && (
-        <Link to="/a-classer" className="block rounded-2xl border border-warn/40 bg-warn/10 p-3 text-sm">
-          <strong>{unclassified}</strong> opération{unclassified > 1 ? 's' : ''} à classer sur cette période →
-        </Link>
+      {cat === '_none' && unclassified > 0 && (
+        <Reveal index={1} className="mt-3">
+          <Card to="/a-classer" tone="warning" className="flex items-center gap-3">
+            <Icon name="flash" className="text-warning" />
+            <span className="t-body flex-1">Trier vite, une par une, avec des raccourcis</span>
+            <Icon name="chevron-forward" size={17} className="text-muted" />
+          </Card>
+        </Reveal>
       )}
 
-      {filtered.length === 0 ? (
-        <EmptyState title="Aucune opération">
-          {all.length === 0 ? (
-            <>
-              Connecte ta banque dans <Link to="/synchro" className="text-accent underline">Synchro</Link> ou charge les données de démo dans{' '}
-              <Link to="/reglages/donnees" className="text-accent underline">Réglages</Link>.
-            </>
-          ) : (
-            'Aucun résultat pour ces filtres.'
-          )}
-        </EmptyState>
-      ) : (
-        <div className="space-y-3">
-          {groups.map(([date, txs]) => {
+      <div className="mt-2">
+        {filtered.length === 0 ? (
+          <Card className="mt-3">
+            <EmptyState
+              icon="list"
+              title="Aucune opération"
+              body={all.length === 0 ? 'Connecte ta banque ou charge les données de démo.' : 'Aucun résultat pour ces filtres.'}
+              action={
+                all.length === 0 ? (
+                  <>
+                    <Button to="/synchro" icon="bank">
+                      Connecter ma banque
+                    </Button>
+                    <Button to="/reglages/donnees" variant="secondary">
+                      Démo
+                    </Button>
+                  </>
+                ) : undefined
+              }
+            />
+          </Card>
+        ) : (
+          groups.map(([date, txs], gi) => {
             const dayTotal = txs.reduce((s, t) => s + t.amount, 0);
             return (
-              <section key={date} aria-label={formatDay(date)}>
-                <h2 className="mb-1 flex justify-between px-2 text-xs font-semibold uppercase tracking-wide text-muted">
-                  <span>{formatDay(date)}</span>
-                  <Money cents={dayTotal} sign />
-                </h2>
-                <ul className="rounded-2xl border border-line/60 bg-surface px-1">
-                  {txs.map((t) => (
-                    <TxRow key={t.id} tx={t} category={t.categoryId ? catMap.get(t.categoryId) : undefined} account={accMap.get(t.accountId)} onClick={() => setEditing(t)} />
-                  ))}
-                </ul>
-              </section>
+              <Reveal key={date} index={Math.min(gi + 1, 6)}>
+                <section aria-label={formatDay(date)}>
+                  <h2 className="t-label mb-2 mt-5 flex justify-between px-0.5 text-muted">
+                    <span className="first-letter:uppercase">{formatDay(date)}</span>
+                    <span className="num normal-case tracking-normal">{formatCents(dayTotal, { sign: true })}</span>
+                  </h2>
+                  <Group>
+                    {txs.map((t) => (
+                      <TxRow key={t.id} tx={t} category={t.categoryId ? catMap.get(t.categoryId) : undefined} account={accMap.get(t.accountId)} onClick={() => setEditing(t)} showDate={false} />
+                    ))}
+                  </Group>
+                </section>
+              </Reveal>
             );
-          })}
-          {filtered.length > limit && (
-            <Button variant="ghost" className="w-full" onClick={() => setLimit((l) => l + 300)}>
+          })
+        )}
+        {filtered.length > limit && (
+          <div className="mt-4">
+            <Button variant="secondary" className="w-full" onClick={() => setLimit((l) => l + 300)}>
               Afficher plus ({filtered.length - limit} restantes)
             </Button>
-          )}
+          </div>
+        )}
+      </div>
+
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtres">
+        <div className="space-y-3">
+          <SelectField
+            label="Catégorie"
+            value={cat}
+            onChange={(v) => setParam('cat', v)}
+            options={[{ value: '', label: 'Toutes' }, { value: '_none', label: '❔ À classer' }, ...categories.map((c) => ({ value: c.id, label: `${c.emoji} ${c.name}` }))]}
+          />
+          <SelectField label="Compte" value={account} onChange={(v) => setParam('compte', v)} options={[{ value: '', label: 'Tous les comptes' }, ...accounts.map((a) => ({ value: a.id, label: `${a.bank} · ${a.nickname ?? a.name}` }))]} />
+          <Button className="w-full" onClick={() => setFiltersOpen(false)}>
+            Voir {filtered.length} opération{filtered.length > 1 ? 's' : ''}
+          </Button>
         </div>
-      )}
-      {editing && <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />}
-    </div>
+      </Sheet>
+      <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />
+    </Screen>
   );
 }

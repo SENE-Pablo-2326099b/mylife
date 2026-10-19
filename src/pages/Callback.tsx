@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Button, Card, PageTitle } from '../components/ui';
+import { useNavigate } from 'react-router-dom';
 import { getSettings } from '../db/seed';
 import { completeBankConnection, getPendingAuth, parseCallback } from '../sync/connect';
 import { EbClient } from '../sync/ebClient';
 import { runSync } from '../sync/store';
+import { Button, Card, EmptyState } from '../ui/index';
+import { Orb } from '../ui/extras';
+import { Screen } from '../ui/Screen';
 
 type Phase = { kind: 'working' } | { kind: 'error'; message: string } | { kind: 'foreign' } | { kind: 'done'; count: number };
 
@@ -46,37 +48,33 @@ export default function CallbackPage() {
   }, []);
 
   return (
-    <div className="space-y-4">
-      <PageTitle>Connexion bancaire</PageTitle>
-      {phase.kind === 'working' && <Card>Finalisation de la connexion…</Card>}
-      {phase.kind === 'done' && <Card>{phase.count} compte(s) connecté(s). Première synchronisation en cours…</Card>}
-      {phase.kind === 'error' && (
-        <Card>
-          <p className="text-bad">{phase.message}</p>
-          <Link to="/synchro" className="mt-3 inline-block text-accent underline">
-            Retour à la synchronisation
-          </Link>
-        </Card>
-      )}
-      {phase.kind === 'foreign' && (
-        <Card>
-          <p>Cette page s’est ouverte dans un autre contexte que celui où tu as lancé la connexion (souvent : navigateur au lieu de l’app installée).</p>
-          <p className="mt-2 text-sm text-muted">Copie ce lien, ouvre Budget Dodge, puis Synchro → « La banque m’a renvoyé dans le navigateur » et colle-le.</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="primary"
-              onClick={() => {
-                void navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true));
-              }}
-            >
-              {copied ? 'Lien copié ✓' : 'Copier le lien'}
-            </Button>
-            <Button variant="ghost" onClick={() => void finish()}>
-              Terminer dans ce navigateur
-            </Button>
+    <Screen stack title="Connexion bancaire" mood="focus" back="/synchro">
+      <Card level="raised">
+        {phase.kind === 'working' && <EmptyState icon="sync" title="Finalisation de la connexion…" />}
+        {phase.kind === 'done' && (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <Orb trigger={phase.count} />
+            <p className="t-title">{phase.count} compte(s) connecté(s)</p>
+            <p className="t-body text-secondary">Première synchronisation en cours…</p>
           </div>
-        </Card>
-      )}
-    </div>
+        )}
+        {phase.kind === 'error' && <EmptyState icon="alert-circle" title="Connexion impossible" body={phase.message} action={<Button to="/synchro" variant="secondary">Retour aux banques</Button>} />}
+        {phase.kind === 'foreign' && (
+          <EmptyState
+            icon="swap"
+            title="Ouvert hors de l’app"
+            body="Cette page s’est ouverte dans un autre contexte que celui de la connexion (souvent : le navigateur au lieu de l’app installée). Copie ce lien, ouvre l’app, puis Banques → « La banque m’a renvoyé dans le navigateur »."
+            action={
+              <>
+                <Button onClick={() => void navigator.clipboard?.writeText(window.location.href).then(() => setCopied(true))}>{copied ? 'Lien copié' : 'Copier le lien'}</Button>
+                <Button variant="secondary" onClick={() => void finish()}>
+                  Terminer ici
+                </Button>
+              </>
+            }
+          />
+        )}
+      </Card>
+    </Screen>
   );
 }

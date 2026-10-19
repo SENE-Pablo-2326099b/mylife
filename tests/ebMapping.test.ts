@@ -76,6 +76,7 @@ describe('comptes et soldes', () => {
   it('bankLabel', () => {
     expect(bankLabel('BNP Paribas')).toBe('BNP');
     expect(bankLabel('Revolut')).toBe('Revolut');
-    expect(bankLabel('Boursorama')).toBe('Boursorama');
+    expect(bankLabel('Boursorama')).toBe('BoursoBank');
+    expect(bankLabel('Banque Exemple SA')).toBe('Banque Exemple');
   });
 });

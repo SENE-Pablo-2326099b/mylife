@@ -1,4 +1,4 @@
-import type { Account } from '../db/types';
+import type { Account, AccountKind } from '../db/types';
 import { isISODate } from '../lib/dates';
 import { decimalToCents } from '../lib/money';
 import type { EbBalance, EbSessionAccount, EbTransaction } from './ebTypes';
@@ -95,11 +95,42 @@ export function pickBalance(balances: EbBalance[]): { amount: number; date: stri
   }
 }
 
-/** Nom court de la banque à partir du nom ASPSP. */
+/** Nom court de la banque à partir du nom ASPSP (« BNP Paribas » → « BNP », « Revolut Bank UAB » → « Revolut »). */
 export function bankLabel(aspspName: string): string {
-  if (/bnp/i.test(aspspName)) return 'BNP';
-  if (/revolut/i.test(aspspName)) return 'Revolut';
-  return aspspName;
+  const known: [RegExp, string][] = [
+    [/bnp/i, 'BNP'],
+    [/revolut/i, 'Revolut'],
+    [/soci[ée]t[ée] g[ée]n[ée]rale/i, 'Société Générale'],
+    [/cr[ée]dit agricole/i, 'Crédit Agricole'],
+    [/cr[ée]dit mutuel/i, 'Crédit Mutuel'],
+    [/caisse d.?[ée]pargne/i, 'Caisse d’Épargne'],
+    [/banque populaire/i, 'Banque Populaire'],
+    [/la banque postale/i, 'La Banque Postale'],
+    [/boursorama|boursobank/i, 'BoursoBank'],
+    [/trade republic/i, 'Trade Republic'],
+  ];
+  for (const [re, label] of known) if (re.test(aspspName)) return label;
+  return aspspName.replace(/\s+(S\.?A\.?|SA|AG|GmbH|UAB|N\.?V\.?|plc|Bank)$/i, '').trim() || aspspName;
+}
+
+/** Type de compte d'après cash_account_type (ISO 20022 : CACC courant, SVGS épargne, CARD carte). */
+export function accountKind(cashAccountType: string | undefined | null): AccountKind {
+  switch ((cashAccountType ?? '').toUpperCase()) {
+    case 'SVGS':
+    case 'LLSV':
+    case 'ONDP':
+    case 'MOMA':
+      return 'savings';
+    case 'CARD':
+      return 'card';
+    case 'CACC':
+    case 'TRAN':
+    case 'CASH':
+    case '':
+      return 'current';
+    default:
+      return 'other';
+  }
 }
 
 export function mapEbAccount(acc: EbSessionAccount, aspspName: string, connectionId: string): Account {
@@ -120,5 +151,7 @@ export function mapEbAccount(acc: EbSessionAccount, aspspName: string, connectio
     lastSyncAt: null,
     lastSyncError: null,
     hidden: false,
+    kind: accountKind(acc.cash_account_type),
+    nickname: null,
   };
 }

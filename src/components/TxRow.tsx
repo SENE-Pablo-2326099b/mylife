@@ -1,32 +1,29 @@
 import type { Account, Category, Transaction } from '../db/types';
 import { formatShort } from '../lib/dates';
-import { Badge, Money } from './ui';
+import { Badge, IconBubble, Money, Tap } from '../ui/primitives';
 
-export function TxRow({ tx, category, account, onClick }: { tx: Transaction; category?: Category; account?: Account; onClick?: () => void }) {
-  const excluded = category && (category.kind === 'excluded' || category.kind === 'income');
+/** Une opération = une ligne : catégorie · libellé · date, catégorie, compte · montant. */
+export function TxRow({ tx, category, account, onClick, showDate = true }: { tx: Transaction; category?: Category; account?: Account; onClick?: () => void; showDate?: boolean }) {
+  const outside = category && (category.kind === 'excluded' || category.kind === 'income');
+  const meta = [showDate ? formatShort(tx.date) : null, category?.name ?? 'À classer', account?.bank].filter(Boolean).join(' · ');
   return (
-    <li>
-      <button type="button" onClick={onClick} className="flex min-h-[56px] w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-raised">
-        <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-raised text-lg">
-          {category?.emoji ?? '❔'}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{tx.label}</span>
-          <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted">
-            <span className="truncate">
-              {formatShort(tx.date)} · {category?.name ?? 'À classer'}
-              {account && ` · ${account.bank}`}
-              {tx.categorySource === 'manual' && <span title="Corrigé à la main"> ✎</span>}
-            </span>
-            {tx.pending && (
-              <span className="shrink-0">
-                <Badge tone="warn">en attente</Badge>
-              </span>
-            )}
+    <Tap onClick={onClick} scaleTo={0.985} className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2.5 text-left">
+      <IconBubble emoji={category?.emoji ?? '❔'} tone={category ? undefined : 'warning'} />
+      <span className="min-w-0 flex-1">
+        <span className="t-body-strong block truncate">{tx.label}</span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="t-small truncate text-secondary">
+            {meta}
+            {tx.categorySource === 'manual' && <span title="Corrigé à la main"> ✎</span>}
           </span>
+          {tx.pending && (
+            <span className="shrink-0">
+              <Badge tone="warning">en attente</Badge>
+            </span>
+          )}
         </span>
-        <Money cents={tx.amount} sign className={`text-sm font-semibold ${tx.amount > 0 ? 'text-good' : ''} ${excluded ? 'opacity-60' : ''}`} />
-      </button>
-    </li>
+      </span>
+      <Money cents={tx.amount} sign tone={tx.amount > 0 && !outside ? 'success' : outside ? 'muted' : undefined} className="text-[15px]" />
+    </Tap>
   );
 }

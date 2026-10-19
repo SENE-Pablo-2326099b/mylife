@@ -7,7 +7,7 @@ describe('sauvegarde JSON', () => {
   it('aller-retour complet, sans le mot de passe du relais', async () => {
     const a = await freshDb();
     await a.transactions.bulkPut([tx({ id: '1', amount: -1234, date: '2026-10-01' }), tx({ id: '2', amount: 500, date: '2026-10-02' })]);
-    await updateSettings({ bridgePassword: 'secret', salary: 160000 }, a);
+    await updateSettings({ bridgePassword: 'secret', incomes: [{ id: 's', label: 'Salaire', amount: 160000, day: 1 }] }, a);
     const backup = JSON.parse(JSON.stringify(await exportBackup(a)));
     expect(JSON.stringify(backup)).not.toContain('secret');
 
@@ -19,7 +19,7 @@ describe('sauvegarde JSON', () => {
     expect(await b.transactions.get('old')).toBeUndefined();
     expect((await b.transactions.get('1'))?.amount).toBe(-1234);
     const s = await b.settings.get('main');
-    expect(s?.salary).toBe(160000);
+    expect(s?.incomes[0]?.amount).toBe(160000);
     expect(s?.bridgePassword).toBe('other-device');
     expect(await b.rules.count()).toBe(await a.rules.count());
   });

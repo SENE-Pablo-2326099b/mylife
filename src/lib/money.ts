@@ -81,11 +81,28 @@ export interface FormatOptions {
   compact?: boolean;
   /** N'affiche pas le symbole €. */
   noSymbol?: boolean;
+  /**
+   * Format court pour les espaces étroits (tuiles, axes) : centimes jusqu'à 100 €, euros ronds
+   * jusqu'à 10 000 €, puis « 12,3 k€ » et « 1,2 M€ ».
+   */
+  short?: boolean;
+}
+
+function shortBody(abs: number): { body: string; unit: string } {
+  const euros = abs / 100;
+  if (euros >= 1_000_000) return { body: (Math.round(euros / 100_000) / 10).toString().replace('.', ','), unit: 'M€' };
+  if (euros >= 10_000) return { body: (Math.round(euros / 100) / 10).toString().replace('.', ','), unit: 'k€' };
+  return { body: groupThousands(Math.round(euros)), unit: '€' };
 }
 
 /** Formate des centimes en euros à la française : "1 537,00 €". */
 export function formatCents(cents: number, opts: FormatOptions = {}): string {
   const abs = Math.abs(Math.round(cents));
+  if (opts.short && abs >= 1000) {
+    const { body, unit } = shortBody(abs);
+    const sign = cents < 0 ? '−' : opts.sign && cents > 0 ? '+' : '';
+    return sign + body + (opts.noSymbol ? '' : `\u00a0${unit}`);
+  }
   const euros = Math.trunc(abs / 100);
   const rest = abs % 100;
   let body = groupThousands(euros);

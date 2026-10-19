@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/db';
 import type { Account, Category, Rule, Settings } from './db/types';
@@ -27,4 +27,11 @@ export function useRules(): Rule[] {
 
 export function useAccounts(): Account[] {
   return useLiveQuery(() => db.accounts.toArray(), []) ?? NO_ACCOUNTS;
+}
+
+/** Garde la dernière valeur non nulle : une feuille garde son contenu pendant qu'elle redescend. */
+export function useLatest<T>(value: T | null): T | null {
+  const ref = useRef(value);
+  if (value !== null) ref.current = value;
+  return ref.current;
 }

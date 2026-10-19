@@ -1,33 +1,50 @@
 import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Card, PageTitle } from '../../components/ui';
 import { db } from '../../db/db';
+import { getSettings, updateSettings } from '../../db/seed';
 import { backupFileName, exportBackup, importBackup, wipeAll } from '../../domain/backup';
 import { clearDemo, loadDemo } from '../../domain/demo';
-import { useSettings } from '../../hooks';
-import { BackLink } from './common';
+import { Button, Card, Reveal, SectionTitle, toast } from '../../ui/index';
+import { Screen } from '../../ui/Screen';
 
 export default function DataPage() {
-  const settings = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const counts = useLiveQuery(async () => ({
-    tx: await db.transactions.count(),
-    demo: await db.transactions.where('source').equals('demo').count(),
-    rules: await db.rules.count(),
-  }), []);
+  const counts = useLiveQuery(
+    async () => ({
+      tx: await db.transactions.count(),
+      demo: await db.transactions.where('source').equals('demo').count(),
+      rules: await db.rules.count(),
+      portfolios: await db.portfolios.count(),
+    }),
+    [],
+  );
 
-  const run = async (fn: () => Promise<string>) => {
+  const run = async (fn: () => Promise<void>) => {
     setBusy(true);
-    setMsg(null);
     try {
-      setMsg({ ok: true, text: await fn() });
+      await fn();
     } catch (e) {
-      setMsg({ ok: false, text: (e as Error).message });
+      toast({ message: (e as Error).message, tone: 'danger' });
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Remplacement annulable : la base actuelle est gardée en mémoire le temps du toast. */
+  const replaceWithUndo = async (message: string, change: () => Promise<unknown>) => {
+    const before = await exportBackup();
+    // La sauvegarde n'emporte jamais le mot de passe du relais : on le garde à part pour l'annulation.
+    const password = (await getSettings()).bridgePassword;
+    await change();
+    toast({
+      message,
+      actionLabel: 'Annuler',
+      onAction: () =>
+        void importBackup(before)
+          .then(() => updateSettings({ bridgePassword: password }))
+          .then(() => toast({ message: 'Données restaurées' })),
+    });
   };
 
   const doExport = () =>
@@ -40,79 +57,71 @@ export default function DataPage() {
       a.download = backupFileName();
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      return `Sauvegarde exportée (${backup.tables.transactions.length} opérations).`;
+      toast({ message: `Sauvegarde exportée (${backup.tables.transactions.length} opérations)` });
     });
 
   const doImport = (file: File) =>
     run(async () => {
       const data = JSON.parse(await file.text()) as unknown;
-      if (!confirm('Remplacer toutes les données de cet appareil par cette sauvegarde ?')) return 'Import annulé.';
-      const res = await importBackup(data);
-      return `Sauvegarde restaurée : ${res.transactions} opérations.`;
+      await replaceWithUndo('Sauvegarde restaurée', () => importBackup(data));
     });
 
   return (
-    <div className="space-y-4">
-      <BackLink />
-      <PageTitle sub="Tout est stocké dans ce navigateur (IndexedDB), sur cet appareil uniquement.">Sauvegarde et données</PageTitle>
-
-      {msg && (
-        <p role="status" className={`rounded-xl p-3 text-sm ${msg.ok ? 'bg-good/10 text-good' : 'bg-bad/10 text-bad'}`}>
-          {msg.text}
-        </p>
-      )}
-
-      <Card title="Sauvegarde JSON">
-        <p className="mb-3 text-sm text-muted">
-          {counts?.tx ?? 0} opérations, {counts?.rules ?? 0} règles. Le fichier contient toute la base (opérations, catégories, règles, réglages), sauf le mot de passe du relais.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => void doExport()} disabled={busy}>
-            Exporter
-          </Button>
-          <Button variant="ghost" onClick={() => fileRef.current?.click()} disabled={busy}>
-            Importer…
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void doImport(f);
-              e.target.value = '';
-            }}
-          />
-        </div>
-      </Card>
-
-      <Card title="Données de démo">
-        <p className="mb-3 text-sm text-muted">Environ 6 semaines d’opérations fictives sur deux comptes de démo, pour essayer l’app tout de suite. Elles ne touchent pas tes vrais comptes.</p>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" disabled={busy} onClick={() => void run(async () => `${await loadDemo(settings)} opérations de démo chargées.`)}>
-            Charger des données de démo
-          </Button>
-          {!!counts?.demo && (
-            <Button variant="ghost" disabled={busy} onClick={() => void run(async () => (await clearDemo(), 'Données de démo supprimées.'))}>
-              Supprimer la démo
+    <Screen stack title="Sauvegarde et données" kicker="Stockées dans ce navigateur uniquement" mood="settings" back="/reglages">
+      <Reveal index={0}>
+        <Card>
+          <p className="t-headline">Sauvegarde JSON</p>
+          <p className="t-small mt-1 text-secondary">
+            {counts?.tx ?? 0} opérations, {counts?.rules ?? 0} règles, {counts?.portfolios ?? 0} portefeuilles. Le fichier contient toute la base (opérations, patrimoine, catégories, règles, réglages), sauf le mot de passe du relais.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button icon="download" onClick={() => void doExport()} disabled={busy}>
+              Exporter
             </Button>
-          )}
-        </div>
-      </Card>
+            <Button variant="secondary" icon="upload" onClick={() => fileRef.current?.click()} disabled={busy}>
+              Importer…
+            </Button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void doImport(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
+        </Card>
+      </Reveal>
 
-      <Card title="Zone dangereuse">
-        <p className="mb-3 text-sm text-muted">Efface toutes les données de cet appareil et revient aux réglages par défaut. Exporte une sauvegarde avant.</p>
-        <Button
-          variant="danger"
-          disabled={busy}
-          onClick={() => {
-            if (confirm('Tout effacer sur cet appareil ? Cette action est irréversible.')) void run(async () => (await wipeAll(), 'Toutes les données ont été effacées.'));
-          }}
-        >
-          Tout effacer
-        </Button>
-      </Card>
-    </div>
+      <Reveal index={1}>
+        <SectionTitle>Démo</SectionTitle>
+        <Card>
+          <p className="t-small text-secondary">Six mois d’une vie fictive : deux banques, un portefeuille d’ETF, du bitcoin en programmé, des objectifs. Pour tout essayer sans connecter de banque.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button disabled={busy} onClick={() => void run(async () => toast({ message: `${await loadDemo()} opérations de démo chargées`, tone: 'gold' }))}>
+              Charger la démo
+            </Button>
+            {!!counts?.demo && (
+              <Button variant="secondary" disabled={busy} onClick={() => void run(() => replaceWithUndo('Démo supprimée', clearDemo))}>
+                Supprimer la démo
+              </Button>
+            )}
+          </div>
+        </Card>
+      </Reveal>
+
+      <Reveal index={2}>
+        <SectionTitle>Tout effacer</SectionTitle>
+        <Card tone="danger">
+          <p className="t-small text-secondary">Efface toutes les données de cet appareil et revient aux réglages de départ. Tu as quelques secondes pour annuler ; exporte une sauvegarde avant si tu veux la garder.</p>
+          <Button variant="danger" icon="trash" className="mt-3" disabled={busy} onClick={() => void run(() => replaceWithUndo('Toutes les données ont été effacées', wipeAll))}>
+            Tout effacer
+          </Button>
+        </Card>
+      </Reveal>
+    </Screen>
   );
 }

@@ -1,4 +1,5 @@
-// Captures mobiles (390 px) de chaque écran avec les données de démo + détection des erreurs console.
+// Captures mobiles de chaque écran avec les données de démo, en thème sombre (Nuit) et clair (Perle),
+// de 320 à 430 px de large, + contrôle des erreurs console, des débordements horizontaux, du clavier et du hors-ligne.
 // Prérequis : `npm run build`. Usage : node scripts/screenshots.mjs   (CHROME_PATH pour un autre navigateur)
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -39,9 +40,9 @@ try {
   });
   page.on('pageerror', (e) => problems.push(`[pageerror] ${page.url()} : ${e.message}`));
 
-  const settle = async () => {
+  const settle = async (ms = 900) => {
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(ms);
   };
   const checkOverflow = async (name) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -53,56 +54,107 @@ try {
     console.log('✓', name);
   };
 
-  // Écran d'accueil vide
+  // Premier lancement : accueil guidé
   await page.goto(BASE + '/');
   await settle();
-  await shot('00-accueil-vide', { fullPage: false });
+  await shot('00-bienvenue', { fullPage: false });
+  await page.getByRole('button', { name: 'Continuer' }).click();
+  await settle(500);
+  await shot('00b-bienvenue-revenus', { fullPage: false });
+  await page.getByRole('button', { name: 'Passer' }).click();
+  await settle();
+  await shot('00c-accueil-vide', { fullPage: false });
 
-  // Chargement des données de démo
+  // Données de démo
   await page.goto(BASE + '/reglages/donnees');
   await settle();
-  await page.getByRole('button', { name: 'Charger des données de démo' }).click();
-  await page.getByRole('status').waitFor();
+  await page.getByRole('button', { name: 'Charger la démo' }).click();
+  await page.getByText('opérations de démo chargées').waitFor({ timeout: 15000 });
   await settle();
 
   const routes = [
     ['01-aujourdhui', '/'],
-    ['02-cycle', '/cycle'],
-    ['03-operations', '/transactions'],
-    ['04-alertes', '/alertes'],
-    ['05-a-classer', '/a-classer'],
-    ['06-synchro', '/synchro'],
-    ['07-reglages', '/reglages'],
-    ['08-regles', '/reglages/regles'],
-    ['09-categories', '/reglages/categories'],
-    ['10-reglages-alertes', '/reglages/alertes'],
-    ['11-donnees', '/reglages/donnees'],
+    ['02-budget', '/budget'],
+    ['03-operations', '/operations'],
+    ['04-patrimoine', '/patrimoine'],
+    ['05-placement', '/patrimoine/placement/demo-p-pea'],
+    ['06-previsions', '/previsions'],
+    ['07-recurrents', '/recurrents'],
+    ['08-independance', '/independance'],
+    ['09-alertes', '/alertes'],
+    ['10-a-classer', '/a-classer'],
+    ['11-reglages', '/reglages'],
+    ['12-budget-mensuel', '/reglages/budget'],
+    ['13-apparence', '/reglages/apparence'],
+    ['14-banques', '/synchro'],
+    ['15-regles', '/reglages/regles'],
+    ['16-categories', '/reglages/categories'],
+    ['17-donnees', '/reglages/donnees'],
   ];
-  for (const [name, path] of routes) {
-    await page.goto(BASE + path);
+
+  const setTheme = async (name) => {
+    await page.goto(BASE + '/reglages/apparence');
+    await settle(400);
+    await page.getByRole('radio', { name: new RegExp(`^Thème ${name}`) }).click();
+    await settle(400);
+  };
+
+  for (const theme of ['Nuit', 'Perle']) {
+    const t = theme.toLowerCase();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await setTheme(theme);
+    for (const [name, path] of routes) {
+      await page.goto(BASE + path);
+      await settle();
+      await shot(`${t}-390-${name}`);
+    }
+    // Ce que l'on voit sans défiler, et la barre condensée au défilement
+    await page.goto(BASE + '/');
     await settle();
-    await shot(name);
+    await shot(`${t}-390-01b-aujourdhui-ecran`, { fullPage: false });
+    await page.mouse.wheel(0, 500);
+    await page.waitForTimeout(600);
+    await shot(`${t}-390-01c-barre-condensee`, { fullPage: false });
+
+    // Feuille d'une opération
+    await page.goto(BASE + '/operations');
+    await settle();
+    await page.locator('main button.hl').filter({ hasText: /€/ }).first().click();
+    await page.waitForTimeout(700);
+    await shot(`${t}-390-18-feuille-operation`, { fullPage: false });
+    await page.keyboard.press('Escape');
+
+    // Petits et grands téléphones
+    for (const width of [320, 430]) {
+      await page.setViewportSize({ width, height: width === 320 ? 640 : 932 });
+      for (const [name, path] of routes) {
+        await page.goto(BASE + path);
+        await settle(500);
+        await checkOverflow(`${t}-${width}-${name}`);
+      }
+      for (const [name, path] of [routes[0], routes[1], routes[3], routes[5]]) {
+        await page.goto(BASE + path);
+        await settle();
+        await shot(`${t}-${width}-${name}`, { fullPage: false });
+      }
+    }
   }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setTheme('Nuit');
 
-  // Premier écran (ce que l'on voit sans défiler) de l'accueil
-  await page.goto(BASE + '/');
+  // Grand écran : barre latérale
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await page.goto(BASE + '/patrimoine');
   await settle();
-  await shot('01b-aujourdhui-ecran', { fullPage: false });
-
-  // Édition d'une opération
-  await page.goto(BASE + '/transactions');
-  await settle();
-  await page.locator('main ul li button').first().click();
-  await page.waitForTimeout(400);
-  await shot('12-edition-operation', { fullPage: false });
-  await page.keyboard.press('Escape');
+  await shot('nuit-1280-patrimoine', { fullPage: false });
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // File à classer : raccourci clavier
   await page.goto(BASE + '/a-classer');
   await settle();
   await page.keyboard.press('1');
-  await page.waitForTimeout(500);
-  await shot('13-a-classer-apres-raccourci', { fullPage: false });
+  await page.waitForTimeout(600);
+  await shot('19-a-classer-apres-raccourci', { fullPage: false });
 
   // Navigation au clavier : le lien d'évitement doit être le premier élément focusable
   await page.goto(BASE + '/');
@@ -117,20 +169,24 @@ try {
   await context.setOffline(true);
   await page.reload();
   await settle().catch(() => {});
-  const offlineOk = await page.getByText('Budget Dodge').first().isVisible().catch(() => false);
-  if (!offlineOk) problems.push('[pwa] l’app ne se charge pas hors ligne');
-  else await shot('14-hors-ligne', { fullPage: false });
+  const offlineOk = await page.getByRole('heading', { name: 'Aujourd’hui' }).first().isVisible().catch(() => false);
+  if (!offlineOk) problems.push('[pwa] l’app ne se recharge pas hors ligne');
+  else console.log('✓ rechargement hors ligne');
   await context.setOffline(false);
 
   await browser.close();
+} catch (e) {
+  problems.push(`[script] ${e instanceof Error ? e.stack : e}`);
 } finally {
   stop();
 }
 
-// Les appels au relais sans clé Enable Banking renvoient 503 en local : ce n'est pas une erreur de l'app.
-const real = problems.filter((p) => !/status of 503/.test(p));
+// Les requêtes vers le relais sans configuration Enable Banking (503) et le service worker en preview sont attendues.
+const real = problems.filter((p) => !/status of 503|status of 401|Failed to load resource/.test(p));
 if (real.length) {
-  console.error('\nProblèmes détectés :\n' + real.join('\n'));
-  process.exit(1);
+  console.log('\nProblèmes détectés :');
+  for (const p of real) console.log(' -', p);
+  process.exitCode = 1;
+} else {
+  console.log('\nAucune erreur console, aucun débordement horizontal.');
 }
-console.log('\nAucune erreur console, aucun débordement horizontal.');

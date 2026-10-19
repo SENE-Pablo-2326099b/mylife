@@ -10,6 +10,7 @@
  */
 import { createSign, timingSafeEqual, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { fetchQuotes, MarketInputError, searchAssets } from './market.js';
 
 export const EB_API_BASE = 'https://api.enablebanking.com';
 
@@ -246,6 +247,15 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
   if (!authenticated) {
     await new Promise((r) => setTimeout(r, 400));
     return reply(401, { error: 'Mot de passe du relais incorrect.' });
+  }
+  // Cours des placements : n'a besoin que du mot de passe, pas de la configuration Enable Banking.
+  if (op === 'quotes' || op === 'searchAsset') {
+    try {
+      return reply(200, op === 'quotes' ? await fetchQuotes(body, fetchImpl) : await searchAssets(body, fetchImpl));
+    } catch (e) {
+      if (e instanceof MarketInputError) return reply(400, { error: e.message });
+      return reply(502, { error: 'Service de cours injoignable.' });
+    }
   }
   if (!env.appId || !env.privateKey) {
     return reply(503, { error: 'Relais non configuré : EB_APP_ID ou EB_PRIVATE_KEY manquant.', configured: false });
