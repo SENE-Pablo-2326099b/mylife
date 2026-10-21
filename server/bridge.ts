@@ -325,7 +325,9 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
     return reply(res.status, {
       error: /application is not active/i.test(message)
         ? 'Application Enable Banking pas encore activée : sur enablebanking.com → Applications → ton application → « Link accounts », puis lie ta banque.'
-        : message,
+        : /redirect uri not allowed/i.test(message)
+          ? `Adresse de retour pas encore autorisée chez Enable Banking : sur enablebanking.com → Applications → ton application → « Redirect URLs », ajoute ${typeof body.redirectUrl === 'string' ? body.redirectUrl : 'l’adresse de retour de l’app'}`
+          : message,
       code: typeof d.error === 'string' ? d.error : undefined,
       detail: d.detail,
     });

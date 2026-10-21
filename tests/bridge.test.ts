@@ -91,6 +91,16 @@ describe('handleBridge', () => {
     expect(out.body).toMatchObject({ error: 'Session expired', code: 'EXPIRED_SESSION' });
   });
 
+  it('adresse de retour inconnue d’Enable Banking : dit laquelle ajouter', async () => {
+    const f = mockFetch(422, { message: 'Redirect URI not allowed', error: 'REDIRECT_URI_NOT_ALLOWED' });
+    const out = await handleBridge(
+      req({ op: 'startAuth', aspsp: { name: 'Revolut', country: 'FR' }, redirectUrl: 'https://budget.example/finances/connexion/retour', state: 's_abcdef123', validUntil: '2026-12-01T00:00:00Z' }),
+      env,
+      f,
+    );
+    expect((out.body as { error: string }).error).toContain('Redirect URLs », ajoute https://budget.example/finances/connexion/retour');
+  });
+
   it('explique quoi faire quand l’application Enable Banking n’est pas activée', async () => {
     const f = mockFetch(403, { message: 'Application is not active' });
     const out = await handleBridge(req({ op: 'aspsps', country: 'FR' }), env, f);

@@ -131,6 +131,11 @@ export async function cloudAccountStatus(): Promise<{ count: number; lastUpdated
   return accountStatus(platform.api, session, 'finances');
 }
 
+/** Nombre d'éléments synchronisables sur cet appareil (pour choisir lesquels garder). */
+export async function localItemCount(): Promise<number> {
+  return (await store.snapshot()).length;
+}
+
 /** Données de l'appareil téléchargées en JSON (filet de sécurité avant un remplacement). */
 export async function downloadLocalCopy(): Promise<void> {
   if ((await db.transactions.count()) === 0 && (await db.portfolios.count()) === 0) return;

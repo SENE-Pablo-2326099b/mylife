@@ -9,6 +9,7 @@ import {
   cloudSignIn,
   cloudSignOut,
   downloadLocalCopy,
+  localItemCount,
   syncCloud,
   useCloud,
 } from '../../sync/cloud';
@@ -120,11 +121,15 @@ function RecoveryKeyCard({ recoveryKey, onDone }: { recoveryKey: string; onDone:
 /** Première synchro de cet appareil : envoyer ses données, ou prendre celles du compte. */
 function JoinCard() {
   const [status, setStatus] = useState<{ count: number; lastUpdated: number | null } | null>(null);
+  const [local, setLocal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     cloudAccountStatus().then(setStatus, (e: unknown) => setError(errorText(e)));
+    void localItemCount().then(setLocal);
   }, []);
+  // L'appareil le plus complet est proposé en premier : on ne remplace jamais de vraies données par du vide.
+  const deviceRicher = status !== null && local !== null && local > status.count;
 
   const run = async (mode: 'auto' | 'useAccount' | 'useDevice') => {
     setBusy(true);
@@ -155,14 +160,30 @@ function JoinCard() {
       {status && status.count > 0 && (
         <>
           <p className="t-small mt-2 text-secondary">
-            Ton compte contient déjà {status.count} éléments MyFinances{status.lastUpdated ? `, modifiés le ${formatDateTime(new Date(status.lastUpdated).toISOString())}` : ''}. Ils vont <strong className="text-ink">remplacer</strong> les données de cet appareil (une copie de celles-ci est d’abord téléchargée, par sécurité).
+            <strong className="text-ink">Cet appareil : {local ?? '…'} éléments · ton compte : {status.count} éléments</strong>
+            {status.lastUpdated ? ` (modifiés le ${formatDateTime(new Date(status.lastUpdated).toISOString())})` : ''}. Un seul des deux est gardé, puis tous tes appareils le partagent.
           </p>
-          <Button className="mt-3 w-full" icon="download" disabled={busy} onClick={() => void run('useAccount')}>
-            {busy ? 'Récupération…' : 'Récupérer les données du compte'}
-          </Button>
-          <Button variant="ghost" className="mt-2 w-full" disabled={busy} onClick={() => void run('useDevice')}>
-            Garder plutôt celles de cet appareil (remplace le compte)
-          </Button>
+          {deviceRicher ? (
+            <>
+              <p className="t-small mt-2 text-secondary">Cet appareil a plus de données que le compte : garde-les (elles remplaceront celles du compte).</p>
+              <Button className="mt-3 w-full" icon="upload" disabled={busy} onClick={() => void run('useDevice')}>
+                {busy ? 'Envoi…' : 'Garder les données de cet appareil'}
+              </Button>
+              <Button variant="ghost" className="mt-2 w-full" disabled={busy} onClick={() => void run('useAccount')}>
+                Prendre quand même celles du compte (copie de sécurité téléchargée)
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button className="mt-3 w-full" icon="download" disabled={busy} onClick={() => void run('useAccount')}>
+                {busy ? 'Récupération…' : 'Récupérer les données du compte'}
+              </Button>
+              <p className="t-caption mt-1 text-muted">Une copie des données de cet appareil est d’abord téléchargée, par sécurité.</p>
+              <Button variant="ghost" className="mt-2 w-full" disabled={busy} onClick={() => void run('useDevice')}>
+                Garder plutôt celles de cet appareil (remplace le compte)
+              </Button>
+            </>
+          )}
         </>
       )}
       {error && <p className="t-small mt-2 text-danger">{error}</p>}
