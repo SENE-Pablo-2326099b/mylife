@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { db, getMeta } from '../db/db';
 import { getSettings } from '../db/seed';
 import { EbClient } from './ebClient';
+import { syncBankBuys } from '../domain/wealthDb';
 import { EnableBankingSource } from './enableBankingSource';
 import { syncAll, type AccountSyncReport } from './syncEngine';
 
@@ -46,6 +47,8 @@ export async function runSync(): Promise<AccountSyncReport[] | null> {
     const settings = await getSettings();
     if (!settings.bridgePassword) throw new Error('Saisis le mot de passe du relais dans Synchro.');
     const reports = await syncAll(new EnableBankingSource(new EbClient(settings.bridgePassword)), settings);
+    // Nouveaux prélèvements Bitstack (ou autre ligne reliée à la banque) → achats.
+    await syncBankBuys().catch(() => 0);
     set({ syncing: false, reports, finishedAt: Date.now() });
     return reports;
   } catch (e) {

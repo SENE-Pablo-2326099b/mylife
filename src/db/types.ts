@@ -227,9 +227,17 @@ export interface Holding {
   priceAt: number | null;
   order: number;
   createdAt: number;
+  /**
+   * Achats automatiques : chaque prélèvement bancaire dont le libellé contient ce mot (ex. « bitstack »)
+   * devient un achat, au cours du jour du prélèvement. null = désactivé.
+   */
+  bankKeyword?: string | null;
+  /** Prélèvements pris en compte à partir de cette date (les plus anciens sont dans le recalage). */
+  bankLinkFrom?: string | null;
 }
 
-export type InvestmentOpType = 'buy' | 'sell' | 'dividend' | 'fee' | 'interest';
+/** « adjust » = recalage : quantité et prix de revient total tels que les affiche le courtier, à cette date. */
+export type InvestmentOpType = 'buy' | 'sell' | 'dividend' | 'fee' | 'interest' | 'adjust';
 
 export interface InvestmentOp {
   id: string;
@@ -246,6 +254,8 @@ export interface InvestmentOp {
   estimated: boolean;
   note: string;
   createdAt: number;
+  /** Achat créé à partir d'un prélèvement bancaire (id de l'opération bancaire). */
+  bankTxId?: string | null;
 }
 
 export type PlanFrequency = 'weekly' | 'biweekly' | 'monthly';

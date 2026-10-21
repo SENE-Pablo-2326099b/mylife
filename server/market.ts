@@ -151,3 +151,37 @@ export async function searchAssets(body: Record<string, unknown>, fetchImpl: Fet
   }
   return { results };
 }
+
+/**
+ * Cours de clôture quotidiens en euros sur les `days` derniers jours (≤ 400) : sert à convertir un
+ * achat daté (ex. prélèvement Bitstack) en quantité au cours de ce jour-là.
+ * Hors euro (Yahoo), conversion au taux du jour : approximation suffisante pour une quantité estimée.
+ */
+export async function fetchHistory(body: Record<string, unknown>, fetchImpl: FetchLike): Promise<{ prices: [string, number][] }> {
+  const [item] = parseItems({ items: [{ source: body.source, symbol: body.symbol }] });
+  const days = typeof body.days === 'number' && Number.isFinite(body.days) ? Math.max(1, Math.min(400, Math.round(body.days))) : 30;
+  const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  if (item.source === 'coingecko') {
+    const data = (await getJson(fetchImpl, `${COINGECKO}/coins/${item.symbol}/market_chart?vs_currency=eur&days=${days}&interval=daily`)) as { prices?: [number, number][] };
+    return { prices: (data.prices ?? []).filter((p) => typeof p[1] === 'number').map(([t, p]) => [day(t), p]) };
+  }
+  const range = days <= 30 ? '1mo' : days <= 90 ? '3mo' : days <= 180 ? '6mo' : days <= 365 ? '1y' : '2y';
+  const data = (await getJson(fetchImpl, `${YAHOO}/v8/finance/chart/${encodeURIComponent(item.symbol)}?range=${range}&interval=1d`)) as {
+    chart?: { result?: { meta?: YahooMeta; timestamp?: number[]; indicators?: { quote?: { close?: (number | null)[] }[] } }[] };
+  };
+  const r = data.chart?.result?.[0];
+  let factor = 1;
+  let cur = r?.meta?.currency ?? 'EUR';
+  if (cur === 'GBp' || cur === 'GBX') {
+    factor = 0.01;
+    cur = 'GBP';
+  }
+  if (cur !== 'EUR') factor *= (await yahooMeta(fetchImpl, `${cur}EUR=X`)).regularMarketPrice as number;
+  const closes = r?.indicators?.quote?.[0]?.close ?? [];
+  const prices: [string, number][] = [];
+  (r?.timestamp ?? []).forEach((t, i) => {
+    const c = closes[i];
+    if (typeof c === 'number') prices.push([day(t * 1000), c * factor]);
+  });
+  return { prices };
+}

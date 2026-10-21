@@ -13,12 +13,15 @@ import { formatCents } from '../../lib/money';
 import { relativeTime } from '../../lib/relative';
 import { Badge, Button, Card, EmptyState, Group, IconButton, Metric, Money, Reveal, Row, SectionTitle, Sheet, Tap, toast, ActionList } from '../../ui/index';
 import { NotFoundScreen, Screen } from '../../ui/Screen';
-import { HoldingForm, OpForm, PlanForm, PortfolioForm } from './forms';
+import { AdjustForm, BankLinkForm, HoldingForm, OpForm, PlanForm, PortfolioForm } from './forms';
 
 const qty = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 8 });
 const pct = (gain: number, base: number) => (base > 0 ? `${gain >= 0 ? '+' : ''}${((gain * 100) / base).toFixed(1).replace('.', ',')} %` : '');
 
-type Panel = { kind: 'holding'; holding: Holding | null } | { kind: 'position'; id: string } | { kind: 'op'; holding: Holding; op: InvestmentOp | null } | { kind: 'plan'; holding: Holding; plan: InvestmentPlan | null } | { kind: 'edit' } | { kind: 'menu' };
+type Panel =
+  | { kind: 'adjust'; holding: Holding; op: InvestmentOp | null }
+  | { kind: 'bank'; holding: Holding }
+  | { kind: 'holding'; holding: Holding | null } | { kind: 'position'; id: string } | { kind: 'op'; holding: Holding; op: InvestmentOp | null } | { kind: 'plan'; holding: Holding; plan: InvestmentPlan | null } | { kind: 'edit' } | { kind: 'menu' };
 
 export default function PortfolioDetailPage() {
   const { id } = useParams();
@@ -67,7 +70,7 @@ export default function PortfolioDetailPage() {
       refreshPlannedSavings,
     );
 
-  const title = shown?.kind === 'holding' ? (shown.holding ? 'Modifier la ligne' : 'Nouvelle ligne') : shown?.kind === 'op' ? 'Mouvement' : shown?.kind === 'plan' ? 'Investissement programmé' : shown?.kind === 'edit' ? 'Modifier le placement' : shown?.kind === 'position' ? (position?.holding.name ?? '') : p.name;
+  const title = shown?.kind === 'adjust' ? 'Recaler sur l’app du courtier' : shown?.kind === 'bank' ? 'Achats depuis ma banque' : shown?.kind === 'holding' ? (shown.holding ? 'Modifier la ligne' : 'Nouvelle ligne') : shown?.kind === 'op' ? 'Mouvement' : shown?.kind === 'plan' ? 'Investissement programmé' : shown?.kind === 'edit' ? 'Modifier le placement' : shown?.kind === 'position' ? (position?.holding.name ?? '') : p.name;
 
   return (
     <Screen
@@ -170,6 +173,16 @@ export default function PortfolioDetailPage() {
           />
         )}
         {shown?.kind === 'edit' && <PortfolioForm initial={p} onDone={() => setPanel(null)} />}
+        {shown?.kind === 'adjust' && (
+          <AdjustForm
+            key={shown.op?.id ?? 'new'}
+            holding={shown.holding}
+            initial={shown.op}
+            current={summary.positions.find((x) => x.holding.id === shown.holding.id) ?? { quantity: 0, averageCost: null }}
+            onDone={() => setPanel(null)}
+          />
+        )}
+        {shown?.kind === 'bank' && <BankLinkForm holding={shown.holding} provider={p.provider || p.name} onDone={() => setPanel(null)} />}
         {shown?.kind === 'holding' && <HoldingForm key={shown.holding?.id ?? 'new'} portfolio={p} initial={shown.holding} onDone={() => setPanel(null)} />}
         {shown?.kind === 'op' && <OpForm key={shown.op?.id ?? 'new'} holding={shown.holding} initial={shown.op} onDone={() => setPanel(null)} />}
         {shown?.kind === 'plan' && (
@@ -204,7 +217,20 @@ export default function PortfolioDetailPage() {
               {position.holding.symbol ? ` · ${position.holding.symbol}` : ''} · cours {position.holding.quoteSource === 'manual' ? 'saisi à la main' : position.holding.quoteSource === 'yahoo' ? 'Yahoo Finance' : 'CoinGecko'}
               {position.holding.priceAt ? `, ${relativeTime(position.holding.priceAt)}` : ''}
             </p>
-            {position.estimated && <Badge tone="warning">Quantités estimées par un plan programmé : vérifie-les avec ton relevé</Badge>}
+            {position.holding.bankKeyword && <Badge tone="accent">Achats automatiques : prélèvements « {position.holding.bankKeyword} »</Badge>}
+            {position.estimated && (
+              <Badge tone="warning">{position.holding.bankKeyword ? 'Quantités au cours du jour du prélèvement (frais non connus) : recale de temps en temps' : 'Quantités estimées par un plan programmé : vérifie-les ou recale la ligne'}</Badge>
+            )}
+            {position.holding.assetClass !== 'cash' && (
+              <div className="grid grid-cols-2 gap-2">
+                <Button size="sm" icon="check" onClick={() => setPanel({ kind: 'adjust', holding: position.holding, op: null })}>
+                  Recaler sur l’app
+                </Button>
+                <Button size="sm" variant="secondary" icon="bank" onClick={() => setPanel({ kind: 'bank', holding: position.holding })}>
+                  Achats depuis ma banque
+                </Button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <Button size="sm" icon="add" onClick={() => setPanel({ kind: 'op', holding: position.holding, op: null })}>
                 Mouvement
@@ -236,7 +262,7 @@ export default function PortfolioDetailPage() {
                   .slice(0, 30)
                   .map((o) => (
                     <div key={o.id} className="flex min-h-[54px] items-center gap-2 pl-4 pr-1">
-                      <Tap onClick={() => setPanel({ kind: 'op', holding: position.holding, op: o })} scaleTo={0.985} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left">
+                      <Tap onClick={() => setPanel(o.type === 'adjust' ? { kind: 'adjust', holding: position.holding, op: o } : { kind: 'op', holding: position.holding, op: o })} scaleTo={0.985} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left">
                         <span className="min-w-0 flex-1">
                           <span className="t-body-strong block truncate">
                             {OP_LABEL[o.type]}
@@ -245,10 +271,11 @@ export default function PortfolioDetailPage() {
                           <span className="t-caption block truncate text-muted">
                             {formatShort(o.date)}
                             {o.quantity ? ` · ${qty(o.quantity)}` : ''}
+                            {o.type === 'adjust' && o.quantity > 0 ? ` · prix moyen ${formatCents(Math.round(o.amount / o.quantity))}` : ''}
                             {o.note ? ` · ${o.note}` : ''}
                           </span>
                         </span>
-                        <Money cents={o.type === 'buy' || o.type === 'fee' ? -o.amount : o.amount} sign tone={o.type === 'dividend' || o.type === 'interest' ? 'success' : undefined} />
+                        {o.type === 'adjust' ? <Money cents={o.amount} /> : <Money cents={o.type === 'buy' || o.type === 'fee' ? -o.amount : o.amount} sign tone={o.type === 'dividend' || o.type === 'interest' ? 'success' : undefined} />}
                       </Tap>
                       <IconButton icon="trash" size={17} label="Supprimer ce mouvement" onClick={() => deleteOp(o)} tone="muted" />
                     </div>

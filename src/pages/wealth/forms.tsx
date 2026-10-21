@@ -4,7 +4,7 @@ import { getSettings } from '../../db/seed';
 import type { Account, AssetClass, Goal, GoalMove, Holding, InvestmentOp, InvestmentOpType, InvestmentPlan, ManualAsset, Portfolio, PortfolioKind, PlanFrequency, QuoteSource } from '../../db/types';
 import { FREQUENCY_LABEL } from '../../domain/plans';
 import { ASSET_CLASS_LABEL } from '../../domain/wealth';
-import { recordSnapshot, refreshPlannedSavings, refreshQuotes } from '../../domain/wealthDb';
+import { recordSnapshot, refreshPlannedSavings, refreshQuotes, syncBankBuys } from '../../domain/wealthDb';
 import { todayISO } from '../../lib/dates';
 import { centsToInput, formatCents, tryDecimalToCents } from '../../lib/money';
 import { uid } from '../../lib/text';
@@ -288,6 +288,109 @@ export function OpForm({ holding, initial, onDone }: { holding: Holding; initial
       {op.estimated && <p className="t-caption text-warning">Quantité estimée au dernier cours connu : corrige-la avec celle de ton relevé.</p>}
       <TextField label="Note" value={op.note} onChange={(note) => set({ note })} placeholder="Facultatif" />
       <Button className="w-full" disabled={op.amount <= 0 && !(withQty && op.quantity > 0)} onClick={() => void save()}>
+        Enregistrer
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- recalage sur le courtier
+
+/**
+ * Recalage : la quantité et le prix d'achat moyen affichés par l'app du courtier (Bitstack, Trade
+ * Republic…) deviennent la référence à cette date. Plus-value = valeur − quantité × prix moyen,
+ * exactement comme dans l'app ; les achats suivants s'y ajoutent.
+ */
+export function AdjustForm({ holding, initial, current, onDone }: { holding: Holding; initial: InvestmentOp | null; current: { quantity: number; averageCost: number | null }; onDone: () => void }) {
+  const [date, setDate] = useState(initial?.date ?? todayISO());
+  const [quantity, setQuantity] = useState(initial?.quantity ?? current.quantity);
+  const [mode, setMode] = useState<'average' | 'total'>('average');
+  const [average, setAverage] = useState(initial && initial.quantity > 0 ? Math.round(initial.amount / initial.quantity) : (current.averageCost ?? 0));
+  const [total, setTotal] = useState(initial?.amount ?? 0);
+  const invested = mode === 'average' ? Math.round(quantity * average) : total;
+  const save = async () => {
+    await db.investmentOps.put({
+      id: initial?.id ?? uid('adj'),
+      holdingId: holding.id,
+      date,
+      type: 'adjust',
+      quantity,
+      amount: invested,
+      planId: null,
+      estimated: false,
+      note: 'Recalé sur l’app du courtier',
+      createdAt: initial?.createdAt ?? Date.now(),
+    });
+    await afterWrite();
+    toast({ message: 'Ligne recalée : quantité et prix d’achat moyen à jour', tone: 'gold' });
+    onDone();
+  };
+  return (
+    <div className="space-y-3">
+      <p className="t-small text-secondary">Recopie ce qu’affiche l’app de ton courtier. Tout ce qui précède cette date est remplacé par ces chiffres ; les achats suivants s’y ajoutent.</p>
+      <DateField label="Date" value={date} onChange={setDate} />
+      <QuantityField label={holding.assetClass === 'crypto' ? 'Quantité détenue (ex. 0,01234567 BTC)' : 'Quantité détenue'} value={quantity} onChange={setQuantity} />
+      <Segmented
+        options={[
+          { value: 'average', label: 'Prix d’achat moyen' },
+          { value: 'total', label: 'Total investi' },
+        ]}
+        value={mode}
+        onChange={setMode}
+        label="Ce que tu connais"
+      />
+      {mode === 'average' ? (
+        <MoneyField label="Prix d’achat moyen (par unité)" value={average} onCommit={(v) => setAverage(Math.abs(v ?? 0))} hint={quantity > 0 && average > 0 ? `soit ${formatCents(invested)} investis` : undefined} />
+      ) : (
+        <MoneyField label="Total investi" value={total} onCommit={(v) => setTotal(Math.abs(v ?? 0))} hint={quantity > 0 && total > 0 ? `soit ${formatCents(Math.round(total / quantity))} par unité` : undefined} />
+      )}
+      {holding.price !== null && quantity > 0 && invested > 0 && (
+        <p className="t-small text-secondary">
+          Au cours actuel : {formatCents(Math.round(quantity * holding.price))}, plus-value {formatCents(Math.round(quantity * holding.price) - invested, { sign: true })}.
+        </p>
+      )}
+      <Button className="w-full" disabled={quantity <= 0 || invested <= 0} onClick={() => void save()}>
+        Recaler
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- achats depuis la banque
+
+/** Relier une ligne aux prélèvements bancaires (Bitstack…) : chaque prélèvement devient un achat. */
+export function BankLinkForm({ holding, provider, onDone }: { holding: Holding; provider: string; onDone: () => void }) {
+  const [on, setOn] = useState(!!holding.bankKeyword);
+  const [keyword, setKeyword] = useState(holding.bankKeyword ?? provider.trim().toLowerCase());
+  const [from, setFrom] = useState(holding.bankLinkFrom ?? todayISO());
+  const save = async () => {
+    await db.holdings.update(holding.id, { bankKeyword: on && keyword.trim() ? keyword.trim() : null, bankLinkFrom: on ? from : null });
+    if (on) {
+      // Le plan programmé ferait doublon : ce sont les prélèvements réels qui font foi.
+      const plans = await db.plans.where('holdingId').equals(holding.id).toArray();
+      for (const p of plans) if (p.active) await db.plans.update(p.id, { active: false });
+      const n = await syncBankBuys();
+      toast({ message: n ? `${n} prélèvement${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} comme achat${n > 1 ? 's' : ''}` : 'Lien enregistré : les prochains prélèvements deviendront des achats' });
+    }
+    await afterWrite();
+    onDone();
+  };
+  return (
+    <div className="space-y-3">
+      <ToggleRow
+        label="Achats automatiques depuis ma banque"
+        hint="Chaque prélèvement dont le libellé contient ce mot devient un achat, au cours du jour du prélèvement. Un virement reçu de ce service devient une vente."
+        checked={on}
+        onChange={setOn}
+      />
+      {on && (
+        <>
+          <TextField label="Mot du libellé bancaire" value={keyword} onChange={setKeyword} mono hint="Ex. « bitstack » : tel qu’il apparaît sur tes opérations BNP / Revolut." />
+          <DateField label="Prélèvements pris en compte à partir du" value={from} onChange={setFrom} />
+          <p className="t-caption text-muted">Conseil : recale d’abord la ligne sur l’app (quantité + prix moyen) : les prélèvements jusqu’à la date du recalage sont alors déjà comptés, seuls les suivants s’ajoutent. Un plan programmé sur cette ligne est mis en pause pour éviter les doublons.</p>
+        </>
+      )}
+      <Button className="w-full" disabled={on && !keyword.trim()} onClick={() => void save()}>
         Enregistrer
       </Button>
     </div>

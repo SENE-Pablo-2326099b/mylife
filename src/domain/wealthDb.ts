@@ -2,9 +2,10 @@ import { db, getMeta, setMeta, type BudgetDB } from '../db/db';
 import { getSettings, updateSettings } from '../db/seed';
 import { changeWithUndo } from '../db/undo';
 import type { Holding } from '../db/types';
-import { todayISO, type ISODate } from '../lib/dates';
+import { addDays, diffDays, todayISO, type ISODate } from '../lib/dates';
 import { uid } from '../lib/text';
 import { EbClient } from '../sync/ebClient';
+import { bankBuys, priceLookup } from './bankBuys';
 import { dueOperations, plannedMonthlySavings } from './plans';
 import { makeSnapshot, netWorth, summarizePortfolio } from './wealth';
 
@@ -27,7 +28,8 @@ export async function runDuePlans(database: BudgetDB = db, today: ISODate = toda
     for (const plan of plans) {
       if (!plan.active) continue;
       const holding = await database.holdings.get(plan.holdingId);
-      if (!holding) continue;
+      // Ligne reliée aux prélèvements bancaires : ce sont eux qui font foi, pas le plan.
+      if (!holding || holding.bankKeyword) continue;
       const ops = dueOperations(plan, holding, today, () => uid('op'));
       if (ops.length === 0) continue;
       await database.investmentOps.bulkPut(ops);
@@ -35,6 +37,42 @@ export async function runDuePlans(database: BudgetDB = db, today: ISODate = toda
       created += ops.length;
     }
   });
+  return created;
+}
+
+/**
+ * Achats automatiques depuis les prélèvements bancaires (lignes avec un mot-clé, ex. Bitstack) :
+ * quantité au cours du jour du prélèvement (historique via le relais, sinon dernier cours connu).
+ * Renvoie le nombre d'achats créés.
+ */
+export async function syncBankBuys(database: BudgetDB = db, today: ISODate = todayISO()): Promise<number> {
+  const holdings = (await database.holdings.toArray()).filter((h) => h.bankKeyword);
+  if (!holdings.length) return 0;
+  const settings = await getSettings(database);
+  const client = settings.bridgePassword ? new EbClient(settings.bridgePassword) : null;
+  let created = 0;
+  for (const h of holdings) {
+    // Un achat sans cours (quantité 0) est recalculé dès qu'un cours est disponible.
+    const ops = (await database.investmentOps.where('holdingId').equals(h.id).toArray()).filter((o) => !(o.bankTxId && o.quantity === 0));
+    const from = h.bankLinkFrom ?? addDays(today, -400);
+    const txs = await database.transactions.where('date').aboveOrEqual(from).toArray();
+    const pending = bankBuys(h, txs, ops, () => null);
+    if (!pending.length) continue;
+    let history: [string, number][] = [];
+    if (client && h.symbol && h.quoteSource !== 'manual') {
+      const oldest = pending.reduce((m, o) => (o.date < m ? o.date : m), today);
+      try {
+        history = await client.priceHistory(h.quoteSource, h.symbol, diffDays(oldest, today) + 2);
+      } catch {
+        /* relais injoignable : dernier cours connu */
+      }
+    }
+    const fresh = bankBuys(h, txs, ops, priceLookup(history, h.price));
+    if (fresh.length) {
+      await database.investmentOps.bulkPut(fresh);
+      created += fresh.length;
+    }
+  }
   return created;
 }
 
@@ -91,6 +129,11 @@ export async function refreshQuotes(opts: { force?: boolean; maxAgeHours?: numbe
 /** Au lancement : plans échus, épargne prévue, photo du jour. Silencieux. */
 export async function wealthHousekeeping(database: BudgetDB = db): Promise<void> {
   await runDuePlans(database);
+  try {
+    await syncBankBuys(database);
+  } catch {
+    /* sans incidence : réessayé au prochain lancement */
+  }
   await refreshPlannedSavings(database);
   try {
     await refreshQuotes({}, database);

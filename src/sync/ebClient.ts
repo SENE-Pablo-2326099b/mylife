@@ -93,6 +93,12 @@ export class EbClient {
     return r.quotes ?? {};
   }
 
+  /** Cours de clôture quotidiens en euros (date ISO, prix en euros) sur les `days` derniers jours. */
+  async priceHistory(source: 'yahoo' | 'coingecko', symbol: string, days: number): Promise<[string, number][]> {
+    const r = await this.call<{ prices: [string, number][] }>('priceHistory', { source, symbol, days });
+    return r.prices ?? [];
+  }
+
   async searchAsset(query: string): Promise<AssetHit[]> {
     const r = await this.call<{ results: AssetHit[] }>('searchAsset', { query });
     return r.results ?? [];

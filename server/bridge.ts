@@ -10,7 +10,7 @@
  */
 import { createSign, timingSafeEqual, createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { fetchQuotes, MarketInputError, searchAssets } from './market.js';
+import { fetchHistory, fetchQuotes, MarketInputError, searchAssets } from './market.js';
 
 export const EB_API_BASE = 'https://api.enablebanking.com';
 
@@ -249,9 +249,9 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
     return reply(401, { error: 'Mot de passe du relais incorrect.' });
   }
   // Cours des placements : n'a besoin que du mot de passe, pas de la configuration Enable Banking.
-  if (op === 'quotes' || op === 'searchAsset') {
+  if (op === 'quotes' || op === 'searchAsset' || op === 'priceHistory') {
     try {
-      return reply(200, op === 'quotes' ? await fetchQuotes(body, fetchImpl) : await searchAssets(body, fetchImpl));
+      return reply(200, op === 'quotes' ? await fetchQuotes(body, fetchImpl) : op === 'priceHistory' ? await fetchHistory(body, fetchImpl) : await searchAssets(body, fetchImpl));
     } catch (e) {
       if (e instanceof MarketInputError) return reply(400, { error: e.message });
       return reply(502, { error: 'Service de cours injoignable.' });

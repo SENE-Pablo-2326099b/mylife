@@ -30,7 +30,9 @@ export function position(holding: Holding, ops: readonly InvestmentOp[]): Positi
   let invested = 0;
   let income = 0;
   let estimated = false;
-  const sorted = [...ops].filter((o) => o.holdingId === holding.id).sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt);
+  // Un recalage passe après les autres mouvements du même jour : il les inclut.
+  const rank = (o: InvestmentOp) => (o.type === 'adjust' ? 1 : 0);
+  const sorted = [...ops].filter((o) => o.holdingId === holding.id).sort((a, b) => a.date.localeCompare(b.date) || rank(a) - rank(b) || a.createdAt - b.createdAt);
   for (const o of sorted) {
     if (o.estimated) estimated = true;
     switch (o.type) {
@@ -52,6 +54,13 @@ export function position(holding: Holding, ops: readonly InvestmentOp[]): Positi
         break;
       case 'fee':
         income -= o.amount;
+        break;
+      case 'adjust':
+        // Recalage sur le courtier : la quantité et le prix de revient deviennent ceux affichés par
+        // l'app (frais, arrondis et estimations antérieures compris). Les mouvements suivants s'y ajoutent.
+        quantity = o.quantity;
+        invested = o.amount;
+        estimated = false;
         break;
     }
   }
@@ -124,7 +133,7 @@ export function netWorth(accounts: readonly Account[], summaries: readonly Portf
   return { cash, investments, invested, other, debts, total: cash + investments + other - debts };
 }
 
-export const OP_LABEL: Record<InvestmentOpType, string> = { buy: 'Achat', sell: 'Vente', dividend: 'Dividende', fee: 'Frais', interest: 'Intérêts' };
+export const OP_LABEL: Record<InvestmentOpType, string> = { buy: 'Achat', sell: 'Vente', dividend: 'Dividende', fee: 'Frais', interest: 'Intérêts', adjust: 'Recalage' };
 
 export const ASSET_CLASS_LABEL: Record<AssetClass, string> = {
   etf: 'ETF',
