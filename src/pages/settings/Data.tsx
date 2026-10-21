@@ -4,9 +4,11 @@ import { db } from '../../db/db';
 import { getSettings, updateSettings } from '../../db/seed';
 import { backupFileName, exportBackup, importBackup, wipeAll } from '../../domain/backup';
 import { clearDemo, loadDemo } from '../../domain/demo';
+import { clearErrors, readErrors } from '../../lib/errorLog';
 import { useCloud } from '../../sync/cloud';
 import { Button, Card, Reveal, SectionTitle, toast } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
+import { APP_NAME } from '../../lib/app';
 
 export default function DataPage() {
   const cloud = useCloud();
@@ -116,7 +118,9 @@ export default function DataPage() {
         </Card>
       </Reveal>
 
-      <Reveal index={2}>
+      <ErrorJournal />
+
+      <Reveal index={3}>
         <SectionTitle>Tout effacer</SectionTitle>
         <Card tone="danger">
           <p className="t-small text-secondary">
@@ -128,5 +132,45 @@ export default function DataPage() {
         </Card>
       </Reveal>
     </Screen>
+  );
+}
+
+/** Les derniers plantages, gardés sur cet appareil : à copier pour signaler un problème. */
+function ErrorJournal() {
+  const [errors, setErrors] = useState(readErrors);
+  const copy = () => {
+    const text = errors.map((e) => `${new Date(e.at).toISOString()} [${e.source}] ${e.path}\n${e.message}${e.stack ? `\n${e.stack}` : ''}`).join('\n\n');
+    void navigator.clipboard.writeText(`${APP_NAME} ${__APP_BUILD__}\n\n${text}`).then(
+      () => toast({ message: 'Journal copié' }),
+      () => toast({ message: 'Copie impossible sur ce navigateur' }),
+    );
+  };
+  return (
+    <Reveal index={2}>
+      <SectionTitle>Journal d’erreurs</SectionTitle>
+      <Card>
+        {errors.length === 0 ? (
+          <p className="t-small text-secondary">Aucune erreur enregistrée sur cet appareil.</p>
+        ) : (
+          <>
+            <p className="t-small text-secondary">
+              {errors.length} erreur{errors.length > 1 ? 's' : ''}, la dernière le {new Date(errors[0]!.at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} : « {errors[0]!.message} ». Rien n’est envoyé : copie le journal pour le partager.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={copy}>Copier le journal</Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  clearErrors();
+                  setErrors([]);
+                }}
+              >
+                Vider
+              </Button>
+            </div>
+          </>
+        )}
+      </Card>
+    </Reveal>
   );
 }

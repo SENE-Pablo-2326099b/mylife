@@ -10,7 +10,7 @@ const BASE = `http://localhost:${PORT}/finances`;
 const executablePath = process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
 mkdirSync('screenshots', { recursive: true });
 
-const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'], {
   env: { ...process.env, BRIDGE_PASSWORD: 'demo-password' },
   stdio: 'ignore',
 });

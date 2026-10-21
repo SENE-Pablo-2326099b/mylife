@@ -8,7 +8,7 @@
  *
  * Utilisé par : api/eb.ts (Vercel), netlify/functions/eb.ts (Netlify), server/vitePlugin.ts (dev / preview).
  */
-import { createHash, createHmac, createSign, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, createSign, hkdfSync, randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fetchHistory, fetchQuotes, MarketInputError, searchAssets } from './market.js';
 
@@ -105,17 +105,62 @@ export function signJwt(appId: string, privateKeyPem: string, nowMs = Date.now()
  * Vérifié ici sans base de données : le relais n'a besoin que de savoir que le compte est valide.
  */
 export function verifySession(token: string | undefined, secret: string, now = Date.now()): boolean {
-  if (!token) return false;
+  return sessionUid(token, secret, now) !== null;
+}
+
+/** Identifiant du compte MyLife porté par un jeton valide, sinon null. */
+export function sessionUid(token: string | undefined, secret: string, now = Date.now()): string | null {
+  if (!token) return null;
   const [payload, sig] = token.replace(/^Bearer\s+/i, '').split('.');
-  if (!payload || !sig) return false;
+  if (!payload || !sig) return null;
   const expected = createHmac('sha256', secret).update(payload).digest();
   const given = Buffer.from(sig, 'base64url');
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return false;
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
     const { uid, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { uid?: unknown; exp?: unknown };
-    return typeof uid === 'string' && typeof exp === 'number' && exp > now;
+    return typeof uid === 'string' && typeof exp === 'number' && exp > now ? uid : null;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+/**
+ * Identifiants Enable Banking propres à un compte (pour les proches qui ont leur application) :
+ * scellés par le relais (AES-256-GCM, clé dérivée du secret des sessions) et liés au compte.
+ * L'app ne garde que le bloc scellé et le renvoie à chaque appel : le relais reste sans base ni état,
+ * et la clé privée n'est lisible que par lui.
+ */
+export interface EbCredentials {
+  appId: string;
+  privateKey: string;
+}
+
+function credentialsKey(secret: string): Buffer {
+  return Buffer.from(hkdfSync('sha256', secret, 'mylife-eb', 'eb-credentials v1', 32));
+}
+
+export function sealCredentials(uid: string, creds: EbCredentials, secret: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', credentialsKey(secret), iv);
+  cipher.setAAD(Buffer.from(uid));
+  const ct = Buffer.concat([cipher.update(JSON.stringify(creds), 'utf8'), cipher.final()]);
+  return `v1.${Buffer.concat([iv, ct, cipher.getAuthTag()]).toString('base64url')}`;
+}
+
+/** null si le bloc est abîmé, scellé avec un autre secret ou pour un autre compte. */
+export function openCredentials(sealed: string, uid: string, secret: string): EbCredentials | null {
+  try {
+    if (!sealed.startsWith('v1.')) return null;
+    const raw = Buffer.from(sealed.slice(3), 'base64url');
+    if (raw.length < 12 + 16 + 2) return null;
+    const decipher = createDecipheriv('aes-256-gcm', credentialsKey(secret), raw.subarray(0, 12));
+    decipher.setAAD(Buffer.from(uid));
+    decipher.setAuthTag(raw.subarray(raw.length - 16));
+    const plain = Buffer.concat([decipher.update(raw.subarray(12, raw.length - 16)), decipher.final()]).toString('utf8');
+    const c = JSON.parse(plain) as Partial<EbCredentials>;
+    return typeof c.appId === 'string' && typeof c.privateKey === 'string' ? { appId: c.appId, privateKey: c.privateKey } : null;
+  } catch {
+    return null;
   }
 }
 
@@ -261,14 +306,50 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
     return reply(503, { error: 'Relais non configuré : variable BRIDGE_PASSWORD ou SESSION_SECRET manquante.', configured: false });
   }
   const given = header(req, 'x-bridge-password') ?? '';
-  const authenticated = (given.length > 0 && !!env.password && safeEqual(given, env.password)) || (!!env.sessionSecret && verifySession(header(req, 'authorization'), env.sessionSecret));
+  const uid = env.sessionSecret ? sessionUid(header(req, 'authorization'), env.sessionSecret) : null;
+  const authenticated = (given.length > 0 && !!env.password && safeEqual(given, env.password)) || uid !== null;
+  // Application Enable Banking du compte connecté, sinon celle du relais.
+  const sealed = header(req, 'x-eb-credentials');
+  const own = sealed && uid && env.sessionSecret ? openCredentials(sealed, uid, env.sessionSecret) : null;
 
   if (op === 'status') {
-    return reply(200, { configured, authenticated, appIdSet: !!env.appId, privateKeySet: !!env.privateKey });
+    return reply(200, { configured: configured || !!own, authenticated, appIdSet: !!env.appId || !!own, privateKeySet: !!env.privateKey || !!own, ownCredentials: !!own });
   }
   if (!authenticated) {
     await new Promise((r) => setTimeout(r, 400));
     return reply(401, { error: 'Mot de passe du relais incorrect.' });
+  }
+  if (sealed && !own) {
+    return reply(400, { error: 'Identifiants Enable Banking de ce compte illisibles : renseigne-les à nouveau (Banques → Ma propre application).', code: 'CREDENTIALS' });
+  }
+  if (op === 'sealCredentials') {
+    if (!uid || !env.sessionSecret) return reply(401, { error: 'Connecte-toi à ton compte MyLife pour enregistrer ta propre application.' });
+    const appId = typeof body.appId === 'string' ? body.appId.trim() : '';
+    const pem = typeof body.privateKey === 'string' ? body.privateKey : '';
+    if (!UUID.test(appId)) return reply(400, { error: 'Identifiant d’application invalide (format attendu : xxxxxxxx-xxxx-…).' });
+    let privateKey: string;
+    let probe: string;
+    try {
+      privateKey = normalizePem(pem);
+      probe = signJwt(appId, privateKey);
+    } catch {
+      return reply(400, { error: 'Clé privée illisible : choisis le fichier .pem téléchargé à la création de l’application.' });
+    }
+    // Vérifie le couple identifiant + clé auprès d'Enable Banking avant de le sceller.
+    let check: Awaited<ReturnType<FetchLike>>;
+    try {
+      check = await fetchImpl(`${env.apiBase ?? EB_API_BASE}/application`, { method: 'GET', headers: { authorization: `Bearer ${probe}`, accept: 'application/json' } });
+    } catch {
+      return reply(502, { error: 'Enable Banking injoignable.' });
+    }
+    if (!check.ok) return reply(400, { error: 'Enable Banking refuse ce couple identifiant + clé : vérifie que la clé correspond bien à cette application.' });
+    let name = '';
+    try {
+      name = String((JSON.parse(await check.text()) as { name?: unknown }).name ?? '');
+    } catch {
+      /* nom facultatif */
+    }
+    return reply(200, { sealed: sealCredentials(uid, { appId, privateKey }, env.sessionSecret), name });
   }
   // Cours des placements : n'a besoin que du mot de passe, pas de la configuration Enable Banking.
   if (op === 'quotes' || op === 'searchAsset' || op === 'priceHistory') {
@@ -279,7 +360,9 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
       return reply(502, { error: 'Service de cours injoignable.' });
     }
   }
-  if (!env.appId || !env.privateKey) {
+  const appId = own?.appId ?? env.appId;
+  const appKey = own?.privateKey ?? env.privateKey;
+  if (!appId || !appKey) {
     return reply(503, { error: 'Relais non configuré : EB_APP_ID ou EB_PRIVATE_KEY manquant.', configured: false });
   }
 
@@ -293,7 +376,7 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
 
   let jwt: string;
   try {
-    jwt = signJwt(env.appId, env.privateKey);
+    jwt = signJwt(appId, appKey);
   } catch {
     return reply(500, { error: 'Clé privée invalide : impossible de signer le JWT.' });
   }

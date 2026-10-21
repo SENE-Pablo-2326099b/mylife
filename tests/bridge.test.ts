@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { buildUpstream, handleBridge, loadBridgeEnv, normalizePem, signJwt, type BridgeEnv } from '../server/bridge';
+import { buildUpstream, handleBridge, loadBridgeEnv, normalizePem, openCredentials, sealCredentials, signJwt, type BridgeEnv } from '../server/bridge';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
@@ -64,7 +64,7 @@ describe('handleBridge', () => {
   it('status indique la configuration sans rien révéler', async () => {
     const out = await handleBridge(req({ op: 'status' }, 'nope'), env);
     expect(out.status).toBe(200);
-    expect(out.body).toEqual({ configured: true, authenticated: false, appIdSet: true, privateKeySet: true });
+    expect(out.body).toEqual({ configured: true, authenticated: false, appIdSet: true, privateKeySet: true, ownCredentials: false });
     expect(JSON.stringify(out.body)).not.toContain('BEGIN');
   });
 
@@ -177,5 +177,55 @@ describe('accès au relais avec un compte MyLife', () => {
     const out = await handleBridge(reqToken({ op: 'status' }, token('u1', Date.now() + 60_000)), { ...withSession, password: undefined });
     expect(out.status).toBe(200);
     expect(out.body).toMatchObject({ configured: true, authenticated: true });
+  });
+
+  describe('application Enable Banking propre au compte', () => {
+    const OWN_APP = '11111111-2222-4333-8444-555555555555';
+    const own = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+    const reqOwn = (body: unknown, t: string, sealed: string) => ({ method: 'POST', headers: { authorization: `Bearer ${t}`, 'x-eb-credentials': sealed }, body });
+
+    it('scellé pour un compte, illisible pour un autre ou avec un autre secret', () => {
+      const sealed = sealCredentials('u1', { appId: OWN_APP, privateKey: own }, secret);
+      expect(sealed).not.toContain('PRIVATE');
+      expect(openCredentials(sealed, 'u1', secret)).toEqual({ appId: OWN_APP, privateKey: own });
+      expect(openCredentials(sealed, 'u2', secret)).toBeNull();
+      expect(openCredentials(sealed, 'u1', 'y'.repeat(40))).toBeNull();
+      expect(openCredentials(sealed.slice(0, -4) + 'AAAA', 'u1', secret)).toBeNull();
+    });
+
+    it('sealCredentials vérifie le couple auprès d’Enable Banking puis le scelle', async () => {
+      const f = mockFetch(200, { name: 'Appli de Léa' });
+      const out = await handleBridge(reqToken({ op: 'sealCredentials', appId: OWN_APP, privateKey: own }, token('u1', Date.now() + 60_000)), withSession, f);
+      expect(out.status).toBe(200);
+      const { sealed, name } = out.body as { sealed: string; name: string };
+      expect(name).toBe('Appli de Léa');
+      expect(openCredentials(sealed, 'u1', secret)?.appId).toBe(OWN_APP);
+      const [url, init] = f.mock.calls[0] as unknown as [string, { headers: Record<string, string> }];
+      expect(url).toBe('https://eb.test/application');
+      expect(decode(init.headers.authorization!.split(' ')[1]!.split('.')[0]!).kid).toBe(OWN_APP);
+    });
+
+    it('refuse sans session, avec une clé illisible ou un couple refusé', async () => {
+      expect((await handleBridge(req({ op: 'sealCredentials', appId: OWN_APP, privateKey: own }), withSession)).status).toBe(401);
+      expect((await handleBridge(reqToken({ op: 'sealCredentials', appId: OWN_APP, privateKey: 'pas une clé' }, token('u1', Date.now() + 60_000)), withSession)).status).toBe(400);
+      expect((await handleBridge(reqToken({ op: 'sealCredentials', appId: OWN_APP, privateKey: own }, token('u1', Date.now() + 60_000)), withSession, mockFetch(401, {}))).status).toBe(400);
+    });
+
+    it('les appels bancaires signent avec l’application du compte', async () => {
+      const sealed = sealCredentials('u1', { appId: OWN_APP, privateKey: own }, secret);
+      const f = mockFetch(200, { aspsps: [] });
+      await handleBridge(reqOwn({ op: 'aspsps', country: 'FR' }, token('u1', Date.now() + 60_000), sealed), withSession, f);
+      const [, init] = f.mock.calls[0] as unknown as [string, { headers: Record<string, string> }];
+      expect(decode(init.headers.authorization!.split(' ')[1]!.split('.')[0]!).kid).toBe(OWN_APP);
+      const status = await handleBridge(reqOwn({ op: 'status' }, token('u1', Date.now() + 60_000), sealed), withSession);
+      expect(status.body).toMatchObject({ ownCredentials: true });
+    });
+
+    it('un bloc d’un autre compte est refusé', async () => {
+      const sealed = sealCredentials('u2', { appId: OWN_APP, privateKey: own }, secret);
+      const out = await handleBridge(reqOwn({ op: 'aspsps', country: 'FR' }, token('u1', Date.now() + 60_000), sealed), withSession, mockFetch(200, {}));
+      expect(out.status).toBe(400);
+      expect(out.body).toMatchObject({ code: 'CREDENTIALS' });
+    });
   });
 });

@@ -9,6 +9,7 @@ import { absorbSetupLink } from './sync/setupLink';
 import { cloudBoot } from './sync/cloud';
 import { maybeAutoSync } from './sync/store';
 import { Backdrop } from './ui/Backdrop';
+import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
 import { Navigation, type TabDef } from './ui/Navigation';
 import { NotFoundScreen } from './ui/Screen';
@@ -128,6 +129,7 @@ function Shell() {
         Aller au contenu
       </a>
       <ScrollToTop />
+      <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={pageFallback}>
       <Routes>
         <Route path="/bienvenue" element={<OnboardingPage />} />
@@ -158,6 +160,7 @@ function Shell() {
         <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
       </Routes>
       </Suspense>
+      </ErrorBoundary>
       {!welcome && <Navigation tabs={tabs} />}
       <ToastHost />
     </>

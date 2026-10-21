@@ -12,11 +12,15 @@ import '@fontsource/sora/latin-600.css';
 import '@fontsource/sora/latin-700.css';
 import App from './App';
 import { BASE_PATH } from './lib/app';
+import { installErrorLog } from './lib/errorLog';
 import { startServiceWorker } from './lib/pwaUpdate';
 // Compte MyLife : installe le suivi des modifications avant l'ouverture de la base.
 import './sync/cloud';
 import { bootTheme } from './ui/themeRuntime';
 import './index.css';
+
+// Plantages gardés sur l'appareil (jamais envoyés) pour pouvoir les signaler.
+installErrorLog();
 
 // Bonnes couleurs dès la première image (thème recopié au dernier lancement).
 bootTheme();
