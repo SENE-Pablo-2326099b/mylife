@@ -90,6 +90,12 @@ describe('handleBridge', () => {
     expect(out.body).toMatchObject({ error: 'Session expired', code: 'EXPIRED_SESSION' });
   });
 
+  it('explique quoi faire quand l’application Enable Banking n’est pas activée', async () => {
+    const f = mockFetch(403, { message: 'Application is not active' });
+    const out = await handleBridge(req({ op: 'aspsps', country: 'FR' }), env, f);
+    expect((out.body as { error: string }).error).toMatch(/Link accounts/);
+  });
+
   it('rejette les paramètres invalides (injection de chemin)', async () => {
     const f = mockFetch(200, {});
     const out = await handleBridge(req({ op: 'balances', accountUid: '../../application' }), env, f);

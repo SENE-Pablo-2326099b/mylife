@@ -299,8 +299,11 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
   }
   if (!res.ok) {
     const d = (data ?? {}) as Record<string, unknown>;
+    const message = typeof d.message === 'string' ? d.message : `Erreur Enable Banking (${res.status})`;
     return reply(res.status, {
-      error: typeof d.message === 'string' ? d.message : `Erreur Enable Banking (${res.status})`,
+      error: /application is not active/i.test(message)
+        ? 'Application Enable Banking pas encore activée : sur enablebanking.com → Applications → ton application → « Link accounts », puis lie ta banque.'
+        : message,
       code: typeof d.error === 'string' ? d.error : undefined,
       detail: d.detail,
     });
