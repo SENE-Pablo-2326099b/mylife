@@ -169,6 +169,10 @@ export interface FireSettings {
   essentialCategoryIds: string[] | null;
   /** Dernier palier fêté (10 %, 25 %…), pour ne fêter chaque palier qu'une fois. */
   lastMilestone: number;
+  /** Année visée pour l'indépendance (null = pas encore choisie). */
+  goalYear: number | null;
+  /** Rythme simulé et gardé : versement mensuel et baisses par poste de dépense (id → part de 0 à 1). */
+  plan: { monthly: number; cuts: Record<string, number> } | null;
 }
 
 export interface Settings {

@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings } from '../src/db/types';
 import { CAT, DEFAULT_CATEGORIES, DEFAULT_FIRE, DEFAULT_SETTINGS } from '../src/domain/defaults';
-import { coastFi, fiTiers, fireLevers, milestoneReached, monteCarlo, monthsToTarget, passiveIncome, realAnnualRate, savingsRateHistory, scenarioSeries, spendingBreakdown, withdrawalTaxRate } from '../src/domain/fire';
+import {
+  affordableSpending,
+  capitalSeries,
+  computeFire,
+  cutsMonthly,
+  futureValue,
+  grossTarget,
+  milestoneReached,
+  monthsToTarget,
+  reducibleSpending,
+  requiredMonthly,
+  spendingBreakdown,
+  spendingCutNeeded,
+  withdrawalTaxRate,
+} from '../src/domain/fire';
 import type { PortfolioSummary } from '../src/domain/wealth';
 import { tx } from './helpers';
 
@@ -25,7 +39,7 @@ function year() {
   return out;
 }
 
-describe('indépendance financière v2', () => {
+describe('indépendance financière : objectif et plan', () => {
   it('dépenses réelles : essentielles (loyer, courses) et confort (restos)', () => {
     const b = spendingBreakdown(year(), cats, settings, TODAY);
     expect(b.source).toBe('history');
@@ -38,75 +52,70 @@ describe('indépendance financière v2', () => {
     expect(custom.essential / custom.annual).toBeCloseTo(0.2, 1);
   });
 
-  it('trois paliers, du plus proche au plus lointain ; l’impôt sur les retraits gonfle le capital visé', () => {
-    const breakdown = { annual: 1_200_000, essential: 960_000 };
-    const [lean, fi, fat] = fiTiers({ current: 5_000_000, monthly: 100_000, breakdown, settings: settings.fire, withdrawalTax: 0 });
-    expect(fi!.target).toBe(30_000_000);
-    expect(lean!.target).toBe(24_000_000);
-    expect(fat!.target).toBe(45_000_000);
-    expect(lean!.months!).toBeLessThan(fi!.months!);
-    expect(fi!.months!).toBeLessThan(fat!.months!);
-    const taxed = fiTiers({ current: 0, monthly: 0, breakdown, settings: settings.fire, withdrawalTax: 0.1 });
-    expect(taxed[1]!.target).toBe(Math.round(30_000_000 / 0.9));
+  it('capital nécessaire : dépenses ÷ taux de retrait, brut de l’impôt sur les retraits', () => {
+    expect(grossTarget(1_200_000, 400, 0)).toBe(30_000_000);
+    expect(grossTarget(1_200_000, 350, 0)).toBe(Math.round(1_200_000 / 0.035));
+    expect(grossTarget(1_200_000, 400, 0.1)).toBe(Math.round(30_000_000 / 0.9));
   });
 
-  it('Coast FI : il suffit de moins aujourd’hui si la retraite est loin', () => {
-    const r = realAnnualRate(settings.fire);
-    const coast = coastFi(30_000_000, r, 2000, 64, TODAY)!;
-    expect(coast).toBe(Math.round(30_000_000 / Math.pow(1 + r, 38)));
-    expect(coastFi(30_000_000, r, null, 64, TODAY)).toBeNull();
-    expect(coastFi(30_000_000, r, 1950, 64, TODAY)).toBeNull();
+  it('versement nécessaire : exactement ce qu’il faut pour arriver à temps', () => {
+    const r = 0.03;
+    const need = requiredMonthly(1_000_000, 30_000_000, r, 240)!;
+    expect(monthsToTarget(1_000_000, need, r, 30_000_000, 240)).not.toBeNull();
+    expect(monthsToTarget(1_000_000, need - 500, r, 30_000_000, 240)).toBeNull();
+    expect(requiredMonthly(40_000_000, 30_000_000, r, 12)).toBe(0);
+    // Le capital seul y arrive : rien à verser.
+    expect(requiredMonthly(20_000_000, 30_000_000, 0.05, 12 * 30)).toBe(0);
+    expect(requiredMonthly(0, 30_000_000, r, 0)).toBeNull();
   });
 
-  it('taux d’épargne mois par mois, revenus passifs', () => {
-    const h = savingsRateHistory(year(), cats, TODAY, 12);
-    expect(h).toHaveLength(12);
-    expect(h.at(-1)?.month).toBe('2026-09');
-    expect(h.at(-1)?.rate).toBeCloseTo(0.5, 5);
-    const ops = [
-      { id: 'd', holdingId: 'h', date: '2026-06-01', type: 'dividend' as const, quantity: 0, amount: 1200, planId: null, estimated: false, note: '', createdAt: 0 },
-      { id: 'f', holdingId: 'h', date: '2026-06-01', type: 'fee' as const, quantity: 0, amount: 200, planId: null, estimated: false, note: '', createdAt: 0 },
-      { id: 'old', holdingId: 'h', date: '2024-01-01', type: 'dividend' as const, quantity: 0, amount: 9999, planId: null, estimated: false, note: '', createdAt: 0 },
-    ];
-    expect(passiveIncome(ops, TODAY)).toBe(1000);
+  it('baisse de dépenses : investie et retirée du train de vie, elle suffit à tenir la date', () => {
+    const terms = { current: 1_000_000, realRate: 0.03, withdrawalBp: 400, tax: 0 };
+    const cut = spendingCutNeeded(terms, 50_000, 1_800_000, 240);
+    expect(cut).toBeGreaterThan(0);
+    expect(cut % 1000).toBe(0);
+    expect(monthsToTarget(terms.current, 50_000 + cut, terms.realRate, grossTarget(1_800_000 - 12 * cut, 400, 0), 240)).not.toBeNull();
+    // Il faut moins réduire ses dépenses qu'augmenter ses versements : l'effet joue deux fois.
+    expect(cut).toBeLessThan(requiredMonthly(terms.current, grossTarget(1_800_000, 400, 0), terms.realRate, 240)! - 50_000);
+    expect(spendingCutNeeded(terms, 5_000_000, 1_800_000, 240)).toBe(0);
   });
 
-  it('impôt sur les retraits : PEA 17,2 % et CTO 30 % sur la part de plus-value', () => {
+  it('revenu permis à une date : cohérent avec le capital atteint', () => {
+    const terms = { current: 1_000_000, realRate: 0.03, withdrawalBp: 400, tax: 0.1 };
+    const fv = futureValue(terms.current, 50_000, terms.realRate, 120);
+    expect(fv).toBe(capitalSeries(terms.current, 50_000, terms.realRate, 10).at(-1));
+    expect(affordableSpending(terms, 50_000, 120)).toBe(Math.round(fv * 0.04 * 0.9));
+  });
+
+  it('postes réductibles : sans les charges fixes ; économies par poste', () => {
+    const b = spendingBreakdown(year(), cats, settings, TODAY);
+    const red = reducibleSpending(b, cats);
+    expect(red.map((c) => c.id)).toEqual([CAT.courses, CAT.restos]);
+    expect(red[1]!.monthly).toBeGreaterThan(18_000);
+    expect(cutsMonthly(red, { [CAT.restos]: 0.5 })).toBe(Math.round(red[1]!.monthly * 0.5));
+    expect(cutsMonthly(red, { [CAT.restos]: 3, inconnu: 1 })).toBe(red[1]!.monthly);
+  });
+
+  it('plan : les économies avancent la date (versées et train de vie plus bas)', () => {
+    const input = { summaries: [], savingsAccounts: [{ id: 'l', balance: 2_000_000 }], txs: year(), cats, settings, today: TODAY, monthly: 30_000 };
+    const base = computeFire(input);
+    const planned = computeFire({ ...input, cutMonthly: 10_000 });
+    expect(planned.monthly).toBe(40_000);
+    expect(planned.annualSpending).toBe(base.annualSpending - 120_000);
+    expect(planned.months!).toBeLessThan(base.months!);
+    // Revenu visé saisi : les économies sont investies mais ne le changent pas.
+    const fixed = computeFire({ ...input, settings: { ...settings, fire: { ...settings.fire, annualSpendingOverride: 2_400_000 } }, cutMonthly: 10_000 });
+    expect(fixed.annualSpending).toBe(2_400_000);
+    expect(fixed.spendingAuto).toBe(false);
+  });
+
+  it('impôt sur les retraits (2026) : PEA 18,6 %, assurance-vie 17,2 %, CTO 31,4 % sur la part de plus-value', () => {
     const s = (wrapper: string, value: number, gain: number) => ({ portfolio: { id: wrapper, name: wrapper, provider: '', kind: 'broker', wrapper, order: 0, createdAt: 0 }, value, gain }) as unknown as PortfolioSummary;
-    expect(withdrawalTaxRate([s('PEA', 100_000, 50_000)])).toBeCloseTo(0.086, 3);
-    expect(withdrawalTaxRate([s('CTO', 100_000, 50_000)])).toBeCloseTo(0.15, 3);
+    expect(withdrawalTaxRate([s('PEA', 100_000, 50_000)])).toBeCloseTo(0.093, 3);
+    expect(withdrawalTaxRate([s('Assurance vie', 100_000, 50_000)])).toBeCloseTo(0.086, 3);
+    expect(withdrawalTaxRate([s('CTO', 100_000, 50_000)])).toBeCloseTo(0.157, 3);
     expect(withdrawalTaxRate([s('Livret A', 100_000, 0)])).toBe(0);
     expect(withdrawalTaxRate([])).toBe(0);
-  });
-
-  it('leviers : épargner plus ou payer moins de frais rapproche, moins de rendement éloigne', () => {
-    const l = Object.fromEntries(fireLevers({ current: 1_000_000, monthly: 50_000, target: 30_000_000, settings: settings.fire }).map((x) => [x.id, x.months]));
-    expect(l.plus100!).toBeGreaterThan(0);
-    expect(l.spend5!).toBeGreaterThan(0);
-    expect(l.fees!).toBeGreaterThan(0);
-    expect(l.return1!).toBeLessThan(0);
-  });
-
-  it('scénarios : prudent < médian < optimiste', () => {
-    const [low, mid, high] = scenarioSeries({ current: 1_000_000, monthly: 50_000, settings: settings.fire, years: 20 });
-    expect(low!.values.at(-1)!).toBeLessThan(mid!.values.at(-1)!);
-    expect(mid!.values.at(-1)!).toBeLessThan(high!.values.at(-1)!);
-  });
-
-  it('Monte-Carlo : déterministe, cohérent avec la projection, sans volatilité = certitude', () => {
-    const base = { current: 2_000_000, monthly: 100_000, target: 30_000_000, realRate: 0.03, annualSpending: 1_200_000 };
-    const a = monteCarlo({ ...base, volatility: 0.15, runs: 400, seed: 7 });
-    const b = monteCarlo({ ...base, volatility: 0.15, runs: 400, seed: 7 });
-    expect(a).toEqual(b);
-    expect(a.p10!).toBeLessThanOrEqual(a.p50!);
-    expect(a.p50!).toBeLessThanOrEqual(a.p90!);
-    expect(a.sustainable40).toBeGreaterThan(0.5);
-    // La médiane aléatoire suit la projection (un peu en dessous : versements réguliers + volatilité).
-    const det = monthsToTarget(base.current, base.monthly, base.realRate, base.target, 720)!;
-    expect(Math.abs(a.p50! - det) / det).toBeLessThan(0.2);
-    const calm = monteCarlo({ ...base, volatility: 0, runs: 50 });
-    expect(calm.p50).toBe(monthsToTarget(base.current, base.monthly, base.realRate, base.target, 720));
-    expect(calm.sustainable40).toBe(1);
   });
 
   it('paliers fêtés', () => {

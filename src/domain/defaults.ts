@@ -246,7 +246,8 @@ export const DEFAULT_ALERTS: AlertSettings = {
 export const DEFAULT_FIRE: FireSettings = {
   annualReturnBp: 500,
   inflationBp: 200,
-  withdrawalBp: 400,
+  // 3,5 % : plus prudent que la règle des 4 % (pensée pour 30 ans) quand l'indépendance arrive tôt.
+  withdrawalBp: 350,
   annualSpendingOverride: null,
   birthYear: null,
   retirementAge: 64,
@@ -255,6 +256,8 @@ export const DEFAULT_FIRE: FireSettings = {
   excludedIds: [],
   essentialCategoryIds: null,
   lastMilestone: 0,
+  goalYear: null,
+  plan: null,
 };
 
 export const DEFAULT_SETTINGS: Settings = {
