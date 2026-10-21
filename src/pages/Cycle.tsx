@@ -15,7 +15,7 @@ import { formatCents } from '../lib/money';
 import { LineChart } from '../ui/charts';
 import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { HeaderActions } from './Today';
+import { HeaderActions } from '../components/HeaderActions';
 
 const NO_TX: Transaction[] = [];
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BudgetExplainer } from '../components/BudgetExplainer';
+import { HeaderActions } from '../components/HeaderActions';
 import { ExceptionalSheet } from '../components/ExceptionalSheet';
 import { TxEditor } from '../components/TxEditor';
 import { TxRow } from '../components/TxRow';
@@ -11,13 +12,11 @@ import { useBudget } from '../domain/useBudget';
 import { useAlerts } from '../domain/useAlerts';
 import { useAccounts, useCategories, useCategoryMap } from '../hooks';
 import { formatCycle, formatDay, formatShort, todayISO } from '../lib/dates';
-import { openMyLifeApp } from '../lib/app';
 import { formatCents } from '../lib/money';
 import { relativeTime } from '../lib/relative';
-import { useSyncState } from '../sync/store';
 import { Ring } from '../ui/charts';
 import { Icon } from '../ui/icons';
-import { Badge, Button, Card, EmptyState, Group, IconButton, Money, Reveal, SectionTitle, StatTile } from '../ui/index';
+import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, StatTile } from '../ui/index';
 import { Screen } from '../ui/Screen';
 
 const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'danger'; icon: 'check-circle' | 'warning' }> = {
@@ -26,25 +25,7 @@ const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'dan
   bad: { label: 'Dépassé', tone: 'danger', icon: 'warning' },
 };
 
-/** Actions de l'en-tête des écrans principaux : alertes et synchro. */
-export function HeaderActions() {
-  const alerts = useAlerts();
-  const sync = useSyncState();
-  const serious = alerts.filter((a) => a.level !== 'info').length;
-  return (
-    <>
-      <IconButton
-        icon="bell"
-        label={serious ? `Alertes (${serious})` : 'Alertes'}
-        to="/alertes"
-        glass
-        badge={serious > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full" style={{ background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }} /> : undefined}
-      />
-      <IconButton icon="sync" label="Synchronisation bancaire" to="/synchro" glass className={sync.syncing ? '[&>svg]:animate-spin' : ''} />
-      <IconButton icon="barbell" label="Ouvrir MyPerf" glass onClick={() => openMyLifeApp('/perf/')} />
-    </>
-  );
-}
+export { HeaderActions };
 
 export default function TodayPage() {
   const categories = useCategories();
@@ -142,6 +123,13 @@ export default function TodayPage() {
         <StatTile label="Demain" value={formatCents(b.nextDailyBudget, { short: true })} hint="par jour" />
       </Reveal>
 
+      {b.cycle.earlyBy > 0 && (
+        <p className="t-small mt-2 flex items-center gap-1.5 px-1 text-secondary">
+          <Icon name="calendar" size={15} className="text-accent" />
+          Paie arrivée {b.cycle.earlyBy} jour{b.cycle.earlyBy > 1 ? 's' : ''} en avance : nouveau cycle depuis le {formatShort(b.cycle.start)}.
+        </p>
+      )}
+
       {b.daysElapsed > 0 && (
         <Reveal index={2} className="mt-3">
           <Card className="flex items-center gap-3">
@@ -158,43 +146,15 @@ export default function TodayPage() {
         </Reveal>
       )}
 
-      {(toClassify > 0 || serious.length > 0 || b.unallocated > 0 || b.cycle.earlyBy > 0) && (
-        <Reveal index={3} className="mt-3 space-y-2">
-          {b.unallocated > 0 && (
-            <Card tone="accent" className="flex items-center gap-3" onClick={() => setExceptional(true)}>
-              <Icon name="sparkles" className="text-accent" />
-              <span className="t-body min-w-0 flex-1">
-                Revenu exceptionnel : <strong className="font-semibold">{formatCents(b.unallocated)}</strong> à affecter
-              </span>
-              <Icon name="chevron-forward" size={17} className="text-muted" />
-            </Card>
-          )}
-          {b.cycle.earlyBy > 0 && (
-            <Card className="flex items-center gap-3">
-              <Icon name="calendar" className="text-accent" />
-              <span className="t-small min-w-0 flex-1 text-secondary">
-                Paie arrivée {b.cycle.earlyBy} jour{b.cycle.earlyBy > 1 ? 's' : ''} en avance : nouveau cycle depuis le {formatShort(b.cycle.start)}.
-              </span>
-            </Card>
-          )}
-          {toClassify > 0 && (
-            <Card to="/a-classer" tone="warning" className="flex items-center gap-3">
-              <Icon name="tag" className="text-warning" />
-              <span className="t-body min-w-0 flex-1">
-                <strong className="font-semibold">{toClassify}</strong> opération{toClassify > 1 ? 's' : ''} à classer
-              </span>
-              <Icon name="chevron-forward" size={17} className="text-muted" />
-            </Card>
-          )}
-          {serious.length > 0 && (
-            <Card to="/alertes" tone="danger" className="flex items-center gap-3">
-              <Icon name="warning" className="text-danger" />
-              <span className="t-body min-w-0 flex-1 truncate">
-                <strong className="font-semibold">{serious.length}</strong> alerte{serious.length > 1 ? 's' : ''} · {serious[0]?.title}
-              </span>
-              <Icon name="chevron-forward" size={17} className="text-muted" />
-            </Card>
-          )}
+      {(toClassify > 0 || serious.length > 0 || b.unallocated > 0) && (
+        <Reveal index={3}>
+          {/* Un seul bloc « à faire » : ce qui attend une action, du plus utile au plus urgent à traiter. */}
+          <SectionTitle action={<Badge tone="accent">{[toClassify > 0, serious.length > 0, b.unallocated > 0].filter(Boolean).length}</Badge>}>À faire</SectionTitle>
+          <Group>
+            {b.unallocated > 0 && <Row icon="sparkles" iconTone="accent" title={<>Revenu exceptionnel : {formatCents(b.unallocated)}</>} subtitle="À affecter : budget, épargne ou objectif" onClick={() => setExceptional(true)} />}
+            {toClassify > 0 && <Row icon="tag" iconTone="warning" title={`${toClassify} opération${toClassify > 1 ? 's' : ''} à classer`} subtitle="Pour un budget juste" to="/a-classer" />}
+            {serious.length > 0 && <Row icon="warning" iconTone="danger" title={`${serious.length} alerte${serious.length > 1 ? 's' : ''}`} subtitle={serious[0]?.title} to="/alertes" />}
+          </Group>
         </Reveal>
       )}
 

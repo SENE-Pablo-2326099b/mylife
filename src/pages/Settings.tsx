@@ -34,18 +34,9 @@ export default function SettingsPage() {
         </Card>
       </Reveal>
 
+      {/* Trois familles : moi (qui je suis, mon compte), mon argent (budget, banques, placements), l'app. */}
       <Reveal index={1}>
-        <SectionTitle>Budget</SectionTitle>
-        <Group>
-          <Row icon="cash" title="Revenus, charges et épargne" subtitle={`Paie le ${s.payday} · ${formatCents(totalIncome(s), { compact: true })} de revenus · enveloppe ${formatCents(computeEnvelope(s), { compact: true })}`} to="/reglages/budget" />
-          <Row icon="tag" title="Catégories et objectifs" subtitle={`${counts?.cats ?? '…'} catégories`} to="/reglages/categories" />
-          <Row icon="rules" title="Règles de classement" subtitle={`${counts?.rules ?? '…'} règles · commerçants, mots-clés`} to="/reglages/regles" />
-          <Row icon="bell" title="Alertes" subtitle="Seuils et règles d’alerte" to="/reglages/alertes" />
-        </Group>
-      </Reveal>
-
-      <Reveal index={2}>
-        <SectionTitle>Comptes</SectionTitle>
+        <SectionTitle>Moi</SectionTitle>
         <Group>
           <Row
             icon="lock"
@@ -53,10 +44,18 @@ export default function SettingsPage() {
             subtitle={!cloud.session ? 'Synchroniser tous tes appareils (chiffré)' : !cloud.joined ? `${cloud.session.login} · à relier à cet appareil` : `${cloud.session.login} · ${cloud.error ? 'erreur de synchro' : cloud.lastSyncAt ? `synchronisé ${relativeTime(cloud.lastSyncAt)}` : 'synchronisé'}`}
             to="/reglages/compte"
           />
-          <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
-          <Row icon="diamond" title="Patrimoine et placements" subtitle="Portefeuilles, objectifs, autres actifs" to="/patrimoine" />
-          <Row icon="upload" title="Importer un relevé Trade Republic" subtitle="PDF : achats, plans d’épargne, dividendes" to="/patrimoine/import" />
           <Row icon="barbell" title="Ouvrir MyPerf" subtitle="Ton entraînement, même compte" onClick={() => openMyLifeApp('/perf/')} />
+        </Group>
+      </Reveal>
+
+      <Reveal index={2}>
+        <SectionTitle>Argent</SectionTitle>
+        <Group>
+          <Row icon="cash" title="Revenus, charges et épargne" subtitle={`Paie le ${s.payday} · ${formatCents(totalIncome(s), { compact: true })} de revenus · enveloppe ${formatCents(computeEnvelope(s), { compact: true })}`} to="/reglages/budget" />
+          <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
+          <Row icon="tag" title="Catégories et objectifs" subtitle={`${counts?.cats ?? '…'} catégories`} to="/reglages/categories" />
+          <Row icon="rules" title="Règles de classement" subtitle={`${counts?.rules ?? '…'} règles · commerçants, mots-clés`} to="/reglages/regles" />
+          <Row icon="upload" title="Importer un relevé Trade Republic" subtitle="PDF : achats, plans d’épargne, dividendes" to="/patrimoine/import" />
         </Group>
       </Reveal>
 
@@ -64,6 +63,7 @@ export default function SettingsPage() {
         <SectionTitle>App</SectionTitle>
         <Group>
           <Row icon="palette" title="Apparence" subtitle={`${theme.name}${s.followSystem ? ' · suit le téléphone' : ''}`} to="/reglages/apparence" />
+          <Row icon="bell" title="Alertes" subtitle="Seuils et règles d’alerte" to="/reglages/alertes" />
           <Row icon="shield" title="Sauvegarde et données" subtitle="Export, import, démo, effacement" to="/reglages/donnees" />
         </Group>
         <p className="t-caption mt-6 text-center text-muted">

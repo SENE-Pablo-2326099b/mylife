@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLatest } from '../../hooks';
 import { db } from '../../db/db';
 import { changeWithUndo } from '../../db/undo';
 import type { Goal, ManualAsset, Transaction } from '../../db/types';
 import { computeFire } from '../../domain/fire';
+import { useRecentTransactions } from '../../domain/recentTransactions';
 import { ASSET_CLASS_LABEL, cashHistory, wealthHistory, type GoalProgress } from '../../domain/wealth';
 import { deleteGoal, recordSnapshot } from '../../domain/wealthDb';
 import { useWealth } from '../../domain/useWealth';
@@ -18,7 +19,7 @@ import { OrbFlash } from '../../ui/extras';
 import { Badge, Button, Card, EmptyState, Group, Icon, IconBubble, Money, ProgressBar, Reveal, Row, SectionTitle, Segmented, Sheet, StatTile, Tap, toast, useTheme } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 import { seriesColors } from '../../ui/themes';
-import { HeaderActions } from '../Today';
+import { HeaderActions } from '../../components/HeaderActions';
 import { AssetForm, GoalForm, GoalMoveForm, PortfolioForm } from './forms';
 
 const NO_TX: Transaction[] = [];
@@ -56,6 +57,30 @@ function GoalCard({ gp, onOpen }: { gp: GoalProgress; onOpen: () => void }) {
   );
 }
 
+const VIEWS = [
+  { value: 'apercu', label: 'Aperçu' },
+  { value: 'placements', label: 'Placements' },
+  { value: 'objectifs', label: 'Objectifs' },
+  { value: 'biens', label: 'Biens' },
+] as const;
+type View = (typeof VIEWS)[number]['value'];
+
+function FireCard({ fire }: { fire: { target: number; current: number; months: number | null } }) {
+  const ratio = fire.target > 0 ? fire.current / fire.target : 0;
+  return (
+    <Card to="/independance" className="flex items-center gap-4">
+      <Ring value={ratio} size={72} stroke={7} tone="gold" label={`${Math.round(ratio * 100)} % de l’objectif`}>
+        <span className="num whitespace-nowrap font-display text-[15px] font-semibold">{Math.min(100, Math.round(ratio * 100))} %</span>
+      </Ring>
+      <span className="min-w-0 flex-1">
+        <span className="t-body-strong block">{fire.months === null ? 'Hors de portée au rythme actuel' : fire.months === 0 ? 'Atteinte' : `Dans ${Math.ceil(fire.months / 12)} ans au rythme actuel`}</span>
+        <span className="t-small block text-secondary">Capital visé {formatCents(fire.target, { compact: true })} · paliers, probabilités, leviers</span>
+      </span>
+      <Icon name="chevron-forward" size={17} className="text-muted" />
+    </Card>
+  );
+}
+
 export default function WealthPage() {
   const w = useWealth();
   const t = useTheme();
@@ -65,7 +90,20 @@ export default function WealthPage() {
   const today = todayISO();
   const [range, setRange] = useState<(typeof RANGES)[number]['value']>('180');
   const from = addDays(today, -Number(range) + 1);
-  const txs = useLiveQuery(() => db.transactions.where('date').aboveOrEqual(addDays(today, -366)).toArray(), [today]) ?? NO_TX;
+  const txs = useRecentTransactions() ?? NO_TX;
+  // Onglet gardé dans l'adresse : le retour arrière y ramène.
+  const [params, setParams] = useSearchParams();
+  const view = (VIEWS.find((v) => v.value === params.get('vue'))?.value ?? 'apercu') as View;
+  const setView = (v: View) => setParams(v === 'apercu' ? {} : { vue: v }, { replace: true });
+  // « + » de l'en-tête : …&ajouter=1 ouvre directement le formulaire de l'onglet.
+  const adding = params.get('ajouter') === '1';
+  useEffect(() => {
+    if (!adding) return;
+    if (view === 'placements') setPortfolioSheet(true);
+    else if (view === 'objectifs') setGoalEdit('new');
+    else if (view === 'biens') setAssetEdit('new');
+    setParams(view === 'apercu' ? {} : { vue: view }, { replace: true });
+  }, [adding, view, setParams]);
 
   const [portfolioSheet, setPortfolioSheet] = useState(false);
   const [goalEdit, setGoalEdit] = useState<Goal | 'new' | null>(null);
@@ -146,6 +184,12 @@ export default function WealthPage() {
           </Card>
         </Reveal>
       ) : (
+        <Reveal index={0} className="mb-3">
+          <Segmented options={VIEWS} value={view} onChange={setView} label="Partie du patrimoine" />
+        </Reveal>
+      )}
+
+      {!empty && view === 'apercu' && (
         <>
           <Reveal index={0}>
             <Card level="raised" glow>
@@ -199,7 +243,28 @@ export default function WealthPage() {
         </>
       )}
 
-      <Reveal index={3}>
+      {view === 'apercu' && !empty && (
+        <Reveal index={3}>
+          <SectionTitle>Indépendance financière</SectionTitle>
+          <FireCard fire={fire} />
+        </Reveal>
+      )}
+
+      {view === 'apercu' && w.accounts.length > 0 && (
+        <Reveal index={4}>
+          <SectionTitle action={<Button variant="ghost" size="sm" to="/synchro">Banques</Button>}>Comptes</SectionTitle>
+          <Group>
+            {w.accounts
+              .filter((a) => !a.hidden)
+              .map((a) => (
+                <Row key={a.id} icon={a.kind === 'savings' ? 'leaf' : 'card'} title={a.nickname ?? a.name} subtitle={`${a.bank}${a.kind === 'savings' ? ' · épargne' : ''}`} right={a.balance !== null ? <Money cents={a.balance} /> : <Badge>solde inconnu</Badge>} />
+              ))}
+          </Group>
+        </Reveal>
+      )}
+
+      {view === 'placements' && (
+      <Reveal index={1}>
         <SectionTitle action={<Button variant="ghost" size="sm" icon="add" onClick={() => setPortfolioSheet(true)}>Ajouter</Button>}>Placements</SectionTitle>
         {w.summaries.length === 0 ? (
           <p className="t-small px-0.5 text-muted">Trade Republic, Bitstack, PEA, assurance vie, livrets… Les cours se mettent à jour tout seuls.</p>
@@ -237,8 +302,10 @@ export default function WealthPage() {
           <Icon name="chevron-forward" size={17} className="text-muted" />
         </Card>
       </Reveal>
+      )}
 
-      <Reveal index={4}>
+      {view === 'objectifs' && (
+      <Reveal index={1}>
         <SectionTitle action={<Button variant="ghost" size="sm" icon="add" onClick={() => setGoalEdit('new')}>Ajouter</Button>}>Objectifs</SectionTitle>
         {w.goalsProgress.length === 0 ? (
           <p className="t-small px-0.5 text-muted">Fonds d’urgence, voyage, permis, apport… Un montant, une date : l’app calcule le versement mensuel.</p>
@@ -250,21 +317,10 @@ export default function WealthPage() {
           </div>
         )}
       </Reveal>
-
-      {w.accounts.length > 0 && (
-        <Reveal index={5}>
-          <SectionTitle action={<Button variant="ghost" size="sm" to="/synchro">Banques</Button>}>Comptes</SectionTitle>
-          <Group>
-            {w.accounts
-              .filter((a) => !a.hidden)
-              .map((a) => (
-                <Row key={a.id} icon={a.kind === 'savings' ? 'leaf' : 'card'} title={a.nickname ?? a.name} subtitle={`${a.bank}${a.kind === 'savings' ? ' · épargne' : ''}`} right={a.balance !== null ? <Money cents={a.balance} /> : <Badge>solde inconnu</Badge>} />
-              ))}
-          </Group>
-        </Reveal>
       )}
 
-      <Reveal index={6}>
+      {view === 'biens' && (
+      <Reveal index={1}>
         <SectionTitle action={<Button variant="ghost" size="sm" icon="add" onClick={() => setAssetEdit('new')}>Ajouter</Button>}>Biens et dettes</SectionTitle>
         {w.assets.length === 0 ? (
           <p className="t-small px-0.5 text-muted">Logement, véhicule, prêt étudiant… pour un patrimoine net complet.</p>
@@ -277,19 +333,7 @@ export default function WealthPage() {
         )}
       </Reveal>
 
-      <Reveal index={7}>
-        <SectionTitle>Indépendance financière</SectionTitle>
-        <Card to="/independance" className="flex items-center gap-4">
-          <Ring value={fire.target > 0 ? fire.current / fire.target : 0} size={72} stroke={7} tone="gold" label={`${Math.round(fire.target > 0 ? (fire.current * 100) / fire.target : 0)} % de l’objectif`}>
-            <span className="num font-display text-[15px] font-semibold">{fire.target > 0 ? Math.min(100, Math.round((fire.current * 100) / fire.target)) : 0} %</span>
-          </Ring>
-          <span className="min-w-0 flex-1">
-            <span className="t-body-strong block">{fire.months === null ? 'Hors de portée au rythme actuel' : fire.months === 0 ? 'Atteinte' : `Dans ${Math.ceil(fire.months / 12)} ans au rythme actuel`}</span>
-            <span className="t-small block text-secondary">Capital visé {formatCents(fire.target, { compact: true })} · simule ton rythme</span>
-          </span>
-          <Icon name="chevron-forward" size={17} className="text-muted" />
-        </Card>
-      </Reveal>
+      )}
 
       <Sheet open={portfolioSheet} onClose={() => setPortfolioSheet(false)} title="Nouveau placement">
         {portfolioSheet && (

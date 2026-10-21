@@ -1,6 +1,8 @@
 import type { IconType } from 'react-icons';
 import {
   IoAdd,
+  IoAppsOutline,
+  IoCloudDoneOutline,
   IoAlertCircleOutline,
   IoAnalyticsOutline,
   IoArrowDown,
@@ -70,6 +72,8 @@ import {
 /** Icônes (Ionicons, comme MyPerf). Un nom = une idée ; « …-fill » = variante pleine des onglets actifs. */
 const ICONS = {
   add: IoAdd,
+  apps: IoAppsOutline,
+  cloud: IoCloudDoneOutline,
   remove: IoRemove,
   'alert-circle': IoAlertCircleOutline,
   analytics: IoAnalyticsOutline,

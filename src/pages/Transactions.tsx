@@ -11,7 +11,7 @@ import { formatCents } from '../lib/money';
 import { normalizeText } from '../lib/text';
 import { Button, Card, Chip, EmptyState, Group, Icon, Money, Reveal, Segmented, SelectField, Sheet } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { HeaderActions } from './Today';
+import { HeaderActions } from '../components/HeaderActions';
 
 const PERIODS = [
   { value: 'cycle', label: 'Cycle' },
