@@ -101,7 +101,7 @@ export default function OnboardingPage() {
                 <Card>
                   <StepperRow label="Jour de paie" hint="Début de chaque cycle" value={s.payday} min={1} max={31} onChange={(payday) => void updateSettings({ payday })} format={(d) => `le ${d}`} />
                 </Card>
-                <LinesEditor lines={s.incomes} onChange={(incomes) => void updateSettings({ incomes })} icon="cash" addLabel="Ajouter un revenu" emptyLabel="Aucun revenu pour l’instant." suggestions={['Salaire', 'Bourse', 'APL', 'Alternance']} />
+                <LinesEditor income lines={s.incomes} onChange={(incomes) => void updateSettings({ incomes })} icon="cash" addLabel="Ajouter un revenu" emptyLabel="Aucun revenu pour l’instant." suggestions={['Salaire', 'Bourse', 'APL', 'Alternance']} />
               </>
             )}
 

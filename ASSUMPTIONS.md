@@ -89,3 +89,14 @@ Tout ce qui est marqué ⚙️ est modifiable dans l'app.
 63. **Indépendance financière** : capital actuel = placements + comptes épargne ; capital visé = dépenses annuelles ÷ taux de retrait (4 %) ; rendement 5 %, inflation 2 % ⚙️ ; dépenses = 12 derniers mois ramenés à l'année (au moins 60 jours d'historique), sinon (charges fixes + enveloppe) × 12.
 64. **Objectifs** : versement nécessaire = reste ÷ mois restants (au moins 1) ; l'objectif passe en or (« atteint ») quand le montant est atteint, l'orbe s'allume au versement qui le complète.
 65. **Démo** : personne fictive « Camille Martin » ; ses réglages ne s'appliquent que si aucun revenu ni charge n'est saisi, et sont retirés avec la démo.
+
+## Moteur du budget (v2.1, `src/domain/budgetEngine.ts`)
+
+66. **Paie en avance** : une opération de revenu à ±25 % de la plus grosse ligne de revenu (hors « versé directement »), arrivée jusqu'à 7 jours avant le jour de paie, ouvre le nouveau cycle ce jour-là. **Paie en retard** : le cycle commence quand même au jour prévu (le budget ne s'arrête pas faute de virement).
+67. **Revenus du cycle** = montants des réglages (stables), y compris ceux **versés directement à un tiers** (APL au CROUS : la charge est débitée nette). Sans aucune ligne configurée, les revenus reçus dans le cycle servent de base.
+68. **Revenu exceptionnel** = opération de revenu qui ne correspond à aucune ligne (chaque ligne prend au plus une opération, la plus proche de son montant à ±25 %). Neutre tant qu'il n'est pas affecté : « Au budget » l'ajoute à l'enveloppe de ce cycle, « De côté » le laisse hors budget.
+69. **Remboursement entre particuliers** : neutre, sauf rattaché à une dépense (éditeur d'opération) ; il réduit alors la dépense, à la date de la dépense. Le rattachement suit la dépense quand elle passe d'« en attente » à définitive.
+70. **Premier cycle partiel** : si la plus ancienne opération connue est postérieure au début du cycle, l'enveloppe est ramenée au prorata des jours couverts.
+71. **Enveloppe dépassée** : budget du jour = 0 € (jamais négatif) ; on affiche le déficit et « 0 € par jour pour ne pas l'aggraver ». Le déficit n'est pas reporté sur le cycle suivant.
+72. **Charges réservées** : une charge fixe est « débitée » si une opération du cycle (charge fixe ou non classée) cite un mot de son libellé (≥ 4 lettres, hors « loyer », « abonnement »…) ou, à défaut, a un montant à ±20 %. Les autres restent réservées et réduisent le « réellement libre » (solde des comptes courants − charges et épargne encore à venir).
+73. **Projection** : rythme = dépenses variables des jours écoulés ÷ jours écoulés (la journée en cours n'entre pas dans la moyenne) ; position de fin de cycle = enveloppe − (dépensé + rythme × jours restants).

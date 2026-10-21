@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings } from '../src/db/types';
-import { computeDailyBudget, dailySeries, isVariable, overrunStreaks, spent, statusFor } from '../src/domain/budget';
+import { computeBudget, dailySeries, isVariable, overrunStreaks, spent, statusFor } from '../src/domain/budget';
+import type { Transaction } from '../src/db/types';
 import { CAT, DEFAULT_SETTINGS, computeEnvelope } from '../src/domain/defaults';
 import { PROFILE, PROFILE_CATEGORIES } from './profile';
 import { tx } from './helpers';
 
 const cats = new Map(PROFILE_CATEGORIES.map((c) => [c.id, c]));
 const settings: Settings = { ...PROFILE };
+const computeDailyBudget = (txs: Transaction[], c: typeof cats, st: Settings, today: string) => computeBudget({ txs, cats: c, settings: st, today });
 
 describe('enveloppe', () => {
   it('par défaut = revenus − charges fixes − investissement', () => {
@@ -41,7 +43,7 @@ describe('ce qui compte comme dépense', () => {
 describe('budget du jour', () => {
   it('début de cycle : enveloppe ÷ durée du cycle', () => {
     const b = computeDailyBudget([], cats, settings, '2026-09-26');
-    expect(b.cycle).toEqual({ start: '2026-09-26', end: '2026-10-25' });
+    expect(b.cycle).toMatchObject({ start: '2026-09-26', end: '2026-10-25', earlyBy: 0 });
     expect(b.daysLeft).toBe(30);
     expect(b.dailyBudget).toBe(Math.floor(89800 / 30)); // 2993
     expect(b.status).toBe('good');
@@ -71,16 +73,17 @@ describe('budget du jour', () => {
     expect(b.dailyBudget).toBe(9800);
   });
 
-  it('enveloppe épuisée → rouge', () => {
+  it('enveloppe épuisée → rouge, budget du jour à 0 et déficit affiché', () => {
     const b = computeDailyBudget([tx({ id: '1', amount: -95000, date: '2026-10-01', categoryId: CAT.courses })], cats, settings, '2026-10-17');
-    expect(b.dailyBudget).toBeLessThan(0);
+    expect(b.dailyBudget).toBe(0);
+    expect(b.overrun).toEqual({ deficit: 95000 - 89800, maxPerDay: 0 });
     expect(b.status).toBe('bad');
   });
 
   it('février (28 jours) et changement d’année', () => {
     expect(computeDailyBudget([], cats, settings, '2027-02-26').daysLeft).toBe(28);
     const jan = computeDailyBudget([], cats, settings, '2027-01-01');
-    expect(jan.cycle).toEqual({ start: '2026-12-26', end: '2027-01-25' });
+    expect(jan.cycle).toMatchObject({ start: '2026-12-26', end: '2027-01-25' });
     expect(jan.daysLeft).toBe(25);
   });
 
@@ -98,7 +101,7 @@ describe('jauge', () => {
     expect(statusFor(3000, 3000)).toBe('warn');
     expect(statusFor(3001, 3000)).toBe('bad');
     expect(statusFor(0, 0)).toBe('warn');
-    expect(statusFor(0, -10)).toBe('bad');
+    expect(statusFor(10, 0)).toBe('bad');
   });
 });
 

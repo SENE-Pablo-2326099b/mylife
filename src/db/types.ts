@@ -81,6 +81,8 @@ export interface Transaction {
   externalId: string | null;
   mcc: string | null;
   createdAt: number;
+  /** Remboursement d'une dépense précise (id de l'opération) : il la réduit au lieu d'être neutre. */
+  refundOf?: string | null;
 }
 
 export interface Account {
@@ -138,6 +140,11 @@ export interface BudgetLine {
   amount: number;
   /** Jour du mois où il tombe (1-31), null = inconnu. Sert aux prévisions de trésorerie. */
   day: number | null;
+  /**
+   * Revenu versé directement à un tiers (ex. APL versée au CROUS) : compte dans le budget mais
+   * n'arrive jamais sur le compte (la charge correspondante est débitée nette). Facultatif.
+   */
+  direct?: boolean;
 }
 
 /** Hypothèses de la projection d'indépendance financière (en points de base : 500 = 5 %). */

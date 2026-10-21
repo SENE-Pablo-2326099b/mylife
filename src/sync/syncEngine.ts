@@ -44,6 +44,13 @@ export async function syncAccount(
     await database.transaction('rw', [database.transactions, database.accounts], async () => {
       if (merge.toDelete.length) await database.transactions.bulkDelete(merge.toDelete);
       if (merge.toAdd.length) await database.transactions.bulkPut(merge.toAdd);
+      // Un remboursement rattaché à une dépense « en attente » suit la dépense devenue définitive.
+      if (merge.renamed.length) {
+        const renamed = new Map(merge.renamed);
+        await database.transactions.filter((t) => !!t.refundOf && renamed.has(t.refundOf)).modify((t) => {
+          t.refundOf = renamed.get(t.refundOf!) ?? t.refundOf;
+        });
+      }
       await database.accounts.update(account.id, {
         lastSyncAt: now.getTime(),
         lastSyncError: null,

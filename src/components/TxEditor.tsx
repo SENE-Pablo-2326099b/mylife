@@ -7,9 +7,10 @@ import { resetToAuto } from '../domain/classifyDb';
 import { CAT } from '../domain/defaults';
 import { learnFromCorrection, type LearnMode } from '../domain/learn';
 import { suggestKeyword } from '../domain/rules';
-import { formatDay } from '../lib/dates';
+import { addDays, formatDay, formatShort } from '../lib/dates';
+import { formatCents } from '../lib/money';
 import { Sheet } from '../ui/Sheet';
-import { Badge, Button, Glass, Money, Segmented, TextField } from '../ui/primitives';
+import { Badge, Button, Glass, Money, Segmented, SelectField, TextField } from '../ui/primitives';
 import { toast } from '../ui/toastStore';
 import { CategoryPicker } from './CategoryPicker';
 
@@ -32,6 +33,17 @@ function TxEditorBody({ tx, categories, onClose }: { tx: Transaction; categories
   const [keyword, setKeyword] = useState(suggestKeyword(tx.label));
   const [person, setPerson] = useState(tx.person ?? tx.counterparty ?? '');
   const [note, setNote] = useState(tx.note);
+  const [refundOf, setRefundOf] = useState(tx.refundOf ?? '');
+  // Un crédit peut rembourser une dépense précise (90 jours avant) : il la réduit au lieu d'être neutre.
+  const candidates = useLiveQuery(async () => {
+    if (tx.amount <= 0) return [];
+    const kinds = new Map(categories.map((c) => [c.id, c.kind]));
+    const list = await db.transactions.where('date').between(addDays(tx.date, -90), tx.date, true, true).toArray();
+    return list
+      .filter((t) => t.amount < 0 && (t.categoryId === null || kinds.get(t.categoryId) === 'variable'))
+      .sort((a, b) => (a.date < b.date ? 1 : -1))
+      .slice(0, 40);
+  }, [tx.id, tx.amount, tx.date, categories]);
 
   useEffect(() => {
     if (rule) setMode('update');
@@ -39,17 +51,20 @@ function TxEditorBody({ tx, categories, onClose }: { tx: Transaction; categories
 
   const category = categories.find((c) => c.id === tx.categoryId);
   const target = picked ?? tx.categoryId;
-  const dirty = !!picked || note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '');
+  const refundChanged = refundOf !== (tx.refundOf ?? '');
+  const dirty = !!picked || note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '') || refundChanged;
 
   const save = async () => {
+    if (refundChanged) await db.transactions.update(tx.id, { refundOf: refundOf || null });
     if (picked) {
       const changed = await learnFromCorrection({ txId: tx.id, categoryId: picked, mode, keyword, person: picked === CAT.remboursements ? person : null });
       if (note !== tx.note) await db.transactions.update(tx.id, { note });
       const cat = categories.find((c) => c.id === picked);
       toast({ message: changed > 0 ? `${cat?.emoji ?? ''} ${cat?.name ?? ''} · ${changed} autre${changed > 1 ? 's' : ''} reclassée${changed > 1 ? 's' : ''}` : `Classée en ${cat?.emoji ?? ''} ${cat?.name ?? ''}` });
-    } else {
+    } else if (note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '')) {
       await db.transactions.update(tx.id, { note, ...(tx.categoryId === CAT.remboursements ? { person } : {}) });
     }
+    if (refundChanged && !picked) toast({ message: refundOf ? 'Remboursement rattaché : la dépense est réduite d’autant' : 'Remboursement détaché' });
     onClose();
   };
 
@@ -101,6 +116,15 @@ function TxEditorBody({ tx, categories, onClose }: { tx: Transaction; categories
       )}
 
       {target === CAT.remboursements && <TextField label="Personne" value={person} onChange={setPerson} />}
+      {tx.amount > 0 && (candidates?.length ?? 0) > 0 && (
+        <SelectField
+          label="Rembourse une dépense"
+          value={refundOf}
+          onChange={setRefundOf}
+          options={[{ value: '', label: 'Aucune (neutre)' }, ...(candidates ?? []).map((t) => ({ value: t.id, label: `${formatShort(t.date)} · ${t.label} · ${formatCents(-t.amount)}` }))]}
+          hint="Ex. un ami te rembourse sa part du resto : la dépense est réduite au lieu de compter en entier."
+        />
+      )}
       <TextField label="Note" value={note} onChange={setNote} placeholder="Facultatif" />
 
       <div className="flex flex-wrap gap-2 pt-1">

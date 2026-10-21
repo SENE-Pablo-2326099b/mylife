@@ -109,3 +109,13 @@ describe('mergeTransactions', () => {
     expect(r2.toDelete).toHaveLength(0);
   });
 });
+
+describe('remboursements rattachés', () => {
+  it('une opération en attente devenue définitive garde son rattachement et signale son nouvel id', () => {
+    const r1 = mergeTransactions('acc', [], [inc({ pending: true, amount: 2000, label: 'Lydia Léa' })], 'enablebanking');
+    const pending = { ...r1.toAdd[0], refundOf: 'resto' };
+    const r2 = mergeTransactions('acc', [pending], [inc({ pending: false, amount: 2000, label: 'Lydia Léa', date: '2026-10-11' })], 'enablebanking');
+    expect(r2.toAdd[0].refundOf).toBe('resto');
+    expect(r2.renamed).toEqual([[pending.id, r2.toAdd[0].id]]);
+  });
+});

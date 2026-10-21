@@ -5,6 +5,7 @@ import type { Transaction } from '../db/types';
 import { useCategoryMap, useSettings } from '../hooks';
 import { addDays, todayISO } from '../lib/dates';
 import { computeAlerts, type Alert } from './alerts';
+import { useBudgetContext } from './useBudget';
 
 const NO_TX: Transaction[] = [];
 
@@ -14,5 +15,6 @@ export function useAlerts(): Alert[] {
   const today = todayISO();
   const from = addDays(today, -400);
   const txs = useLiveQuery(() => db.transactions.where('date').aboveOrEqual(from).toArray(), [from]) ?? NO_TX;
-  return useMemo(() => computeAlerts({ txs, cats, settings, today }), [txs, cats, settings, today]);
+  const { allocations, dataStart } = useBudgetContext();
+  return useMemo(() => computeAlerts({ txs, cats, settings, today, allocations, dataStart }), [txs, cats, settings, today, allocations, dataStart]);
 }

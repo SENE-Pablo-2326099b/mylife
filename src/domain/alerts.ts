@@ -1,9 +1,10 @@
 import type { Settings, Transaction } from '../db/types';
-import { addDays, cycleFor, formatShort, type ISODate } from '../lib/dates';
+import { addDays, formatShort, type ISODate } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { normalizeText } from '../lib/text';
 import { dailySeries, overrunStreaks, spent, isSpending, type CatMap } from './budget';
-import { CAT, computeEnvelope } from './defaults';
+import { CAT } from './defaults';
+import { currentCycle, cycleEnvelope, type Allocations } from './budgetEngine';
 
 export type AlertLevel = 'info' | 'warn' | 'bad';
 
@@ -22,14 +23,17 @@ export interface AlertInput {
   cats: CatMap;
   settings: Settings;
   today: ISODate;
+  allocations?: Allocations;
+  dataStart?: ISODate | null;
 }
 
 const LEVEL_ORDER: Record<AlertLevel, number> = { bad: 0, warn: 1, info: 2 };
 const AMAZON = /\b(amazon|amzn)/;
 
-export function computeAlerts({ txs, cats, settings, today }: AlertInput): Alert[] {
+export function computeAlerts({ txs, cats, settings, today, allocations, dataStart }: AlertInput): Alert[] {
   const cfg = settings.alerts;
-  const cycle = cycleFor(today, settings.payday);
+  // Même cycle (paie en avance comprise) et même enveloppe que le budget du jour.
+  const cycle = currentCycle({ txs, cats, settings, today });
   const inCycle = txs.filter((t) => t.date >= cycle.start && t.date <= today);
   const alerts: Alert[] = [];
 
@@ -86,7 +90,7 @@ export function computeAlerts({ txs, cats, settings, today }: AlertInput): Alert
 
   // 3. Dépassement du budget quotidien plusieurs jours de suite
   if (cfg.dailyOverrun.enabled && cfg.dailyOverrun.days > 0) {
-    const series = dailySeries(txs, cats, cycle, computeEnvelope(settings), today);
+    const series = dailySeries(txs, cats, cycle, cycleEnvelope({ txs, cats, settings, allocations, dataStart }, cycle).total, today);
     const { current, longest, longestEnd } = overrunStreaks(series);
     if (current >= cfg.dailyOverrun.days) {
       alerts.push({

@@ -1,6 +1,7 @@
 import type { Category, Transaction } from '../db/types';
 import { cycleLength, diffDays, type Cycle } from '../lib/dates';
-import { isSpending, isVariable, spent, type CatMap } from './budget';
+import { isSpending, spent, type CatMap } from './budget';
+import { refundMap, variableSpend } from './budgetEngine';
 
 export interface CategoryLine {
   category: Category | null;
@@ -58,8 +59,10 @@ export interface CycleSummary {
 
 export function summarize(txs: Transaction[], cats: CatMap, cycle: Cycle, until?: string): CycleSummary {
   const cur = within(txs, cycle, until);
-  const variable = spent(cur, cats, isVariable);
-  const total = spent(cur, cats, isSpending);
+  // Même règle que le budget du jour : remboursements rattachés déduits de leur dépense.
+  const refunds = refundMap(txs);
+  const variable = cur.reduce((s, t) => s + variableSpend(t, cats, refunds), 0);
+  const total = variable + spent(cur.filter((t) => t.categoryId !== null && cats.get(t.categoryId)?.kind === 'fixed'), cats, isSpending);
   const food = spent(
     cur.filter((t) => t.categoryId && cats.get(t.categoryId)?.isFood),
     cats,

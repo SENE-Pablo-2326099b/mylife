@@ -22,6 +22,7 @@ function lines(v: unknown): BudgetLine[] | null {
       label: typeof l.label === 'string' ? l.label : 'Sans nom',
       amount: Math.abs(int(l.amount, 0)),
       day: typeof l.day === 'number' && l.day >= 1 && l.day <= 31 ? Math.round(l.day) : null,
+      ...(l.direct === true ? { direct: true } : {}),
     }));
 }
 

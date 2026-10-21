@@ -54,7 +54,7 @@ export default function BudgetSettingsPage() {
 
       <Reveal index={2}>
         <SectionTitle action={<Money cents={totalIncome(s)} className="text-[14px] text-success" />}>Revenus du mois</SectionTitle>
-        <LinesEditor lines={s.incomes} onChange={(incomes) => save({ incomes })} icon="cash" addLabel="Ajouter un revenu" emptyLabel="Salaire, bourse, aides, pension, freelance…" suggestions={['Salaire', 'APL', 'Bourse', 'Prime d’activité']} />
+        <LinesEditor income lines={s.incomes} onChange={(incomes) => save({ incomes })} icon="cash" addLabel="Ajouter un revenu" emptyLabel="Salaire, bourse, aides, pension, freelance…" suggestions={['Salaire', 'APL', 'Bourse', 'Prime d’activité']} />
       </Reveal>
 
       <Reveal index={3}>

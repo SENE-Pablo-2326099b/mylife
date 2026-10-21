@@ -32,6 +32,8 @@ export interface MergeResult {
   newPending: number;
   /** Opérations en attente devenues définitives. */
   settled: number;
+  /** Ancien id « en attente » → id définitif (pour suivre les remboursements rattachés). */
+  renamed: [string, string][];
 }
 
 const CARRY_FIELDS = ['categoryId', 'categorySource', 'ruleId', 'person', 'note'] as const;
@@ -61,7 +63,7 @@ export function mergeTransactions(
   const oldPending = known.filter((t) => t.pending);
   const unclaimedPending = [...oldPending];
 
-  const result: MergeResult = { toAdd: [], toDelete: oldPending.map((t) => t.id), duplicates: 0, newBooked: 0, newPending: 0, settled: 0 };
+  const result: MergeResult = { toAdd: [], toDelete: oldPending.map((t) => t.id), duplicates: 0, newBooked: 0, newPending: 0, settled: 0, renamed: [] };
 
   for (const { id, tx } of assignIds(accountId, incoming)) {
     if (!tx.pending && (bookedIds.has(id) || (tx.externalId && bookedRefs.has(tx.externalId)))) {
@@ -99,6 +101,8 @@ export function mergeTransactions(
       if (prev.categorySource === 'manual' || prev.note) {
         for (const f of CARRY_FIELDS) (row as unknown as Record<string, unknown>)[f] = prev[f];
       }
+      if (prev.refundOf) row.refundOf = prev.refundOf;
+      if (prev.id !== id) result.renamed.push([prev.id, id]);
       if (!tx.pending) result.settled++;
     }
     if (tx.pending) result.newPending++;

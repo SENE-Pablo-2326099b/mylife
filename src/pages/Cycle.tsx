@@ -5,10 +5,12 @@ import { db } from '../db/db';
 import type { Transaction } from '../db/types';
 import { dailySeries } from '../domain/budget';
 import { categoryBreakdown, summarize } from '../domain/cycleStats';
-import { computeEnvelope, totalFixed } from '../domain/defaults';
+import { totalFixed } from '../domain/defaults';
+import { cycleEnvelope, payDates, resolveCycle } from '../domain/budgetEngine';
+import { useBudgetContext } from '../domain/useBudget';
 import { personBalances } from '../domain/people';
 import { useCategoryMap, useSettings } from '../hooks';
-import { addDays, cycleFor, cycleLength, formatCycle, formatShort, previousCycle, todayISO, type Cycle } from '../lib/dates';
+import { addDays, cycleLength, formatCycle, formatShort, todayISO, type Cycle, type ISODate } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { LineChart } from '../ui/charts';
 import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap } from '../ui/index';
@@ -17,9 +19,10 @@ import { HeaderActions } from './Today';
 
 const NO_TX: Transaction[] = [];
 
-function shiftCycle(c: Cycle, n: number, payday: number): Cycle {
+/** Cycle décalé de n (paies en avance comprises, comme le budget du jour). */
+function shiftCycle(c: Cycle, n: number, payday: number, pays: readonly ISODate[]): Cycle {
   let cur = c;
-  for (let i = 0; i < Math.abs(n); i++) cur = n < 0 ? previousCycle(cur, payday) : cycleFor(addDays(cur.end, 1), payday);
+  for (let i = 0; i < Math.abs(n); i++) cur = resolveCycle(n < 0 ? addDays(cur.start, -1) : addDays(cur.end, 1), payday, pays);
   return cur;
 }
 
@@ -31,14 +34,17 @@ export default function CyclePage() {
   const [params, setParams] = useSearchParams();
   const offset = Math.min(0, parseInt(params.get('n') ?? '0', 10) || 0);
   const today = todayISO();
-  const current = cycleFor(today, settings.payday);
-  const cycle = shiftCycle(current, offset, settings.payday);
-  const prev = previousCycle(cycle, settings.payday);
+  const credits = useLiveQuery(() => db.transactions.filter((t) => t.amount > 0 && t.categoryId !== null).toArray(), []) ?? NO_TX;
+  const pays = useMemo(() => payDates(credits, cats, settings), [credits, cats, settings]);
+  const current = resolveCycle(today, settings.payday, pays);
+  const cycle = shiftCycle(current, offset, settings.payday, pays);
+  const prev = shiftCycle(cycle, -1, settings.payday, pays);
   const isCurrent = offset === 0;
   const until = isCurrent ? today : cycle.end;
-  const envelope = computeEnvelope(settings);
+  const context = useBudgetContext();
 
   const txs = useLiveQuery(() => db.transactions.where('date').between(prev.start, cycle.end, true, true).toArray(), [prev.start, cycle.end]) ?? NO_TX;
+  const envelope = cycleEnvelope({ txs, cats, settings, ...context }, cycle).total;
   const refunds = useLiveQuery(() => db.transactions.where('categoryId').equals('remboursements').toArray(), []) ?? NO_TX;
 
   const { lines, summary, prevSummary, prevSameStage, chart } = useMemo(() => {

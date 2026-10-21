@@ -12,6 +12,7 @@ export function LinesEditor({
   emptyLabel,
   suggestions = [],
   icon,
+  income = false,
 }: {
   lines: BudgetLine[];
   onChange: (lines: BudgetLine[]) => void;
@@ -19,6 +20,8 @@ export function LinesEditor({
   emptyLabel: string;
   suggestions?: string[];
   icon: 'cash' | 'receipt';
+  /** Lignes de revenus : option « versé directement à un tiers » (APL au CROUS…). */
+  income?: boolean;
 }) {
   const [editing, setEditing] = useState<BudgetLine | null>(null);
   const isNew = editing !== null && !lines.some((l) => l.id === editing.id);
@@ -43,7 +46,7 @@ export function LinesEditor({
               key={l.id}
               icon={icon}
               title={l.label}
-              subtitle={l.day ? `le ${l.day} du mois` : 'jour non précisé'}
+              subtitle={[l.day ? `le ${l.day} du mois` : 'jour non précisé', l.direct ? 'versé directement' : null].filter(Boolean).join(' · ')}
               right={<span className="num font-display font-semibold">{formatCents(l.amount)}</span>}
               chevron
               onClick={() => setEditing(l)}
@@ -67,13 +70,13 @@ export function LinesEditor({
           ))}
       </div>
       <Sheet open={editing !== null} onClose={() => setEditing(null)} title={isNew ? addLabel : 'Modifier'}>
-        {editing && <LineForm key={editing.id} line={editing} onSave={save} onDelete={isNew ? undefined : () => remove(editing)} />}
+        {editing && <LineForm key={editing.id} line={editing} income={income} onSave={save} onDelete={isNew ? undefined : () => remove(editing)} />}
       </Sheet>
     </>
   );
 }
 
-function LineForm({ line, onSave, onDelete }: { line: BudgetLine; onSave: (l: BudgetLine) => void; onDelete?: () => void }) {
+function LineForm({ line, income, onSave, onDelete }: { line: BudgetLine; income: boolean; onSave: (l: BudgetLine) => void; onDelete?: () => void }) {
   const [draft, setDraft] = useState(line);
   const set = (patch: Partial<BudgetLine>) => setDraft((d) => ({ ...d, ...patch }));
   return (
@@ -88,6 +91,15 @@ function LineForm({ line, onSave, onDelete }: { line: BudgetLine; onSave: (l: Bu
         <Toggle checked={draft.day !== null} onChange={(on) => set({ day: on ? (draft.day ?? 1) : null })} label="Jour connu" />
       </div>
       {draft.day !== null && <Stepper value={draft.day} min={1} max={31} onChange={(day) => set({ day })} format={(d) => `le ${d}`} label="Jour du mois" />}
+      {income && (
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="t-body-strong">Versé directement à un tiers</p>
+            <p className="t-caption text-muted">Ex. APL versée au CROUS : compte dans ton budget, mais n’arrive jamais sur ton compte (le loyer est débité net).</p>
+          </div>
+          <Toggle checked={!!draft.direct} onChange={(direct) => set({ direct })} label="Versé directement à un tiers" />
+        </div>
+      )}
       <div className="flex gap-2 pt-1">
         <Button className="flex-1" disabled={!draft.label.trim() || draft.amount <= 0} onClick={() => onSave({ ...draft, label: draft.label.trim() })}>
           Enregistrer
