@@ -4,7 +4,7 @@ import { db, type SqlValue } from './db';
 import { SCHEMA_VERSION } from './migrations';
 
 /** Insert order respects foreign keys; deletion runs in reverse. */
-const TABLES = [
+export const TABLES = [
   'settings',
   'exercises',
   'exercise_one_rm',

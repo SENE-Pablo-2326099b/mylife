@@ -30,6 +30,8 @@ import { Backdrop } from '@/ui/components/Backdrop';
 import { ToastHost } from '@/ui/components/ToastHost';
 import { REST_BAR_HEIGHT, useBreakpoint } from '@/ui/responsive';
 import { BOOT_BG, space, useTheme } from '@/ui/theme';
+import { cloudBoot } from '@/services/cloud';
+import { installSyncTriggers } from '@/services/cloud/sqliteStore';
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -38,6 +40,8 @@ function bootstrap(): string | null {
   try {
     const db = setDb(openExpoDb());
     migrate(db);
+    // Synchro MyLife : déclencheurs de suivi recréés d'après le schéma (inactifs tant que pas de compte).
+    installSyncTriggers(db);
     // First launch: load the real program + history (programme-reel.md, historique-seances.csv).
     if (seedPersonalIfFresh() === null) seedIfEmpty();
     upgradePersonalData();
@@ -132,6 +136,10 @@ export default function RootLayout() {
     }
     if (fontsReady) void SplashScreen.hideAsync();
   }, [boot.kind, fontsReady]);
+  // Compte MyLife : récupère ce que les autres appareils ont fait, puis synchronise au fil de l'eau.
+  useEffect(() => {
+    if (boot.kind === 'ready') cloudBoot();
+  }, [boot.kind]);
   // Daily safety copy of the whole database, off the first frame's critical path.
   useEffect(() => {
     if (boot.kind !== 'ready') return;

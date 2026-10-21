@@ -235,6 +235,19 @@ export const MIGRATIONS: readonly string[] = [
     WHERE te.id = workout_exercises.template_exercise_id AND te.exercise_id != workout_exercises.exercise_id
   );
   `,
+  // 9 — synchro MyLife : file des lignes modifiées sur cet appareil (remplie par des déclencheurs,
+  // voir src/services/cloud/sqliteStore.ts) et état de la synchro. Pas dans les sauvegardes.
+  `
+  CREATE TABLE IF NOT EXISTS sync_queue (
+    tbl TEXT NOT NULL,
+    rid TEXT NOT NULL,
+    ver INTEGER NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (tbl, rid)
+  );
+  CREATE TABLE IF NOT EXISTS sync_state (k TEXT PRIMARY KEY NOT NULL, v TEXT NOT NULL);
+  INSERT OR IGNORE INTO sync_state (k, v) VALUES ('applying', '0');
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

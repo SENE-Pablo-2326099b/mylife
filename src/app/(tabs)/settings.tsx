@@ -10,6 +10,7 @@ import { replaceWithPersonalData } from "@/import/importer";
 import { backupBeforeReplace, lastAutoBackupAt, shareLatestAutoBackup } from "@/services/autoBackup";
 import { exportCsv, exportJson, importJson } from "@/services/exportService";
 import { requestNotificationPermission } from "@/services/notifications";
+import { useCloud } from "@/services/cloud";
 import { useCoach } from "@/state/coachStore";
 import { useSettings } from "@/state/settingsStore";
 import { showToast } from "@/state/toastStore";
@@ -68,6 +69,7 @@ const INTENTIONS: readonly { key: Intention; label: string }[] = [
 ];
 
 export default function SettingsScreen() {
+  const cloud = useCloud();
   const settings = useSettings((s) => s.settings);
   const update = useSettings((s) => s.update);
   const [importing, setImporting] = useState(false);
@@ -115,6 +117,12 @@ export default function SettingsScreen() {
 
           <SectionTitle title="Données" />
           <Group>
+            <Row
+              icon="lock-closed-outline"
+              title="Compte MyLife"
+              subtitle={!cloud.session ? "Synchroniser téléphone et ordinateur (chiffré)" : !cloud.joined ? `${cloud.session.login} · à relier à cet appareil` : `${cloud.session.login} · ${cloud.error ? "erreur de synchro" : "synchronisé"}`}
+              onPress={() => router.push("/account")}
+            />
             <Row
               icon="download-outline"
               title="Exporter tout (JSON)"
