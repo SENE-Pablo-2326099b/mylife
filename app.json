@@ -23,7 +23,12 @@
       "package": "com.myperf.app"
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "MyPerf",
+      "shortName": "MyPerf",
+      "lang": "fr",
+      "themeColor": "#0C0C0F",
+      "backgroundColor": "#0C0C0F"
     },
     "plugins": [
       "expo-router",
@@ -47,7 +52,8 @@
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "baseUrl": "/perf"
     },
     "backgroundColor": "#0C0C0F"
   }

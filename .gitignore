@@ -44,3 +44,7 @@ example
 
 # Windows download metadata
 *:Zone.Identifier
+
+# Version web (PWA MyLife)
+web/perf/
+web/.vercel

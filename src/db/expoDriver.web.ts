@@ -1,7 +1,8 @@
 /**
- * Browser PREVIEW driver (the app targets iOS/Android). expo-sqlite's web build is alpha and its
- * synchronous API times out on real workloads, so the browser uses sql.js — synchronous, in memory,
- * snapshotted to localStorage after writes so a reload keeps the data.
+ * Web driver (PWA MyLife + aperçu). expo-sqlite's web build is alpha and its synchronous API times
+ * out on real workloads, so the browser uses sql.js — synchronous, in memory — and the database file
+ * is saved to IndexedDB after writes (no 5 MB limit, unlike localStorage) and when the app goes to
+ * the background. A database saved by the older localStorage driver is migrated once.
  */
 import type { Database } from 'sql.js';
 import initSqlJs from 'sql.js/dist/sql-asm.js';
@@ -9,7 +10,37 @@ import initSqlJs from 'sql.js/dist/sql-asm.js';
 import type { Db, SqlValue } from './db';
 
 const STORAGE_KEY = 'myperf.sqlite';
+const IDB_NAME = 'myperf';
+const IDB_STORE = 'files';
 let sqlite: Database | null = null;
+
+function idb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGet(key: string): Promise<Uint8Array | null> {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result instanceof Uint8Array ? req.result : null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbPut(key: string, value: Uint8Array): Promise<void> {
+  const db = await idb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
 
 export const NEEDS_PREPARE = true;
 
@@ -28,24 +59,65 @@ function fromBase64(b64: string): Uint8Array {
 
 export async function prepareExpoDb(): Promise<void> {
   const SQL = await initSqlJs();
-  let saved: string | null = null;
+  let bytes: Uint8Array | null = null;
   try {
-    saved = localStorage.getItem(STORAGE_KEY);
+    bytes = await idbGet(STORAGE_KEY);
   } catch {
-    saved = null;
+    bytes = null;
   }
-  sqlite = saved === null ? new SQL.Database() : new SQL.Database(fromBase64(saved));
+  if (bytes === null) {
+    // Ancien stockage (localStorage) : repris une fois, effacé seulement une fois copié dans IndexedDB.
+    let legacy: string | null = null;
+    try {
+      legacy = localStorage.getItem(STORAGE_KEY);
+    } catch {
+      legacy = null;
+    }
+    if (legacy !== null) {
+      bytes = fromBase64(legacy);
+      try {
+        await idbPut(STORAGE_KEY, bytes);
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // IndexedDB indisponible : on garde l'ancienne copie.
+      }
+    }
+  }
+  sqlite = bytes === null ? new SQL.Database() : new SQL.Database(bytes);
+  // L'app peut être fermée à tout moment (PWA mise en arrière-plan) : on sauvegarde à ce moment-là.
+  const flush = () => {
+    if (saveTimer !== null && sqlite) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      void save(sqlite);
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flush();
+  });
+  window.addEventListener('pagehide', flush);
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-function scheduleSave(db: Database) {
-  if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
+
+async function save(db: Database): Promise<void> {
+  try {
+    await idbPut(STORAGE_KEY, db.export());
+  } catch {
+    // IndexedDB indisponible (navigation privée…) : dernier recours, l'ancien stockage.
     try {
       localStorage.setItem(STORAGE_KEY, toBase64(db.export()));
     } catch {
-      // Storage full or unavailable: the preview keeps working in memory.
+      // Stockage plein : l'app continue en mémoire.
     }
+  }
+}
+
+function scheduleSave(db: Database) {
+  if (saveTimer !== null) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void save(db);
   }, 300);
 }
 

@@ -59,7 +59,9 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",
-    "gen:import": "node scripts/gen-history-module.mjs"
+    "gen:import": "node scripts/gen-history-module.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "deploy:web": "npx --yes vercel@61.1.0 deploy web --prod --yes"
   },
   "private": true,
   "jest": {

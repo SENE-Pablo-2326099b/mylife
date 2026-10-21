@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+// Version web installable (PWA) de MyPerf, servie sous MyLife à l'adresse /perf/.
+// 1. export Expo (baseUrl /perf dans app.json) dans web/perf ;
+// 2. manifeste, icônes, service worker (hors ligne : toute l'app est mise en cache) ;
+// 3. index.html : manifeste, icône iPhone, enregistrement du service worker.
+// Usage : npm run build:web   puis   npm run deploy:web
+import { execSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const ROOT = new URL('..', import.meta.url).pathname;
+const OUT = join(ROOT, 'web', 'perf');
+const BASE = '/perf/';
+
+rmSync(OUT, { recursive: true, force: true });
+execSync(`npx expo export -p web --output-dir ${OUT}`, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' } });
+cpSync(join(ROOT, 'web', 'static'), OUT, { recursive: true });
+
+writeFileSync(
+  join(OUT, 'manifest.webmanifest'),
+  JSON.stringify(
+    {
+      name: 'MyPerf',
+      short_name: 'MyPerf',
+      description: 'Séances, cycles et progression. Les données restent sur ton appareil.',
+      lang: 'fr',
+      id: BASE,
+      start_url: BASE,
+      scope: BASE,
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#0C0C0F',
+      theme_color: '#0C0C0F',
+      icons: [
+        { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+        { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+        { src: 'maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      ],
+    },
+    null,
+    2,
+  ),
+);
+
+// Liste des fichiers à mettre en cache, avec une empreinte : un nouveau build = un nouveau cache.
+const files = [];
+const walk = (dir) => {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walk(p);
+    else if (!/\.map$|^sw\.js$|metadata\.json$/.test(name)) files.push(relative(OUT, p).split('\\').join('/'));
+  }
+};
+walk(OUT);
+const hash = createHash('sha256');
+for (const f of files.sort()) hash.update(f).update(readFileSync(join(OUT, f)));
+const version = hash.digest('hex').slice(0, 12);
+
+writeFileSync(
+  join(OUT, 'sw.js'),
+  `// Service worker MyPerf (généré par scripts/build-web.mjs) : l'app entière en cache, hors ligne.
+const CACHE = 'myperf-${version}';
+const BASE = '${BASE}';
+const FILES = ${JSON.stringify(files.map((f) => BASE + f))};
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('myperf-') && k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+  );
+});
+self.addEventListener('fetch', (e) => {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET' || url.origin !== location.origin || !url.pathname.startsWith(BASE)) return;
+  // Navigation : la page de l'app (routeur côté client), depuis le cache si hors ligne.
+  if (e.request.mode === 'navigate') {
+    e.respondWith(fetch(e.request).catch(() => caches.match(BASE + 'index.html')));
+    return;
+  }
+  e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request)));
+});
+`,
+);
+
+writeFileSync(
+  join(OUT, 'register-sw.js'),
+  `if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('${BASE}sw.js', { scope: '${BASE}' }).then((reg) => {
+    // Nouvelle version installée : on recharge une fois pour l'utiliser.
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing;
+      w && w.addEventListener('statechange', () => {
+        if (w.state === 'activated' && navigator.serviceWorker.controller) location.reload();
+      });
+    });
+    setInterval(() => reg.update().catch(() => {}), 3600000);
+  });
+}
+`,
+);
+
+const indexPath = join(OUT, 'index.html');
+const head = [
+  `<link rel="manifest" href="${BASE}manifest.webmanifest">`,
+  `<link rel="apple-touch-icon" href="${BASE}apple-touch-icon.png">`,
+  '<meta name="theme-color" content="#0C0C0F">',
+  '<meta name="apple-mobile-web-app-capable" content="yes">',
+  '<meta name="mobile-web-app-capable" content="yes">',
+  '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
+  '<meta name="apple-mobile-web-app-title" content="MyPerf">',
+  `<script src="${BASE}register-sw.js" defer></script>`,
+].join('');
+writeFileSync(indexPath, readFileSync(indexPath, 'utf8').replace('</head>', `${head}</head>`));
+console.log(`\n✓ PWA MyPerf prête dans web/perf (version ${version}, ${files.length} fichiers en cache)`);
