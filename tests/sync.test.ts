@@ -151,12 +151,13 @@ describe('synchronisation entre appareils', () => {
     // Le téléphone a déjà des données : il alimente le compte vide.
     phone.write('transactions', 't1', { label: 'Carrefour', amount: -2350 });
     phone.write('transactions', 't2', { label: 'Loyer', amount: -40000 });
-    expect(await join(phone, srv.api, session, random)).toEqual({ action: 'uploaded', count: 2 });
+    phone.write('investmentOps', 'op1', { type: 'buy', amount: 3345 }); // nom de table en camelCase (MyFinances)
+    expect(await join(phone, srv.api, session, random)).toEqual({ action: 'uploaded', count: 3 });
     // Le PC avait d'autres données (ancienne copie) : il prend celles du compte.
     pc.write('transactions', 'vieux', { label: 'Ancienne copie' });
     pc.session = session;
     expect((await join(pc, srv.api, session, random)).action).toBe('downloaded');
-    expect([...pc.rows.keys()].sort()).toEqual(['transactions|t1', 'transactions|t2']);
+    expect([...pc.rows.keys()].sort()).toEqual(['investmentOps|op1', 'transactions|t1', 'transactions|t2']);
 
     // Modifications des deux côtés.
     pc.write('transactions', 't3', { label: 'Resto', amount: -1800 });
