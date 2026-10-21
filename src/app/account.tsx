@@ -3,7 +3,7 @@ import { Platform, View } from 'react-native';
 
 import { db } from '@/db/db';
 import { backupBeforeReplace } from '@/services/autoBackup';
-import { cloudAccountStatus, cloudChangePassword, cloudCreate, cloudJoin, cloudRecover, cloudSignIn, cloudSignOut, refreshCloud, syncCloud, useCloud } from '@/services/cloud';
+import { cloudAccountStatus, cloudChangePassword, cloudCreate, cloudJoin, cloudRecover, cloudSignIn, cloudSignOut, localItemCount, refreshCloud, syncCloud, useCloud } from '@/services/cloud';
 import { exportJson } from '@/services/exportService';
 import { showToast } from '@/state/toastStore';
 import { Badge, Button, Card, Field, Segmented, Text } from '@/ui/components/primitives';
@@ -91,11 +91,15 @@ function RecoveryKey({ value, onDone }: { value: string; onDone: () => void }) {
 
 function Join() {
   const [status, setStatus] = useState<{ count: number; lastUpdated: number | null } | null>(null);
+  const [local, setLocal] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     cloudAccountStatus().then(setStatus, (e: unknown) => setError(message(e)));
+    void localItemCount().then(setLocal);
   }, []);
+  // L'appareil le plus complet est proposé en premier : on ne remplace jamais de vraies données par du vide.
+  const deviceRicher = status !== null && local !== null && local > status.count;
   const run = async (mode: 'auto' | 'useAccount' | 'useDevice') => {
     setBusy(true);
     setError(null);
@@ -128,10 +132,21 @@ function Join() {
         {status !== null && status.count > 0 && (
           <>
             <Text tone="secondary">
-              Ton compte contient déjà {status.count} éléments MyPerf (modifiés le {when(status.lastUpdated)}). Ils vont remplacer les données de cet appareil — une copie de celles-ci est gardée avant.
+              Cet appareil : {local ?? '…'} éléments · ton compte : {status.count} éléments (modifiés le {when(status.lastUpdated)}). Un seul des deux est gardé, puis tous tes appareils le partagent.
             </Text>
-            <Button label={busy ? 'Récupération…' : 'Récupérer les données du compte'} icon="cloud-download-outline" onPress={() => void run('useAccount')} disabled={busy} />
-            <Button label="Garder plutôt celles de cet appareil (remplace le compte)" variant="ghost" onPress={() => void run('useDevice')} disabled={busy} />
+            {deviceRicher ? (
+              <>
+                <Text tone="secondary">Cet appareil a plus de données que le compte : garde-les (elles remplaceront celles du compte).</Text>
+                <Button label={busy ? 'Envoi…' : 'Garder les données de cet appareil'} icon="cloud-upload-outline" onPress={() => void run('useDevice')} disabled={busy} />
+                <Button label="Prendre quand même celles du compte (copie gardée avant)" variant="ghost" onPress={() => void run('useAccount')} disabled={busy} />
+              </>
+            ) : (
+              <>
+                <Button label={busy ? 'Récupération…' : 'Récupérer les données du compte'} icon="cloud-download-outline" onPress={() => void run('useAccount')} disabled={busy} />
+                <Text variant="caption" tone="muted">Une copie des données de cet appareil est gardée avant.</Text>
+                <Button label="Garder plutôt celles de cet appareil (remplace le compte)" variant="ghost" onPress={() => void run('useDevice')} disabled={busy} />
+              </>
+            )}
           </>
         )}
         {error !== null && <Text variant="small" tone="danger">{error}</Text>}

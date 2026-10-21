@@ -135,4 +135,9 @@ export async function cloudJoin(mode: JoinMode = 'auto') {
   }
 }
 
+/** Nombre d'éléments synchronisables sur cet appareil (pour choisir lesquels garder). */
+export async function localItemCount(): Promise<number> {
+  return (await store.snapshot()).length;
+}
+
 export { refreshState as refreshCloud };
