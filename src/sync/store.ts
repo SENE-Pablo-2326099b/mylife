@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { db, getMeta } from '../db/db';
 import { getSettings } from '../db/seed';
-import { EbClient } from './ebClient';
+import { canUseRelay, EbClient } from './ebClient';
 import { syncBankBuys } from '../domain/wealthDb';
 import { EnableBankingSource } from './enableBankingSource';
 import { syncAll, type AccountSyncReport } from './syncEngine';
@@ -33,7 +33,7 @@ export function useSyncState(): SyncState {
 
 export async function getClient(): Promise<EbClient | null> {
   const s = await getSettings();
-  return s.bridgePassword ? new EbClient(s.bridgePassword) : null;
+  return canUseRelay(s) ? new EbClient(s.bridgePassword) : null;
 }
 
 export async function hasBankAccounts(): Promise<boolean> {
@@ -45,7 +45,7 @@ export async function runSync(): Promise<AccountSyncReport[] | null> {
   set({ syncing: true, error: null });
   try {
     const settings = await getSettings();
-    if (!settings.bridgePassword) throw new Error('Saisis le mot de passe du relais dans Synchro.');
+    if (!canUseRelay(settings)) throw new Error('Connecte-toi à ton compte MyLife (Réglages → Compte) ou saisis le mot de passe du relais (Banques).');
     const reports = await syncAll(new EnableBankingSource(new EbClient(settings.bridgePassword)), settings);
     // Nouveaux prélèvements Bitstack (ou autre ligne reliée à la banque) → achats.
     await syncBankBuys().catch(() => 0);
@@ -61,8 +61,11 @@ export async function runSync(): Promise<AccountSyncReport[] | null> {
 export async function maybeAutoSync(): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const settings = await getSettings();
-  if (!settings.autoSyncHours || !settings.bridgePassword || !(await hasBankAccounts())) return;
-  const last = (await getMeta<number>('lastSyncAt')) ?? 0;
+  if (!settings.autoSyncHours || !canUseRelay(settings) || !(await hasBankAccounts())) return;
+  // Dernière interrogation de la banque, sur cet appareil ou un autre (comptes synchronisés) :
+  // la DSP2 limite les accès automatiques à 4 par jour et par compte.
+  const accounts = await db.accounts.where('source').equals('enablebanking').toArray();
+  const last = Math.max((await getMeta<number>('lastSyncAt')) ?? 0, ...accounts.map((a) => a.lastSyncAt ?? 0));
   if (Date.now() - last < settings.autoSyncHours * 3600_000) return;
   await runSync();
 }

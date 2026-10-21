@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { generateKeyPairSync, createVerify } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { buildUpstream, handleBridge, loadBridgeEnv, normalizePem, signJwt, type BridgeEnv } from '../server/bridge';
@@ -138,5 +139,33 @@ describe('buildUpstream', () => {
   it('pagination', () => {
     const u = buildUpstream('transactions', { accountUid: UID, continuationKey: 'abc==' }, env);
     expect(u.path).toBe(`/accounts/${UID}/transactions?continuation_key=abc%3D%3D`);
+  });
+});
+
+describe('accès au relais avec un compte MyLife', () => {
+  const secret = 's'.repeat(40);
+  const token = (uid: string, exp: number, key = secret) => {
+    const payload = Buffer.from(JSON.stringify({ uid, exp })).toString('base64url');
+    return `${payload}.${createHmac('sha256', key).update(payload).digest('base64url')}`;
+  };
+  const withSession = { ...env, sessionSecret: secret };
+  const reqToken = (body: unknown, t: string) => ({ method: 'POST', headers: { authorization: `Bearer ${t}` }, body });
+
+  it('une session valide remplace le mot de passe', async () => {
+    const out = await handleBridge(reqToken({ op: 'status' }, token('u1', Date.now() + 60_000)), withSession);
+    expect(out.body).toMatchObject({ authenticated: true });
+  });
+
+  it('session expirée, falsifiée ou d’un autre serveur : refusée', async () => {
+    for (const t of [token('u1', Date.now() - 1), token('u1', Date.now() + 60_000, 'x'.repeat(40)), 'abc.def', '']) {
+      const out = await handleBridge(reqToken({ op: 'status' }, t), withSession);
+      expect(out.body).toMatchObject({ authenticated: false });
+    }
+  });
+
+  it('relais sans mot de passe mais avec sessions : configuré', async () => {
+    const out = await handleBridge(reqToken({ op: 'status' }, token('u1', Date.now() + 60_000)), { ...withSession, password: undefined });
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ configured: true, authenticated: true });
   });
 });

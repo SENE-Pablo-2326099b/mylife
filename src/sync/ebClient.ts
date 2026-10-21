@@ -1,4 +1,5 @@
 import type { EbAspsp, EbBalance, EbGetSessionResponse, EbSession, EbStartAuthResponse, EbTransactionsPage } from './ebTypes';
+import { currentSession } from './cloud/platform';
 import { SourceError } from './source';
 
 /** Le relais est servi sur la même origine que l'app (aucun autre domaine n'est contacté). */
@@ -15,6 +16,16 @@ export interface BridgeStatus {
 
 const EXPIRED_CODES = /EXPIRED|REVOKED|CLOSED|CANCELLED|SESSION|ACCESS_DENIED|CONSENT|ACCOUNT_DOES_NOT_EXIST/i;
 
+function relayAuthorization(): Record<string, string> {
+  const token = typeof localStorage === 'undefined' ? null : currentSession()?.token;
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
+/** Accès au relais : mot de passe saisi, ou compte MyLife connecté. */
+export function canUseRelay(settings: { bridgePassword: string }): boolean {
+  return !!settings.bridgePassword || (typeof localStorage !== 'undefined' && !!currentSession());
+}
+
 export class EbClient {
   constructor(private password: string, private fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
 
@@ -23,7 +34,8 @@ export class EbClient {
     try {
       res = await this.fetchImpl(BRIDGE_URL, {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-bridge-password': this.password },
+        // Connecté à un compte MyLife : le jeton suffit, le mot de passe du relais devient inutile.
+        headers: { 'content-type': 'application/json', 'x-bridge-password': this.password, ...relayAuthorization() },
         body: JSON.stringify({ op, ...payload }),
         cache: 'no-store',
       });

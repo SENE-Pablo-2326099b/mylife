@@ -8,7 +8,7 @@
  *
  * Utilisé par : api/eb.ts (Vercel), netlify/functions/eb.ts (Netlify), server/vitePlugin.ts (dev / preview).
  */
-import { createSign, timingSafeEqual, createHash } from 'node:crypto';
+import { createHash, createHmac, createSign, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fetchHistory, fetchQuotes, MarketInputError, searchAssets } from './market.js';
 
@@ -21,6 +21,8 @@ export interface BridgeEnv {
   apiBase?: string;
   /** Liste d'URL de retour autorisées, séparées par des virgules (facultatif). */
   allowedRedirects?: string;
+  /** Secret des sessions MyLife : un compte connecté accède au relais sans mot de passe. */
+  sessionSecret?: string;
 }
 
 export interface BridgeRequest {
@@ -63,6 +65,7 @@ export function loadBridgeEnv(source: Record<string, string | undefined> = proce
     password: source.BRIDGE_PASSWORD || undefined,
     apiBase: source.EB_API_BASE || EB_API_BASE,
     allowedRedirects: source.EB_REDIRECT_URLS || undefined,
+    sessionSecret: source.SESSION_SECRET && source.SESSION_SECRET.length >= 32 ? source.SESSION_SECRET : undefined,
   };
 }
 
@@ -95,6 +98,25 @@ export function signJwt(appId: string, privateKeyPem: string, nowMs = Date.now()
   signer.end();
   const signature = signer.sign(privateKeyPem);
   return `${signingInput}.${base64url(signature)}`;
+}
+
+/**
+ * Jeton de session MyLife (même format que MyLife/server/core.ts : charge base64url + HMAC-SHA256).
+ * Vérifié ici sans base de données : le relais n'a besoin que de savoir que le compte est valide.
+ */
+export function verifySession(token: string | undefined, secret: string, now = Date.now()): boolean {
+  if (!token) return false;
+  const [payload, sig] = token.replace(/^Bearer\s+/i, '').split('.');
+  if (!payload || !sig) return false;
+  const expected = createHmac('sha256', secret).update(payload).digest();
+  const given = Buffer.from(sig, 'base64url');
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return false;
+  try {
+    const { uid, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { uid?: unknown; exp?: unknown };
+    return typeof uid === 'string' && typeof exp === 'number' && exp > now;
+  } catch {
+    return false;
+  }
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -233,13 +255,13 @@ export async function handleBridge(req: BridgeRequest, env: BridgeEnv, fetchImpl
     return reply(400, { error: (e as Error).message });
   }
   const op = typeof body.op === 'string' ? body.op : '';
-  const configured = !!(env.appId && env.privateKey && env.password);
+  const configured = !!(env.appId && env.privateKey && (env.password || env.sessionSecret));
 
-  if (!env.password) {
-    return reply(503, { error: 'Relais non configuré : variable BRIDGE_PASSWORD manquante.', configured: false });
+  if (!env.password && !env.sessionSecret) {
+    return reply(503, { error: 'Relais non configuré : variable BRIDGE_PASSWORD ou SESSION_SECRET manquante.', configured: false });
   }
   const given = header(req, 'x-bridge-password') ?? '';
-  const authenticated = given.length > 0 && safeEqual(given, env.password);
+  const authenticated = (given.length > 0 && !!env.password && safeEqual(given, env.password)) || (!!env.sessionSecret && verifySession(header(req, 'authorization'), env.sessionSecret));
 
   if (op === 'status') {
     return reply(200, { configured, authenticated, appIdSet: !!env.appId, privateKeySet: !!env.privateKey });

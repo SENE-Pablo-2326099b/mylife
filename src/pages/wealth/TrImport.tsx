@@ -9,7 +9,7 @@ import { recordSnapshot, refreshPlannedSavings, refreshQuotes } from '../../doma
 import { formatShort } from '../../lib/dates';
 import { formatCents } from '../../lib/money';
 import { pdfPages } from '../../lib/pdfText';
-import { EbClient } from '../../sync/ebClient';
+import { canUseRelay, EbClient } from '../../sync/ebClient';
 import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, ToggleRow, undoable } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 
@@ -52,7 +52,7 @@ export default function TrImportPage() {
       const [portfolios, holdings, ops, plans] = await Promise.all([db.portfolios.toArray(), db.holdings.toArray(), db.investmentOps.toArray(), db.plans.toArray()]);
       const plan = planTrImport(st, { portfolios, holdings, ops, plans }, { createPlans, activePlans });
       const settings = await getSettings();
-      if (settings.bridgePassword && plan.holdings.length) {
+      if (canUseRelay(settings) && plan.holdings.length) {
         setBusy('Recherche des cours…');
         const client = new EbClient(settings.bridgePassword);
         await resolveQuotes(plan, (q) => client.searchAsset(q));

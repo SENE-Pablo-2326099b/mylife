@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSettings } from '../db/seed';
 import { BASE_PATH } from '../lib/app';
 import { completeBankConnection, getPendingAuth, parseCallback } from '../sync/connect';
-import { EbClient } from '../sync/ebClient';
+import { canUseRelay, EbClient } from '../sync/ebClient';
 import { runSync } from '../sync/store';
 import { Button, Card, EmptyState } from '../ui/index';
 import { Orb } from '../ui/extras';
@@ -22,7 +22,7 @@ export default function CallbackPage() {
     if (error) return setPhase({ kind: 'error', message: `La banque a refusé ou annulé l’accès (${error}).` });
     if (!code) return setPhase({ kind: 'error', message: 'Aucun code d’autorisation dans le lien de retour.' });
     const settings = await getSettings();
-    if (!settings.bridgePassword) return setPhase({ kind: 'foreign' });
+    if (!canUseRelay(settings)) return setPhase({ kind: 'foreign' });
     try {
       const accounts = await completeBankConnection(new EbClient(settings.bridgePassword), code, state);
       window.history.replaceState(null, '', `${BASE_PATH}/connexion/retour`);

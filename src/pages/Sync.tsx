@@ -50,6 +50,8 @@ function BridgeCard({ status, onRefresh }: { status: BridgeStatus | null; onRefr
         {badge}
       </div>
       <p className="t-small mt-1 text-secondary">Ton téléphone ne contacte jamais ta banque directement : le relais (ta fonction serverless) signe les requêtes et te renvoie les opérations. Rien n’y est stocké.</p>
+      {status?.authenticated && !settings.bridgePassword && <p className="t-small mt-2 text-success">Accès autorisé par ton compte MyLife : aucun mot de passe à saisir.</p>}
+      {status?.reachable && !status.authenticated && <p className="t-small mt-2 text-secondary">Le plus simple : connecte-toi à ton compte MyLife (Réglages → Compte MyLife). Sinon, saisis le mot de passe du relais.</p>}
       {status && !status.reachable && <p className="t-small mt-2 text-danger">{status.error}</p>}
       {status?.reachable && !status.configured && (
         <p className="t-small mt-2 text-warning">

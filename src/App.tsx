@@ -19,6 +19,7 @@ import BudgetSettingsPage from './pages/settings/BudgetSettings';
 import CategoriesPage from './pages/settings/Categories';
 import DataPage from './pages/settings/Data';
 import ProfilePage from './pages/settings/Profile';
+import AccountPage from './pages/settings/Account';
 import RulesPage from './pages/settings/Rules';
 import SyncPage from './pages/Sync';
 import TodayPage from './pages/Today';
@@ -27,6 +28,7 @@ import PortfolioDetailPage from './pages/wealth/PortfolioDetail';
 import TrImportPage from './pages/wealth/TrImport';
 import WealthPage from './pages/wealth/Wealth';
 import { absorbSetupLink } from './sync/setupLink';
+import { cloudBoot } from './sync/cloud';
 import { maybeAutoSync } from './sync/store';
 import { Backdrop } from './ui/Backdrop';
 import { SkeletonCard } from './ui/extras';
@@ -82,7 +84,11 @@ function Shell() {
   const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
 
   useEffect(() => {
-    void maybeAutoSync().finally(() => void wealthHousekeeping().catch(() => undefined));
+    // D'abord ce que les autres appareils ont fait (dont leurs synchros bancaires), puis la banque.
+    void cloudBoot()
+      .catch(() => undefined)
+      .then(() => maybeAutoSync())
+      .finally(() => void wealthHousekeeping().catch(() => undefined));
   }, []);
 
   const tabs: TabDef[] = [
@@ -123,6 +129,7 @@ function Shell() {
         <Route path="/connexion/retour" element={<CallbackPage />} />
         <Route path="/reglages" element={<SettingsPage />} />
         <Route path="/reglages/profil" element={<ProfilePage />} />
+        <Route path="/reglages/compte" element={<AccountPage />} />
         <Route path="/reglages/budget" element={<BudgetSettingsPage />} />
         <Route path="/reglages/apparence" element={<AppearancePage />} />
         <Route path="/reglages/regles" element={<RulesPage />} />

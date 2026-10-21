@@ -8,7 +8,7 @@ import { recordSnapshot, refreshPlannedSavings, refreshQuotes, syncBankBuys } fr
 import { todayISO } from '../../lib/dates';
 import { centsToInput, formatCents, tryDecimalToCents } from '../../lib/money';
 import { uid } from '../../lib/text';
-import { EbClient, type AssetHit } from '../../sync/ebClient';
+import { canUseRelay, EbClient, type AssetHit } from '../../sync/ebClient';
 import { Badge, Button, Chip, Divider, Field, Icon, MoneyField, Segmented, SelectField, Stepper, Tap, TextField, toast, ToggleRow } from '../../ui/index';
 
 /** Formulaires du patrimoine (dans des feuilles). Après chaque écriture : épargne prévue et photo du jour. */
@@ -108,12 +108,14 @@ function AssetSearch({ onPick }: { onPick: (hit: AssetHit) => void }) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<AssetHit[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [password, setPassword] = useState<string | null>(null);
+  // undefined = en cours de lecture ; null = pas d'accès au relais.
+  const [password, setPassword] = useState<string | null | undefined>(undefined);
   useEffect(() => {
-    void getSettings().then((s) => setPassword(s.bridgePassword));
+    // Mot de passe du relais, ou '' quand le compte MyLife connecté suffit.
+    void getSettings().then((s) => setPassword(canUseRelay(s) ? s.bridgePassword : null));
   }, []);
   useEffect(() => {
-    if (!password || query.trim().length < 2) {
+    if (password == null || query.trim().length < 2) {
       setHits(null);
       return;
     }
@@ -128,7 +130,7 @@ function AssetSearch({ onPick }: { onPick: (hit: AssetHit) => void }) {
     }, 350);
     return () => clearTimeout(h);
   }, [query, password]);
-  if (password === '') return <p className="t-caption text-muted">Recherche automatique des cours : saisis le mot de passe du relais dans Banques. Tu peux aussi tout saisir à la main ci-dessous.</p>;
+  if (password === null) return <p className="t-caption text-muted">Recherche automatique des cours : connecte ton compte MyLife (Réglages → Compte). Tu peux aussi tout saisir à la main ci-dessous.</p>;
   return (
     <div className="space-y-2">
       <div className="relative">

@@ -4,10 +4,12 @@ import { db } from '../../db/db';
 import { getSettings, updateSettings } from '../../db/seed';
 import { backupFileName, exportBackup, importBackup, wipeAll } from '../../domain/backup';
 import { clearDemo, loadDemo } from '../../domain/demo';
+import { useCloud } from '../../sync/cloud';
 import { Button, Card, Reveal, SectionTitle, toast } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 
 export default function DataPage() {
+  const cloud = useCloud();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const counts = useLiveQuery(
@@ -101,7 +103,7 @@ export default function DataPage() {
         <Card>
           <p className="t-small text-secondary">Six mois d’une vie fictive : deux banques, un portefeuille d’ETF, du bitcoin en programmé, des objectifs. Pour tout essayer sans connecter de banque.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button disabled={busy} onClick={() => void run(async () => toast({ message: `${await loadDemo()} opérations de démo chargées`, tone: 'gold' }))}>
+            <Button disabled={busy || cloud.joined} onClick={() => void run(async () => toast({ message: `${await loadDemo()} opérations de démo chargées`, tone: 'gold' }))}>
               Charger la démo
             </Button>
             {!!counts?.demo && (
@@ -110,13 +112,16 @@ export default function DataPage() {
               </Button>
             )}
           </div>
+          {cloud.joined && <p className="t-caption mt-2 text-muted">Indisponible tant que cet appareil est synchronisé avec ton compte : la démo irait dans tes vraies données.</p>}
         </Card>
       </Reveal>
 
       <Reveal index={2}>
         <SectionTitle>Tout effacer</SectionTitle>
         <Card tone="danger">
-          <p className="t-small text-secondary">Efface toutes les données de cet appareil et revient aux réglages de départ. Tu as quelques secondes pour annuler ; exporte une sauvegarde avant si tu veux la garder.</p>
+          <p className="t-small text-secondary">
+            Efface toutes les données de cet appareil{cloud.joined ? ' et de ton compte MyLife (donc de tous tes appareils synchronisés)' : ''} et revient aux réglages de départ. Tu as quelques secondes pour annuler ; exporte une sauvegarde avant si tu veux la garder.
+          </p>
           <Button variant="danger" icon="trash" className="mt-3" disabled={busy} onClick={() => void run(() => replaceWithUndo('Toutes les données ont été effacées', wipeAll))}>
             Tout effacer
           </Button>

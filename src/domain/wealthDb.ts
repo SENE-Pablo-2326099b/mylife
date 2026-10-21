@@ -4,7 +4,7 @@ import { changeWithUndo } from '../db/undo';
 import type { Holding } from '../db/types';
 import { addDays, diffDays, todayISO, type ISODate } from '../lib/dates';
 import { uid } from '../lib/text';
-import { EbClient } from '../sync/ebClient';
+import { canUseRelay, EbClient } from '../sync/ebClient';
 import { bankBuys, priceLookup } from './bankBuys';
 import { dueOperations, plannedMonthlySavings } from './plans';
 import { makeSnapshot, netWorth, summarizePortfolio } from './wealth';
@@ -49,7 +49,7 @@ export async function syncBankBuys(database: BudgetDB = db, today: ISODate = tod
   const holdings = (await database.holdings.toArray()).filter((h) => h.bankKeyword);
   if (!holdings.length) return 0;
   const settings = await getSettings(database);
-  const client = settings.bridgePassword ? new EbClient(settings.bridgePassword) : null;
+  const client = canUseRelay(settings) ? new EbClient(settings.bridgePassword) : null;
   let created = 0;
   for (const h of holdings) {
     // Un achat sans cours (quantité 0) est recalculé dès qu'un cours est disponible.
@@ -102,7 +102,7 @@ const QUOTES_KEY = 'quotesAt';
  */
 export async function refreshQuotes(opts: { force?: boolean; maxAgeHours?: number } = {}, database: BudgetDB = db): Promise<{ updated: number; errors: string[]; skipped?: string }> {
   const settings = await getSettings(database);
-  if (!settings.bridgePassword) return { updated: 0, errors: [], skipped: 'Mot de passe du relais non saisi (Réglages → Banques).' };
+  if (!canUseRelay(settings)) return { updated: 0, errors: [], skipped: 'Connecte ton compte MyLife (Réglages → Compte) pour mettre les cours à jour.' };
   if (typeof navigator !== 'undefined' && !navigator.onLine) return { updated: 0, errors: [], skipped: 'Hors ligne.' };
   const last = (await getMeta<number>(QUOTES_KEY, database)) ?? 0;
   if (!opts.force && Date.now() - last < (opts.maxAgeHours ?? 6) * 3600_000) return { updated: 0, errors: [], skipped: 'Cours récents.' };

@@ -6,11 +6,14 @@ import { APP_NAME } from '../lib/app';
 import { formatCents } from '../lib/money';
 import { themeInfo, isThemeId } from '../ui/themes';
 import { checkForUpdate } from '../lib/pwaUpdate';
+import { relativeTime } from '../lib/relative';
+import { useCloud } from '../sync/cloud';
 import { Button, Card, Group, Icon, Reveal, Row, SectionTitle } from '../ui/index';
 import { Screen } from '../ui/Screen';
 
 export default function SettingsPage() {
   const s = useSettings();
+  const cloud = useCloud();
   const counts = useLiveQuery(async () => ({ banks: await db.connections.where('status').equals('active').count(), rules: await db.rules.count(), cats: await db.categories.count() }), []);
   const theme = themeInfo(isThemeId(s.theme) ? s.theme : 'nuit');
   const initial = (s.firstName.trim()[0] ?? '').toUpperCase();
@@ -43,6 +46,12 @@ export default function SettingsPage() {
       <Reveal index={2}>
         <SectionTitle>Comptes</SectionTitle>
         <Group>
+          <Row
+            icon="lock"
+            title="Compte MyLife"
+            subtitle={!cloud.session ? 'Synchroniser tous tes appareils (chiffré)' : !cloud.joined ? `${cloud.session.login} · à relier à cet appareil` : `${cloud.session.login} · ${cloud.error ? 'erreur de synchro' : cloud.lastSyncAt ? `synchronisé ${relativeTime(cloud.lastSyncAt)}` : 'synchronisé'}`}
+            to="/reglages/compte"
+          />
           <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
           <Row icon="diamond" title="Patrimoine et placements" subtitle="Portefeuilles, objectifs, autres actifs" to="/patrimoine" />
           <Row icon="upload" title="Importer un relevé Trade Republic" subtitle="PDF : achats, plans d’épargne, dividendes" to="/patrimoine/import" />
