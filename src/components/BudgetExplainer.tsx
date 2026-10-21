@@ -1,6 +1,7 @@
 import type { Account, Category, Transaction } from '../db/types';
 import { isVariable, type BudgetState, type CatMap } from '../domain/budget';
 import { formatShort } from '../lib/dates';
+import { formatCents } from '../lib/money';
 import { Button, Card, Divider, Group, Money, SectionTitle, Sheet } from '../ui/index';
 import { TxRow } from './TxRow';
 
@@ -42,6 +43,7 @@ export function BudgetExplainer({
   const noIncome = env.incomeSource === 'received' && env.income === 0;
   const available = b.available;
   const pending = b.charges.filter((c) => !c.paidBy);
+  const upcomingSavings = b.upcoming.filter((u) => u.savings).reduce((s, u) => s + u.amount, 0);
   const cat = (t: Transaction): Category | undefined => (t.categoryId ? cats.get(t.categoryId) : undefined);
 
   return (
@@ -71,7 +73,17 @@ export function BudgetExplainer({
         )}
         <Line sign="−" label={`Dépensé du ${formatShort(b.cycle.start)} à hier`} cents={b.spentBefore} />
         <Divider />
-        <Line sign="=" label="Disponible pour la fin du cycle" cents={available} strong />
+        <Line sign="=" label="Reste de l’enveloppe" cents={b.fromEnvelope} strong={b.limitedBy === 'envelope'} />
+        {b.realFree !== null && (
+          <>
+            <Line label="Réellement libre sur tes comptes" cents={b.realFree + b.spentToday} strong={b.limitedBy === 'cash'} />
+            <p className="t-caption pb-1 text-muted">
+              {b.limitedBy === 'cash'
+                ? 'Ton argent réel est plus bas que l’enveloppe : c’est lui qui fixe le budget du jour.'
+                : 'Ton argent réel couvre l’enveloppe : c’est l’enveloppe qui fixe le budget du jour.'}
+            </p>
+          </>
+        )}
         <Line sign="÷" label={`${b.daysLeft} jour${b.daysLeft > 1 ? 's' : ''} jusqu’à la paie, aujourd’hui compris`} cents={b.dailyBudget} />
         <p className="t-small mt-2 text-muted">
           {available < 0
@@ -80,20 +92,18 @@ export function BudgetExplainer({
         </p>
       </Card>
 
-      {(pending.length > 0 || b.realFree !== null) && (
+      {b.realFree !== null && (
         <Card className="mt-3">
-          <p className="t-body-strong">Encore réservé ce cycle</p>
-          {pending.map((c) => (
-            <Line key={c.line.id} label={c.line.label} cents={c.line.amount} />
-          ))}
-          {b.reservedSavings > 0 && <Line label="Épargne pas encore versée" cents={b.reservedSavings} />}
-          {b.realFree !== null && (
-            <>
-              <Divider />
-              <Line label="Sur tes comptes courants, réellement libre" cents={b.realFree} strong />
-            </>
-          )}
-          <p className="t-caption mt-1 text-muted">Une charge prévue mais pas encore débitée reste réservée : elle n’est pas libre même si l’argent est encore sur le compte.</p>
+          <p className="t-body-strong">Réellement libre d’ici la paie</p>
+          <Line label="Solde de tes comptes du quotidien" cents={b.realFree + b.reservedCharges + b.reservedSavings} />
+          {b.upcoming.length > 0
+            ? b.upcoming.map((u, i) => <Line key={`${u.date}-${u.label}-${i}`} sign="−" label={`${u.label} · ${formatShort(u.date)}`} cents={u.amount} />)
+            : pending.map((c) => <Line key={c.line.id} sign="−" label={c.line.label} cents={c.line.amount} />)}
+          {b.reservedSavings - upcomingSavings > 0 && <Line sign="−" label="Épargne prévue pas encore versée" cents={b.reservedSavings - upcomingSavings} />}
+          <Divider />
+          <Line sign="=" label="Réellement libre" cents={b.realFree} strong />
+          {b.spentToday > 0 && <p className="t-caption text-muted">Le solde inclut déjà tes {formatCents(b.spentToday)} dépensés aujourd’hui : ils sont réintégrés pour que le budget du jour ne bouge pas dans la journée.</p>}
+          <p className="t-caption mt-1 text-muted">Prélèvements détectés automatiquement dans ton historique (loyer, forfait, abonnements…) et investissements programmés. Les virements entre tes comptes ne comptent pas. Un compte d’épargne se règle dans Banques.</p>
         </Card>
       )}
 

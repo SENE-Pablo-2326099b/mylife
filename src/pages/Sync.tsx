@@ -10,7 +10,7 @@ import { completeBankConnection, disconnectBank, parseCallback, startBankConnect
 import { EbClient, type BridgeStatus } from '../sync/ebClient';
 import type { EbAspsp } from '../sync/ebTypes';
 import { runSync, useSyncState } from '../sync/store';
-import { Badge, Button, Card, deferred, Disclosure, EmptyState, Group, Icon, Money, Reveal, Row, SectionTitle, SelectField, Sheet, Tap, TextField, toast } from '../ui/index';
+import { Badge, Button, Card, deferred, Disclosure, EmptyState, Group, Icon, Money, Reveal, Row, Segmented, SectionTitle, SelectField, Sheet, Tap, TextField, toast } from '../ui/index';
 import { Screen } from '../ui/Screen';
 
 export const COUNTRIES = [
@@ -81,19 +81,37 @@ function BridgeCard({ status, onRefresh }: { status: BridgeStatus | null; onRefr
   );
 }
 
+const ACCOUNT_ROLES = [
+  { value: 'current', label: 'Quotidien' },
+  { value: 'savings', label: 'Épargne' },
+] as const;
+
 function AccountRow({ account }: { account: Account }) {
+  const [open, setOpen] = useState(false);
+  const role = account.kind === 'savings' ? 'savings' : 'current';
   return (
-    <Row
-      icon={account.kind === 'savings' ? 'leaf' : 'card'}
-      title={account.nickname ?? account.name}
-      subtitle={
-        <>
-          {account.iban ? `••${account.iban.slice(-4)} · ` : ''}synchro {relativeTime(account.lastSyncAt)}
-          {account.lastSyncError && <span className="block text-danger">{account.lastSyncError}</span>}
-        </>
-      }
-      right={account.balance !== null ? <Money cents={account.balance} /> : undefined}
-    />
+    <>
+      <Sheet open={open} onClose={() => setOpen(false)} title={account.nickname ?? account.name}>
+        <p className="t-small mb-3 text-secondary">
+          Un compte « Quotidien » compte dans ton argent réellement disponible (budget du jour, prévision). Un compte « Épargne » (livret, cash mis de côté, compte d’un courtier) n’y compte pas : les virements vers lui sont de l’épargne.
+        </p>
+        <Segmented options={ACCOUNT_ROLES} value={role} onChange={(kind) => void db.accounts.update(account.id, { kind })} label="Rôle du compte" />
+      </Sheet>
+      <Row
+        onClick={() => setOpen(true)}
+        chevron
+        icon={account.kind === 'savings' ? 'leaf' : 'card'}
+        title={account.nickname ?? account.name}
+        subtitle={
+          <>
+            {account.kind === 'savings' ? 'Épargne · ' : ''}
+            {account.iban ? `••${account.iban.slice(-4)} · ` : ''}synchro {relativeTime(account.lastSyncAt)}
+            {account.lastSyncError && <span className="block text-danger">{account.lastSyncError}</span>}
+          </>
+        }
+        right={account.balance !== null ? <Money cents={account.balance} /> : undefined}
+      />
+    </>
   );
 }
 

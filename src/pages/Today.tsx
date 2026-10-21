@@ -92,7 +92,7 @@ export default function TodayPage() {
 
   // Enveloppe dépassée : on montre le déficit, jamais un budget du jour négatif.
   const over = b.overrun;
-  const heroLabel = over ? 'Déficit du cycle' : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
+  const heroLabel = over ? (b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Déficit du cycle') : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
   const heroValue = over ? over.deficit : Math.abs(b.remainingToday);
   const p = b.projection;
 
@@ -126,6 +126,7 @@ export default function TodayPage() {
               </div>
             </div>
           )}
+          {b.limitedBy === 'cash' && !over && <p className="t-caption mt-3 text-center text-warning">Plafonné par l’argent réellement libre sur tes comptes</p>}
           <p className="t-caption mt-3 flex items-center justify-center gap-1 text-muted">
             <Icon name="info" size={14} />
             {over ? 'Pourquoi ? Touche pour voir le détail' : 'Comment c’est calculé'}

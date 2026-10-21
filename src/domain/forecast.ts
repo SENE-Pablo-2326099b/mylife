@@ -17,6 +17,7 @@ export interface ForecastEvent {
   /** Signé, en centimes. */
   amount: number;
   source: 'recurring' | 'income' | 'charge' | 'plan';
+  categoryId?: string | null;
 }
 
 export interface Forecast {
@@ -78,10 +79,12 @@ export function buildForecast(input: {
   // Récurrences détectées (hors dépenses courantes déjà dans le rythme quotidien, hors ignorées).
   const used = input.recurring.filter((r) => {
     if (!r.active || r.status === 'ignored') return false;
+    // Virements entre mes comptes : l'argent reste sur les comptes, ni entrée ni sortie.
+    if (r.categoryId === CAT.transferts) return false;
     const kind = r.categoryId ? cats.get(r.categoryId)?.kind : undefined;
     return r.kind === 'income' || kind !== 'variable';
   });
-  for (const r of used) for (const date of recurringDates(r, from, until)) events.push({ date, label: r.label, amount: r.amount, source: 'recurring' });
+  for (const r of used) for (const date of recurringDates(r, from, until)) events.push({ date, label: r.label, amount: r.amount, source: 'recurring', categoryId: r.categoryId });
 
   const monthlyRecurring = used.filter((r) => r.cadence === 'monthly');
   const covered = (amount: number, day: number | null, kind: 'income' | 'expense') =>
@@ -101,7 +104,7 @@ export function buildForecast(input: {
     if (!p.active) continue;
     const already = used.some((r) => r.kind === 'expense' && r.categoryId === CAT.epargne && close(r.amount, -p.amount) && (r.cadence === 'monthly') === (p.frequency === 'monthly'));
     if (already) continue;
-    for (const date of occurrences(p, from, until)) events.push({ date, label: p.label, amount: -p.amount, source: 'plan' });
+    for (const date of occurrences(p, from, until)) events.push({ date, label: p.label, amount: -p.amount, source: 'plan', categoryId: CAT.epargne });
   }
   events.sort((a, b) => a.date.localeCompare(b.date) || a.amount - b.amount);
 

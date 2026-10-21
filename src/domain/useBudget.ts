@@ -4,7 +4,10 @@ import { db, getMeta, setMeta } from '../db/db';
 import type { Transaction } from '../db/types';
 import { useAccounts, useCategoryMap, useSettings } from '../hooks';
 import { addDays, cycleFor, todayISO } from '../lib/dates';
-import { computeBudget, EARLY_PAY_DAYS, type Allocations, type BudgetState, type ExceptionalAllocation } from './budgetEngine';
+import { computeBudget, currentCycle, EARLY_PAY_DAYS, type Allocations, type BudgetState, type ExceptionalAllocation, type UpcomingOutflow } from './budgetEngine';
+import { CAT } from './defaults';
+import { forecastAccounts } from './forecast';
+import { useForecast } from './useInsights';
 
 const NO_TX: Transaction[] = [];
 const ALLOCATIONS_KEY = 'exceptionalAllocations';
@@ -37,13 +40,26 @@ export function useBudget(today = todayISO()): { state: BudgetState; txs: Transa
   const to = addDays(nominal.end, 35);
   const txs = useLiveQuery(() => db.transactions.where('date').between(from, to, true, true).toArray(), [from, to]);
   const { allocations, dataStart } = useBudgetContext();
-  const current = accounts.filter((a) => !a.hidden && a.balance !== null && (a.kind ?? 'current') !== 'savings');
-  const balance = current.length ? current.reduce((s, a) => s + (a.balance ?? 0), 0) : null;
-
   const list = txs ?? NO_TX;
+  // Comptes « du quotidien » (pas l'épargne) : leur solde réel est le plafond du budget.
+  const current = forecastAccounts(accounts);
+  const balance = current.length ? current.reduce((s, a) => s + (a.balance ?? 0), 0) : null;
+  // Sorties déjà engagées d'ici la paie, détectées dans l'historique réel (prévision de trésorerie).
+  const cycleEnd = useMemo(() => currentCycle({ txs: list, cats, settings, today }).end, [list, cats, settings, today]);
+  const { forecast } = useForecast(cycleEnd);
+  const upcoming = useMemo<UpcomingOutflow[] | null>(
+    () =>
+      forecast
+        ? forecast.events
+            .filter((e) => e.amount < 0)
+            .map((e) => ({ date: e.date, label: e.label, amount: -e.amount, savings: e.source === 'plan' || e.categoryId === CAT.epargne }))
+        : null,
+    [forecast],
+  );
+
   const state = useMemo(
-    () => computeBudget({ txs: list, cats, settings, today, allocations, dataStart, balance }),
-    [list, cats, settings, today, allocations, dataStart, balance],
+    () => computeBudget({ txs: list, cats, settings, today, allocations, dataStart, balance, upcoming }),
+    [list, cats, settings, today, allocations, dataStart, balance, upcoming],
   );
   return { state, txs: list, loading: txs === undefined };
 }

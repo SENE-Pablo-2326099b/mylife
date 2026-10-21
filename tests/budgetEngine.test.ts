@@ -243,3 +243,36 @@ describe('réglages', () => {
     expect(n.incomes.find((l) => l.id === 'paie')).not.toHaveProperty('direct');
   });
 });
+
+describe('plafond réel : jamais plus que l’argent réellement libre', () => {
+  // Enveloppe 1 190 €, 100 € déjà dépensés → 1 090 € « théoriques » ; mais 600 € sur les comptes,
+  // dont 10 € de forfait et 100 € d'épargne encore à venir → 490 € réellement libres.
+  const txs = [salary('2026-10-01'), spend('a', '2026-10-05', 10000), tx({ id: 'crous', date: '2026-10-05', amount: -20000, label: 'PRLV CROUS', categoryId: CAT.logement })];
+
+  it('le budget du jour se base sur le plus petit des deux', () => {
+    const b = run(txs, '2026-10-21', { balance: 60000 });
+    expect(b.fromEnvelope).toBe(ENVELOPE - 10000);
+    expect(b.realFree).toBe(60000 - 1000 - 10000);
+    expect(b.limitedBy).toBe('cash');
+    expect(b.available).toBe(49000);
+    expect(b.dailyBudget).toBe(Math.floor(49000 / 11));
+  });
+
+  it('reste fixe dans la journée : le solde baisse avec les achats du jour, qui sont réintégrés', () => {
+    const morning = run(txs, '2026-10-21', { balance: 60000 });
+    const evening = run([...txs, spend('b', '2026-10-21', 3000)], '2026-10-21', { balance: 57000 });
+    expect(evening.dailyBudget).toBe(morning.dailyBudget);
+    expect(evening.remainingToday).toBe(morning.dailyBudget - 3000);
+  });
+
+  it('solde confortable ou inconnu : l’enveloppe reste la limite', () => {
+    expect(run(txs, '2026-10-21', { balance: 500000 }).limitedBy).toBe('envelope');
+    expect(run(txs, '2026-10-21').limitedBy).toBe('envelope');
+  });
+
+  it('solde insuffisant pour les charges à venir : déficit réel', () => {
+    const b = run(txs, '2026-10-21', { balance: 5000 });
+    expect(b.dailyBudget).toBe(0);
+    expect(b.overrun?.deficit).toBe(1000 + 10000 - 5000);
+  });
+});

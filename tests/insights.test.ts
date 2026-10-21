@@ -84,6 +84,12 @@ describe('prévision de trésorerie', () => {
     expect(f.events.map((e) => e.label)).toEqual(['TRADE REPUBLIC', 'FONCIA LOYER']);
   });
 
+  it('un virement récurrent entre mes comptes n’est pas une sortie d’argent', () => {
+    const recurring = detectRecurring(monthly('VIR VERS REVOLUT', -30000, 3, 4, CAT.transferts), cats, TODAY);
+    const f = buildForecast({ today: TODAY, until: '2026-11-06', startBalance: 0, recurring, cats, settings: { incomes: [], fixedCharges: [] }, plans: [], dailySpend: 0 });
+    expect(f.events).toEqual([]);
+  });
+
   it('rythme quotidien des dépenses courantes', () => {
     const txs = Array.from({ length: 28 }, (_, i) => tx({ id: `d${i}`, date: addDays(TODAY, -1 - i), amount: -1500, categoryId: CAT.courses }));
     txs.push(tx({ id: 'rent', date: addDays(TODAY, -3), amount: -70000, categoryId: CAT.logement }));

@@ -22,6 +22,9 @@ import { CAT, plannedSavings, totalFixed } from './defaults';
  *   prorata des jours couverts, sinon les jours sans données feraient croire à des économies.
  * - Enveloppe dépassée : budget du jour = 0 (jamais négatif), avec le déficit ; le maximum à dépenser
  *   par jour sans aggraver le déficit est donc 0 €. Le déficit n'est pas reporté sur le cycle suivant.
+ * - Plafond réel : si le solde des comptes courants est connu, le reste disponible ne dépasse jamais
+ *   ce solde moins les charges fixes pas encore débitées et l'épargne pas encore versée (ce qui est
+ *   « réellement libre »). Sans solde connu, seule l'enveloppe compte.
  * - Projection : rythme = dépenses variables des jours écoulés (hors aujourd'hui, journée en cours)
  *   ÷ jours écoulés.
  */
@@ -46,8 +49,23 @@ export interface BudgetInput {
   allocations?: Allocations;
   /** Date de la plus ancienne opération connue (premier cycle partiel). */
   dataStart?: ISODate | null;
-  /** Solde actuel des comptes, pour « réellement libre ». */
+  /** Solde actuel des comptes courants, pour « réellement libre ». */
   balance?: number | null;
+  /**
+   * Sorties d'argent déjà engagées d'ici la fin du cycle (après aujourd'hui) : prélèvements récurrents
+   * détectés dans l'historique, charges des réglages non détectées, investissements programmés.
+   * Fournies : elles remplacent l'estimation à partir des seules lignes de charges des réglages.
+   */
+  upcoming?: readonly UpcomingOutflow[] | null;
+}
+
+export interface UpcomingOutflow {
+  date: ISODate;
+  label: string;
+  /** Centimes positifs. */
+  amount: number;
+  /** Investissement / épargne (plan programmé, versement récurrent vers l'épargne). */
+  savings?: boolean;
 }
 
 export interface ResolvedCycle extends Cycle {
@@ -92,8 +110,12 @@ export interface BudgetState {
   spentToday: number;
   daysLeft: number;
   daysElapsed: number;
-  /** Reste avant aujourd'hui (enveloppe − dépenses variables jusqu'à hier), peut être négatif. */
+  /** Reste avant aujourd'hui, peut être négatif : le plus petit de l'enveloppe et de l'argent réellement libre. */
   available: number;
+  /** Enveloppe − dépenses variables jusqu'à hier. */
+  fromEnvelope: number;
+  /** Ce qui limite le budget : l'enveloppe, ou le solde réel des comptes (plus bas). */
+  limitedBy: 'envelope' | 'cash';
   /** Budget du jour, fixe toute la journée ; jamais négatif. */
   dailyBudget: number;
   remainingToday: number;
@@ -115,6 +137,8 @@ export interface BudgetState {
     gap: number;
   };
   charges: ChargeStatus[];
+  /** Sorties à venir prises en compte dans « réellement libre » (détectées), si connues. */
+  upcoming: UpcomingOutflow[];
   reservedCharges: number;
   reservedSavings: number;
   /** Solde − charges et épargne encore à venir, si le solde est connu. */
@@ -272,9 +296,32 @@ export function computeBudget(input: BudgetInput): BudgetState {
     else if (t.date === today) spentToday += v;
   }
 
+  const charges = chargeStatuses(settings.fixedCharges, inCycle, cats);
+  const savedThisCycle = inCycle.filter((t) => t.amount < 0 && t.categoryId === CAT.epargne).reduce((s, t) => s - t.amount, 0);
+  const upcoming = (input.upcoming ?? []).filter((u) => u.date > today && u.date <= cycle.end && u.amount > 0);
+  let reservedCharges: number;
+  let reservedSavings: number;
+  if (input.upcoming) {
+    // Détecté dans l'historique réel : prélèvements et investissements prévus d'ici la paie.
+    reservedCharges = upcoming.filter((u) => !u.savings).reduce((s, u) => s + u.amount, 0);
+    const plannedAhead = upcoming.filter((u) => u.savings).reduce((s, u) => s + u.amount, 0);
+    // Épargne saisie à la main (sans plan) : ce qui n'a pas encore été versé ce cycle reste réservé.
+    const manualLeft = settings.savings.mode === 'manual' ? Math.max(0, envelope.savings - savedThisCycle - plannedAhead) : 0;
+    reservedSavings = plannedAhead + manualLeft;
+  } else {
+    reservedCharges = charges.filter((c) => !c.paidBy).reduce((s, c) => s + c.line.amount, 0);
+    reservedSavings = Math.max(0, envelope.savings - savedThisCycle);
+  }
+  const realFree = input.balance == null ? null : input.balance - reservedCharges - reservedSavings;
+
   const daysLeft = Math.max(1, diffDays(today, cycle.end) + 1);
   const daysElapsed = Math.max(0, diffDays(cycle.start, today));
-  const available = envelope.total - spentBefore;
+  // Le budget ne promet jamais plus que l'argent réellement libre : le solde (qui inclut déjà les
+  // dépenses du jour, d'où leur réintégration) moins les charges et l'épargne encore à venir.
+  const fromEnvelope = envelope.total - spentBefore;
+  const fromCash = realFree === null ? null : realFree + spentToday;
+  const limitedBy: 'envelope' | 'cash' = fromCash !== null && fromCash < fromEnvelope ? 'cash' : 'envelope';
+  const available = limitedBy === 'cash' ? fromCash! : fromEnvelope;
   const dailyBudget = available > 0 ? Math.floor(available / daysLeft) : 0;
   const remainingCycle = available - spentToday;
   const nextDailyBudget = daysLeft > 1 ? Math.max(0, Math.floor(remainingCycle / (daysLeft - 1))) : 0;
@@ -283,11 +330,6 @@ export function computeBudget(input: BudgetInput): BudgetState {
   const pace = daysElapsed > 0 ? Math.round(spentBefore / daysElapsed) : 0;
   const projectedSpend = spentBefore + Math.max(spentToday, pace) + pace * (daysLeft - 1);
   const ideal = Math.round((envelope.total * (daysElapsed + 1)) / length);
-
-  const charges = chargeStatuses(settings.fixedCharges, inCycle, cats);
-  const reservedCharges = charges.filter((c) => !c.paidBy).reduce((s, c) => s + c.line.amount, 0);
-  const savedThisCycle = inCycle.filter((t) => t.amount < 0 && t.categoryId === CAT.epargne).reduce((s, t) => s - t.amount, 0);
-  const reservedSavings = Math.max(0, envelope.savings - savedThisCycle);
 
   return {
     today,
@@ -301,6 +343,8 @@ export function computeBudget(input: BudgetInput): BudgetState {
     daysLeft,
     daysElapsed,
     available,
+    fromEnvelope,
+    limitedBy,
     dailyBudget,
     remainingToday: dailyBudget - spentToday,
     remainingCycle,
@@ -308,11 +352,12 @@ export function computeBudget(input: BudgetInput): BudgetState {
     overrun: deficit > 0 ? { deficit, maxPerDay: 0 } : null,
     usedPercent: dailyBudget > 0 ? Math.round((spentToday * 100) / dailyBudget) : spentToday > 0 || available <= 0 ? 100 : 0,
     status: deficit > 0 || (available <= 0 && spentToday > 0) ? 'bad' : statusFor(spentToday, dailyBudget),
-    projection: { pace, projectedSpend, projectedEnd: envelope.total - projectedSpend, ideal, gap: ideal - (spentBefore + spentToday) },
+    projection: { pace, projectedSpend, projectedEnd: available + spentBefore - projectedSpend, ideal, gap: ideal - (spentBefore + spentToday) },
     charges,
+    upcoming,
     reservedCharges,
     reservedSavings,
-    realFree: input.balance == null ? null : input.balance - reservedCharges - reservedSavings,
+    realFree,
   };
 }
 
