@@ -28,9 +28,18 @@ const COLUMN = { compact: 'max-w-content px-4', medium: 'max-w-content-md px-6',
 
 /**
  * Coque d'écran. Les écrans à onglets s'ouvrent sur un grand titre (sur-titre or + titre) qui se
- * condense en barre de verre flottante au défilement ; les écrans poussés portent cette barre dès le
- * départ, avec un bouton retour. Le champ de lumière suit le défilement (parallaxe) et change
- * d'ambiance par section (`mood`). `footer` : l'action principale, fixée en bas sous le pouce.
+ * condense en barre de verre au défilement ; les écrans poussés portent cette barre dès le départ,
+ * avec un bouton retour. Le champ de lumière suit le défilement (parallaxe) et change d'ambiance par
+ * section (`mood`). `footer` : l'action principale, fixée en bas sous le pouce.
+ *
+ * Condensation pilotée par une seule progression p (0 → 1 entre 8 et 64 px de défilement) :
+ * - grand titre : s'efface (p 0 → 0,45), rétrécit (1 → 0,94) et monte ; élastique en tirant vers le bas ;
+ * - barre : flou et teinte montent de p 0,35 à 1, titre déjà effacé (jamais d'opacité animée sur un
+ *   élément flouté, jamais de titre flouté en traînée) ;
+ *   liseré et ombre se posent à la fin (p 0,85 → 1) ;
+ * - titre de la barre : apparaît de p 0,55 à 1 en montant de 6 px ;
+ * - actions : celles du grand titre s'effacent avant que celles de la barre n'apparaissent
+ *   (jamais deux jeux visibles à la fois) ; seules les visibles reçoivent les touchers.
  */
 export function Screen({
   title,
@@ -60,13 +69,22 @@ export function Screen({
   const bp = useBreakpoint();
   const goBack = useGoBack(back);
   const { scrollY } = useScroll();
-  const barOpacity = useTransform(scrollY, [24, 64], [stack ? 1 : 0, 1]);
-  const barTitleOpacity = useTransform(scrollY, [40, 80], [stack ? 1 : 0, 1]);
-  const barTitleY = useTransform(scrollY, [40, 80], [stack ? 0 : 8, 0]);
-  const titleOpacity = useTransform(scrollY, [0, 60], [1, 0]);
-  const titleY = useTransform(scrollY, [-100, 0, 100], [30, 0, -24]);
-  const [barShown, setBarShown] = useState(stack);
-  useMotionValueEvent(scrollY, 'change', (y) => setBarShown(stack || y > 24));
+  const p = useTransform(scrollY, [8, 64], stack ? [1, 1] : [0, 1], { clamp: true });
+  const titleOpacity = useTransform(p, [0, 0.45], [1, 0]);
+  // Le verre ne monte qu'une fois le grand titre presque effacé : jamais de titre flouté en traînée.
+  const glass = useTransform(p, [0.35, 1], [0, 1]);
+  const titleScale = useTransform(scrollY, [-120, 0, 64], [1.06, 1, 0.94]);
+  const titleY = useTransform(scrollY, [-120, 0, 64], [24, 0, -12]);
+  const edgeOpacity = useTransform(p, [0.85, 1], [0, 1]);
+  const barTitleOpacity = useTransform(p, [0.55, 1], [0, 1]);
+  const barTitleY = useTransform(p, [0.55, 1], [6, 0]);
+  const headerActions = useTransform(p, [0, 0.4], [1, 0]);
+  const barActions = useTransform(p, [0.6, 1], [0, 1]);
+  const [condensed, setCondensed] = useState(stack);
+  useMotionValueEvent(p, 'change', (v) => {
+    const next = stack || v > 0.5;
+    setCondensed((c) => (c === next ? c : next));
+  });
 
   useEffect(() => {
     setMood(mood);
@@ -83,33 +101,58 @@ export function Screen({
   const column = `mx-auto w-full ${COLUMN[bp]}`;
   const docked = !stack && bp !== 'expanded';
   const bottomPad = (footer ? 84 : 0) + (docked ? 112 : 32);
+  // Titre long dans la barre (écrans poussés) : sur deux lignes, plus petit, plutôt que coupé.
+  const longTitle = title.length > 22;
 
   return (
     <div className="min-h-[100dvh]" style={{ paddingLeft: 'var(--nav-left, 0px)', paddingTop: `calc(var(--safe-top) + ${stack ? 68 : 16}px)`, paddingBottom: `calc(var(--safe-bottom) + ${bottomPad}px)` }}>
       <main id="contenu" className={column} tabIndex={-1}>
         {!stack && !titleHidden && (
-          <motion.header className="mb-4 flex items-end gap-2" style={{ opacity: titleOpacity, y: titleY }}>
-            <div className="min-w-0 flex-1">
-              {kicker && <p className="t-label mb-1 text-gold">{kicker}</p>}
-              <h1 className={`${bp === 'expanded' ? 't-hero' : 't-large'} truncate first-letter:uppercase`}>{title}</h1>
-            </div>
-            {right && <div className="flex shrink-0 items-center gap-1">{right}</div>}
-          </motion.header>
+          <header className="mb-4">
+            {/* Ligne du haut : sur-titre et actions ; le titre a ensuite toute la largeur (pas de mot coupé à 320 px). */}
+            {(kicker || right) && (
+              <div className="flex min-h-11 items-center gap-2">
+                <motion.p className="t-label min-w-0 flex-1 text-gold" style={{ opacity: titleOpacity }}>
+                  {kicker}
+                </motion.p>
+                {right && (
+                  <motion.div className="flex shrink-0 items-center gap-1" style={{ opacity: headerActions, pointerEvents: condensed ? 'none' : 'auto' }} aria-hidden={condensed} {...(condensed ? { inert: '' } : {})}>
+                    {right}
+                  </motion.div>
+                )}
+              </div>
+            )}
+            <motion.h1
+              className={`${bp === 'expanded' ? 't-hero' : 't-large'} line-clamp-2 origin-bottom-left text-balance first-letter:uppercase will-change-transform`}
+              style={{ opacity: titleOpacity, scale: titleScale, y: titleY }}
+            >
+              {title}
+            </motion.h1>
+          </header>
         )}
         {stack && <h1 className="sr-only">{title}</h1>}
         {stack && kicker && <p className="t-label mb-3 px-0.5 text-gold">{kicker}</p>}
         {children}
       </main>
 
-      {/* Barre condensée : ne prend les touchers qu'une fois visible. */}
-      <motion.div className="fixed inset-x-0 top-0 z-30" style={{ opacity: barOpacity, left: 'var(--nav-left, 0px)', pointerEvents: barShown ? 'auto' : 'none' }}>
-        <div className="glass glass-float rounded-none border-x-0 border-t-0" style={{ paddingTop: 'var(--safe-top)' }}>
+      {/* Barre : transparente au repos (les touchers passent au grand titre), verre une fois condensée. */}
+      <motion.div className="condense-bar fixed inset-x-0 top-0 z-30" style={{ ['--p' as string]: glass, left: 'var(--nav-left, 0px)', pointerEvents: condensed ? 'auto' : 'none' }}>
+        <motion.div aria-hidden className="condense-edge pointer-events-none absolute inset-0" style={{ opacity: edgeOpacity }} />
+        <div className="relative" style={{ paddingTop: 'var(--safe-top)' }}>
           <div className={`${column} flex h-14 items-center gap-1`}>
             {stack && <IconButton icon="chevron-back" label="Retour" tone="ink" onClick={goBack} className="-ml-2" />}
-            <motion.p className="t-headline min-w-0 flex-1 truncate first-letter:uppercase" style={{ opacity: barTitleOpacity, y: barTitleY }} aria-hidden={!stack}>
+            <motion.p
+              className={`${longTitle && stack ? 't-body-strong line-clamp-2 leading-tight' : 't-headline truncate'} min-w-0 flex-1 first-letter:uppercase`}
+              style={{ opacity: barTitleOpacity, y: barTitleY }}
+              aria-hidden={!stack}
+            >
               {title}
             </motion.p>
-            {right && <div className="flex shrink-0 items-center gap-1">{right}</div>}
+            {right && (
+              <motion.div className="flex shrink-0 items-center gap-1" style={{ opacity: stack ? 1 : barActions }} aria-hidden={!condensed} {...(condensed ? {} : { inert: '' })}>
+                {right}
+              </motion.div>
+            )}
           </div>
         </div>
       </motion.div>

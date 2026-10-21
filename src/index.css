@@ -132,6 +132,29 @@ input[type='number']::-webkit-outer-spin-button {
 .glass-solid {
   --g-fill: var(--glass-raised-solid);
 }
+/*
+ * Barre d'écran qui se condense au défilement (Screen) : `--p` va de 0 (repos, transparente) à 1
+ * (barre de verre). Flou et teinte montent ensemble au lieu d'animer l'opacité d'un élément flouté
+ * (qui faisait « sauter » le flou et coûtait cher sur téléphone).
+ */
+.condense-bar {
+  --p: 0;
+  background: color-mix(in srgb, var(--glass-float-fill) calc(var(--p) * 100%), transparent);
+  -webkit-backdrop-filter: blur(calc(var(--p) * var(--glass-float-blur))) saturate(calc(100% + var(--p) * 70%));
+  backdrop-filter: blur(calc(var(--p) * var(--glass-float-blur))) saturate(calc(100% + var(--p) * 70%));
+}
+.no-live-blur .condense-bar {
+  background: color-mix(in srgb, var(--glass-float-solid) calc(var(--p) * 100%), transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* Liseré et ombre : ils se posent à la fin de la condensation. */
+.condense-edge {
+  box-shadow:
+    inset 0 -1px 0 var(--glass-float-rim),
+    0 8px 24px -12px rgba(0, 0, 0, 0.45);
+}
+
 /* Android : pas d'ombre floue sur les plaques répétées (cartes, lignes), seulement sur ce qui flotte. */
 .android .glass:not(.glass-float):not(.glass-lens) {
   box-shadow: inset 0 1px 0 var(--g-spec), var(--g-glow);
