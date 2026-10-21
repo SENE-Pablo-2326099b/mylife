@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "setup": "node scripts/setup.mjs"
   },
   "dependencies": {
     "@fontsource/inter": "5.2.8",

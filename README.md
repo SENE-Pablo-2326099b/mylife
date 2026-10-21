@@ -54,15 +54,20 @@ Au premier lancement, l'accueil guidé propose « Essayer avec la démo » (6 mo
 
 ## Configurer Enable Banking
 
+**Le plus simple : `npm run setup`.** Le script te connecte à Vercel, met l'app en ligne (HTTPS gratuit), affiche l'URL de retour et les liens de confidentialité à coller dans Enable Banking, puis — avec l'Application ID et la clé `.pem` (trouvée automatiquement dans Téléchargements, Windows/WSL compris) — enregistre les variables dans Vercel, redéploie, vérifie le relais et génère le mot de passe du relais (gardé dans `.env.local`). Relançable à tout moment ; sans terminal interactif : `npm run setup -- --app-id=<id> --pem=<chemin>`.
+
+Sur Android ou ordinateur, le lien `https://<app>/synchro#relais=<mot de passe>` affiché à la fin enregistre le mot de passe d'un clic (le fragment `#…` n'est jamais envoyé au serveur). Sur iPhone, l'app installée ne partage pas son stockage avec Safari : saisis le mot de passe dans l'app installée.
+
+Les étapes manuelles, pour référence :
+
 Enable Banking propose un mode **« restricted production »** gratuit : une application de production limitée aux comptes que tu as toi-même liés. C'est exactement le cas d'usage.
 
 1. **Crée un compte** sur <https://enablebanking.com/sign-in/> (lien de connexion par e-mail), puis ouvre le *Control Panel*.
 2. **Enregistre une application** (*Applications → Register new application*) :
    - Environnement : **Production** (ou *Sandbox* pour tester avec des banques fictives).
    - Clé : choisis *Generate in the browser (using SubtleCrypto) and export private key*. Le fichier `.pem` téléchargé est ta **clé privée** : garde-le hors du dépôt (`*.pem` est dans `.gitignore`).
-   - **Redirect URLs** : ajoute exactement
-     - `https://<ton-domaine>/connexion/retour` (production)
-     - `http://localhost:5173/connexion/retour` et `http://localhost:4173/connexion/retour` (développement)
+   - **Redirect URLs** : `https://<ton-domaine>/connexion/retour`. Enable Banking n'accepte que du HTTPS en production : la connexion bancaire se fait donc depuis l'app déployée, pas depuis `localhost`.
+   - **Privacy URL / Terms URL** : `https://<ton-domaine>/confidentialite.html` (page fournie dans `public/`).
    - Note l'**Application ID** affiché.
 3. **Active l'application** : une application de production reste « pending » tant que tu n'as pas mis **tes propres comptes en liste blanche** (*whitelist your own accounts*, depuis la page de l'application dans le Control Panel ; la doc Enable Banking décrit la marche à suivre). Une fois tes comptes BNP et Revolut liés, l'application fonctionne en *restricted production*, limitée à ces comptes.
 4. **Configure les variables d'environnement** (voir `.env.example`) :

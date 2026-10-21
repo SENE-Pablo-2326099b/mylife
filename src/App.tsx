@@ -25,6 +25,7 @@ import TodayPage from './pages/Today';
 import TransactionsPage from './pages/Transactions';
 import PortfolioDetailPage from './pages/wealth/PortfolioDetail';
 import WealthPage from './pages/wealth/Wealth';
+import { absorbSetupLink } from './sync/setupLink';
 import { maybeAutoSync } from './sync/store';
 import { Backdrop } from './ui/Backdrop';
 import { SkeletonCard } from './ui/extras';
@@ -32,6 +33,7 @@ import { Navigation, type TabDef } from './ui/Navigation';
 import { NotFoundScreen } from './ui/Screen';
 import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
+import { toast } from './ui/toastStore';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -39,7 +41,11 @@ export default function App() {
 
   useEffect(() => {
     ensureSeeded()
-      .then(() => setReady(true))
+      .then(absorbSetupLink)
+      .then((linked) => {
+        setReady(true);
+        if (linked) toast({ message: 'Relais configuré sur cet appareil' });
+      })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
 

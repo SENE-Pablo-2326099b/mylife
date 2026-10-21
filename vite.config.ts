@@ -33,8 +33,8 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
           navigateFallback: '/index.html',
-          // Le relais bancaire et le retour de banque ne doivent jamais être servis depuis le cache.
-          navigateFallbackDenylist: [/^\/api\//],
+          // Le relais bancaire et les pages statiques (confidentialité) ne passent pas par index.html.
+          navigateFallbackDenylist: [/^\/api\//, /\.html$/],
           runtimeCaching: [],
           cleanupOutdatedCaches: true,
         },
