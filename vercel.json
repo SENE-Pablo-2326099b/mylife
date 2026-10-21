@@ -2,19 +2,51 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/finances", "destination": "https://myfinances-sepia-sigma.vercel.app/finances/" },
-    { "source": "/finances/:path*", "destination": "https://myfinances-sepia-sigma.vercel.app/finances/:path*" },
-    { "source": "/api/eb", "destination": "https://myfinances-sepia-sigma.vercel.app/api/eb" },
-    { "source": "/perf", "destination": "https://myperf-six.vercel.app/perf/" },
-    { "source": "/perf/:path*", "destination": "https://myperf-six.vercel.app/perf/:path*" }
+    {
+      "source": "/finances",
+      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/index.html"
+    },
+    {
+      "source": "/finances/",
+      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/index.html"
+    },
+    {
+      "source": "/finances/:path+",
+      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/:path+"
+    },
+    {
+      "source": "/api/eb",
+      "destination": "https://myfinances-sepia-sigma.vercel.app/api/eb"
+    },
+    {
+      "source": "/perf",
+      "destination": "https://myperf-six.vercel.app/perf/index.html"
+    },
+    {
+      "source": "/perf/",
+      "destination": "https://myperf-six.vercel.app/perf/index.html"
+    },
+    {
+      "source": "/perf/:path+",
+      "destination": "https://myperf-six.vercel.app/perf/:path+"
+    }
   ],
   "headers": [
     {
       "source": "/((?!finances|perf|api).*)",
       "headers": [
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'" },
-        { "key": "Referrer-Policy", "value": "no-referrer" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; frame-ancestors 'none'; base-uri 'self'"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "no-referrer"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     }
   ]
