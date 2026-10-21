@@ -3,6 +3,7 @@ import { Platform, useColorScheme } from 'react-native';
 import type { SetType } from '@/domain/types';
 import type { ThemeId } from '@/db/repos/settings';
 import { useSettings } from '@/state/settingsStore';
+import { BASE_TEXT } from '@/vendor/lumen';
 
 import { paletteFor, themeInfo } from './themes';
 
@@ -148,9 +149,9 @@ const dark: Palette = {
   surfaceAlt: 'rgba(205,190,255,0.085)',
   surfacePressed: 'rgba(205,190,255,0.14)',
   border: 'rgba(214,200,255,0.11)',
-  text: '#F6F3FF',
-  textSecondary: 'rgba(232,226,255,0.68)',
-  textMuted: 'rgba(222,214,250,0.44)',
+  text: BASE_TEXT.nuit.text,
+  textSecondary: BASE_TEXT.nuit.secondary,
+  textMuted: BASE_TEXT.nuit.muted,
   ghost: 'rgba(222,214,250,0.36)',
   accent: '#A88BFF',
   accentGradient: ['#B9A0FF', '#7340FF'],
@@ -232,9 +233,9 @@ const light: Palette = {
   surfaceAlt: 'rgba(60,30,140,0.05)',
   surfacePressed: 'rgba(60,30,140,0.09)',
   border: 'rgba(60,30,140,0.09)',
-  text: '#161032',
-  textSecondary: 'rgba(22,16,50,0.64)',
-  textMuted: 'rgba(22,16,50,0.52)',
+  text: BASE_TEXT.perle.text,
+  textSecondary: BASE_TEXT.perle.secondary,
+  textMuted: BASE_TEXT.perle.muted,
   ghost: 'rgba(22,16,50,0.44)',
   accent: '#6C2BFF',
   accentGradient: ['#9466FF', '#6420FF'],

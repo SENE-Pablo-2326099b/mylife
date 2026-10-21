@@ -1,11 +1,11 @@
 import { DEFAULT_PLATES } from '@/domain/plates';
 import { DEFAULT_REST, type RestSettings } from '@/domain/rest';
+import { THEME_IDS, type ThemeId } from '@/vendor/lumen';
 
 import { db } from '../db';
 
-/** Colour themes (palettes in src/ui/themes.ts). Dark first; each has a light / dark counterpart. */
-export const THEME_IDS = ['nuit', 'ocean', 'braise', 'graphite', 'perle', 'glacier', 'sable', 'craie'] as const;
-export type ThemeId = (typeof THEME_IDS)[number];
+/** Colour themes (palettes in src/ui/themes.ts), shared by the MyLife apps (MyLife/packages/lumen). */
+export { THEME_IDS, type ThemeId };
 
 export interface AppSettings {
   theme: ThemeId;
