@@ -107,7 +107,7 @@ async function deploy() {
   urls.sort((a, b) => a.length - b.length);
   // Seul le domaine de production est public : les adresses d'équipe et de déploiement sont protégées par Vercel.
   for (const u of urls) {
-    const res = await fetch(`${u}/confidentialite.html`, { redirect: 'manual' }).catch(() => null);
+    const res = await fetch(`${u}/finances/confidentialite.html`, { redirect: 'manual' }).catch(() => null);
     if (res?.status === 200) return u;
   }
   throw new Error(`Aucune adresse publique trouvée parmi :\n${urls.join('\n')}\n(Vercel → Settings → Deployment Protection)`);
@@ -156,7 +156,7 @@ async function main() {
   }
   console.log(green(`L'app est en ligne : ${url}`));
 
-  const redirect = `${url}/connexion/retour`;
+  const redirect = `${url}/finances/connexion/retour`;
   const given = ARGS['app-id'] && ARGS.pem;
   if (!given && status?.configured && (!INTERACTIVE || !(await yes('Enable Banking est déjà configuré. Changer d’application ou de clé ?', false)))) {
     return finish(url, password);
@@ -167,8 +167,8 @@ async function main() {
   console.log(`  • Environment : ${bold('Production')}`);
   console.log(`  • Redirect URLs : ${bold(redirect)}`);
   console.log(`  • Email for data protection matters : ton adresse e-mail`);
-  console.log(`  • Privacy URL : ${bold(`${url}/confidentialite.html`)}`);
-  console.log(`  • Terms URL : ${bold(`${url}/confidentialite.html#conditions`)}`);
+  console.log(`  • Privacy URL : ${bold(`${url}/finances/confidentialite.html`)}`);
+  console.log(`  • Terms URL : ${bold(`${url}/finances/confidentialite.html#conditions`)}`);
   console.log('  • Key : « Generate in the browser (using SubtleCrypto) and export private key » → un fichier .pem se télécharge');
   console.log('Puis, sur la page de l’application : « Link accounts » pour lier ta (tes) banque(s) et activer l’app.');
   if (!given && !INTERACTIVE) {
@@ -223,7 +223,7 @@ async function main() {
 
 function finish(url, password) {
   step(6, 'Sur ton téléphone');
-  const link = `${url}/synchro#relais=${password}`;
+  const link = `${url}/finances/synchro#relais=${password}`;
   console.log(`Adresse de l'app : ${bold(url)}`);
   console.log(`Mot de passe du relais : ${bold(password)}  (aussi dans .env.local)`);
   console.log(`\n${bold('iPhone')} : ouvre ${url} dans Safari → Partager → « Sur l'écran d'accueil ».`);

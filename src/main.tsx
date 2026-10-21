@@ -11,6 +11,7 @@ import '@fontsource/inter/latin-ext-600.css';
 import '@fontsource/sora/latin-600.css';
 import '@fontsource/sora/latin-700.css';
 import App from './App';
+import { BASE_PATH } from './lib/app';
 import { startServiceWorker } from './lib/pwaUpdate';
 import { bootTheme } from './ui/themeRuntime';
 import './index.css';
@@ -23,7 +24,7 @@ startServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter basename={BASE_PATH || undefined} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <App />
     </BrowserRouter>
   </StrictMode>,

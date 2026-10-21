@@ -1,4 +1,5 @@
 import { db, getMeta, setMeta, type BudgetDB } from '../db/db';
+import { BASE_PATH } from '../lib/app';
 import type { Account } from '../db/types';
 import { classifyTransactions } from '../domain/classifyDb';
 import { uid } from '../lib/text';
@@ -17,7 +18,7 @@ export interface PendingAuth {
 }
 
 export function callbackUrl(origin = window.location.origin): string {
-  return origin + CALLBACK_PATH;
+  return origin + BASE_PATH + CALLBACK_PATH;
 }
 
 /** Démarre la connexion à une banque : redirige vers la page d'authentification de la banque. */

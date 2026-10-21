@@ -6,7 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 
 const PORT = 4317;
-const BASE = `http://localhost:${PORT}`;
+const BASE = `http://localhost:${PORT}/finances`;
 const executablePath = process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
 mkdirSync('screenshots', { recursive: true });
 
@@ -17,9 +17,9 @@ const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--stric
 const stop = () => server.kill('SIGTERM');
 
 async function waitForServer() {
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 100; i++) {
     try {
-      const r = await fetch(BASE);
+      const r = await fetch(BASE + '/');
       if (r.ok) return;
     } catch {
       /* pas encore prêt */

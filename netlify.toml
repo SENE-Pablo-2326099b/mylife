@@ -8,8 +8,13 @@
 
 # La fonction eb.ts déclare elle-même son chemin (/api/eb).
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/"
+  to = "/finances/"
+  status = 302
+
+[[redirects]]
+  from = "/finances/*"
+  to = "/finances/index.html"
   status = 200
 
 [[headers]]
@@ -21,6 +26,6 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
 
 [[headers]]
-  for = "/sw.js"
+  for = "/finances/sw.js"
   [headers.values]
     Cache-Control = "no-cache"

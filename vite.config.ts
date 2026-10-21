@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   // Variables sans préfixe VITE_ : elles restent côté serveur et ne sont jamais injectées dans le bundle.
   const env = { ...process.env, ...loadEnv(mode, process.cwd(), '') };
   return {
+    // Servie sous MyLife (même origine que les autres apps) : https://…/finances/
+    base: '/finances/',
     // Date du build, affichée dans Réglages : pour vérifier que l'app installée est à jour.
     define: { __APP_BUILD__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')) },
     plugins: [
@@ -20,8 +22,9 @@ export default defineConfig(({ mode }) => {
           short_name: 'MyFinances',
           description: 'Budget au jour près, patrimoine et placements. Les données restent sur ton appareil.',
           lang: 'fr',
-          start_url: '/',
-          scope: '/',
+          start_url: '/finances/',
+          scope: '/finances/',
+          id: '/finances/',
           display: 'standalone',
           orientation: 'portrait',
           background_color: '#0B0719',
@@ -34,7 +37,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
-          navigateFallback: '/index.html',
+          navigateFallback: '/finances/index.html',
           // Le relais bancaire et les pages statiques (confidentialité) ne passent pas par index.html.
           navigateFallbackDenylist: [/^\/api\//, /\.html$/],
           runtimeCaching: [],
@@ -43,6 +46,6 @@ export default defineConfig(({ mode }) => {
         devOptions: { enabled: false },
       }),
     ],
-    build: { chunkSizeWarningLimit: 900 },
+    build: { outDir: 'dist/finances', chunkSizeWarningLimit: 900 },
   };
 });

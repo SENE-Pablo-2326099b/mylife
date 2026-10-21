@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSettings } from '../db/seed';
+import { BASE_PATH } from '../lib/app';
 import { completeBankConnection, getPendingAuth, parseCallback } from '../sync/connect';
 import { EbClient } from '../sync/ebClient';
 import { runSync } from '../sync/store';
@@ -24,7 +25,7 @@ export default function CallbackPage() {
     if (!settings.bridgePassword) return setPhase({ kind: 'foreign' });
     try {
       const accounts = await completeBankConnection(new EbClient(settings.bridgePassword), code, state);
-      window.history.replaceState(null, '', '/connexion/retour');
+      window.history.replaceState(null, '', `${BASE_PATH}/connexion/retour`);
       setPhase({ kind: 'done', count: accounts.length });
       await runSync();
       navigate('/synchro', { replace: true });
