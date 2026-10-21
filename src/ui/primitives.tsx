@@ -718,17 +718,31 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
   return (
     <Glass className="rounded-[18px] p-1" role="radiogroup" aria-label={label}>
       <div className="flex">
-        {options.map((o) => {
+        {options.map((o, i) => {
           const selected = o.value === value;
+          const focusable = selected || (i === 0 && !options.some((x) => x.value === value));
           return (
             <button
               key={o.value}
               type="button"
               role="radio"
               aria-checked={selected}
+              // Groupe de boutons radio : une seule étape de tabulation, flèches pour changer.
+              tabIndex={focusable ? 0 : -1}
               onClick={() => {
                 haptic('tap');
                 onChange(o.value);
+              }}
+              onKeyDown={(e) => {
+                const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+                if (!step) return;
+                e.preventDefault();
+                const at = options.findIndex((x) => x.value === value);
+                const next = options[(Math.max(at, 0) + step + options.length) % options.length];
+                if (!next) return;
+                onChange(next.value);
+                const group = e.currentTarget.parentElement;
+                requestAnimationFrame(() => group?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus());
               }}
               className={`relative min-h-[36px] flex-1 px-1 py-1 text-center text-[13px] font-semibold leading-tight ${selected ? 'text-ink' : 'text-secondary'}`}
             >

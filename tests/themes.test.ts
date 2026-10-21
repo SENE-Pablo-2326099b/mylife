@@ -53,11 +53,11 @@ describe('thèmes Lumen', () => {
     expect(perle.text).toBe('#161032');
   });
 
-  it.each([...THEME_IDS])('%s : texte ≥ 7:1, secondaire ≥ 4,5:1, discret ≥ 3:1, couleurs porteuses de sens ≥ 3:1', (id) => {
+  it.each([...THEME_IDS])('%s : texte ≥ 7:1, secondaire et discret ≥ 4,5:1 (petits textes), couleurs porteuses de sens ≥ 3:1', (id) => {
     const p = themePalette(id);
     expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
     expect(contrast(p.textSecondary, p.bg)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(p.textMuted, p.bg)).toBeGreaterThanOrEqual(3);
+    expect(contrast(p.textMuted, p.bg)).toBeGreaterThanOrEqual(4.5);
     for (const c of [p.accent, p.success, p.gold, p.warning, p.danger, p.info]) expect(contrast(c, p.bg)).toBeGreaterThanOrEqual(3);
     expect(contrast(p.onAccent, p.accentGradient[1])).toBeGreaterThanOrEqual(3);
     expect(contrast(p.onSuccess, p.success)).toBeGreaterThanOrEqual(3);
