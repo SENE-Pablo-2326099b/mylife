@@ -51,7 +51,11 @@ function BridgeCard({ status, onRefresh }: { status: BridgeStatus | null; onRefr
       </div>
       <p className="t-small mt-1 text-secondary">Ton téléphone ne contacte jamais ta banque directement : le relais (ta fonction serverless) signe les requêtes et te renvoie les opérations. Rien n’y est stocké.</p>
       {status && !status.reachable && <p className="t-small mt-2 text-danger">{status.error}</p>}
-      {status?.reachable && !status.configured && <p className="t-small mt-2 text-warning">{status.error ?? 'Variables EB_APP_ID / EB_PRIVATE_KEY manquantes.'} Voir le README, « Configurer Enable Banking ».</p>}
+      {status?.reachable && !status.configured && (
+        <p className="t-small mt-2 text-warning">
+          Le relais n’est pas encore relié à Enable Banking. Sur l’ordinateur où se trouve le projet, lance <code>npm run setup</code> : il indique quoi créer sur enablebanking.com et termine la configuration. Les cours des placements fonctionnent déjà.
+        </p>
+      )}
       {status?.reachable && (status.configured || !settings.bridgePassword) && !status.authenticated && (
         <form
           className="mt-3 flex items-end gap-2"
