@@ -2,18 +2,17 @@ import { describe, expect, it } from 'vitest';
 import type { Settings } from '../src/db/types';
 import { CAT, DEFAULT_CATEGORIES, DEFAULT_FIRE, DEFAULT_SETTINGS } from '../src/domain/defaults';
 import {
-  affordableSpending,
-  capitalSeries,
+  compoundSchedule,
   computeFire,
   cutsMonthly,
-  futureValue,
+  effectiveRate,
   grossTarget,
   milestoneReached,
-  monthsToTarget,
+  monthlyNeeded,
+  monthsToReach,
+  passiveMonthly,
   reducibleSpending,
-  requiredMonthly,
   spendingBreakdown,
-  spendingCutNeeded,
   withdrawalTaxRate,
 } from '../src/domain/fire';
 import type { PortfolioSummary } from '../src/domain/wealth';
@@ -58,33 +57,37 @@ describe('indépendance financière : objectif et plan', () => {
     expect(grossTarget(1_200_000, 400, 0.1)).toBe(Math.round(30_000_000 / 0.9));
   });
 
-  it('versement nécessaire : exactement ce qu’il faut pour arriver à temps', () => {
-    const r = 0.03;
-    const need = requiredMonthly(1_000_000, 30_000_000, r, 240)!;
-    expect(monthsToTarget(1_000_000, need, r, 30_000_000, 240)).not.toBeNull();
-    expect(monthsToTarget(1_000_000, need - 500, r, 30_000_000, 240)).toBeNull();
-    expect(requiredMonthly(40_000_000, 30_000_000, r, 12)).toBe(0);
-    // Le capital seul y arrive : rien à verser.
-    expect(requiredMonthly(20_000_000, 30_000_000, 0.05, 12 * 30)).toBe(0);
-    expect(requiredMonthly(0, 30_000_000, r, 0)).toBeNull();
+  it('intérêts composés : mêmes conventions que les calculatrices usuelles (exemple Finary)', () => {
+    // 10 000 € + 100 €/mois pendant 20 ans à 5 % → 67 113 €.
+    const y = compoundSchedule({ initial: 1_000_000, monthly: 10_000, annualRate: 0.05 }, 20);
+    expect(y).toHaveLength(21);
+    expect(Math.round(y[20]!.total / 100)).toBe(67_113);
+    expect(y[20]!.contributions).toBe(3_400_000);
+    expect(y[20]!.interest).toBe(y[20]!.total - y[20]!.contributions);
+    expect(y[0]).toEqual({ year: 0, contributions: 1_000_000, interest: 0, total: 1_000_000 });
   });
 
-  it('baisse de dépenses : investie et retirée du train de vie, elle suffit à tenir la date', () => {
-    const terms = { current: 1_000_000, realRate: 0.03, withdrawalBp: 400, tax: 0 };
-    const cut = spendingCutNeeded(terms, 50_000, 1_800_000, 240);
-    expect(cut).toBeGreaterThan(0);
-    expect(cut % 1000).toBe(0);
-    expect(monthsToTarget(terms.current, 50_000 + cut, terms.realRate, grossTarget(1_800_000 - 12 * cut, 400, 0), 240)).not.toBeNull();
-    // Il faut moins réduire ses dépenses qu'augmenter ses versements : l'effet joue deux fois.
-    expect(cut).toBeLessThan(requiredMonthly(terms.current, grossTarget(1_800_000, 400, 0), terms.realRate, 240)! - 50_000);
-    expect(spendingCutNeeded(terms, 5_000_000, 1_800_000, 240)).toBe(0);
+  it('épargne en hausse chaque année, taux net (frais, inflation)', () => {
+    const flat = compoundSchedule({ initial: 0, monthly: 10_000, annualRate: 0.05 }, 10)[10]!;
+    const rising = compoundSchedule({ initial: 0, monthly: 10_000, annualRate: 0.05, savingsGrowth: 0.03 }, 10)[10]!;
+    expect(rising.contributions).toBeGreaterThan(flat.contributions);
+    expect(compoundSchedule({ initial: 0, monthly: 10_000, annualRate: 0.05, savingsGrowth: 0.03 }, 1)[1]!.contributions).toBe(120_000);
+    expect(effectiveRate(500, 20, null)).toBeCloseTo(0.048, 10);
+    expect(effectiveRate(500, 20, 200)).toBeCloseTo(1.048 / 1.02 - 1, 10);
   });
 
-  it('revenu permis à une date : cohérent avec le capital atteint', () => {
-    const terms = { current: 1_000_000, realRate: 0.03, withdrawalBp: 400, tax: 0.1 };
-    const fv = futureValue(terms.current, 50_000, terms.realRate, 120);
-    expect(fv).toBe(capitalSeries(terms.current, 50_000, terms.realRate, 10).at(-1));
-    expect(affordableSpending(terms, 50_000, 120)).toBe(Math.round(fv * 0.04 * 0.9));
+  it('date atteinte et épargne nécessaire : cohérentes entre elles', () => {
+    const p = { initial: 1_000_000, annualRate: 0.03 };
+    const need = monthlyNeeded(p, 30_000_000, 240);
+    expect(monthsToReach({ ...p, monthly: need }, 30_000_000, 240)).not.toBeNull();
+    expect(monthsToReach({ ...p, monthly: need - 200 }, 30_000_000, 240)).toBeNull();
+    expect(monthlyNeeded({ initial: 40_000_000, annualRate: 0.03 }, 30_000_000, 12)).toBe(0);
+    expect(monthsToReach({ initial: 0, monthly: 0, annualRate: 0.05 }, 100, 600)).toBeNull();
+  });
+
+  it('revenu à vie d’un capital : taux de retrait, impôt déduit', () => {
+    expect(passiveMonthly(30_000_000, 400, 0)).toBe(100_000);
+    expect(passiveMonthly(30_000_000, 400, 0.1)).toBe(90_000);
   });
 
   it('postes réductibles : sans les charges fixes ; économies par poste', () => {
@@ -96,17 +99,16 @@ describe('indépendance financière : objectif et plan', () => {
     expect(cutsMonthly(red, { [CAT.restos]: 3, inconnu: 1 })).toBe(red[1]!.monthly);
   });
 
-  it('plan : les économies avancent la date (versées et train de vie plus bas)', () => {
+  it('indépendance sur tes données : capital, train de vie réel ou choisi', () => {
     const input = { summaries: [], savingsAccounts: [{ id: 'l', balance: 2_000_000 }], txs: year(), cats, settings, today: TODAY, monthly: 30_000 };
     const base = computeFire(input);
-    const planned = computeFire({ ...input, cutMonthly: 10_000 });
-    expect(planned.monthly).toBe(40_000);
-    expect(planned.annualSpending).toBe(base.annualSpending - 120_000);
-    expect(planned.months!).toBeLessThan(base.months!);
-    // Revenu visé saisi : les économies sont investies mais ne le changent pas.
-    const fixed = computeFire({ ...input, settings: { ...settings, fire: { ...settings.fire, annualSpendingOverride: 2_400_000 } }, cutMonthly: 10_000 });
+    expect(base.current).toBe(2_000_000);
+    expect(base.spendingAuto).toBe(true);
+    expect(base.target).toBe(grossTarget(base.annualSpending, settings.fire.withdrawalBp, 0));
+    expect(computeFire({ ...input, monthly: 60_000 }).months!).toBeLessThan(base.months!);
+    const fixed = computeFire({ ...input, settings: { ...settings, fire: { ...settings.fire, annualSpendingOverride: 2_400_000, excludedIds: ['l'] } } });
     expect(fixed.annualSpending).toBe(2_400_000);
-    expect(fixed.spendingAuto).toBe(false);
+    expect(fixed.current).toBe(0);
   });
 
   it('impôt sur les retraits (2026) : PEA 18,6 %, assurance-vie 17,2 %, CTO 31,4 % sur la part de plus-value', () => {

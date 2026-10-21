@@ -65,19 +65,10 @@ const VIEWS = [
 ] as const;
 type View = (typeof VIEWS)[number]['value'];
 
-function FireCard({ fire }: { fire: { target: number; current: number; months: number | null; goalYear: number | null } }) {
+function FireCard({ fire }: { fire: { target: number; current: number; months: number | null } }) {
   const ratio = fire.target > 0 ? fire.current / fire.target : 0;
   const year = fire.months === null ? null : new Date().getFullYear() + Math.ceil(fire.months / 12);
-  const status =
-    fire.months === 0
-      ? 'Atteinte'
-      : fire.goalYear === null
-        ? fire.months === null
-          ? 'Hors de portée au rythme actuel'
-          : `En ${year} au rythme actuel`
-        : year !== null && year <= fire.goalYear
-          ? `En avance sur ton objectif ${fire.goalYear}`
-          : `Objectif ${fire.goalYear} : ${year === null ? 'hors de portée' : `${year - fire.goalYear} an${year - fire.goalYear > 1 ? 's' : ''} de retard`} au rythme actuel`;
+  const status = fire.months === 0 ? 'Atteinte' : year === null ? 'Hors de portée au rythme actuel' : `En ${year} au rythme actuel`;
   return (
     <Card to="/independance" className="flex items-center gap-4">
       <Ring value={ratio} size={72} stroke={7} tone="gold" label={`${Math.round(ratio * 100)} % de l’objectif`}>
@@ -85,7 +76,7 @@ function FireCard({ fire }: { fire: { target: number; current: number; months: n
       </Ring>
       <span className="min-w-0 flex-1">
         <span className="t-body-strong block">{status}</span>
-        <span className="t-small block text-secondary">Capital visé {formatCents(fire.target, { compact: true })} · ton plan pour y arriver</span>
+        <span className="t-small block text-secondary">Capital nécessaire {formatCents(fire.target, { compact: true })} · simulateur</span>
       </span>
       <Icon name="chevron-forward" size={17} className="text-muted" />
     </Card>
@@ -153,7 +144,7 @@ export default function WealthPage() {
   const fire = useMemo(() => {
     const monthly = settings.savings.mode === 'manual' ? settings.savings.manual : plannedMonthlySavings(w.plans, w.goals);
     const r = computeFire({ summaries: w.summaries, savingsAccounts: w.accounts.filter((a) => a.kind === 'savings' && !a.hidden), txs, cats, settings, today, monthly });
-    return { target: r.target, current: r.current, months: r.months, goalYear: settings.fire.goalYear };
+    return { target: r.target, current: r.current, months: r.months };
   }, [txs, cats, settings, today, w.summaries, w.accounts, w.plans, w.goals]);
 
   const empty = w.loaded && w.accounts.length === 0 && w.portfolios.length === 0 && w.assets.length === 0 && w.goals.length === 0;

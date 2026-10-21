@@ -110,16 +110,15 @@ try {
       await page.keyboard.press('Escape');
     });
 
-    await step('indépendance financière : objectif, quoi faire, simulation gardée comme plan', async () => {
-      await open('/independance');
-      await page.getByText('Ton objectif').waitFor();
-      await page.getByRole('button', { name: 'à partir de quand ?' }).click();
-      await page.getByRole('button', { name: 'Diminuer Année visée' }).click();
-      await page.getByRole('button', { name: 'Fermer' }).first().click();
-      await page.getByText(/Pour y être en \d{4}|d’avance|Pile dans les temps/).first().waitFor();
-      await page.getByRole('button', { name: /^100\s€$/ }).first().click();
-      await page.getByRole('button', { name: 'Garder comme mon plan' }).click();
-      await page.getByRole('button', { name: 'Revenir à mon rythme actuel' }).waitFor();
+    await step('indépendance financière : simulateur pré-rempli, capital final, vivre de ce capital', async () => {
+      await open('/independance?capital=10000&epargne=100&horizon=20');
+      await page.getByText('Capital final', { exact: true }).waitFor();
+      // 10 000 € + 100 €/mois, 20 ans au taux enregistré : le résultat suit les paramètres de l'adresse.
+      await page.getByText(/après 20 ans/).waitFor();
+      await page.getByText('Vivre de ce capital').waitFor();
+      await page.getByRole('button', { name: 'Augmenter Horizon de placement' }).click();
+      await page.waitForURL(/horizon=21/);
+      await page.getByText(/après 21 ans/).waitFor();
     });
 
     await step('journal d’erreurs visible et vide', async () => {

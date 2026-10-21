@@ -149,65 +149,87 @@ export function grossTarget(annualSpending: number, withdrawalBp: number, tax: n
   return Math.round(fireTarget(Math.max(0, annualSpending), withdrawalBp) / Math.max(0.5, 1 - tax));
 }
 
-/** Versement mensuel nécessaire pour atteindre `target` en `months` mois (0 si le capital y suffit seul). */
-export function requiredMonthly(current: number, target: number, realRate: number, months: number): number | null {
-  if (current >= target) return 0;
-  if (months <= 0) return null;
-  const rm = Math.pow(1 + realRate, 1 / 12) - 1;
-  const g = Math.pow(1 + rm, months);
-  const grown = current * g;
-  if (grown >= target) return 0;
-  const factor = Math.abs(rm) < 1e-12 ? months : (g - 1) / rm;
-  return Math.ceil((target - grown) / factor);
-}
-
-export interface FireTerms {
-  current: number;
-  realRate: number;
-  withdrawalBp: number;
-  tax: number;
-}
+// ---------------------------------------------------------------- simulateur d'intérêts composés
 
 /**
- * Baisse de dépenses mensuelle qui suffit à tenir `months` : chaque euro économisé est investi ET
- * retiré du train de vie visé (on vivra avec moins). Arrondie à 10 € près.
+ * Paramètres du simulateur. Conventions (celles des calculatrices usuelles) : taux annuel effectif,
+ * versements en fin de mois au taux mensuel équivalent ; l'épargne mensuelle peut augmenter chaque année.
  */
-export function spendingCutNeeded(terms: FireTerms, monthly: number, annualSpending: number, months: number): number {
-  const reach = (cut: number) => monthsToTarget(terms.current, monthly + cut, terms.realRate, grossTarget(annualSpending - 12 * cut, terms.withdrawalBp, terms.tax), months) !== null;
-  if (months <= 0 || reach(0)) return 0;
-  let lo = 0;
-  let hi = Math.max(0, Math.round(annualSpending / 12));
-  for (let i = 0; i < 40 && hi - lo > 100; i++) {
-    const mid = (lo + hi) / 2;
-    if (reach(mid)) hi = mid;
-    else lo = mid;
-  }
-  return Math.ceil(hi / 1000) * 1000;
+export interface CompoundParams {
+  initial: number;
+  monthly: number;
+  /** Taux annuel effectif retenu (frais et, en euros d'aujourd'hui, inflation déjà déduits). */
+  annualRate: number;
+  /** Hausse annuelle de l'épargne mensuelle (0,02 = +2 % par an). */
+  savingsGrowth?: number;
 }
 
-/** Capital dans `months` mois en versant `monthly` chaque mois. */
-export function futureValue(current: number, monthly: number, realRate: number, months: number): number {
-  const rm = Math.pow(1 + realRate, 1 / 12) - 1;
-  let v = current;
-  for (let m = 0; m < months; m++) v = v * (1 + rm) + monthly;
-  return Math.round(v);
+export interface CompoundYear {
+  year: number;
+  /** Capital initial + versements cumulés. */
+  contributions: number;
+  interest: number;
+  total: number;
 }
 
-/** Train de vie (par an, net) que le capital atteint dans `months` mois permettrait de financer. */
-export function affordableSpending(terms: FireTerms, monthly: number, months: number): number {
-  return Math.round(futureValue(terms.current, monthly, terms.realRate, Math.max(0, months)) * (terms.withdrawalBp / 10000) * Math.max(0.5, 1 - terms.tax));
+/** Taux effectif net : rendement − frais, et moins l'inflation pour raisonner en euros d'aujourd'hui. */
+export function effectiveRate(returnBp: number, feesBp: number, inflationBp: number | null): number {
+  const nominal = (returnBp - feesBp) / 10000;
+  return inflationBp === null ? nominal : (1 + nominal) / (1 + inflationBp / 10000) - 1;
 }
 
-/** Valeur du capital en fin de chaque année (année 0 = aujourd'hui). */
-export function capitalSeries(current: number, monthly: number, realRate: number, years: number): number[] {
-  const rm = Math.pow(1 + realRate, 1 / 12) - 1;
-  const out = [current];
-  let v = current;
+function stepper(p: CompoundParams) {
+  const rm = Math.pow(1 + p.annualRate, 1 / 12) - 1;
+  let value = p.initial;
+  let paid = p.initial;
+  let month = 0;
+  return {
+    next() {
+      const deposit = p.monthly * Math.pow(1 + (p.savingsGrowth ?? 0), Math.floor(month / 12));
+      value = value * (1 + rm) + deposit;
+      paid += deposit;
+      month++;
+      return { value, paid };
+    },
+  };
+}
+
+/** Capital, versements et intérêts à la fin de chaque année (année 0 = aujourd'hui). */
+export function compoundSchedule(p: CompoundParams, years: number): CompoundYear[] {
+  const out: CompoundYear[] = [{ year: 0, contributions: p.initial, interest: 0, total: p.initial }];
+  const s = stepper(p);
   for (let y = 1; y <= years; y++) {
-    for (let m = 0; m < 12; m++) v = v * (1 + rm) + monthly;
-    out.push(Math.round(v));
+    let r = { value: 0, paid: 0 };
+    for (let m = 0; m < 12; m++) r = s.next();
+    out.push({ year: y, contributions: Math.round(r.paid), interest: Math.round(r.value - r.paid), total: Math.round(r.value) });
   }
   return out;
+}
+
+/** Mois pour que le capital atteigne `target` (null au-delà de `maxMonths`). */
+export function monthsToReach(p: CompoundParams, target: number, maxMonths = 12 * 80): number | null {
+  if (p.initial >= target) return 0;
+  const s = stepper(p);
+  for (let m = 1; m <= maxMonths; m++) if (s.next().value >= target) return m;
+  return null;
+}
+
+/** Épargne mensuelle (de départ) nécessaire pour atteindre `target` en `months` mois, à 1 € près. */
+export function monthlyNeeded(p: Omit<CompoundParams, 'monthly'>, target: number, months: number): number {
+  if (monthsToReach({ ...p, monthly: 0 }, target, months) !== null) return 0;
+  let lo = 0;
+  let hi = Math.max(100, target);
+  for (let i = 0; i < 60 && hi - lo > 100; i++) {
+    const mid = (lo + hi) / 2;
+    if (monthsToReach({ ...p, monthly: mid }, target, months) !== null) hi = mid;
+    else lo = mid;
+  }
+  return Math.ceil(hi / 100) * 100;
+}
+
+/** Revenu mensuel net qu'un capital peut verser durablement (taux de retrait, impôt sur les retraits). */
+export function passiveMonthly(capital: number, withdrawalBp: number, tax: number): number {
+  return Math.round((capital * (withdrawalBp / 10000) * Math.max(0.5, 1 - tax)) / 12);
 }
 
 /** Postes de dépense qu'on peut réduire (hors charges fixes), du plus gros au plus petit, par mois. */
@@ -232,15 +254,22 @@ export function milestoneReached(progress: number): number {
 
 // ---------------------------------------------------------------- calcul commun (écrans Patrimoine et FI)
 
-export interface FireState extends FireTerms {
+export interface FireState {
+  /** Capital pris en compte aujourd'hui. */
+  current: number;
+  /** Rendement réel net (frais et inflation déduits). */
+  realRate: number;
+  withdrawalBp: number;
+  /** Impôt moyen sur les retraits (0 → 1). */
+  tax: number;
   /** Dépenses réelles (12 derniers mois ramenés à l'année, ou budget × 12). */
   breakdown: SpendingBreakdown;
-  /** Train de vie visé une fois indépendant, par an (saisi, ou dépenses réelles moins les baisses prévues). */
+  /** Train de vie visé une fois indépendant, par an (saisi, ou dépenses réelles). */
   annualSpending: number;
   /** Le train de vie visé suit les dépenses réelles (pas de montant saisi). */
   spendingAuto: boolean;
-  /** Versement mensuel retenu (rythme + baisses de dépenses réinvesties). */
   monthly: number;
+  /** Capital nécessaire pour vivre de ses placements. */
   target: number;
   /** Mois avant l'objectif à ce rythme (null au-delà de 80 ans). */
   months: number | null;
@@ -249,9 +278,7 @@ export interface FireState extends FireTerms {
 
 /**
  * Capital pris en compte (placements + comptes épargne, sauf exclusions), train de vie visé, impôt sur
- * les retraits, date atteinte. Une seule source pour tous les écrans : ils affichent la même date.
- * `cutMonthly` : dépenses en moins chaque mois (plan simulé), investies et retirées du train de vie visé
- * quand celui-ci suit les dépenses réelles.
+ * les retraits, date atteinte au rythme donné. Une seule source pour tous les écrans.
  */
 export function computeFire(input: {
   summaries: readonly PortfolioSummary[];
@@ -261,20 +288,18 @@ export function computeFire(input: {
   settings: Settings;
   today: ISODate;
   monthly: number;
-  cutMonthly?: number;
 }): FireState {
   const f = input.settings.fire;
-  const cut = Math.max(0, input.cutMonthly ?? 0);
   const excluded = new Set(f.excludedIds);
   const summaries = input.summaries.filter((s) => !excluded.has(s.portfolio.id));
   const current = summaries.reduce((s, x) => s + x.value, 0) + input.savingsAccounts.filter((a) => !excluded.has(a.id)).reduce((s, a) => s + (a.balance ?? 0), 0);
   const breakdown = spendingBreakdown(input.txs, input.cats, input.settings, input.today);
   const spendingAuto = f.annualSpendingOverride === null;
-  const annualSpending = spendingAuto ? Math.max(0, breakdown.annual - 12 * cut) : (f.annualSpendingOverride ?? 0);
+  const annualSpending = spendingAuto ? breakdown.annual : (f.annualSpendingOverride ?? 0);
   const tax = withdrawalTaxRate(summaries);
-  const realRate = realAnnualRate(f) - f.feesBp / 10000;
+  const realRate = effectiveRate(f.annualReturnBp, f.feesBp, f.inflationBp);
   const target = grossTarget(annualSpending, f.withdrawalBp, tax);
-  const monthly = Math.max(0, input.monthly + cut);
+  const monthly = Math.max(0, input.monthly);
   const months = target > 0 ? monthsToTarget(current, monthly, realRate, target) : null;
   return { current, realRate, withdrawalBp: f.withdrawalBp, tax, breakdown, annualSpending, spendingAuto, monthly, target, months, progress: target > 0 ? Math.min(1, current / target) : 0 };
 }

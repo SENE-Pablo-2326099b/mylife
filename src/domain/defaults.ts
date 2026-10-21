@@ -256,8 +256,6 @@ export const DEFAULT_FIRE: FireSettings = {
   excludedIds: [],
   essentialCategoryIds: null,
   lastMilestone: 0,
-  goalYear: null,
-  plan: null,
 };
 
 export const DEFAULT_SETTINGS: Settings = {

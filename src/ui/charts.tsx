@@ -426,3 +426,143 @@ export function ColumnChart({ data, format, height = 150, label }: { data: { lab
     </div>
   );
 }
+
+/**
+ * Colonnes empilées (une par période) : chaque couche a sa couleur, séparées par un filet de 2 px ;
+ * une ligne de référence en pointillés en option. Survol / toucher = valeurs exactes de la colonne.
+ */
+export function StackedColumns({
+  labels,
+  layers,
+  reference,
+  formatY,
+  height = 220,
+  ariaLabel,
+  legend = true,
+}: {
+  labels: string[];
+  layers: { id: string; label: string; color: string; values: number[] }[];
+  reference?: { label: string; value: number } | null;
+  formatY: (v: number) => string;
+  height?: number;
+  ariaLabel: string;
+  /** false : les couches sont déjà nommées à côté (chiffres clés avec leur pastille). */
+  legend?: boolean;
+}) {
+  const t = useTheme();
+  const [ref, width] = useWidth<HTMLDivElement>();
+  const [active, setActive] = useState<number | null>(null);
+  const n = labels.length;
+  if (n === 0) return null;
+  const totals = labels.map((_, i) => layers.reduce((s, l) => s + Math.max(0, l.values[i] ?? 0), 0));
+  const top = Math.max(1, ...totals, reference?.value ?? 0) * 1.06;
+  const padT = 10;
+  const padB = 22;
+  const gridLabels = [0, 0.5, 1].map((f) => formatY(f * top));
+  const padR = Math.max(36, Math.max(...gridLabels.map((l) => l.length)) * 6.4 + 10);
+  const plotW = Math.max(1, width - padR);
+  const plotH = height - padT - padB;
+  const slot = plotW / n;
+  const barW = Math.max(2, Math.min(28, slot * 0.68));
+  const sy = (v: number) => padT + (1 - v / top) * plotH;
+  const cx = (i: number) => slot * i + slot / 2;
+  const tickEvery = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(plotW / 52))));
+  const pick = (clientX: number, el: Element) => {
+    const x = clientX - el.getBoundingClientRect().left;
+    setActive(Math.max(0, Math.min(n - 1, Math.floor(x / slot))));
+  };
+
+  return (
+    <div>
+      <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1" aria-label="Légende">
+        {legend &&
+          layers.map((l) => (
+            <li key={l.id} className="t-caption flex items-center gap-1.5 text-secondary">
+              <span aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ background: l.color }} />
+              {l.label}
+            </li>
+          ))}
+        {reference && (
+          <li className="t-caption flex items-center gap-1.5 text-secondary">
+            <SeriesSwatch look="dashed" />
+            {reference.label}
+          </li>
+        )}
+      </ul>
+      <div
+        ref={ref}
+        className="relative touch-pan-y select-none"
+        style={{ height }}
+        role="img"
+        aria-label={ariaLabel}
+        onPointerMove={(e) => pick(e.clientX, e.currentTarget)}
+        onPointerDown={(e) => pick(e.clientX, e.currentTarget)}
+        onPointerLeave={() => setActive(null)}
+      >
+        {width > 0 && (
+          <svg width={width} height={height} className="absolute inset-0 overflow-visible">
+            {[0, 0.5, 1].map((f) => (
+              <g key={f}>
+                <line x1={0} x2={plotW} y1={sy(f * top)} y2={sy(f * top)} stroke={t.border} strokeWidth={1} />
+                <text x={width - 2} y={sy(f * top) + 4} textAnchor="end" fontSize={11} fill={t.textMuted} fontFamily="Inter, sans-serif">
+                  {formatY(f * top)}
+                </text>
+              </g>
+            ))}
+            {labels.map((_, i) => {
+              let base = 0;
+              const visible = layers.filter((l) => (l.values[i] ?? 0) > 0);
+              return (
+                <g key={i} opacity={active === null || active === i ? 1 : 0.55}>
+                  {visible.map((l, k) => {
+                    const v = l.values[i] ?? 0;
+                    const y0 = sy(base);
+                    base += v;
+                    const y1 = sy(base);
+                    // Filet de 2 px entre les couches ; extrémité haute arrondie (4 px) sur la dernière.
+                    const gap = k > 0 ? 2 : 0;
+                    const h = Math.max(0, y0 - y1 - gap);
+                    const last = k === visible.length - 1;
+                    const r = last ? Math.min(4, h / 2, barW / 2) : 0;
+                    const x = cx(i) - barW / 2;
+                    const y = y1;
+                    return (
+                      <path
+                        key={l.id}
+                        d={`M${x},${y + h} V${y + r} Q${x},${y} ${x + r},${y} H${x + barW - r} Q${x + barW},${y} ${x + barW},${y + r} V${y + h} Z`}
+                        fill={l.color}
+                      />
+                    );
+                  })}
+                </g>
+              );
+            })}
+            {reference && reference.value > 0 && reference.value <= top && (
+              <line x1={0} x2={plotW} y1={sy(reference.value)} y2={sy(reference.value)} stroke={t.textMuted} strokeWidth={1.5} strokeDasharray="4 3" />
+            )}
+            {labels.map((l, i) =>
+              i % tickEvery === 0 || i === n - 1 ? (
+                <text key={i} x={cx(i)} y={height - 4} textAnchor="middle" fontSize={11} fill={t.textMuted} fontFamily="Inter, sans-serif">
+                  {l}
+                </text>
+              ) : null,
+            )}
+          </svg>
+        )}
+        {active !== null && width > 0 && (
+          <Glass level="raised" className="glass-solid pointer-events-none absolute top-0 z-10 rounded-sm px-3 py-2" style={{ left: Math.min(Math.max(0, cx(active) - 90), Math.max(0, width - 190)), width: 186 }}>
+            <p className="t-caption text-muted">{labels[active]}</p>
+            <p className="t-small num font-display font-semibold">{formatY(totals[active] ?? 0)}</p>
+            {layers.map((l) => (
+              <p key={l.id} className="t-small flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 shrink-0 rounded-[2px]" style={{ background: l.color }} />
+                <span className="num">{formatY(l.values[active] ?? 0)}</span>
+                <span className="truncate text-muted">{l.label}</span>
+              </p>
+            ))}
+          </Glass>
+        )}
+      </div>
+    </div>
+  );
+}
