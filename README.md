@@ -25,6 +25,7 @@ Les opérations bancaires arrivent automatiquement via **Enable Banking** (API D
   une fonction serverless *à toi* (Vercel ou Netlify), sur le **même domaine** que l'app. Elle garde la clé privée, signe les requêtes, relaie les réponses et ne stocke ni ne journalise rien.
 - Le relais n'accepte qu'une **liste fermée** d'opérations en lecture (liste des banques, autorisation, session, soldes, transactions) et exige un mot de passe (`BRIDGE_PASSWORD`).
 - Aucune analytics, aucun tracking, aucune police ou script externe (Sora et Inter sont embarquées). En production, la CSP impose `connect-src 'self'` : le navigateur ne peut parler qu'à ton propre domaine.
+- **Assistant IA (facultatif)** : avec ta propre clé API Anthropic (gardée sur l'appareil, hors sauvegardes et synchro), l'assistant envoie ta question et les données qu'il lit pour y répondre à l'API Claude (`api.anthropic.com`, seul domaine externe autorisé par la CSP en plus du tien). Il ne modifie rien sans ta validation, changement par changement. Sans clé, rien ne part.
 - **Journal d'erreurs** : les derniers plantages (30 au plus) restent sur l'appareil (`localStorage`), jamais envoyés ; *Réglages → Sauvegarde et données* permet de les copier pour signaler un problème.
 - **Cours des placements** : le relais interroge Yahoo Finance (ETF, actions) et CoinGecko (crypto) avec les seuls **symboles** (ex. `CW8.PA`, `bitcoin`), jamais de montant. Ces deux opérations ne demandent que `BRIDGE_PASSWORD` (pas la configuration Enable Banking). Sans relais, les cours se saisissent à la main.
 

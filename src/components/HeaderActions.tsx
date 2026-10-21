@@ -57,6 +57,9 @@ function QuickActions({ open, onClose }: { open: boolean; onClose: () => void })
   };
   return (
     <Sheet open={open} onClose={onClose} title="Actions rapides">
+      <Group className="mb-3">
+        <Row icon="sparkles" iconTone="accent" title="Demander à l’assistant" subtitle="Claude lit tes finances et propose, tu valides" onClick={() => go('/assistant')} />
+      </Group>
       <Group>
         <Row icon="sync" iconTone="accent" title="Synchroniser les banques" subtitle={bank.syncing ? 'En cours…' : 'Soldes et nouvelles opérations'} onClick={bank.syncing ? undefined : syncBanks} />
         {toClassify > 0 && <Row icon="tag" iconTone="warning" title={`Classer ${toClassify} opération${toClassify > 1 ? 's' : ''}`} onClick={() => go('/a-classer')} />}

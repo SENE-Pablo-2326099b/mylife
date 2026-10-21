@@ -63,6 +63,7 @@ export default function SettingsPage() {
         <SectionTitle>App</SectionTitle>
         <Group>
           <Row icon="palette" title="Apparence" subtitle={`${theme.name}${s.followSystem ? ' · suit le téléphone' : ''}`} to="/reglages/apparence" />
+          <Row icon="sparkles" title="Assistant IA" subtitle="Claude, avec ta clé API Anthropic" to="/assistant" />
           <Row icon="bell" title="Alertes" subtitle="Seuils et règles d’alerte" to="/reglages/alertes" />
           <Row icon="shield" title="Sauvegarde et données" subtitle="Export, import, démo, effacement" to="/reglages/donnees" />
         </Group>

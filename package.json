@@ -16,6 +16,7 @@
     "setup": "node scripts/setup.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@fontsource/inter": "5.2.8",
     "@fontsource/sora": "5.2.8",
     "@noble/ciphers": "2.4.0",

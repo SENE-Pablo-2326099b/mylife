@@ -121,6 +121,11 @@ try {
       await page.getByText(/après 21 ans/).waitFor();
     });
 
+    await step('assistant : configuration de la clé proposée', async () => {
+      await open('/assistant');
+      await page.getByText('Connecter l’assistant').waitFor();
+    });
+
     await step('journal d’erreurs visible et vide', async () => {
       await open('/reglages/donnees');
       await page.getByText('Aucune erreur enregistrée sur cet appareil.').waitFor();

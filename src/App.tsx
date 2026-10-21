@@ -20,6 +20,7 @@ import { toast } from './ui/toastStore';
 
 // Pages chargées à la demande : l'ouverture de l'app ne télécharge que l'écran Aujourd'hui.
 const AlertsPage = lazy(() => import('./pages/Alerts'));
+const AssistantPage = lazy(() => import('./pages/Assistant'));
 const CallbackPage = lazy(() => import('./pages/Callback'));
 const CyclePage = lazy(() => import('./pages/Cycle'));
 const ForecastPage = lazy(() => import('./pages/insights/Forecast'));
@@ -148,6 +149,7 @@ function Shell() {
         <Route path="/transactions" element={<Navigate to="/operations" replace />} />
         <Route path="/a-classer" element={<QueuePage />} />
         <Route path="/alertes" element={<AlertsPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
         <Route path="/patrimoine" element={<WealthPage />} />
         <Route path="/patrimoine/placement/:id" element={<PortfolioDetailPage />} />
         <Route path="/patrimoine/import" element={<TrImportPage />} />
