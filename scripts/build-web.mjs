@@ -35,13 +35,20 @@ if (existsSync(join(OUT, 'assets', 'node_modules'))) {
 }
 
 // Les fichiers JS sont servis « immuables » : leur nom doit changer avec leur contenu (après réécriture).
+// Tous les morceaux (entrée + chargés à la demande) sont renommés, et chaque référence mise à jour.
 const jsDir = join(OUT, '_expo', 'static', 'js', 'web');
-const indexFile = join(OUT, 'index.html');
-for (const name of readdirSync(jsDir).filter((n) => n.endsWith('.js'))) {
-  const digest = createHash('sha256').update(readFileSync(join(jsDir, name))).digest('hex').slice(0, 10);
-  const renamed = name.replace(/\.js$/, `-${digest}.js`);
-  renameSync(join(jsDir, name), join(jsDir, renamed));
-  writeFileSync(indexFile, readFileSync(indexFile, 'utf8').split(name).join(renamed));
+const digest = (file) => createHash('sha256').update(readFileSync(file)).digest('hex').slice(0, 10);
+const replaceIn = (file, from, to) => writeFileSync(file, readFileSync(file, 'utf8').split(from).join(to));
+const all = readdirSync(jsDir).filter((n) => n.endsWith('.js'));
+// D'abord les morceaux chargés à la demande, puis l'entrée : son empreinte inclut les nouveaux noms.
+const ordered = [...all.filter((n) => !n.startsWith('entry-')), ...all.filter((n) => n.startsWith('entry-'))];
+const current = new Map(all.map((n) => [n, n]));
+for (const name of ordered) {
+  const file = join(jsDir, current.get(name));
+  const renamed = name.replace(/\.js$/, `-${digest(file)}.js`);
+  for (const other of [join(OUT, 'index.html'), ...[...current.values()].filter((n) => n !== current.get(name)).map((n) => join(jsDir, n))]) replaceIn(other, name, renamed);
+  renameSync(file, join(jsDir, renamed));
+  current.set(name, renamed);
 }
 
 writeFileSync(

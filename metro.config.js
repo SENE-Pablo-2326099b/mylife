@@ -12,4 +12,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   return (resolveRequest ?? context.resolveRequest)(context, moduleName, platform);
 };
 
+// sql.js en WebAssembly sur le web (650 Ko binaire au lieu de 1,35 Mo de JavaScript asm.js).
+config.resolver.assetExts.push('wasm');
+
 module.exports = config;

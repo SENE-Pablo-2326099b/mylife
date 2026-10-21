@@ -5,7 +5,6 @@ import { today } from '@/domain/dates';
 import { getKv, setKv } from '@/db/repos/settings';
 import { advance, repairHistory, resolveApproval, userMessage, type CoachMode, type CreateMessage, type Msg, type PendingApproval, type TurnOutcome } from '@/services/coach/agent';
 import { loadApiKey, saveApiKey } from '@/services/coach/apiKey';
-import { createCoachClient, describeCoachError } from '@/services/coach/client';
 
 const HISTORY_KEY = 'coach_history';
 const MODE_KEY = 'coach_mode';
@@ -59,11 +58,23 @@ function restore(): Msg[] {
   }
 }
 
+/**
+ * Le SDK Claude (lourd) n'est chargé qu'au premier message envoyé au coach : l'ouverture de l'app
+ * (surtout la version web) ne le télécharge pas.
+ */
+let clientModule: Promise<typeof import('@/services/coach/client')> | null = null;
+const coachClient = () => (clientModule ??= import('@/services/coach/client'));
+
 export const useCoach = create<CoachState>((set, get) => {
   const transport = (): CreateMessage | null => {
     if (createOverride !== null) return createOverride;
     const key = get().apiKey;
-    return typeof key === 'string' && key !== '' ? createCoachClient(key) : null;
+    if (typeof key !== 'string' || key === '') return null;
+    let client: CreateMessage | null = null;
+    return async (params) => {
+      client ??= (await coachClient()).createCoachClient(key);
+      return client(params);
+    };
   };
 
   const settle = (outcome: TurnOutcome) => {
@@ -86,6 +97,7 @@ export const useCoach = create<CoachState>((set, get) => {
     try {
       await task(create);
     } catch (e) {
+      const { describeCoachError } = await coachClient();
       set({ busy: false, error: describeCoachError(e) });
     }
   };

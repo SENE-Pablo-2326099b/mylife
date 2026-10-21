@@ -5,7 +5,9 @@
  * the background. A database saved by the older localStorage driver is migrated once.
  */
 import type { Database } from 'sql.js';
-import initSqlJs from 'sql.js/dist/sql-asm.js';
+import { Asset } from 'expo-asset';
+import initSqlJs from 'sql.js/dist/sql-wasm.js';
+import sqlWasm from 'sql.js/dist/sql-wasm.wasm';
 
 import type { Db, SqlValue } from './db';
 
@@ -58,7 +60,9 @@ function fromBase64(b64: string): Uint8Array {
 }
 
 export async function prepareExpoDb(): Promise<void> {
-  const SQL = await initSqlJs();
+  // Moteur SQLite en WebAssembly, servi comme fichier de l'app (mis en cache hors ligne).
+  const wasmUrl = Asset.fromModule(sqlWasm).uri;
+  const SQL = await initSqlJs({ locateFile: () => wasmUrl });
   let bytes: Uint8Array | null = null;
   try {
     bytes = await idbGet(STORAGE_KEY);
