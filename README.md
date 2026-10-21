@@ -3,10 +3,10 @@
 Gestion de finances personnelles **pour tout le monde**, pensée pour le téléphone (PWA installable, hors ligne), au design **Lumen** (verre et lumière, 8 thèmes clairs et sombres).
 Les opérations bancaires arrivent automatiquement via **Enable Banking** (API DSP2 en lecture seule) ; tout le reste (revenus, charges, catégories, règles, placements, objectifs) se règle dans l'app. Nouveautés et choix de la V2 : voir **[V2.md](V2.md)**.
 
-- **Aujourd'hui** : combien je peux encore dépenser aujourd'hui (enveloppe vie courante ÷ jours restants jusqu'à la paie), anneau vert / orange / rouge.
+- **Aujourd'hui** : combien je peux encore dépenser aujourd'hui (enveloppe vie courante ÷ jours restants jusqu'à la paie), anneau vert / orange / rouge ; un toucher détaille le calcul (revenus − charges − épargne, dépenses du cycle, non classées, plus grosses dépenses).
 - **Budget** : le cycle de paie à paie, courbe cumulée vs trajectoire et cycle précédent, catégories et objectifs ; **prévision de trésorerie** et **abonnements / récurrents détectés**.
 - **Opérations** : recherche, filtres, correction de catégorie avec création de règle, file « à classer » au clavier.
-- **Patrimoine** : patrimoine net et son historique, comptes, **placements** (Trade Republic, Bitstack, PEA, assurance vie…) avec PRU, plus-values, **investissements programmés** et cours automatiques, **objectifs d'épargne**, biens et dettes, **indépendance financière**.
+- **Patrimoine** : patrimoine net et son historique, comptes, **placements** (Trade Republic, Bitstack, PEA, assurance vie…) avec PRU, plus-values, **investissements programmés** et cours automatiques, **objectifs d'épargne**, biens et dettes, **indépendance financière**. **Import du relevé Trade Republic (PDF)** : lu sur l'appareil (pdf.js), achats / ventes / plans d'épargne / dividendes rangés en PEA et CTO, divisions détectées, réimport sans doublon.
 - **Réglages** : accueil guidé au premier lancement, profil, revenus / charges / épargne en listes, catégories, règles, alertes, banques, apparence (thèmes, suivre le téléphone), sauvegarde JSON, démo.
 
 ---

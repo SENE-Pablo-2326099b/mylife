@@ -24,6 +24,7 @@ import SyncPage from './pages/Sync';
 import TodayPage from './pages/Today';
 import TransactionsPage from './pages/Transactions';
 import PortfolioDetailPage from './pages/wealth/PortfolioDetail';
+import TrImportPage from './pages/wealth/TrImport';
 import WealthPage from './pages/wealth/Wealth';
 import { absorbSetupLink } from './sync/setupLink';
 import { maybeAutoSync } from './sync/store';
@@ -116,6 +117,7 @@ function Shell() {
         <Route path="/alertes" element={<AlertsPage />} />
         <Route path="/patrimoine" element={<WealthPage />} />
         <Route path="/patrimoine/placement/:id" element={<PortfolioDetailPage />} />
+        <Route path="/patrimoine/import" element={<TrImportPage />} />
         <Route path="/independance" element={<FirePage />} />
         <Route path="/synchro" element={<SyncPage />} />
         <Route path="/connexion/retour" element={<CallbackPage />} />

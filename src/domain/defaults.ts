@@ -174,10 +174,24 @@ function ruleSeeds(holderNames: readonly string[]): RuleSeed[] {
   return out;
 }
 
-export function buildDefaultRules(holderNames: readonly string[] | string, now = Date.now()): Rule[] {
-  const names = typeof holderNames === 'string' ? [holderNames] : holderNames;
-  return ruleSeeds(names).map((s, i) => ({
-    id: `default-${String(i).padStart(3, '0')}`,
+/**
+ * Règles par défaut ajoutées après coup : identifiant stable (les règles d'origine sont numérotées
+ * par position), posées une seule fois sur les installations existantes par `ensureSeeded`.
+ */
+export const ADDED_RULE_SEEDS: (RuleSeed & { id: string })[] = [
+  {
+    id: 'default-broker-ops',
+    cat: CAT.epargne,
+    label: 'Ordres de bourse & versements PEA',
+    pattern: '\\b(buy trade|sell trade|savings plan execution|saveback|round ?up|versement pea|execution d ?ordre|ordre d ?achat|ordre de vente)\\b',
+    regex: true,
+    priority: 45,
+  },
+];
+
+function seedToRule(s: RuleSeed, id: string, now: number): Rule {
+  return {
+    id,
     categoryId: s.cat,
     pattern: s.pattern,
     isRegex: !!s.regex,
@@ -189,7 +203,16 @@ export function buildDefaultRules(holderNames: readonly string[] | string, now =
     label: s.label,
     enabled: true,
     createdAt: now,
-  }));
+  };
+}
+
+export function addedRules(now = Date.now()): Rule[] {
+  return ADDED_RULE_SEEDS.map((s) => seedToRule(s, s.id, now));
+}
+
+export function buildDefaultRules(holderNames: readonly string[] | string, now = Date.now()): Rule[] {
+  const names = typeof holderNames === 'string' ? [holderNames] : holderNames;
+  return [...ruleSeeds(names).map((s, i) => seedToRule(s, `default-${String(i).padStart(3, '0')}`, now)), ...addedRules(now)];
 }
 
 /** Règle « virement entre mes comptes » d'un titulaire (ajoutée quand on renseigne son nom). */

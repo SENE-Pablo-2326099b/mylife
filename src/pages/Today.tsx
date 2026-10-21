@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { BudgetExplainer } from '../components/BudgetExplainer';
 import { TxEditor } from '../components/TxEditor';
 import { TxRow } from '../components/TxRow';
 import { db, getMeta } from '../db/db';
@@ -56,6 +57,7 @@ export default function TodayPage() {
   const lastSync = useLiveQuery(() => getMeta<number>('lastSyncAt'), []);
   const alerts = useAlerts();
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [explain, setExplain] = useState(false);
 
   const b = useMemo(() => computeDailyBudget(txs, cats, settings, today), [txs, cats, settings, today]);
   const todayTxs = txs.filter((t) => t.date === today).sort((x, y) => x.amount - y.amount);
@@ -90,14 +92,18 @@ export default function TodayPage() {
   }
 
   const remaining = b.remainingToday;
+  // Enveloppe déjà dépassée avant aujourd'hui : c'est le cycle qui est en dépassement, pas la journée.
+  const cycleOver = b.envelope - b.spentBefore < 0;
+  const heroLabel = cycleOver ? 'Cycle dépassé de' : remaining >= 0 ? 'Reste aujourd’hui' : 'Dépassement';
+  const heroValue = cycleOver ? -b.remainingCycle : Math.abs(remaining);
 
   return (
     <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />}>
       <Reveal index={0}>
-        <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5">
+        <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5" onClick={() => setExplain(true)} label="Comment le budget du jour est calculé">
           <Ring value={b.usedPercent / 100} tone={status.tone} size={232} label={`${status.label} : ${b.usedPercent} % du budget du jour utilisé`}>
-            <span className="t-label text-muted">{remaining >= 0 ? 'Reste aujourd’hui' : 'Dépassement'}</span>
-            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${remaining < 0 ? 'text-danger' : ''}`}>{formatCents(Math.abs(remaining))}</span>
+            <span className="t-label text-muted">{heroLabel}</span>
+            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${remaining < 0 ? 'text-danger' : ''}`}>{formatCents(heroValue)}</span>
             <span className="mt-2">
               <Badge tone={status.tone} icon={status.icon}>
                 {status.label}
@@ -114,6 +120,10 @@ export default function TodayPage() {
               <Money cents={b.spentToday} className="text-[18px]" />
             </div>
           </div>
+          <p className="t-caption mt-3 flex items-center justify-center gap-1 text-muted">
+            <Icon name="info" size={14} />
+            {cycleOver ? 'Pourquoi ? Touche pour voir le détail' : 'Comment c’est calculé'}
+          </p>
         </Card>
       </Reveal>
 
@@ -165,6 +175,7 @@ export default function TodayPage() {
       <p className="t-caption mt-6 text-center text-muted">
         Enveloppe vie courante <Money cents={b.envelope} compact className="text-secondary" /> · dépensé <Money cents={b.spentBefore + b.spentToday} compact className="text-secondary" /> · synchro {relativeTime(lastSync)}
       </p>
+      <BudgetExplainer open={explain && !editing} onClose={() => setExplain(false)} b={b} settings={settings} txs={txs} cats={cats} accounts={accMap} onEdit={setEditing} />
       <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />
     </Screen>
   );

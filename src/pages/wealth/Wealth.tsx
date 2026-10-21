@@ -136,7 +136,10 @@ export default function WealthPage() {
                   <Button icon="add" onClick={() => setPortfolioSheet(true)}>
                     Ajouter un placement
                   </Button>
-                  <Button variant="secondary" onClick={() => setGoalEdit('new')}>
+                  <Button variant="secondary" icon="upload" to="/patrimoine/import">
+                    Importer un relevé Trade Republic
+                  </Button>
+                  <Button variant="ghost" onClick={() => setGoalEdit('new')}>
                     Créer un objectif
                   </Button>
                 </>
@@ -227,6 +230,9 @@ export default function WealthPage() {
             ))}
           </Group>
         )}
+        <Button variant="ghost" size="sm" icon="upload" to="/patrimoine/import" className="mt-2">
+          Importer un relevé Trade Republic (PDF)
+        </Button>
       </Reveal>
 
       <Reveal index={4}>
