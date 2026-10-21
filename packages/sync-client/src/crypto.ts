@@ -11,13 +11,43 @@ import { gcm } from '@noble/ciphers/aes.js';
 import { hkdf } from '@noble/hashes/hkdf.js';
 import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
+import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
 
 /** Aléa cryptographique fourni par la plateforme (WebCrypto, expo-crypto). */
 export type RandomBytes = (n: number) => Uint8Array;
 
-const enc = new TextEncoder();
-const dec = new TextDecoder();
+/**
+ * UTF-8 sans TextEncoder/TextDecoder : le moteur JavaScript de l'app Android (Hermes) ne les a pas
+ * toujours. Les paires de substitution (émojis) sont gérées.
+ */
+const enc = {
+  encode(s: string): Uint8Array {
+    const out: number[] = [];
+    for (const ch of s) {
+      const c = ch.codePointAt(0)!;
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    return Uint8Array.from(out);
+  },
+};
+const dec = {
+  decode(b: Uint8Array): string {
+    let s = '';
+    for (let i = 0; i < b.length; ) {
+      const x = b[i];
+      let c: number;
+      if (x < 0x80) c = b[i++];
+      else if (x < 0xe0) c = ((b[i++] & 31) << 6) | (b[i++] & 63);
+      else if (x < 0xf0) c = ((b[i++] & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
+      else c = ((b[i++] & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
+      s += String.fromCodePoint(c);
+    }
+    return s;
+  },
+};
 
 export function toB64(bytes: Uint8Array): string {
   let s = '';
@@ -32,7 +62,7 @@ export function fromB64(b64: string): Uint8Array {
   return out;
 }
 
-const info = (label: string) => utf8ToBytes(`mylife/${label}/v1`);
+const info = (label: string) => enc.encode(`mylife/${label}/v1`);
 const derive = (ikm: Uint8Array, label: string) => hkdf(sha256, ikm, undefined, info(label), 32);
 
 export interface PasswordKeys {

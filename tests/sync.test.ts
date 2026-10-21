@@ -223,3 +223,15 @@ describe('synchronisation entre appareils', () => {
     expect(core.verifyToken(t, 'y'.repeat(40), 1000)).toBeNull();
   });
 });
+
+describe('chiffrement des lignes', () => {
+  it('aller-retour fidèle : accents, émojis, nombres ; lié à son emplacement', async () => {
+    const { encryptRow, decryptRow } = await import('../packages/sync-client/src/crypto');
+    const dek = random(32);
+    const row = { label: 'Café « Élysée » ☕ 🏋️‍♂️', amount: -1234, nested: { ok: true, list: [1, 2.5, null] } };
+    const payload = encryptRow(dek, 'perf', 'sets', 's1', row, random);
+    expect(decryptRow(dek, 'perf', 'sets', 's1', payload)).toEqual(row);
+    expect(() => decryptRow(dek, 'perf', 'sets', 'autre-ligne', payload)).toThrow();
+    expect(() => decryptRow(random(32), 'perf', 'sets', 's1', payload)).toThrow();
+  });
+});
