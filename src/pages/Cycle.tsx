@@ -1,3 +1,4 @@
+import { refreshEverything } from '../sync/refresh';
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -127,6 +128,7 @@ export default function CyclePage() {
       title={isCurrent ? 'Ce cycle' : 'Cycle passé'}
       kicker={`Budget · ${formatCycle(cycle)}`}
       mood="budget"
+      onRefresh={refreshEverything}
       right={
         <>
           <IconButton icon="chevron-back" label="Cycle précédent" glass onClick={() => go(offset - 1)} />

@@ -1,3 +1,4 @@
+import { refreshEverything } from '../sync/refresh';
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -82,7 +83,7 @@ export default function TransactionsPage() {
   const accLabel = account ? `${accMap.get(account)?.bank ?? ''} ${accMap.get(account)?.nickname ?? accMap.get(account)?.name ?? ''}` : null;
 
   return (
-    <Screen title="Opérations" kicker="Dépenses et revenus" mood="activity" right={<HeaderActions />}>
+    <Screen title="Opérations" kicker="Dépenses et revenus" mood="activity" right={<HeaderActions />} onRefresh={refreshEverything}>
       <Reveal index={0} className="space-y-3">
         <div className="relative">
           <Icon name="search" size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />

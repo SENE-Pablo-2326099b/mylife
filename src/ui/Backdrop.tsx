@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { useMood, type Mood } from './mood';
+import { useAmbient, useMood, type Mood } from './mood';
 import { springs } from './motion';
 import { useWindowHeight, useWindowWidth } from './responsive';
 import { withAlpha } from './theme';
@@ -91,12 +91,21 @@ export function Backdrop() {
   const width = useWindowWidth();
   const height = useWindowHeight();
   const current = useMood();
+  const ambient = useAmbient();
   return (
     // Découpé : les halos sont plus grands que l'écran. Sans ça, un navigateur mobile élargirait la page.
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={{ background: 'linear-gradient(180deg, var(--field-0), var(--field-1) 55%, var(--field-2))' }}>
       {HALOS.map((h) => (
         <Halo key={h.color} spec={h} width={width} height={height} current={current} />
       ))}
+      {/* Lumière d'état (budget) : monte et s'éteint en fondu. */}
+      <motion.div
+        className="absolute inset-x-0 top-0"
+        style={{ height: '70%', background: `radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--${ambient ?? 'accent'}) 30%, transparent), transparent 70%)` }}
+        initial={false}
+        animate={{ opacity: ambient ? 1 : 0 }}
+        transition={{ duration: 1.2, ease: 'easeOut' }}
+      />
       {/* Vignette : bords calmes, texte lisible. */}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, var(--veil-0) 35%, var(--veil-1) 100%)' }} />
       {/* Trame de points, nette autour du verre et adoucie dessous : c'est elle qui fait lire le flou. */}

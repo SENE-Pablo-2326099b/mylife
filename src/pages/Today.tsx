@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { refreshEverything } from '../sync/refresh';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BudgetExplainer } from '../components/BudgetExplainer';
 import { HeaderActions } from '../components/HeaderActions';
@@ -17,8 +18,10 @@ import { relativeTime } from '../lib/relative';
 import { runSync, useSyncState } from '../sync/store';
 import { Ring } from '../ui/charts';
 import { Icon } from '../ui/icons';
-import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, StatTile } from '../ui/index';
+import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Rolling, Row, SectionTitle, StatTile } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Tilt } from '../ui/Tilt';
+import { setAmbient } from '../ui/mood';
 import { useBreakpoint } from '../ui/responsive';
 
 const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'danger'; icon: 'check-circle' | 'warning' }> = {
@@ -50,6 +53,12 @@ export default function TodayPage() {
   const accMap = new Map(accounts.map((a) => [a.id, a]));
   const serious = alerts.filter((a) => a.level !== 'info');
   const status = STATUS[b.status];
+  // Le champ de lumière prend la couleur du budget du jour tant que cet écran est ouvert.
+  const ambientTone = total ? (b.overrun ? 'danger' : status.tone) : null;
+  useEffect(() => {
+    setAmbient(ambientTone);
+    return () => setAmbient(null);
+  }, [ambientTone]);
 
   if (total === 0) {
     return (
@@ -84,14 +93,17 @@ export default function TodayPage() {
   const p = b.projection;
 
   return (
-    <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />}>
+    <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />} onRefresh={refreshEverything}>
       {/* Grand écran : l'anneau du jour à gauche, les chiffres du cycle empilés à droite. */}
       <div className={wide ? 'grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-stretch gap-3' : ''}>
       <Reveal index={0} className={wide ? 'flex [&>*]:flex-1' : ''}>
+        <Tilt className="h-full">
         <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5" onClick={() => setExplain(true)} label="Comment le budget du jour est calculé">
           <Ring value={b.usedPercent / 100} tone={status.tone} size={232} label={`${status.label} : ${b.usedPercent} % du budget du jour utilisé`}>
             <span className="t-label text-muted">{heroLabel}</span>
-            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${over || b.remainingToday < 0 ? 'text-danger' : ''}`}>{formatCents(heroValue)}</span>
+            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${over || b.remainingToday < 0 ? 'text-danger' : ''}`}>
+              <Rolling mount text={formatCents(heroValue)} />
+            </span>
             <span className="mt-2">
               <Badge tone={status.tone} icon={status.icon}>
                 {over ? 'Enveloppe dépassée' : status.label}
@@ -121,6 +133,7 @@ export default function TodayPage() {
             {over ? 'Pourquoi ? Touche pour voir le détail' : 'Comment c’est calculé'}
           </p>
         </Card>
+        </Tilt>
       </Reveal>
 
       <div className={wide ? 'flex flex-col gap-3' : ''}>

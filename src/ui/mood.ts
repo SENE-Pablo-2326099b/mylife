@@ -23,3 +23,28 @@ export function useMood(): Mood {
     () => mood,
   );
 }
+
+/**
+ * Lumière d'état : une lueur posée en haut du champ, verte, ambre ou rouge selon que le budget tient,
+ * frôle ou dépasse. null = pas d'état à montrer (l'écran ne parle pas du budget).
+ */
+export type Ambient = 'success' | 'warning' | 'danger' | null;
+let ambient: Ambient = null;
+const ambientListeners = new Set<() => void>();
+
+export function setAmbient(next: Ambient): void {
+  if (next === ambient) return;
+  ambient = next;
+  ambientListeners.forEach((l) => l());
+}
+
+export function useAmbient(): Ambient {
+  return useSyncExternalStore(
+    (l) => {
+      ambientListeners.add(l);
+      return () => ambientListeners.delete(l);
+    },
+    () => ambient,
+    () => ambient,
+  );
+}

@@ -10,8 +10,9 @@ import { useCategoryMap, useSettings } from '../../hooks';
 import { todayISO } from '../../lib/dates';
 import { formatCents } from '../../lib/money';
 import { StackedColumns } from '../../ui/charts';
-import { Button, Card, Chip, Disclosure, Divider, MoneyField, ProgressBar, Reveal, Sheet, StepperRow, ToggleRow, toast, useTheme } from '../../ui/index';
+import { Button, Card, Chip, Disclosure, Divider, MoneyField, ProgressBar, Reveal, Rolling, Sheet, StepperRow, ToggleRow, toast, useTheme } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
+import { Tilt } from '../../ui/Tilt';
 import { useBreakpoint } from '../../ui/responsive';
 
 /**
@@ -170,7 +171,9 @@ export default function FirePage() {
     <Card level="raised" glow className="space-y-4">
       <div>
         <p className="t-label text-muted">Capital final</p>
-        <p className="num t-hero mt-1">{full(end.total)}</p>
+        <p className="num t-hero mt-1">
+          <Rolling mount text={full(end.total)} />
+        </p>
         <p className="t-small text-secondary">
           après {yearsWord(horizon)}, en {thisYear + horizon}
           {real ? ' · en euros d’aujourd’hui' : ''}
@@ -329,7 +332,9 @@ export default function FirePage() {
           {wide && finder && <Reveal index={2}>{finder}</Reveal>}
         </div>
         <div className="space-y-3">
-          <Reveal index={1}>{result}</Reveal>
+          <Reveal index={1}>
+            <Tilt>{result}</Tilt>
+          </Reveal>
           <Reveal index={2}>{freedom}</Reveal>
         </div>
       </div>

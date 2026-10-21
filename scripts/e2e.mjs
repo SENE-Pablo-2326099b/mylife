@@ -102,6 +102,21 @@ try {
       expect(page.url().includes('vue=placements'), 'onglet perdu');
     });
 
+    await step('palette de commande : chercher une opération, aller à un écran', async () => {
+      await open('/');
+      if (width < 1000) await page.getByRole('button', { name: /Chercher, aller, agir/ }).click();
+      else await page.keyboard.press('Control+k');
+      await page.getByLabel('Chercher, aller, agir, demander').fill('indépendance');
+      await page.keyboard.press('Enter');
+      await page.waitForURL(/independance/);
+      // Écran poussé : le dock est rangé, le raccourci clavier ouvre la palette de partout.
+      await page.keyboard.press('Control+k');
+      await page.getByLabel('Chercher, aller, agir, demander').fill('carrefour');
+      await page.getByRole('option', { name: /Carrefour/ }).first().waitFor();
+      await page.keyboard.press('Escape');
+      await page.getByRole('dialog', { name: 'Rechercher et agir' }).waitFor({ state: 'detached' });
+    });
+
     await step('lanceur MyLife : apps et état des synchros', async () => {
       await open('/');
       await page.getByRole('button', { name: /Apps et synchro/ }).click();

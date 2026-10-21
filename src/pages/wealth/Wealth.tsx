@@ -1,3 +1,4 @@
+import { refreshEverything } from '../../sync/refresh';
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,6 +19,7 @@ import { AllocationBar, LineChart, Ring } from '../../ui/charts';
 import { OrbFlash } from '../../ui/extras';
 import { Badge, Button, Card, EmptyState, Group, Icon, IconBubble, Money, ProgressBar, Reveal, Row, SectionTitle, Segmented, Sheet, StatTile, Tap, toast, useTheme } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
+import { Tilt } from '../../ui/Tilt';
 import { seriesColors } from '../../ui/themes';
 import { HeaderActions } from '../../components/HeaderActions';
 import { AssetForm, GoalForm, GoalMoveForm, PortfolioForm } from './forms';
@@ -161,7 +163,7 @@ export default function WealthPage() {
   };
 
   return (
-    <Screen title="Patrimoine" kicker="Tout ce que tu possèdes" mood="wealth" right={<HeaderActions />}>
+    <Screen title="Patrimoine" kicker="Tout ce que tu possèdes" mood="wealth" right={<HeaderActions />} onRefresh={refreshEverything}>
       {empty ? (
         <Reveal>
           <Card level="raised" glow>
@@ -194,10 +196,11 @@ export default function WealthPage() {
       {!empty && view === 'apercu' && (
         <>
           <Reveal index={0}>
+            <Tilt>
             <Card level="raised" glow>
               <p className="t-label text-muted">Patrimoine net</p>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3">
-                <Money cents={w.worth.total} className="text-[40px] leading-[46px] tracking-[-1.2px]" />
+                <Money roll cents={w.worth.total} className="text-[40px] leading-[46px] tracking-[-1.2px]" />
                 {history.length > 1 && (
                   <span className={`t-body-strong ${delta >= 0 ? 'text-success' : 'text-danger'}`}>
                     {formatCents(delta, { sign: true, compact: true })} <span className="t-small text-muted">en {RANGES.find((r) => r.value === range)?.label}</span>
@@ -221,6 +224,7 @@ export default function WealthPage() {
                 </div>
               )}
             </Card>
+            </Tilt>
           </Reveal>
 
           <Reveal index={1} className="mt-3 grid grid-cols-2 gap-2">

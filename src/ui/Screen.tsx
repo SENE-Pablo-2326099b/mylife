@@ -3,12 +3,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { setMood, type Mood } from './mood';
 import { useGoBack } from './useGoBack';
 import { setDockHidden } from './dockStore';
-import { springs } from './motion';
 import { Button, EmptyState, IconButton } from './primitives';
 import { useBreakpoint } from './responsive';
+import { PullToRefresh } from './PullToRefresh';
 import { APP_NAME } from '../lib/app';
 
-const ANDROID = typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
 
 /**
  * Apparition échelonnée des blocs d'un écran : chacun monte et se pose sur un ressort.
@@ -50,6 +49,7 @@ export function Screen({
   back = '/',
   footer,
   titleHidden = false,
+  onRefresh,
 }: {
   title: string;
   /** Sur-titre en petites capitales or (« BUDGET », « DÉPENSES »). */
@@ -64,6 +64,8 @@ export function Screen({
   footer?: ReactNode;
   /** Pas de grand titre (l'écran porte son propre en-tête). */
   titleHidden?: boolean;
+  /** Tirer vers le bas en haut de l'écran pour actualiser (écrans principaux). */
+  onRefresh?: () => Promise<unknown>;
 }) {
   const bp = useBreakpoint();
   const goBack = useGoBack(back);
@@ -131,15 +133,7 @@ export function Screen({
         )}
         {stack && <h1 className="sr-only">{title}</h1>}
         {stack && kicker && <p className="t-label mb-3 px-0.5 text-gold">{kicker}</p>}
-        {/*
-          Entrée de l'écran : le contenu monte d'un trait, sur un ressort. Seulement une translation :
-          une opacité ou un filtre sur un parent couperait le vrai flou du verre qu'il contient.
-        */}
-        {ANDROID ? children : (
-          <motion.div initial={{ y: 18 }} animate={{ y: 0 }} transition={springs.soft}>
-            {children}
-          </motion.div>
-        )}
+        {children}
       </main>
 
       {/* Barre : transparente au repos (les touchers passent au grand titre), verre une fois condensée. */}
@@ -164,6 +158,7 @@ export function Screen({
         </div>
       </motion.div>
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-20" style={{ height: 'var(--safe-top)', background: 'var(--status-veil)' }} />
+      {onRefresh && <PullToRefresh onRefresh={onRefresh} />}
 
       {footer && (
         <div className="pointer-events-none fixed inset-x-0 z-30" style={{ left: 'var(--nav-left, 0px)', bottom: `calc(var(--safe-bottom) + ${docked ? 96 : 12}px)` }}>

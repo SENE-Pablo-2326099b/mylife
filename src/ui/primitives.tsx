@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion';
-import { Children, forwardRef, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react';
+import { Children, forwardRef, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { centsToInput, formatCents, tryDecimalToCents } from '../lib/money';
 import { haptic, springs } from './motion';
@@ -444,23 +444,75 @@ export function Divider({ className = '' }: { className?: string }) {
 // ---------------------------------------------------------------- montants
 
 /** Montant : Sora 600, chiffres tabulaires, format français (virgule, espace insécable avant €). */
+/**
+ * Chiffres qui roulent : chaque chiffre est une petite colonne 0-9 qui glisse jusqu'à sa valeur, comme
+ * un compteur mécanique. Les colonnes sont alignées depuis la droite (les unités restent à leur place).
+ * `mount` : défile aussi à la première apparition (chiffres principaux) ; sinon seulement quand la
+ * valeur change, et le texte reste du texte simple tant qu'elle n'a pas changé (listes légères).
+ */
+export function Rolling({ text, className = '', mount = false }: { text: string; className?: string; mount?: boolean }) {
+  const [shown, setShown] = useState(mount ? text.replace(/\d/g, '0') : text);
+  const [live, setLive] = useState(mount);
+  const first = useRef(text);
+  const changed = useRef(mount);
+  useEffect(() => {
+    if (!changed.current && text === first.current) return;
+    changed.current = true;
+    setLive(true);
+    const id = requestAnimationFrame(() => setShown(text));
+    return () => cancelAnimationFrame(id);
+  }, [text, mount]);
+  if (!live) return <span className={className}>{text}</span>;
+  const chars = [...shown];
+  return (
+    <span className={`relative inline-flex ${className}`} aria-label={text} role="text">
+      {chars.map((c, i) => {
+        const fromRight = chars.length - i;
+        if (!/\d/.test(c)) {
+          return (
+            <span key={`s${fromRight}-${c}`} aria-hidden className="whitespace-pre">
+              {c}
+            </span>
+          );
+        }
+        return (
+          <span key={`d${fromRight}`} aria-hidden className="relative inline-block overflow-hidden align-bottom" style={{ height: '1.15em', lineHeight: '1.15em' }}>
+            {/* Chiffre invisible : donne à la colonne la largeur réelle (police, chasse, approche). */}
+            <span className="invisible">0</span>
+            <span className="roll-column absolute left-0 top-0 flex flex-col" style={{ transform: `translateY(${-Number(c) * 1.15}em)` }}>
+              {'0123456789'.split('').map((d) => (
+                <span key={d} style={{ height: '1.15em' }}>
+                  {d}
+                </span>
+              ))}
+            </span>
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 export function Money({
   cents,
   sign,
   compact,
   className = '',
   tone,
+  roll = false,
 }: {
   cents: number;
   sign?: boolean;
   compact?: boolean;
   className?: string;
+  /** Défile depuis zéro à l'apparition (chiffres principaux). */
+  roll?: boolean;
   /** 'auto' : vert si positif. */
   tone?: 'auto' | 'danger' | 'success' | 'gold' | 'accent' | 'muted';
 }) {
   const color =
     tone === 'auto' ? (cents > 0 ? 'text-success' : '') : tone === 'danger' ? 'text-danger' : tone === 'success' ? 'text-success' : tone === 'gold' ? 'text-gold' : tone === 'accent' ? 'text-accent' : tone === 'muted' ? 'text-muted' : '';
-  return <span className={`num whitespace-nowrap font-display font-semibold ${color} ${className}`}>{formatCents(cents, { sign, compact })}</span>;
+  return <Rolling mount={roll} text={formatCents(cents, { sign, compact })} className={`num whitespace-nowrap font-display font-semibold ${color} ${className}`} />;
 }
 
 // ---------------------------------------------------------------- champs

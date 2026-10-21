@@ -35,7 +35,21 @@ export function installGlassLight(): void {
     },
     { passive: true },
   );
-  document.addEventListener('pointerdown', (e) => light(plateAt(e.target), e.clientX, e.clientY), { passive: true });
+  document.addEventListener(
+    'pointerdown',
+    (e) => {
+      const el = plateAt(e.target);
+      light(el, e.clientX, e.clientY);
+      // Onde de lumière qui part du point de contact (relancée à chaque appui).
+      if (el) {
+        el.classList.remove('rippling');
+        void el.offsetWidth;
+        el.classList.add('rippling');
+        el.addEventListener('animationend', () => el.classList.remove('rippling'), { once: true });
+      }
+    },
+    { passive: true },
+  );
   const release = (e: PointerEvent) => e.pointerType !== 'mouse' && dim();
   document.addEventListener('pointerup', release, { passive: true });
   document.addEventListener('pointercancel', release, { passive: true });

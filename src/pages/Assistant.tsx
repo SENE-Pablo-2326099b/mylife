@@ -1,5 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toolInput, visibleText, type Msg, type ProposedChange } from '../assistant/agent';
 import { decide, resetConversation, retry, send, setApiKey, setAssistantContext, setMode, useAssistant } from '../assistant/store';
 import { WRITE_TOOL_NAMES, type AssistantContext } from '../assistant/tools';
@@ -235,6 +236,16 @@ export default function AssistantPage() {
     setDraft('');
     void send(text);
   };
+
+  // Question venue de la palette de commande (?q=…) : envoyée dès que les données sont prêtes.
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('q');
+  useEffect(() => {
+    if (!asked || !context) return;
+    setParams({}, { replace: true });
+    if (a.apiKey) submit(asked);
+    else setDraft(asked);
+  }, [asked, context]); // eslint-disable-line react-hooks/exhaustive-deps
   const lastIsUser = a.messages[a.messages.length - 1]?.role === 'user';
   const ready = !!a.apiKey && !editingKey;
 

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './db/db';
 import { ensureSeeded } from './db/seed';
 import { wealthHousekeeping } from './domain/wealthDb';
@@ -12,6 +12,9 @@ import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
 import { Navigation, type TabDef } from './ui/Navigation';
+import { PageTransition } from './ui/PageTransition';
+import { setPaletteOpen } from './ui/paletteStore';
+import { CommandPalette } from './components/CommandPalette';
 import { NotFoundScreen } from './ui/Screen';
 import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
@@ -88,17 +91,10 @@ export default function App() {
   );
 }
 
-/** Remonte en haut à chaque changement d'écran (les écrans défilent avec la fenêtre). */
-function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  return null;
-}
-
 function Shell() {
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
+  const navigate = useNavigate();
   const onboarded = useLiveQuery(async () => (await db.settings.get('main'))?.onboarded ?? false, []);
   const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
 
@@ -135,10 +131,10 @@ function Shell() {
       <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-md focus:px-3 focus:py-2 liquid">
         Aller au contenu
       </a>
-      <ScrollToTop />
       <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={pageFallback}>
-      <Routes>
+      <PageTransition>
+      <Routes location={location}>
         <Route path="/bienvenue" element={<OnboardingPage />} />
         <Route path="/" element={<TodayPage />} />
         <Route path="/budget" element={<CyclePage />} />
@@ -167,9 +163,11 @@ function Shell() {
         <Route path="/reglages/donnees" element={<DataPage />} />
         <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
       </Routes>
+      </PageTransition>
       </Suspense>
       </ErrorBoundary>
-      {!welcome && <Navigation tabs={tabs} />}
+      {!welcome && <Navigation tabs={tabs} onSearch={() => setPaletteOpen(true)} onAssistant={() => navigate('/assistant')} />}
+      {!welcome && <CommandPalette />}
       <ToastHost />
     </>
   );

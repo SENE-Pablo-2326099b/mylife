@@ -80,6 +80,12 @@ input[type='number']::-webkit-outer-spin-button {
   inherits: false;
   initial-value: 0;
 }
+/* Onde de lumière au toucher : 0 = départ du point de contact, 1 = éteinte. */
+@property --rp {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 1;
+}
 
 .glass {
   --g-fill: var(--glass-pane-fill);
@@ -96,6 +102,12 @@ input[type='number']::-webkit-outer-spin-button {
   position: relative;
   isolation: isolate;
   background:
+    radial-gradient(
+      circle at var(--mx, 50%) var(--my, 50%),
+      transparent calc(var(--rp) * 420px - 40px),
+      color-mix(in srgb, var(--touch, transparent) calc((1 - var(--rp)) * 160%), transparent) calc(var(--rp) * 420px),
+      transparent calc(var(--rp) * 420px + 1.5px)
+    ),
     radial-gradient(260px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--touch, transparent) calc(var(--gl) * 100%), transparent), transparent 70%),
     radial-gradient(130% 90% at 0% 0%, var(--corner-light, transparent), transparent 55%),
     radial-gradient(120% 90% at 100% 100%, var(--corner-shade, transparent), transparent 60%),
@@ -104,6 +116,7 @@ input[type='number']::-webkit-outer-spin-button {
     var(--grain, linear-gradient(transparent, transparent)),
     linear-gradient(var(--g-fill), var(--g-fill));
   background-size:
+    auto,
     auto,
     auto,
     auto,
@@ -123,6 +136,20 @@ input[type='number']::-webkit-outer-spin-button {
   transition: --gl 0.45s ease-out;
 }
 /* L'arête : un dégradé de lumière limité au bord d'1 px. */
+.glass.rippling {
+  animation: glass-ripple 0.75s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes glass-ripple {
+  from {
+    --rp: 0;
+  }
+  to {
+    --rp: 1;
+  }
+}
+.reduce-motion .glass.rippling {
+  animation: none;
+}
 .glass::before {
   content: '';
   position: absolute;
@@ -466,4 +493,79 @@ input[type='number']::-webkit-outer-spin-button {
 /* Android : halos figés (la dérive redessine tout l'écran sous chaque couche de verre). */
 .android .halo-drift {
   animation: none !important;
+}
+
+/* ------------------------------------------------------------------ Palette de commande */
+
+/* Le monde derrière la palette recule : flou profond, assombri, légèrement teinté. */
+.palette-veil {
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+/* ------------------------------------------------------------------ Dock */
+
+.dock-shell {
+  --g-blur: 28px;
+}
+/* La capsule de l'onglet actif : une lentille de lumière posée dans le verre. */
+.dock-pill {
+  background:
+    radial-gradient(120% 140% at 30% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%),
+    var(--accent-soft);
+  box-shadow:
+    inset 0 1px 0 var(--highlight),
+    inset 0 0 0 1px var(--accent-rim),
+    0 0 24px -4px var(--accent-glow);
+}
+/* L'orbe : une perle de lumière liquide, cerclée d'un halo qui tourne lentement. */
+.orb {
+  color: var(--on-accent);
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.55), transparent 42%),
+    linear-gradient(145deg, var(--accent-g0), var(--accent-g1));
+  box-shadow:
+    0 8px 26px -4px var(--accent-glow),
+    0 0 0 1px rgba(255, 255, 255, 0.18) inset,
+    inset 0 -4px 10px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.orb:active {
+  transform: scale(0.9);
+}
+.orb-ring {
+  inset: -4px;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--accent-g0) 60deg, transparent 140deg, var(--gold) 220deg, transparent 300deg);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%, #000 70%, transparent 72%);
+  mask: radial-gradient(circle, transparent 62%, #000 64%, #000 70%, transparent 72%);
+  opacity: 0.7;
+  animation: orb-spin 7s linear infinite;
+}
+@keyframes orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.reduce-motion .orb-ring,
+.android .orb-ring {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orb-ring {
+    animation: none;
+  }
+}
+
+/* Chiffres qui roulent (Rolling) : un ressort amorti, sans rebond. */
+.roll-column {
+  transition: transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reduce-motion .roll-column {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .roll-column {
+    transition: none;
+  }
 }
