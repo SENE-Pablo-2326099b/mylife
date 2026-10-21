@@ -4,6 +4,9 @@ import { normalizeSettings } from '../domain/settingsModel';
 import { db, getMeta, setMeta, type BudgetDB } from './db';
 import type { Settings } from './types';
 
+/** À augmenter quand le classement change : toutes les opérations sont reclassées une fois (corrections manuelles conservées). */
+const CLASSIFIER_VERSION = 2;
+
 /** Initialise la base au premier lancement (réglages, catégories, règles par défaut) et migre les réglages. */
 export async function ensureSeeded(database: BudgetDB = db): Promise<void> {
   let rulesAdded = false;
@@ -26,6 +29,10 @@ export async function ensureSeeded(database: BudgetDB = db): Promise<void> {
       if (toAdd.length) await database.rules.bulkPut(toAdd);
       await setMeta('addedRules', ADDED_RULE_SEEDS.map((r) => r.id), database);
       rulesAdded = toAdd.length > 0;
+    }
+    if (((await getMeta<number>('classifierVersion', database)) ?? 1) < CLASSIFIER_VERSION) {
+      await setMeta('classifierVersion', CLASSIFIER_VERSION, database);
+      rulesAdded = true;
     }
   });
   if (rulesAdded && (await database.transactions.count()) > 0) await classifyTransactions(database);

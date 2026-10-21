@@ -230,9 +230,14 @@ export default function WealthPage() {
             ))}
           </Group>
         )}
-        <Button variant="ghost" size="sm" icon="upload" to="/patrimoine/import" className="mt-2">
-          Importer un relevé Trade Republic (PDF)
-        </Button>
+        <Card to="/patrimoine/import" className="mt-2 flex items-center gap-3">
+          <IconBubble icon="upload" tone="accent" />
+          <span className="min-w-0 flex-1">
+            <span className="t-body-strong block">Importer un relevé Trade Republic</span>
+            <span className="t-small block text-secondary">PDF : achats, plans d’épargne et dividendes rangés tout seuls</span>
+          </span>
+          <Icon name="chevron-forward" size={17} className="text-muted" />
+        </Card>
       </Reveal>
 
       <Reveal index={4}>
@@ -289,6 +294,11 @@ export default function WealthPage() {
       </Reveal>
 
       <Sheet open={portfolioSheet} onClose={() => setPortfolioSheet(false)} title="Nouveau placement">
+        {portfolioSheet && (
+          <Button variant="secondary" icon="upload" to="/patrimoine/import" className="mb-4 w-full" onClick={() => setPortfolioSheet(false)}>
+            Trade Republic : importer le relevé PDF
+          </Button>
+        )}
         {portfolioSheet && (
           <PortfolioForm
             initial={null}

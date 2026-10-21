@@ -5,7 +5,8 @@ import { useSettings } from '../hooks';
 import { APP_NAME } from '../lib/app';
 import { formatCents } from '../lib/money';
 import { themeInfo, isThemeId } from '../ui/themes';
-import { Card, Group, Icon, Reveal, Row, SectionTitle } from '../ui/index';
+import { checkForUpdate } from '../lib/pwaUpdate';
+import { Button, Card, Group, Icon, Reveal, Row, SectionTitle } from '../ui/index';
 import { Screen } from '../ui/Screen';
 
 export default function SettingsPage() {
@@ -44,6 +45,7 @@ export default function SettingsPage() {
         <Group>
           <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
           <Row icon="diamond" title="Patrimoine et placements" subtitle="Portefeuilles, objectifs, autres actifs" to="/patrimoine" />
+          <Row icon="upload" title="Importer un relevé Trade Republic" subtitle="PDF : achats, plans d’épargne, dividendes" to="/patrimoine/import" />
         </Group>
       </Reveal>
 
@@ -56,6 +58,12 @@ export default function SettingsPage() {
         <p className="t-caption mt-6 text-center text-muted">
           {APP_NAME} · tes données restent sur cet appareil. Aucune publicité, aucun traceur.
         </p>
+        <p className="t-caption mt-1 text-center text-muted">Version du {__APP_BUILD__} UTC</p>
+        <div className="mt-2 flex justify-center">
+          <Button variant="ghost" size="sm" icon="sync" onClick={() => void checkForUpdate()}>
+            Rechercher une mise à jour
+          </Button>
+        </div>
       </Reveal>
     </Screen>
   );

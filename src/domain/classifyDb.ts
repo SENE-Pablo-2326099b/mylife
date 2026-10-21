@@ -6,7 +6,7 @@ import { TRANSFER_WINDOW_DAYS } from './transfers';
 
 async function loadContext(database: BudgetDB): Promise<ClassifyContext> {
   const [rules, accounts] = await Promise.all([database.rules.toArray(), database.accounts.toArray()]);
-  const ownIbans = new Set(accounts.map((a) => a.iban).filter((i): i is string => !!i));
+  const ownIbans = new Set(accounts.map((a) => a.iban?.replace(/\s+/g, '').toUpperCase()).filter((i): i is string => !!i));
   return { rules, ownIbans };
 }
 

@@ -86,3 +86,54 @@ describe('classifyBatch', () => {
     expect(byId.b.categoryId).toBeNull();
   });
 });
+
+describe('virement BNP → Revolut sans nom de titulaire configuré', () => {
+  const bare = { rules: [], ownIbans: new Set<string>() };
+
+  it('les deux jambes deviennent des transferts : ni dépense ni revenu', () => {
+    const bnp = tx({ id: 'b', accountId: 'bnp', date: '2026-10-20', amount: -15000, label: 'VIR SEPA INST EMIS', rawText: 'VIR SEPA INST EMIS / MOTIF / REF 1234' });
+    const rev = tx({ id: 'r', accountId: 'revolut', date: '2026-10-20', amount: 15000, label: 'Payment from M Dupont', rawText: 'Payment from M Dupont' });
+    const out = classifyBatch([bnp, rev], [bnp, rev], bare);
+    expect(out.map((t) => [t.id, t.categoryId])).toEqual([
+      ['b', CAT.transferts],
+      ['r', CAT.transferts],
+    ]);
+    expect(out[0].transferPairId).toBeTruthy();
+    expect(out[0].transferPairId).toBe(out[1].transferPairId);
+  });
+
+  it('jamais deux paiements par carte de même montant', () => {
+    const card = tx({ id: 'c', accountId: 'bnp', date: '2026-10-20', amount: -2000, label: 'CB CARREFOUR' });
+    const refund = tx({ id: 'v', accountId: 'revolut', date: '2026-10-20', amount: 2000, label: 'Vinted' });
+    expect(pairTransfers([card, refund], CAT.transferts)).toEqual([]);
+  });
+
+  it('une catégorie corrigée à la main n’est pas écrasée', () => {
+    const bnp = tx({ id: 'b', accountId: 'bnp', date: '2026-10-20', amount: -15000, label: 'VIR SEPA EMIS', categoryId: CAT.restos, categorySource: 'manual' });
+    const rev = tx({ id: 'r', accountId: 'revolut', date: '2026-10-21', amount: 15000, label: 'Top-Up' });
+    expect(pairTransfers([bnp, rev], CAT.transferts)).toEqual([]);
+  });
+
+  it('même compte ou dates trop éloignées : pas de transfert', () => {
+    const a = tx({ id: 'a', accountId: 'bnp', date: '2026-10-01', amount: -5000, label: 'VIR SEPA' });
+    expect(pairTransfers([a, tx({ id: 'x', accountId: 'bnp', date: '2026-10-01', amount: 5000, label: 'VIR SEPA' })], CAT.transferts)).toEqual([]);
+    expect(pairTransfers([a, tx({ id: 'y', accountId: 'revolut', date: '2026-10-09', amount: 5000, label: 'Top-Up' })], CAT.transferts)).toEqual([]);
+  });
+});
+
+describe('mise à jour du classement', () => {
+  it('les virements déjà synchronisés sont reclassés une fois au lancement', async () => {
+    const { freshDb } = await import('./helpers');
+    const { ensureSeeded } = await import('../src/db/seed');
+    const { setMeta } = await import('../src/db/db');
+    const database = await freshDb();
+    await database.transactions.bulkPut([
+      tx({ id: 'b', accountId: 'bnp', date: '2026-10-20', amount: -15000, label: 'VIR SEPA INST EMIS' }),
+      tx({ id: 'r', accountId: 'revolut', date: '2026-10-20', amount: 15000, label: 'Payment from M Dupont' }),
+    ]);
+    await setMeta('classifierVersion', 1, database);
+    await ensureSeeded(database);
+    expect((await database.transactions.get('b'))?.categoryId).toBe(CAT.transferts);
+    expect((await database.transactions.get('r'))?.categoryId).toBe(CAT.transferts);
+  });
+});
