@@ -5,6 +5,7 @@ import { useSettings } from '../hooks';
 import { APP_NAME } from '../lib/app';
 import { formatCents } from '../lib/money';
 import { themeInfo, isThemeId } from '../ui/themes';
+import { openMyLifeApp } from '../lib/app';
 import { checkForUpdate } from '../lib/pwaUpdate';
 import { relativeTime } from '../lib/relative';
 import { useCloud } from '../sync/cloud';
@@ -55,6 +56,7 @@ export default function SettingsPage() {
           <Row icon="bank" title="Banques" subtitle={counts?.banks ? `${counts.banks} connexion${counts.banks > 1 ? 's' : ''} active${counts.banks > 1 ? 's' : ''}` : 'Connecter via Enable Banking'} to="/synchro" />
           <Row icon="diamond" title="Patrimoine et placements" subtitle="Portefeuilles, objectifs, autres actifs" to="/patrimoine" />
           <Row icon="upload" title="Importer un relevé Trade Republic" subtitle="PDF : achats, plans d’épargne, dividendes" to="/patrimoine/import" />
+          <Row icon="barbell" title="Ouvrir MyPerf" subtitle="Ton entraînement, même compte" onClick={() => openMyLifeApp('/perf/')} />
         </Group>
       </Reveal>
 

@@ -11,6 +11,7 @@ import { useBudget } from '../domain/useBudget';
 import { useAlerts } from '../domain/useAlerts';
 import { useAccounts, useCategories, useCategoryMap } from '../hooks';
 import { formatCycle, formatDay, formatShort, todayISO } from '../lib/dates';
+import { openMyLifeApp } from '../lib/app';
 import { formatCents } from '../lib/money';
 import { relativeTime } from '../lib/relative';
 import { useSyncState } from '../sync/store';
@@ -40,6 +41,7 @@ export function HeaderActions() {
         badge={serious > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full" style={{ background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }} /> : undefined}
       />
       <IconButton icon="sync" label="Synchronisation bancaire" to="/synchro" glass className={sync.syncing ? '[&>svg]:animate-spin' : ''} />
+      <IconButton icon="barbell" label="Ouvrir MyPerf" glass onClick={() => openMyLifeApp('/perf/')} />
     </>
   );
 }
