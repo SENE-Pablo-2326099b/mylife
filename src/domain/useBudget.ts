@@ -8,6 +8,7 @@ import { computeBudget, currentCycle, EARLY_PAY_DAYS, type Allocations, type Bud
 import { CAT } from './defaults';
 import { forecastAccounts } from './forecast';
 import { useForecast } from './useInsights';
+import { useRecentTransactions } from './recentTransactions';
 
 const NO_TX: Transaction[] = [];
 const ALLOCATIONS_KEY = 'exceptionalAllocations';
@@ -38,7 +39,9 @@ export function useBudget(today = todayISO()): { state: BudgetState; txs: Transa
   // Fenêtre large : paie en avance (avant le début prévu) et cycle suivant déjà ouvert.
   const from = addDays(nominal.start, -EARLY_PAY_DAYS - 1);
   const to = addDays(nominal.end, 35);
-  const txs = useLiveQuery(() => db.transactions.where('date').between(from, to, true, true).toArray(), [from, to]);
+  // Opérations du cycle, prises dans la lecture partagée des opérations récentes.
+  const recent = useRecentTransactions();
+  const txs = useMemo(() => recent?.filter((t) => t.date >= from && t.date <= to), [recent, from, to]);
   const { allocations, dataStart } = useBudgetContext();
   const list = txs ?? NO_TX;
   // Comptes « du quotidien » (pas l'épargne) : leur solde réel est le plafond du budget.

@@ -1,32 +1,10 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { db } from './db/db';
 import { ensureSeeded } from './db/seed';
 import { wealthHousekeeping } from './domain/wealthDb';
-import AlertsPage from './pages/Alerts';
-import CallbackPage from './pages/Callback';
-import CyclePage from './pages/Cycle';
-import ForecastPage from './pages/insights/Forecast';
-import FirePage from './pages/insights/Fire';
-import RecurringPage from './pages/insights/Recurring';
-import OnboardingPage from './pages/Onboarding';
-import QueuePage from './pages/Queue';
-import SettingsPage from './pages/Settings';
-import AlertsSettingsPage from './pages/settings/AlertsSettings';
-import AppearancePage from './pages/settings/Appearance';
-import BudgetSettingsPage from './pages/settings/BudgetSettings';
-import CategoriesPage from './pages/settings/Categories';
-import DataPage from './pages/settings/Data';
-import ProfilePage from './pages/settings/Profile';
-import AccountPage from './pages/settings/Account';
-import RulesPage from './pages/settings/Rules';
-import SyncPage from './pages/Sync';
 import TodayPage from './pages/Today';
-import TransactionsPage from './pages/Transactions';
-import PortfolioDetailPage from './pages/wealth/PortfolioDetail';
-import TrImportPage from './pages/wealth/TrImport';
-import WealthPage from './pages/wealth/Wealth';
 import { absorbSetupLink } from './sync/setupLink';
 import { cloudBoot } from './sync/cloud';
 import { maybeAutoSync } from './sync/store';
@@ -37,6 +15,45 @@ import { NotFoundScreen } from './ui/Screen';
 import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
 import { toast } from './ui/toastStore';
+
+
+// Pages chargées à la demande : l'ouverture de l'app ne télécharge que l'écran Aujourd'hui.
+const AlertsPage = lazy(() => import('./pages/Alerts'));
+const CallbackPage = lazy(() => import('./pages/Callback'));
+const CyclePage = lazy(() => import('./pages/Cycle'));
+const ForecastPage = lazy(() => import('./pages/insights/Forecast'));
+const FirePage = lazy(() => import('./pages/insights/Fire'));
+const RecurringPage = lazy(() => import('./pages/insights/Recurring'));
+const OnboardingPage = lazy(() => import('./pages/Onboarding'));
+const QueuePage = lazy(() => import('./pages/Queue'));
+const SettingsPage = lazy(() => import('./pages/Settings'));
+const AlertsSettingsPage = lazy(() => import('./pages/settings/AlertsSettings'));
+const AppearancePage = lazy(() => import('./pages/settings/Appearance'));
+const BudgetSettingsPage = lazy(() => import('./pages/settings/BudgetSettings'));
+const CategoriesPage = lazy(() => import('./pages/settings/Categories'));
+const DataPage = lazy(() => import('./pages/settings/Data'));
+const ProfilePage = lazy(() => import('./pages/settings/Profile'));
+const AccountPage = lazy(() => import('./pages/settings/Account'));
+const RulesPage = lazy(() => import('./pages/settings/Rules'));
+const SyncPage = lazy(() => import('./pages/Sync'));
+const TransactionsPage = lazy(() => import('./pages/Transactions'));
+const PortfolioDetailPage = lazy(() => import('./pages/wealth/PortfolioDetail'));
+const TrImportPage = lazy(() => import('./pages/wealth/TrImport'));
+const WealthPage = lazy(() => import('./pages/wealth/Wealth'));
+
+/** Une fois l'app affichée, les onglets principaux se préchargent en tâche de fond (tap instantané). */
+function prefetchTabs() {
+  const run = () => void Promise.all([import('./pages/Cycle'), import('./pages/Transactions'), import('./pages/wealth/Wealth'), import('./pages/Settings')]).catch(() => undefined);
+  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 4000 });
+  else setTimeout(run, 2000);
+}
+
+const pageFallback = (
+  <div className="mx-auto max-w-content space-y-3 px-4 pt-16" aria-busy="true">
+    <SkeletonCard tall />
+    <SkeletonCard />
+  </div>
+);
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -84,6 +101,7 @@ function Shell() {
   const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
 
   useEffect(() => {
+    prefetchTabs();
     // D'abord ce que les autres appareils ont fait (dont leurs synchros bancaires), puis la banque.
     void cloudBoot()
       .catch(() => undefined)
@@ -110,6 +128,7 @@ function Shell() {
         Aller au contenu
       </a>
       <ScrollToTop />
+      <Suspense fallback={pageFallback}>
       <Routes>
         <Route path="/bienvenue" element={<OnboardingPage />} />
         <Route path="/" element={<TodayPage />} />
@@ -138,6 +157,7 @@ function Shell() {
         <Route path="/reglages/donnees" element={<DataPage />} />
         <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
       </Routes>
+      </Suspense>
       {!welcome && <Navigation tabs={tabs} />}
       <ToastHost />
     </>
