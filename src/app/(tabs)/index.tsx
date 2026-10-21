@@ -15,6 +15,7 @@ import { listPlanned } from '@/db/repos/planning';
 import { listTemplateExercises, listTemplates } from '@/db/repos/templates';
 import { getActiveWorkout, listWorkouts } from '@/db/repos/workouts';
 import { WorkoutView } from '@/features/workout/WorkoutView';
+import { openFinances } from '@/services/mylifeApps';
 import { beginWorkout } from '@/services/startFlow';
 import { templatePreview, type TemplatePreviewLine } from '@/services/workoutService';
 import { Glass } from '@/ui/components/Glass';
@@ -393,7 +394,12 @@ function TodayOverview() {
       title="Aujourd’hui"
       subtitle={formatLongDate(date)}
       mood="today"
-      right={<IconButton icon="sparkles" label="Coach IA" glass color={t.accent} onPress={() => router.push('/coach')} />}>
+      right={
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <IconButton icon="wallet-outline" label="Ouvrir MyFinances" glass onPress={openFinances} />
+          <IconButton icon="sparkles" label="Coach IA" glass color={t.accent} onPress={() => router.push('/coach')} />
+        </View>
+      }>
       <Columns weights={[1.45, 1]}>
         <View style={{ gap: space.sm }}>
           <Reveal index={0}>

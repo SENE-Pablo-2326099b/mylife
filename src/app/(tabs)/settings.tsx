@@ -11,6 +11,7 @@ import { backupBeforeReplace, lastAutoBackupAt, shareLatestAutoBackup } from "@/
 import { exportCsv, exportJson, importJson } from "@/services/exportService";
 import { requestNotificationPermission } from "@/services/notifications";
 import { useCloud } from "@/services/cloud";
+import { openFinances } from "@/services/mylifeApps";
 import { useCoach } from "@/state/coachStore";
 import { useSettings } from "@/state/settingsStore";
 import { showToast } from "@/state/toastStore";
@@ -122,6 +123,12 @@ export default function SettingsScreen() {
               title="Compte MyLife"
               subtitle={!cloud.session ? "Synchroniser téléphone et ordinateur (chiffré)" : !cloud.joined ? `${cloud.session.login} · à relier à cet appareil` : `${cloud.session.login} · ${cloud.error ? "erreur de synchro" : "synchronisé"}`}
               onPress={() => router.push("/account")}
+            />
+            <Row
+              icon="wallet-outline"
+              title="Ouvrir MyFinances"
+              subtitle="Ton budget et tes placements, même compte"
+              onPress={openFinances}
             />
             <Row
               icon="download-outline"
