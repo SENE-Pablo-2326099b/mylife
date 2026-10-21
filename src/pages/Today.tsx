@@ -19,6 +19,7 @@ import { Ring } from '../ui/charts';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, StatTile } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { useBreakpoint } from '../ui/responsive';
 
 const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'danger'; icon: 'check-circle' | 'warning' }> = {
   good: { label: 'Dans le budget', tone: 'success', icon: 'check-circle' },
@@ -29,6 +30,7 @@ const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'dan
 export { HeaderActions };
 
 export default function TodayPage() {
+  const wide = useBreakpoint() === 'expanded';
   const categories = useCategories();
   const cats = useCategoryMap();
   const accounts = useAccounts();
@@ -83,7 +85,9 @@ export default function TodayPage() {
 
   return (
     <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />}>
-      <Reveal index={0}>
+      {/* Grand écran : l'anneau du jour à gauche, les chiffres du cycle empilés à droite. */}
+      <div className={wide ? 'grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-stretch gap-3' : ''}>
+      <Reveal index={0} className={wide ? 'flex [&>*]:flex-1' : ''}>
         <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5" onClick={() => setExplain(true)} label="Comment le budget du jour est calculé">
           <Ring value={b.usedPercent / 100} tone={status.tone} size={232} label={`${status.label} : ${b.usedPercent} % du budget du jour utilisé`}>
             <span className="t-label text-muted">{heroLabel}</span>
@@ -119,7 +123,8 @@ export default function TodayPage() {
         </Card>
       </Reveal>
 
-      <Reveal index={1} className="mt-3 grid grid-cols-3 gap-2">
+      <div className={wide ? 'flex flex-col gap-3' : ''}>
+      <Reveal index={1} className={wide ? 'grid grid-cols-1 gap-3 min-[1180px]:grid-cols-3' : 'mt-3 grid grid-cols-3 gap-2'}>
         <StatTile label="Reste du cycle" value={formatCents(b.remainingCycle, { short: true })} tone={b.remainingCycle < 0 ? 'danger' : undefined} to="/budget" />
         <StatTile label="Jours restants" value={b.daysLeft} />
         <StatTile label="Demain" value={formatCents(b.nextDailyBudget, { short: true })} hint="par jour" />
@@ -133,7 +138,7 @@ export default function TodayPage() {
       )}
 
       {b.daysElapsed > 0 && (
-        <Reveal index={2} className="mt-3">
+        <Reveal index={2} className={wide ? '' : 'mt-3'}>
           <Card className="flex items-center gap-3">
             <Icon name={p.projectedEnd >= 0 ? 'trend-up' : 'trend-down'} className={p.projectedEnd >= 0 ? 'text-success' : 'text-danger'} />
             <span className="min-w-0 flex-1">
@@ -147,6 +152,8 @@ export default function TodayPage() {
           </Card>
         </Reveal>
       )}
+      </div>
+      </div>
 
       {(toClassify > 0 || serious.length > 0 || b.unallocated > 0) && (
         <Reveal index={3}>

@@ -28,7 +28,7 @@ const HALOS: HaloSpec[] = [
   {
     color: 'violet',
     size: 0.9,
-    opacity: 0.32,
+    opacity: 0.3,
     drift: 40,
     period: 19,
     parallax: 0.25,
@@ -37,7 +37,7 @@ const HALOS: HaloSpec[] = [
   {
     color: 'gold',
     size: 0.8,
-    opacity: 0.22,
+    opacity: 0.2,
     drift: 55,
     period: 24,
     parallax: 0.15,
@@ -46,7 +46,7 @@ const HALOS: HaloSpec[] = [
   {
     color: 'indigo',
     size: 1.0,
-    opacity: 0.26,
+    opacity: 0.24,
     drift: 60,
     period: 29,
     parallax: 0.08,
@@ -99,6 +99,17 @@ export function Backdrop() {
       ))}
       {/* Vignette : bords calmes, texte lisible. */}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, var(--veil-0) 35%, var(--veil-1) 100%)' }} />
+      {/* Trame de points, nette autour du verre et adoucie dessous : c'est elle qui fait lire le flou. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'radial-gradient(circle, var(--grid) 1.2px, transparent 1.7px)',
+          backgroundSize: '22px 22px',
+          WebkitMaskImage: 'radial-gradient(ellipse 140% 85% at 50% 0%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 90%)',
+          maskImage: 'radial-gradient(ellipse 140% 85% at 50% 0%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 90%)',
+        }}
+      />
+
     </div>
   );
 }

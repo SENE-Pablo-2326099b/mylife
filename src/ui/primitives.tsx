@@ -335,7 +335,7 @@ export function Badge({ children, tone = 'neutral', icon }: { children: ReactNod
 export function SectionTitle({ children, action, className = '' }: { children: ReactNode; action?: ReactNode; className?: string }) {
   return (
     <div className={`mb-2.5 mt-7 flex min-h-[28px] flex-wrap items-center justify-between gap-x-3 px-0.5 ${className}`}>
-      <h2 className="t-label shrink-0 text-muted">{children}</h2>
+      <h2 className="t-headline shrink-0 text-ink">{children}</h2>
       {action}
     </div>
   );
@@ -821,9 +821,12 @@ export function EmptyState({ icon = 'sparkles', title, body, action }: { icon?: 
 export function Metric({ label, value, hint, tone, className = '' }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: 'danger' | 'success' | 'gold' | 'accent' | 'warning'; className?: string }) {
   const color = tone ? `text-${tone}` : '';
   return (
-    <div className={`min-w-0 ${className}`}>
+    // Le chiffre se règle sur la largeur de sa tuile (container query) : jamais « 16… » à 320 px.
+    <div className={`min-w-0 ${className}`} style={{ containerType: 'inline-size' }}>
       <p className="t-label line-clamp-2 text-muted">{label}</p>
-      <p className={`num mt-0.5 truncate font-display text-[22px] font-semibold tracking-[-0.6px] ${color}`}>{value}</p>
+      <p className={`num mt-0.5 truncate font-display font-semibold tracking-[-0.6px] ${color}`} style={{ fontSize: 'min(22px, 29cqi)' }}>
+        {value}
+      </p>
       {hint && <p className="t-caption mt-0.5 text-muted">{hint}</p>}
     </div>
   );

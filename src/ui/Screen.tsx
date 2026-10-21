@@ -15,13 +15,12 @@ const ANDROID = typeof navigator !== 'undefined' && /android/i.test(navigator.us
  * Désactivée sur Android (composer des blocs de verre en fondu ralentissait l'ouverture des écrans)
  * et quand « réduire les animations » est actif (MotionConfig).
  */
-export function Reveal({ index = 0, children, className = '' }: { index?: number; children: ReactNode; className?: string }) {
-  if (ANDROID) return <div className={className}>{children}</div>;
-  return (
-    <motion.div className={className} initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springs.soft, delay: Math.min(index, 10) * 0.06 }}>
-      {children}
-    </motion.div>
-  );
+/**
+ * Bloc d'écran. L'entrée est orchestrée une seule fois par l'écran entier (Screen) plutôt que bloc par
+ * bloc : `index` ne sert plus qu'à garder les appels existants lisibles.
+ */
+export function Reveal({ children, className = '' }: { index?: number; children: ReactNode; className?: string }) {
+  return <div className={className}>{children}</div>;
 }
 
 const COLUMN = { compact: 'max-w-content px-4', medium: 'max-w-content-md px-6', expanded: 'max-w-content-lg px-8' } as const;
@@ -132,7 +131,15 @@ export function Screen({
         )}
         {stack && <h1 className="sr-only">{title}</h1>}
         {stack && kicker && <p className="t-label mb-3 px-0.5 text-gold">{kicker}</p>}
-        {children}
+        {/*
+          Entrée de l'écran : le contenu monte d'un trait, sur un ressort. Seulement une translation :
+          une opacité ou un filtre sur un parent couperait le vrai flou du verre qu'il contient.
+        */}
+        {ANDROID ? children : (
+          <motion.div initial={{ y: 18 }} animate={{ y: 0 }} transition={springs.soft}>
+            {children}
+          </motion.div>
+        )}
       </main>
 
       {/* Barre : transparente au repos (les touchers passent au grand titre), verre une fois condensée. */}

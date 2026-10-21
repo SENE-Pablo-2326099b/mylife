@@ -321,6 +321,18 @@ export function cssVars(p: Palette): Record<string, string> {
     v[`--glass-${level}-shadow`] = g.shadow;
     v[`--glass-${level}-blur`] = `${g.blur}px`;
   }
+  // Verre optique (index.css) : arête biseautée, épaisseur, lumière au contact, grain, trame du fond.
+  const dark = p.scheme === 'dark';
+  v['--edge-hi'] = dark ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,1)';
+  v['--edge-lo'] = dark ? 'rgba(255,255,255,0.03)' : withAlpha(p.text, 0.05);
+  v['--edge-hi2'] = dark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.75)';
+  v['--depth'] = dark ? 'rgba(0,0,0,0.34)' : withAlpha(p.text, 0.06);
+  v['--contact'] = dark ? 'rgba(0,0,0,0.35)' : withAlpha(p.text, 0.08);
+  v['--touch'] = dark ? withAlpha(p.accentGradient[0], 0.2) : 'rgba(255,255,255,0.7)';
+  v['--grid'] = withAlpha(p.text, dark ? 0.12 : 0.12);
+  v['--corner-light'] = dark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.55)';
+  v['--corner-shade'] = dark ? 'rgba(0,0,0,0.18)' : withAlpha(p.text, 0.03);
+  v['--grain'] = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 ${dark ? 0.06 : 0.05} 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
   // Teintes dérivées de chaque couleur porteuse de sens : lavis du verre, bord, lueur.
   for (const tone of TONES) {
     const hex = p[tone];

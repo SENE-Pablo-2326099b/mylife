@@ -19,7 +19,7 @@ const TYPE = {
   'body-strong': ['sans', 600, 15, 21, '0'],
   small: ['sans', 400, 13, 18, '0'],
   caption: ['sans', 500, 12, 16, '0'],
-  label: ['sans', 600, 11, 14, '1.3px', 1.2],
+  label: ['sans', 500, 12, 16, '0.1px', 1.2],
   number: ['display', 600, 18, 22, '-0.3px'],
 };
 
@@ -66,7 +66,6 @@ export default {
           fontSize: size(px, cap ?? 1.3),
           lineHeight: `${(lh / px).toFixed(3)}`,
           letterSpacing: track,
-          ...(name === 'label' ? { textTransform: 'uppercase' } : {}),
           ...(family === 'display' ? { fontVariantNumeric: 'tabular-nums' } : {}),
         };
       }

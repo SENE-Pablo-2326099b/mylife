@@ -17,6 +17,7 @@ import { startServiceWorker } from './lib/pwaUpdate';
 // Compte MyLife : installe le suivi des modifications avant l'ouverture de la base.
 import './sync/cloud';
 import { bootTheme } from './ui/themeRuntime';
+import { installGlassLight } from './ui/glassLight';
 import './index.css';
 
 // Plantages gardés sur l'appareil (jamais envoyés) pour pouvoir les signaler.
@@ -24,6 +25,9 @@ installErrorLog();
 
 // Bonnes couleurs dès la première image (thème recopié au dernier lancement).
 bootTheme();
+
+// Lumière au contact du verre (pointeur, doigt).
+installGlassLight();
 
 // Service worker : l'app fonctionne hors ligne et se met à jour automatiquement.
 startServiceWorker();

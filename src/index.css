@@ -25,7 +25,8 @@ html {
 
 body {
   min-height: 100dvh;
-  background: var(--bg);
+  /* Transparent : le champ de lumière (Backdrop, z-index négatif) se peint entre le fond de <html> et la page. */
+  background: transparent;
   color: var(--text);
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: min(0.9375rem, 19.5px);
@@ -65,10 +66,21 @@ input[type='number']::-webkit-outer-spin-button {
 /* ------------------------------------------------------------------ Verre */
 
 /*
- * Une plaque de verre : remplissage translucide + reflet en haut + lavis de teinte (option) +
- * bord fin + liseré spéculaire (ombre interne d'1 px) + ombre portée. Le vrai flou n'est utilisé
- * que pour float / lens ; ailleurs (et sur Android) le verre est simulé par un remplissage plus dense.
+ * Verre optique. Chaque plaque empile :
+ * - un corps translucide, et un vrai flou de ce qui est derrière (sauf Android : corps plus dense) ;
+ * - un reflet en haut, un lavis de teinte (option), un grain très fin (la matière) ;
+ * - une arête biseautée : un liseré qui accroche la lumière en haut à gauche et, plus faiblement, en
+ *   bas à droite (::before, masqué pour ne garder que le bord) ;
+ * - de l'épaisseur : liseré clair en haut, ombre interne en bas, ombre portée en deux couches ;
+ * - une lumière au contact : là où passe le pointeur ou le doigt (variables --mx / --my / --gl posées
+ *   par ui/glassLight.ts), un éclat doux qui s'éteint en fondu.
  */
+@property --gl {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 .glass {
   --g-fill: var(--glass-pane-fill);
   --g-sheen0: var(--glass-pane-sheen0);
@@ -76,19 +88,55 @@ input[type='number']::-webkit-outer-spin-button {
   --g-rim: var(--glass-pane-rim);
   --g-spec: var(--glass-pane-spec);
   --g-shadow: var(--glass-pane-shadow);
+  --g-blur: 16px;
   --g-wash0: transparent;
   --g-wash1: transparent;
   --g-glow: 0 0 0 transparent;
+  --g-edge: var(--edge-hi);
   position: relative;
+  isolation: isolate;
   background:
+    radial-gradient(260px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--touch, transparent) calc(var(--gl) * 100%), transparent), transparent 70%),
+    radial-gradient(130% 90% at 0% 0%, var(--corner-light, transparent), transparent 55%),
+    radial-gradient(120% 90% at 100% 100%, var(--corner-shade, transparent), transparent 60%),
     linear-gradient(135deg, var(--g-wash0), var(--g-wash1)),
     linear-gradient(180deg, var(--g-sheen0) 0%, var(--g-sheen1) 60%),
+    var(--grain, linear-gradient(transparent, transparent)),
     linear-gradient(var(--g-fill), var(--g-fill));
-  border: 1px solid var(--g-rim);
+  background-size:
+    auto,
+    auto,
+    auto,
+    auto,
+    auto,
+    180px 180px,
+    auto;
+  border: 1px solid transparent;
   box-shadow:
     inset 0 1px 0 var(--g-spec),
+    inset 0 -1px 0 var(--depth),
     var(--g-shadow),
+    0 1px 2px var(--contact),
     var(--g-glow);
+  -webkit-backdrop-filter: blur(var(--g-blur)) saturate(180%);
+  backdrop-filter: blur(var(--g-blur)) saturate(180%);
+  transition: --gl 0.45s ease-out;
+}
+/* L'arête : un dégradé de lumière limité au bord d'1 px. */
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(150deg, var(--g-edge) 0%, var(--g-rim) 26%, var(--edge-lo) 52%, var(--g-rim) 78%, var(--edge-hi2) 100%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 .glass-raised {
   --g-fill: var(--glass-raised-fill);
@@ -97,6 +145,7 @@ input[type='number']::-webkit-outer-spin-button {
   --g-rim: var(--glass-raised-rim);
   --g-spec: var(--glass-raised-spec);
   --g-shadow: var(--glass-raised-shadow);
+  --g-blur: 22px;
 }
 .glass-float {
   --g-fill: var(--glass-float-fill);
@@ -105,8 +154,7 @@ input[type='number']::-webkit-outer-spin-button {
   --g-rim: var(--glass-float-rim);
   --g-spec: var(--glass-float-spec);
   --g-shadow: var(--glass-float-shadow);
-  -webkit-backdrop-filter: blur(var(--glass-float-blur)) saturate(170%);
-  backdrop-filter: blur(var(--glass-float-blur)) saturate(170%);
+  --g-blur: var(--glass-float-blur);
 }
 .glass-lens {
   --g-fill: var(--glass-lens-fill);
@@ -115,10 +163,14 @@ input[type='number']::-webkit-outer-spin-button {
   --g-rim: var(--glass-lens-rim);
   --g-spec: var(--glass-lens-spec);
   --g-shadow: var(--glass-lens-shadow);
-  -webkit-backdrop-filter: blur(var(--glass-lens-blur)) saturate(170%);
-  backdrop-filter: blur(var(--glass-lens-blur)) saturate(170%);
+  --g-blur: var(--glass-lens-blur);
 }
-/* Sans flou réel (Android, ou navigateur sans backdrop-filter) : verre dense. */
+/* Sans flou réel (Android, ou navigateur sans backdrop-filter) : verre dense, pas de flou. */
+.android .glass:not(.glass-float):not(.glass-lens) {
+  --g-blur: 0px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 .no-live-blur .glass-float {
   --g-fill: var(--glass-float-solid);
   -webkit-backdrop-filter: none;
@@ -157,43 +209,53 @@ input[type='number']::-webkit-outer-spin-button {
 
 /* Android : pas d'ombre floue sur les plaques répétées (cartes, lignes), seulement sur ce qui flotte. */
 .android .glass:not(.glass-float):not(.glass-lens) {
-  box-shadow: inset 0 1px 0 var(--g-spec), var(--g-glow);
+  box-shadow:
+    inset 0 1px 0 var(--g-spec),
+    inset 0 -1px 0 var(--depth),
+    var(--g-glow);
 }
 
 .tone-accent {
   --g-wash0: var(--accent-wash0);
   --g-wash1: var(--accent-wash1);
   --g-rim: var(--accent-rim);
+  --g-edge: var(--accent-rim-strong);
 }
 .tone-gold {
   --g-wash0: var(--gold-wash0);
   --g-wash1: var(--gold-wash1);
   --g-rim: var(--gold-rim);
+  --g-edge: var(--gold-rim-strong);
 }
 .tone-success {
   --g-wash0: var(--success-wash0);
   --g-wash1: var(--success-wash1);
   --g-rim: var(--success-rim);
+  --g-edge: var(--success-rim-strong);
 }
 .tone-danger {
   --g-wash0: var(--danger-wash0);
   --g-wash1: var(--danger-wash1);
   --g-rim: var(--danger-rim);
+  --g-edge: var(--danger-rim-strong);
 }
 .tone-warning {
   --g-wash0: var(--warning-wash0);
   --g-wash1: var(--warning-wash1);
   --g-rim: var(--warning-rim);
+  --g-edge: var(--warning-rim-strong);
 }
 .tone-info {
   --g-wash0: var(--info-wash0);
   --g-wash1: var(--info-wash1);
   --g-rim: var(--info-rim);
+  --g-edge: var(--info-rim-strong);
 }
 /* Il émet de la lumière : actif, principal. */
 .glass-glow {
-  --g-rim: var(--accent-rim-strong);
-  --g-glow: 0 0 32px var(--accent-glow);
+  --g-rim: var(--accent-rim);
+  --g-edge: var(--accent-rim-strong);
+  --g-glow: 0 0 40px -6px var(--accent-glow);
 }
 
 /* ------------------------------------------------------------------ Lumière liquide (boutons principaux) */
@@ -204,8 +266,10 @@ input[type='number']::-webkit-outer-spin-button {
     linear-gradient(135deg, var(--accent-g0), var(--accent-g1));
   color: var(--on-accent);
   box-shadow:
-    0 10px 28px var(--accent-glow),
-    inset 0 1px 0 var(--highlight);
+    0 10px 28px -4px var(--accent-glow),
+    inset 0 1px 0 var(--highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 .liquid-gold {
   background:
