@@ -566,3 +566,90 @@ export function StackedColumns({
     </div>
   );
 }
+
+/**
+ * Calendrier du cycle : une case par jour, intensité de l'accent selon la dépense (une seule teinte,
+ * du clair au soutenu), point d'alerte quand le jour a dépassé son budget, contour pointillé pour les
+ * jours à venir, anneau pour aujourd'hui. Toucher un jour = son détail sous la grille.
+ */
+export function SpendCalendar({
+  days,
+  today,
+  format,
+  label,
+}: {
+  days: { date: string; spent: number; budget: number; future: boolean }[];
+  today: string;
+  format: (cents: number) => string;
+  label: string;
+}) {
+  const [picked, setPicked] = useState<string | null>(null);
+  if (days.length === 0) return null;
+  const max = Math.max(1, ...days.map((d) => d.spent));
+  const first = new Date(`${days[0]!.date}T12:00:00Z`).getUTCDay();
+  const lead = (first + 6) % 7;
+  const pickedDay = days.find((d) => d.date === picked) ?? null;
+  const fmtDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1.5" role="grid" aria-label={label}>
+        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+          <span key={i} className="t-caption pb-0.5 text-center text-muted" aria-hidden>
+            {d}
+          </span>
+        ))}
+        {Array.from({ length: lead }, (_, i) => (
+          <span key={`l${i}`} aria-hidden />
+        ))}
+        {days.map((d) => {
+          const level = d.spent > 0 ? Math.ceil((d.spent / max) * 4) : 0;
+          const over = !d.future && d.spent > d.budget && d.budget >= 0 && d.spent > 0;
+          const isToday = d.date === today;
+          const day = Number(d.date.slice(8, 10));
+          return (
+            <button
+              key={d.date}
+              type="button"
+              role="gridcell"
+              aria-label={`${fmtDay(d.date)} : ${d.future ? 'à venir' : `${format(d.spent)} dépensés${over ? ', au-dessus du budget du jour' : ''}`}`}
+              aria-pressed={picked === d.date}
+              onClick={() => setPicked(picked === d.date ? null : d.date)}
+              className={`relative flex aspect-square items-center justify-center rounded-[10px] text-[11px] font-semibold transition-transform active:scale-95 ${d.future ? 'border border-dashed border-line text-muted' : ''}`}
+              style={
+                d.future
+                  ? undefined
+                  : {
+                      background: level === 0 ? 'var(--surface-alt)' : `color-mix(in srgb, var(--accent) ${[0, 22, 40, 62, 88][level]}%, transparent)`,
+                      color: level >= 3 ? 'var(--on-accent)' : 'var(--text-secondary)',
+                      boxShadow: `${isToday ? '0 0 0 2px var(--text), ' : ''}inset 0 1px 0 var(--glass-pane-spec)${picked === d.date ? ', 0 0 0 2px var(--accent-rim-strong)' : ''}`,
+                    }
+              }
+            >
+              {day}
+              {over && <span aria-hidden className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warning)', boxShadow: '0 0 0 1.5px var(--bg)' }} />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="t-caption mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-muted">
+        <span className="flex items-center gap-1.5">
+          moins
+          {[0, 22, 40, 62, 88].map((p) => (
+            <span key={p} aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ background: p ? `color-mix(in srgb, var(--accent) ${p}%, transparent)` : 'var(--surface-alt)' }} />
+          ))}
+          plus
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--warning)' }} />
+          au-dessus du budget du jour
+        </span>
+      </div>
+      {pickedDay && (
+        <p className="t-small mt-2 text-secondary" aria-live="polite">
+          <strong className="text-ink">{fmtDay(pickedDay.date)}</strong> ·{' '}
+          {pickedDay.future ? 'à venir' : `${format(pickedDay.spent)} dépensés · budget du jour ${format(pickedDay.budget)}`}
+        </p>
+      )}
+    </div>
+  );
+}

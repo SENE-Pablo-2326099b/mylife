@@ -9,11 +9,15 @@ import { totalFixed } from '../domain/defaults';
 import { cycleEnvelope, payDates, resolveCycle } from '../domain/budgetEngine';
 import { useBudgetContext } from '../domain/useBudget';
 import { personBalances } from '../domain/people';
-import { useCategoryMap, useSettings } from '../hooks';
+import { useAccounts, useCategoryMap, useSettings } from '../hooks';
 import { addDays, cycleLength, formatCycle, formatShort, todayISO, type Cycle, type ISODate } from '../lib/dates';
 import { formatCents } from '../lib/money';
-import { LineChart } from '../ui/charts';
-import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap } from '../ui/index';
+import { AllocationBar, ColumnChart, LineChart, SpendCalendar } from '../ui/charts';
+import { seriesColors } from '../ui/themes';
+import { TxRow } from '../components/TxRow';
+import { biggestExpenses, cycleHeatmap, cycleHistory, topMerchants, weekdayProfile } from '../domain/cycleInsights';
+import { useRecentTransactions } from '../domain/recentTransactions';
+import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap, useTheme } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { HeaderActions } from '../components/HeaderActions';
 
@@ -27,6 +31,11 @@ function shiftCycle(c: Cycle, n: number, payday: number, pays: readonly ISODate[
 }
 
 const euros = (v: number) => formatCents(v, { short: true });
+const WEEKDAY_LONG = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+const WEEKDAY_SHORT = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+const MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+/** Libellé court d'un cycle : son mois de départ (« oct. »). */
+const cycleMonth = (c: Cycle) => MONTHS[Number(c.start.slice(5, 7)) - 1] ?? c.start;
 
 export default function CyclePage() {
   const settings = useSettings();
@@ -71,6 +80,40 @@ export default function CyclePage() {
   }, [txs, cats, cycle.start, cycle.end, prev.start, prev.end, until, envelope]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const people = useMemo(() => personBalances(refunds), [refunds]);
+  const t = useTheme();
+  const accounts = useAccounts();
+  const accMap = new Map(accounts.map((a) => [a.id, a]));
+
+  // Au-delà du total : jour par jour, habitudes, cycle après cycle, où part l'argent.
+  const recent = useRecentTransactions() ?? NO_TX;
+  const insights = useMemo(() => {
+    const heat = cycleHeatmap(txs, cats, cycle, envelope, until);
+    const history = cycleHistory(
+      recent,
+      cats,
+      [5, 4, 3, 2, 1, 0].map((n) => shiftCycle(cycle, -n, settings.payday, pays)),
+      (c) => cycleEnvelope({ txs: recent, cats, settings, ...context }, c).total,
+    ).filter((h) => h.spent > 0 || h.cycle.start === cycle.start);
+    const habitStart = shiftCycle(cycle, -2, settings.payday, pays).start;
+    const weekdays = weekdayProfile(recent, cats, habitStart, until);
+    return {
+      heat,
+      history,
+      weekdays,
+      merchants: topMerchants(txs, cats, cycle.start, until),
+      biggest: biggestExpenses(txs, cats, cycle.start, until),
+    };
+  }, [txs, recent, cats, cycle.start, cycle.end, until, envelope, settings, pays, context]); // eslint-disable-line react-hooks/exhaustive-deps
+  const busiest = insights.weekdays.reduce((m, d) => (d.average > m.average ? d : m), insights.weekdays[0]!);
+  const calmest = insights.weekdays.reduce((m, d) => (d.average < m.average ? d : m), insights.weekdays[0]!);
+  const historyAvg = insights.history.length ? Math.round(insights.history.reduce((s2, h) => s2 + h.spent, 0) / insights.history.length) : 0;
+  const daysLeft = Math.max(0, summary.length - summary.daysElapsed);
+  const perDay = summary.daysElapsed > 0 ? Math.round(summary.variable / summary.daysElapsed) : 0;
+  const projected = summary.variable + perDay * daysLeft;
+  const leftPerDay = daysLeft > 0 ? Math.max(0, Math.floor((envelope - summary.variable) / daysLeft)) : 0;
+  const colors = seriesColors(t);
+  const shares = lines.filter((l) => l.spent > 0).slice(0, 6);
+  const others = lines.filter((l) => l.spent > 0).slice(6).reduce((s2, l) => s2 + l.spent, 0);
   const delta = summary.variable - prevSameStage.variable;
   const expectedNow = Math.round((envelope * summary.daysElapsed) / summary.length);
   const go = (n: number) => setParams(n === 0 ? {} : { n: String(n) }, { replace: true });
@@ -108,6 +151,18 @@ export default function CyclePage() {
                 ? `${ahead ? 'Au-dessus' : 'En dessous'} de la trajectoire : ${formatCents(expectedNow)} prévus au jour ${summary.daysElapsed}.`
                 : `Reste ${formatCents(envelope - summary.variable)} non dépensés.`}
           </p>
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3">
+            <Metric label="Par jour" value={euros(perDay)} hint="en moyenne" />
+            {isCurrent ? <Metric label="Reste / jour" value={euros(leftPerDay)} hint={`${daysLeft} j restants`} /> : <Metric label="Jours" value={String(summary.length)} hint="dans le cycle" />}
+            <Metric label={isCurrent ? 'Fin projetée' : 'Écart'} value={euros(isCurrent ? projected : summary.variable - envelope)} tone={(isCurrent ? projected : summary.variable) > envelope ? 'danger' : 'success'} hint={isCurrent ? 'à ce rythme' : summary.variable > envelope ? 'au-dessus' : 'en dessous'} />
+          </div>
+        </Card>
+      </Reveal>
+
+      <Reveal index={1}>
+        <SectionTitle action={<span className="t-caption text-muted">touche un jour</span>}>Jour par jour</SectionTitle>
+        <Card>
+          <SpendCalendar days={insights.heat} today={today} format={euros} label={`Dépenses de vie courante jour par jour, du ${formatShort(cycle.start)} au ${formatShort(cycle.end)}`} />
         </Card>
       </Reveal>
 
@@ -158,6 +213,17 @@ export default function CyclePage() {
             <EmptyState icon="pie" title="Aucune dépense sur ce cycle" />
           </Card>
         ) : (
+          <>
+          <Card className="mb-2">
+            <AllocationBar
+              items={[
+                ...shares.map((l, i) => ({ label: `${l.category?.emoji ?? ''} ${l.category?.name ?? l.id}`.trim(), value: l.spent, color: colors[i % colors.length] as string })),
+                ...(others > 0 ? [{ label: 'Autres', value: others, color: 'var(--text-muted)' }] : []),
+              ]}
+              format={euros}
+              label="Répartition des dépenses du cycle par catégorie"
+            />
+          </Card>
           <Group>
             {lines.map((l) => {
               const target = l.category?.target ?? null;
@@ -189,10 +255,71 @@ export default function CyclePage() {
               );
             })}
           </Group>
+          </>
         )}
       </Reveal>
 
-      <Reveal index={3}>
+      {busiest && busiest.average > 0 && (
+        <Reveal index={3}>
+          <SectionTitle action={<span className="t-caption text-muted">3 derniers cycles</span>}>Tes habitudes</SectionTitle>
+          <Card>
+            <p className="t-body mb-3">
+              Tu dépenses le plus le <strong className="font-semibold">{WEEKDAY_LONG[busiest.day]}</strong> ({euros(busiest.average)} en moyenne), le moins le {WEEKDAY_LONG[calmest.day]} ({euros(calmest.average)}).
+            </p>
+            <ColumnChart
+              data={insights.weekdays.map((d) => ({ label: WEEKDAY_SHORT[d.day] ?? '', value: d.average, lit: d.day === busiest.day }))}
+              format={euros}
+              height={140}
+              label={`Dépense moyenne par jour de la semaine : ${insights.weekdays.map((d) => `${WEEKDAY_LONG[d.day]} ${euros(d.average)}`).join(', ')}.`}
+            />
+          </Card>
+        </Reveal>
+      )}
+
+      {insights.history.length > 1 && (
+        <Reveal index={4}>
+          <SectionTitle action={<span className="t-caption text-muted">moyenne {euros(historyAvg)}</span>}>Cycle après cycle</SectionTitle>
+          <Card>
+            <ColumnChart
+              data={insights.history.map((h) => ({ label: cycleMonth(h.cycle), value: h.spent, tone: h.spent > h.envelope && h.envelope > 0 ? ('danger' as const) : undefined, lit: h.cycle.start === cycle.start }))}
+              format={euros}
+              height={150}
+              label={`Vie courante par cycle : ${insights.history.map((h) => `${cycleMonth(h.cycle)} ${euros(h.spent)} sur ${euros(h.envelope)}`).join(', ')}.`}
+            />
+            <p className="t-caption mt-2 text-muted">En rouge : enveloppe dépassée. Le cycle affiché est en surbrillance.</p>
+          </Card>
+        </Reveal>
+      )}
+
+      {insights.merchants.length > 0 && (
+        <Reveal index={5}>
+          <SectionTitle>Où part l’argent</SectionTitle>
+          <Group>
+            {insights.merchants.map((m) => (
+              <Row
+                key={m.label}
+                emoji={m.categoryId ? (cats.get(m.categoryId)?.emoji ?? '❔') : '❔'}
+                title={m.label}
+                subtitle={`${m.count} fois · ${m.categoryId ? (cats.get(m.categoryId)?.name ?? '') : 'À classer'}`}
+                right={<Money cents={m.total} compact />}
+              />
+            ))}
+          </Group>
+        </Reveal>
+      )}
+
+      {insights.biggest.length > 0 && (
+        <Reveal index={6}>
+          <SectionTitle>Plus grosses dépenses</SectionTitle>
+          <Group>
+            {insights.biggest.map((tx) => (
+              <TxRow key={tx.id} tx={tx} category={tx.categoryId ? cats.get(tx.categoryId) : undefined} account={accMap.get(tx.accountId)} />
+            ))}
+          </Group>
+        </Reveal>
+      )}
+
+      <Reveal index={7}>
         <Disclosure title="Plus de chiffres" summary={`Nourriture ${summary.foodPercent} %`}>
           <div className="grid grid-cols-2 gap-2">
             <Card>
