@@ -14,6 +14,7 @@ import { useAccounts, useCategories, useCategoryMap } from '../hooks';
 import { formatCycle, formatDay, formatShort, todayISO } from '../lib/dates';
 import { formatCents } from '../lib/money';
 import { relativeTime } from '../lib/relative';
+import { runSync, useSyncState } from '../sync/store';
 import { Ring } from '../ui/charts';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, StatTile } from '../ui/index';
@@ -38,6 +39,7 @@ export default function TodayPage() {
   const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
   const lastSync = useLiveQuery(() => getMeta<number>('lastSyncAt'), []);
   const alerts = useAlerts();
+  const sync = useSyncState();
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [explain, setExplain] = useState(false);
   const [exceptional, setExceptional] = useState(false);
@@ -175,8 +177,15 @@ export default function TodayPage() {
       </Reveal>
 
       <p className="t-caption mt-6 text-center text-muted">
-        Enveloppe vie courante <Money cents={b.envelope.total} compact className="text-secondary" /> · dépensé <Money cents={b.spentBefore + b.spentToday} compact className="text-secondary" /> · synchro {relativeTime(lastSync)}
+        Enveloppe vie courante <Money cents={b.envelope.total} compact className="text-secondary" /> · dépensé <Money cents={b.spentBefore + b.spentToday} compact className="text-secondary" />
       </p>
+      {/* Les achats du jour n'arrivent qu'après une synchro : l'heure de la dernière et de quoi relancer. */}
+      <div className="mt-1 flex items-center justify-center gap-1">
+        <span className="t-caption text-muted">Banques synchronisées {relativeTime(lastSync)}</span>
+        <Button variant="ghost" size="sm" icon="sync" disabled={sync.syncing} onClick={() => void runSync()}>
+          {sync.syncing ? 'En cours…' : 'Actualiser'}
+        </Button>
+      </div>
       <BudgetExplainer open={explain && !editing} onClose={() => setExplain(false)} b={b} txs={txs} cats={cats} accounts={accMap} onEdit={setEditing} />
       <ExceptionalSheet open={exceptional} onClose={() => setExceptional(false)} items={b.exceptional} accounts={accMap} />
       <TxEditor tx={editing} categories={categories} onClose={() => setEditing(null)} />

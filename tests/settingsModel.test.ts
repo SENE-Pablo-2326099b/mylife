@@ -47,3 +47,11 @@ describe('réglages : personnalisation et migration', () => {
     expect('salary' in ((await database.settings.get('main')) as object)).toBe(false);
   });
 });
+
+describe('application Enable Banking propre au compte', () => {
+  it('gardée par la normalisation (sinon tout autre réglage l’effacerait)', () => {
+    const own = { sealed: 'v1.abc', appId: '11111111-2222-4333-8444-555555555555', name: 'Appli' };
+    expect(normalizeSettings({ ...DEFAULT_SETTINGS, ebOwnApp: own }).ebOwnApp).toEqual(own);
+    expect(normalizeSettings({ ...DEFAULT_SETTINGS, ebOwnApp: { sealed: 3 } }).ebOwnApp).toBeNull();
+  });
+});

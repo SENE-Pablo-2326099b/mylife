@@ -3,13 +3,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/db';
 import type { Account, Category, Rule, Settings } from './db/types';
 import { DEFAULT_SETTINGS } from './domain/defaults';
+import { normalizeSettings } from './domain/settingsModel';
 
 const NO_CATEGORIES: Category[] = [];
 const NO_RULES: Rule[] = [];
 const NO_ACCOUNTS: Account[] = [];
 
 export function useSettings(): Settings {
-  return useLiveQuery(() => db.settings.get('main'), []) ?? DEFAULT_SETTINGS;
+  // Toujours complétés (champs ajoutés depuis l'enregistrement) : les écrans n'ont pas à s'en soucier.
+  return useLiveQuery(async () => normalizeSettings((await db.settings.get('main')) ?? DEFAULT_SETTINGS), []) ?? DEFAULT_SETTINGS;
 }
 
 export function useCategories(): Category[] {

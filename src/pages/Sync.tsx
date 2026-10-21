@@ -5,6 +5,7 @@ import { updateSettings } from '../db/seed';
 import type { Account, Connection } from '../db/types';
 import { useSettings } from '../hooks';
 import { formatDateTime, relativeTime } from '../lib/relative';
+import { formatShort } from '../lib/dates';
 import { normalizeText } from '../lib/text';
 import { callbackUrl, completeBankConnection, disconnectBank, parseCallback, startBankConnection } from '../sync/connect';
 import { ebClientFor, type BridgeStatus, type EbClient } from '../sync/ebClient';
@@ -191,6 +192,11 @@ const ACCOUNT_ROLES = [
 
 function AccountRow({ account }: { account: Account }) {
   const [open, setOpen] = useState(false);
+  // Ce que la banque a réellement transmis : la date de la dernière opération reçue et celles encore « en cours ».
+  const received = useLiveQuery(async () => {
+    const list = await db.transactions.where('accountId').equals(account.id).toArray();
+    return { last: list.reduce<string | null>((m, t) => (m === null || t.date > m ? t.date : m), null), pending: list.filter((t) => t.pending).length };
+  }, [account.id]);
   const role = account.kind === 'savings' ? 'savings' : 'current';
   return (
     <>
@@ -209,6 +215,12 @@ function AccountRow({ account }: { account: Account }) {
           <>
             {account.kind === 'savings' ? 'Épargne · ' : ''}
             {account.iban ? `••${account.iban.slice(-4)} · ` : ''}synchro {relativeTime(account.lastSyncAt)}
+            {received?.last && (
+              <span className="block">
+                dernière opération reçue : {formatShort(received.last)}
+                {received.pending > 0 ? ` · ${received.pending} en cours` : ''}
+              </span>
+            )}
             {account.lastSyncError && <span className="block text-danger">{account.lastSyncError}</span>}
           </>
         }

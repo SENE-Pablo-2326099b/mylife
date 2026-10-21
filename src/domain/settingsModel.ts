@@ -73,6 +73,10 @@ export function normalizeSettings(raw: unknown): Settings {
     envelopeOverride: typeof r.envelopeOverride === 'number' ? Math.round(r.envelopeOverride) : null,
     alerts: { ...DEFAULT_ALERTS, ...(r.alerts ?? {}) },
     bridgePassword: typeof r.bridgePassword === 'string' ? r.bridgePassword : '',
+    ebOwnApp:
+      r.ebOwnApp && typeof r.ebOwnApp === 'object' && typeof r.ebOwnApp.sealed === 'string' && typeof r.ebOwnApp.appId === 'string'
+        ? { sealed: r.ebOwnApp.sealed, appId: r.ebOwnApp.appId, name: typeof r.ebOwnApp.name === 'string' ? r.ebOwnApp.name : '' }
+        : null,
     initialSyncDays: Math.min(730, Math.max(1, int(r.initialSyncDays, DEFAULT_SETTINGS.initialSyncDays))),
     autoSyncHours: Math.max(0, int(r.autoSyncHours, DEFAULT_SETTINGS.autoSyncHours)),
     bankCountry: typeof r.bankCountry === 'string' && /^[A-Z]{2}$/.test(r.bankCountry) ? r.bankCountry : 'FR',

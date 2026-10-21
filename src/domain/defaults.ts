@@ -270,6 +270,7 @@ export const DEFAULT_SETTINGS: Settings = {
   envelopeOverride: null,
   alerts: DEFAULT_ALERTS,
   bridgePassword: '',
+  ebOwnApp: null,
   initialSyncDays: 90,
   autoSyncHours: 6,
   bankCountry: 'FR',

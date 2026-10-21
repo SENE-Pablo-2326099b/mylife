@@ -108,6 +108,11 @@ function Shell() {
       .catch(() => undefined)
       .then(() => maybeAutoSync())
       .finally(() => void wealthHousekeeping().catch(() => undefined));
+    // Sur téléphone, l'app reste souvent ouverte en arrière-plan : on revérifie les banques à chaque
+    // retour (toujours dans la limite de « synchro auto toutes les N heures »).
+    const onShow = () => document.visibilityState === 'visible' && void maybeAutoSync().catch(() => undefined);
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
   }, []);
 
   const tabs: TabDef[] = [
