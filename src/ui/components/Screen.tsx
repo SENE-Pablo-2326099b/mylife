@@ -9,7 +9,6 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withDelay,
   withSpring,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +22,8 @@ import { Glass } from './Glass';
 import { Button, EmptyState, IconButton, Text } from './primitives';
 
 /**
- * Staggered entrance for the blocks of a screen: each rises and comes into focus on a spring.
+ * Entrance of a screen: its blocks rise together, once, on a spring (one orchestrated moment rather
+ * than a cascade, same as MyFinances). `index` is kept so existing calls stay readable.
  * Driven by a shared value rather than a layout `entering` animation, which the web build leaves
  * absolutely positioned (out of flow) after it ends.
  * Android: off — fading whole blocks of glass composites them off-screen every frame and slowed
@@ -31,13 +31,13 @@ import { Button, EmptyState, IconButton, Text } from './primitives';
  */
 const REVEAL = Platform.OS !== 'android';
 
-export function Reveal({ index = 0, children, style }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Reveal({ children, style }: { index?: number; children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const reduceMotion = useReducedMotion();
   const reduce = !REVEAL || reduceMotion;
   const p = useSharedValue(reduce ? 1 : 0);
   useEffect(() => {
-    if (!reduce) p.set(withDelay(Math.min(index, 10) * 60, withSpring(1, springs.soft)));
-  }, [index, p, reduce]);
+    if (!reduce) p.set(withSpring(1, springs.soft));
+  }, [p, reduce]);
   const anim = useAnimatedStyle(() => ({ opacity: Math.min(1, p.value * 1.4), transform: [{ translateY: (1 - p.value) * 22 }] }));
   return <Animated.View style={[style, anim]}>{children}</Animated.View>;
 }

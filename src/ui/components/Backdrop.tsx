@@ -12,7 +12,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Mask, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { springs } from '../motion';
 import { useTheme } from '../theme';
@@ -155,6 +155,36 @@ export function Backdrop() {
         start={{ x: 0.5, y: 0.35 }}
         end={{ x: 0.5, y: 1 }}
       />
+      <DotGrid width={width} height={height} />
+    </View>
+  );
+}
+
+/**
+ * Trame de points, nette en haut et qui s'efface vers le bas : sharp around the glass, softened under
+ * it — it is what makes the blur read as glass.
+ */
+function DotGrid({ width, height }: { width: number; height: number }) {
+  const t = useTheme();
+  const dot = t.scheme === 'dark' ? 'rgba(246,243,255,0.12)' : 'rgba(22,16,50,0.12)';
+  return (
+    <View renderToHardwareTextureAndroid style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <Pattern id="dots" width={22} height={22} patternUnits="userSpaceOnUse">
+            <Circle cx={11} cy={11} r={1.2} fill={dot} />
+          </Pattern>
+          <SvgLinearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#fff" stopOpacity={1} />
+            <Stop offset="0.5" stopColor="#fff" stopOpacity={0.35} />
+            <Stop offset="0.9" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+          <Mask id="grid-mask">
+            <Rect width={width} height={height} fill="url(#fade)" />
+          </Mask>
+        </Defs>
+        <Rect width={width} height={height} fill="url(#dots)" mask="url(#grid-mask)" />
+      </Svg>
     </View>
   );
 }

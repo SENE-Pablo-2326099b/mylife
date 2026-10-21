@@ -55,7 +55,7 @@ const VARIANTS: Record<TextVariant, TextStyle> = {
   bodyStrong: { fontFamily: family.semibold, fontSize: font.body, lineHeight: 21 },
   small: { fontFamily: family.regular, fontSize: font.small, lineHeight: 18 },
   caption: { fontFamily: family.medium, fontSize: font.caption, lineHeight: 16 },
-  label: { fontFamily: family.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.3, textTransform: 'uppercase' },
+  label: { fontFamily: family.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0.1 },
   number: { fontFamily: family.number, fontSize: font.input, letterSpacing: -0.3 },
 };
 
@@ -403,7 +403,7 @@ export function SectionTitle({ title, action }: { title: string; action?: ReactN
         minHeight: 28,
         paddingHorizontal: 2,
       }}>
-      <Text variant="label" tone="muted" style={{ flexShrink: 0 }}>
+      <Text variant="headline" style={{ flexShrink: 0 }}>
         {title}
       </Text>
       {action}

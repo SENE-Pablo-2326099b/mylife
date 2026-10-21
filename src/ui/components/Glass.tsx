@@ -1,7 +1,7 @@
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { LIVE_BLUR, radius as radii, useTheme, type GlassLevel } from '../theme';
 
@@ -17,6 +17,19 @@ import { LIVE_BLUR, radius as radii, useTheme, type GlassLevel } from '../theme'
  * line instead of an inset shadow. Same look at a fraction of the GPU cost.
  */
 const ANDROID = Platform.OS === 'android';
+/** Grain très fin (la matière du verre), une petite texture répétée. */
+const GRAIN = require('../../../assets/images/grain.png') as number;
+
+/**
+ * Verre optique : l'arête est biseautée (bords haut et gauche qui accrochent la lumière, bas et
+ * droite plus sombres, avec un reflet faible en bas à droite), une lumière d'angle éclaire l'intérieur
+ * en haut à gauche, une ombre douce l'assombrit en bas à droite, et un grain très fin lui donne sa matière.
+ */
+function edges(dark: boolean) {
+  return dark
+    ? { hi: 'rgba(255,255,255,0.34)', side: 'rgba(255,255,255,0.16)', lo: 'rgba(255,255,255,0.07)', light: 'rgba(255,255,255,0.075)', shade: 'rgba(0,0,0,0.18)', depth: 'rgba(0,0,0,0.34)', grain: 0.11 }
+    : { hi: 'rgba(255,255,255,1)', side: 'rgba(255,255,255,0.7)', lo: 'rgba(22,16,50,0.08)', light: 'rgba(255,255,255,0.55)', shade: 'rgba(22,16,50,0.035)', depth: 'rgba(22,16,50,0.06)', grain: 0.07 };
+}
 export type GlassTone = 'neutral' | 'accent' | 'danger' | 'info' | 'warning';
 
 export function Glass({
@@ -47,6 +60,7 @@ export function Glass({
 }) {
   const t = useTheme();
   const spec = t.glass[level];
+  const e = edges(t.scheme === 'dark');
   const wantsBlur = blur ?? spec.blur > 0;
   const liveBlur = wantsBlur && LIVE_BLUR;
   const toneColor =
@@ -63,6 +77,8 @@ export function Glass({
         {liveBlur && <BlurView intensity={spec.blur} tint={t.blurTint} style={StyleSheet.absoluteFill} />}
         <View style={[StyleSheet.absoluteFill, { backgroundColor: wantsBlur && !LIVE_BLUR ? spec.solidFill : spec.fill }]} />
         <LinearGradient colors={spec.sheen} locations={[0, 0.6]} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={[e.light, 'transparent', e.shade]} locations={[0, 0.5, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <Image source={GRAIN} resizeMode="repeat" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: e.grain }]} />
         {toneColor !== null && (
           <LinearGradient
             colors={[`${toneColor}2E`, `${toneColor}08`]}
@@ -82,9 +98,11 @@ export function Glass({
           StyleSheet.absoluteFill,
           corners,
           {
-            borderWidth: StyleSheet.hairlineWidth * 1.5,
+            borderWidth: 1,
+            // Arête biseautée : lumière en haut et à gauche, ombre en bas et à droite.
             borderColor: glow ? `${t.accent}66` : toneColor !== null ? `${toneColor}44` : spec.rim,
-            boxShadow: ANDROID ? undefined : `inset 0px 1px 0px ${spec.specular}`,
+            ...(glow || toneColor !== null ? {} : { borderTopColor: e.hi, borderLeftColor: e.side, borderRightColor: e.lo, borderBottomColor: e.lo }),
+            boxShadow: ANDROID ? undefined : `inset 0px 1px 0px ${spec.specular}, inset 0px -1px 0px ${e.depth}`,
           },
         ]}
       />
