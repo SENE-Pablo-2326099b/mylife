@@ -25,6 +25,7 @@ Les opérations bancaires arrivent automatiquement via **Enable Banking** (API D
   une fonction serverless *à toi* (Vercel ou Netlify), sur le **même domaine** que l'app. Elle garde la clé privée, signe les requêtes, relaie les réponses et ne stocke ni ne journalise rien.
 - Le relais n'accepte qu'une **liste fermée** d'opérations en lecture (liste des banques, autorisation, session, soldes, transactions) et exige un mot de passe (`BRIDGE_PASSWORD`).
 - Aucune analytics, aucun tracking, aucune police ou script externe (Sora et Inter sont embarquées). En production, la CSP impose `connect-src 'self'` : le navigateur ne peut parler qu'à ton propre domaine.
+- **Journal d'erreurs** : les derniers plantages (30 au plus) restent sur l'appareil (`localStorage`), jamais envoyés ; *Réglages → Sauvegarde et données* permet de les copier pour signaler un problème.
 - **Cours des placements** : le relais interroge Yahoo Finance (ETF, actions) et CoinGecko (crypto) avec les seuls **symboles** (ex. `CW8.PA`, `bitcoin`), jamais de montant. Ces deux opérations ne demandent que `BRIDGE_PASSWORD` (pas la configuration Enable Banking). Sans relais, les cours se saisissent à la main.
 
 ---
@@ -47,6 +48,7 @@ Au premier lancement, l'accueil guidé propose « Essayer avec la démo » (6 mo
 | `npm run preview` | sert le build de production (relais inclus) sur http://localhost:4173 |
 | `npm test` | tests unitaires (Vitest) |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
+| `npm run e2e` | construit l'app puis la parcourt de bout en bout avec la démo (320 et 390 px) : chaque écran sans erreur ni débordement, actions rapides, onglets du patrimoine, lanceur MyLife, indépendance financière, journal d'erreurs, relance hors ligne (Chrome ; `CHROME_PATH` pour un autre binaire) |
 | `npm run screenshots` | captures de chaque écran avec la démo, thèmes Nuit et Perle, 320 / 390 / 430 / 1 280 px, + contrôle des erreurs console, des débordements, du clavier et du hors-ligne (nécessite `npm run build` et Chrome ; `CHROME_PATH` pour un autre binaire) |
 | `node scripts/make-icons.mjs` | régénère les icônes PNG de la PWA à partir de `public/favicon.svg` |
 
@@ -84,6 +86,10 @@ Enable Banking propose un mode **« restricted production »** gratuit : une app
 5. **Dans l'app** : *Banques* (icône ⟳ en haut à droite, ou Réglages → Banques) → saisis le mot de passe du relais → **Ajouter une banque** → choisis le pays et ta banque → authentification sur son site → retour automatique dans l'app. Recommence pour chaque banque.
 
 La synchro se fait ensuite toute seule à l'ouverture de l'app (au plus toutes les 6 h, réglable : la DSP2 limite à 4 accès automatiques par jour et par compte), ou à la demande. L'accès bancaire expire au bout de 90 à 180 jours selon la banque : l'app affiche « Expire dans N j », puis « Reconnecter ».
+
+### Pour un proche (sa propre application Enable Banking)
+
+En *restricted production*, Enable Banking ne lit que les comptes liés à l'application qui fait la demande : un proche qui utilise ton relais doit donc avoir **sa** application. Il crée son compte MyLife (code d'invitation), puis *Banques → Ma propre application Enable Banking* : il crée une application *Production* sur enablebanking.com (avec l'URL de retour affichée dans l'app), lie ses comptes, puis renseigne l'Application ID et choisit son `.pem`. Le relais vérifie le couple auprès d'Enable Banking, le **scelle** (AES-256-GCM, clé dérivée de `SESSION_SECRET`, lié à son compte) et ne renvoie qu'un bloc illisible, que l'app joint à chaque appel bancaire. Rien n'est stocké côté serveur ; changer `SESSION_SECRET` oblige à le renseigner à nouveau.
 
 > **iPhone** : une PWA installée et Safari ne partagent pas leurs données. Si la banque te renvoie dans Safari au lieu de l'app, la page de retour te propose de copier le lien : colle-le dans *Synchro → « La banque m'a renvoyé dans le navigateur »*.
 
