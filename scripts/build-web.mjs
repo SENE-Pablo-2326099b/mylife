@@ -34,6 +34,16 @@ if (existsSync(join(OUT, 'assets', 'node_modules'))) {
   rewrite(OUT);
 }
 
+// Les fichiers JS sont servis « immuables » : leur nom doit changer avec leur contenu (après réécriture).
+const jsDir = join(OUT, '_expo', 'static', 'js', 'web');
+const indexFile = join(OUT, 'index.html');
+for (const name of readdirSync(jsDir).filter((n) => n.endsWith('.js'))) {
+  const digest = createHash('sha256').update(readFileSync(join(jsDir, name))).digest('hex').slice(0, 10);
+  const renamed = name.replace(/\.js$/, `-${digest}.js`);
+  renameSync(join(jsDir, name), join(jsDir, renamed));
+  writeFileSync(indexFile, readFileSync(indexFile, 'utf8').split(name).join(renamed));
+}
+
 writeFileSync(
   join(OUT, 'manifest.webmanifest'),
   JSON.stringify(
