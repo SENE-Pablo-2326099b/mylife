@@ -14,3 +14,6 @@ app reste un dépôt indépendant, déployable seule, mais le navigateur ne voit
 qui permettra une connexion unique et la synchronisation chiffrée entre appareils (étapes suivantes).
 
 Déployer l'accueil : `npx vercel@61.1.0 deploy --prod`.
+
+**Après le déploiement d'une app** : si un fichier répond 404 *via MyLife* alors qu'il existe sur l'adresse
+de l'app (le CDN de MyLife a pu garder un 404 obtenu pendant la mise en ligne), redéployer MyLife vide son cache.
