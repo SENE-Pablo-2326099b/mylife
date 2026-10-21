@@ -2,13 +2,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, ReduceMotion, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import { useEffect, useState } from 'react';
+import { router } from 'expo-router';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { Easing, FadeIn, LinearTransition, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatDuration } from '@/domain/dates';
 import { Keypad } from '@/features/workout/Keypad';
+import { Orbit } from '@/features/navigation/Orbit';
 import { RestTimerBar } from '@/features/workout/RestTimerBar';
 import { useEntry } from '@/state/entryStore';
 import { useWorkoutStore } from '@/state/workoutStore';
@@ -66,84 +68,102 @@ function LiveDot() {
 }
 
 /**
- * The liquid indicator: two edges on different springs — the leading edge darts ahead, the
- * trailing one catches up — so the bead stretches like a drop sliding along the glass.
+ * The orb at the centre of the dock: a bead of liquid light ringed by a slowly turning halo. Opens
+ * the MyLife spaces; a long press opens the coach.
  */
-function useLiquidEdges(index: number, slot: number, pad: number) {
-  const left = useSharedValue(index * slot + pad);
-  const right = useSharedValue((index + 1) * slot - pad);
-  const prev = useRef(index);
+function Orb({ onPress, onLongPress }: { onPress: () => void; onLongPress: () => void }) {
+  const t = useTheme();
+  const reduce = useReducedMotion();
+  const spin = useSharedValue(0);
   useEffect(() => {
-    const toRight = index >= prev.current;
-    const lead = { ...springs.liquid, stiffness: 420, damping: 24 };
-    const trail = { ...springs.soft, stiffness: 150 };
-    left.value = withSpring(index * slot + pad, toRight ? trail : lead);
-    right.value = withSpring((index + 1) * slot - pad, toRight ? lead : trail);
-    prev.current = index;
-  }, [index, slot, pad, left, right]);
-  return { left, right };
+    if (reduce || Platform.OS === 'android') return;
+    spin.set(withRepeat(withTiming(1, { duration: 7000, easing: Easing.linear }), -1));
+  }, [reduce, spin]);
+  const ring = useAnimatedStyle(() => ({ transform: [{ rotate: `${spin.value * 360}deg` }] }));
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Espaces MyLife et actions (appui long : coach)"
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      onLongPress={() => {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        onLongPress();
+      }}
+      style={({ pressed }) => ({ width: 60, height: 60, marginHorizontal: 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.9 : 1 }] })}>
+      <View style={{ position: 'absolute', width: 60, height: 60, borderRadius: 30, overflow: 'hidden', opacity: 0.75 }}>
+        <Animated.View style={[StyleSheet.absoluteFill, ring]}>
+          <LinearGradient colors={[t.accentGradient[0], 'transparent', t.gold, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        </Animated.View>
+      </View>
+      <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', boxShadow: shade(`0px 8px 24px ${t.accentGlow}`) }}>
+        <LinearGradient colors={t.accentGradient} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <LinearGradient colors={['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']} locations={[0, 0.5]} start={{ x: 0.2, y: 0 }} end={{ x: 0.5, y: 0.7 }} style={StyleSheet.absoluteFill} />
+          <Ionicons name="planet" size={24} color={t.onAccent} />
+        </LinearGradient>
+      </View>
+    </Pressable>
+  );
 }
 
+/**
+ * The dock: the active tab stretches into a capsule of light (icon + name), the others stay icons;
+ * the orb sits in the middle. Réglages moved to the MyLife spaces (orb), like in MyFinances.
+ */
 function DockTabs(props: BottomTabBarProps) {
   const t = useTheme();
-  const [width, setWidth] = useState(0);
   const press = usePressTab(props);
   const live = useActiveSession() !== null;
-  const slot = width / TABS.length;
-  // Very narrow docks (foldable cover screens): smaller labels so the five tabs never touch.
-  const tight = width > 0 && slot < 62;
-  const { left, right } = useLiquidEdges(props.state.index, slot, tight ? 3 : 6);
-  const bead = useAnimatedStyle(() => ({ left: left.value, width: Math.max(0, right.value - left.value) }));
+  const [orbit, setOrbit] = useState(false);
+  const items = props.state.routes
+    .map((route, i) => ({ route, i, tab: TABS.find((x) => x.name === route.name) }))
+    .filter((x): x is { route: (typeof props.state.routes)[number]; i: number; tab: (typeof TABS)[number] } => x.tab !== undefined && x.tab.name !== 'settings');
+  const half = Math.ceil(items.length / 2);
+  const layout = Platform.OS === 'web' ? undefined : LinearTransition.springify().damping(18).stiffness(220);
 
-  return (
-    <View style={{ height: DOCK_HEIGHT, flexDirection: 'row' }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-      {width > 0 && (
+  const item = ({ route, i, tab }: (typeof items)[number]) => {
+    const focused = props.state.index === i;
+    return (
+      <Pressable key={route.key} onPress={() => press(i)} accessibilityRole="tab" accessibilityState={{ selected: focused }} accessibilityLabel={tab.label}>
         <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              top: 7,
-              bottom: 7,
-              borderRadius: radius.lg,
-              backgroundColor: t.accentSoft,
-              borderWidth: StyleSheet.hairlineWidth * 1.5,
-              borderColor: `${t.accent}55`,
-              boxShadow: shade(`0px 0px 22px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`),
-            },
-            bead,
-          ]}
-        />
-      )}
-      {props.state.routes.map((route, i) => {
-        const tab = TABS.find((x) => x.name === route.name);
-        if (tab === undefined) return null;
-        const focused = props.state.index === i;
-        return (
-          <Pressable
-            key={route.key}
-            onPress={() => press(i)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={tab.label}
-            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-            <View>
-              <Ionicons name={focused ? tab.active : tab.icon} size={22} color={focused ? t.accent : t.textMuted} />
-              {tab.name === 'index' && live && (
-                <View style={{ position: 'absolute', top: -2, right: -6 }}>
-                  <LiveDot />
-                </View>
-              )}
-            </View>
-            <Text
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              maxFontSizeMultiplier={1.15}
-              style={{ fontFamily: family.semibold, fontSize: tight ? 9 : 10.5, letterSpacing: tight ? -0.2 : 0, color: focused ? t.text : t.textMuted, maxWidth: slot - 4 }}>
+          layout={layout}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            height: 48,
+            paddingHorizontal: focused ? 16 : 13,
+            borderRadius: 24,
+            ...(focused
+              ? { backgroundColor: t.accentSoft, borderWidth: 1, borderColor: `${t.accent}55`, boxShadow: shade(`0px 0px 22px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`) }
+              : {}),
+          }}>
+          <View>
+            <Ionicons name={focused ? tab.active : tab.icon} size={22} color={focused ? t.accent : t.textSecondary} />
+            {tab.name === 'index' && live && (
+              <View style={{ position: 'absolute', top: -2, right: -6 }}>
+                <LiveDot />
+              </View>
+            )}
+          </View>
+          {focused && (
+            <Text numberOfLines={1} maxFontSizeMultiplier={1.15} style={{ fontFamily: family.semibold, fontSize: 13, color: t.text }}>
               {tab.label}
             </Text>
-          </Pressable>
-        );
-      })}
+          )}
+        </Animated.View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <View style={{ height: DOCK_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2 }}>
+      {items.slice(0, half).map(item)}
+      <Orb onPress={() => setOrbit(true)} onLongPress={() => router.push('/coach')} />
+      {items.slice(half).map(item)}
+      <Orbit visible={orbit} onClose={() => setOrbit(false)} />
     </View>
   );
 }
@@ -174,7 +194,7 @@ export function Dock(props: BottomTabBarProps) {
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: Math.max(insets.bottom, DOCK_MARGIN), paddingHorizontal: DOCK_MARGIN, alignItems: 'center' }}>
       <View pointerEvents="box-none" style={{ width: '100%', maxWidth: 560, gap: space.sm }}>
         <RestTimerBar />
-        <Glass level="float" radius={radius.xl + 2} contentStyle={{ overflow: 'hidden', borderRadius: radius.xl + 2 }}>
+        <Glass level="float" radius={DOCK_HEIGHT / 2} style={{ alignSelf: 'center' }} contentStyle={{ overflow: 'hidden', borderRadius: DOCK_HEIGHT / 2 }}>
           <Animated.View entering={flowAnim(FadeIn.duration(180).reduceMotion(ReduceMotion.System))}>
             <DockTabs {...props} />
           </Animated.View>
