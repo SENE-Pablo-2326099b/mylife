@@ -6,7 +6,7 @@
 // Usage : npm run build:web   puis   npm run deploy:web
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -16,6 +16,23 @@ const BASE = '/perf/';
 rmSync(OUT, { recursive: true, force: true });
 execSync(`npx expo export -p web --output-dir ${OUT}`, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' } });
 cpSync(join(ROOT, 'web', 'static'), OUT, { recursive: true });
+
+// Vercel n'envoie jamais un dossier nommé node_modules : les polices et icônes qu'Expo y range
+// (assets/node_modules/…) sont déplacées dans assets/nm/ et les références réécrites.
+if (existsSync(join(OUT, 'assets', 'node_modules'))) {
+  renameSync(join(OUT, 'assets', 'node_modules'), join(OUT, 'assets', 'nm'));
+  const rewrite = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) rewrite(p);
+      else if (/\.(js|html|json|css)$/.test(name)) {
+        const text = readFileSync(p, 'utf8');
+        if (text.includes('/assets/node_modules/')) writeFileSync(p, text.split('/assets/node_modules/').join('/assets/nm/'));
+      }
+    }
+  };
+  rewrite(OUT);
+}
 
 writeFileSync(
   join(OUT, 'manifest.webmanifest'),
