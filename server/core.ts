@@ -332,7 +332,8 @@ export async function sync(
   const extra = overruled.filter((r) => !seen.has(`${r.tbl}|${r.rid}`));
   // Curseur : dernière ligne renvoyée, ou à défaut la plus récente du compte (les nôtres comprises).
   let next = cursor;
-  if (page.length) next = Number(page[page.length - 1].seq);
+  const lastRow = page[page.length - 1];
+  if (lastRow) next = Number(lastRow.seq);
   else {
     const last = await db.query<{ s: string | number | null }>('SELECT MAX(seq) AS s FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
     next = Math.max(cursor, Number(last.rows[0]?.s ?? 0));

@@ -61,7 +61,7 @@ class Device implements LocalStore {
   }
   async pending(limit: number): Promise<PendingChange[]> {
     return [...this.queue].slice(0, limit).map(([k, q]) => {
-      const [tbl, rid] = k.split('|');
+      const [tbl = '', rid = ''] = k.split('|');
       return { tbl, rid, ver: q.ver, updatedAt: q.at, row: this.rows.get(k) ?? null };
     });
   }
@@ -75,7 +75,7 @@ class Device implements LocalStore {
     }
   }
   async snapshot() {
-    return [...this.rows].map(([k, row]) => ({ tbl: k.split('|')[0], rid: k.split('|')[1], row }));
+    return [...this.rows].map(([k, row]) => ({ tbl: k.split('|')[0] ?? '', rid: k.split('|')[1] ?? '', row }));
   }
   async replace(rows: RemoteRow[]) {
     this.rows.clear();
@@ -196,7 +196,7 @@ describe('synchronisation entre appareils', () => {
     await join(d, srv.api, session, random);
     const { rows } = await srv.db.query<{ payload: string }>('SELECT payload FROM records');
     expect(rows).toHaveLength(1);
-    expect(rows[0].payload).not.toMatch(/Pharmacie|1234/);
+    expect(rows[0]?.payload).not.toMatch(/Pharmacie|1234/);
     const users = await srv.db.query('SELECT * FROM users');
     expect(JSON.stringify(users.rows)).not.toMatch(/mot-de-passe/);
   }, 30_000);

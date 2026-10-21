@@ -35,14 +35,24 @@ const enc = {
 };
 const dec = {
   decode(b: Uint8Array): string {
+    const at = (k: number) => b[k] ?? 0;
     let s = '';
     for (let i = 0; i < b.length; ) {
-      const x = b[i];
+      const x = at(i);
       let c: number;
-      if (x < 0x80) c = b[i++];
-      else if (x < 0xe0) c = ((b[i++] & 31) << 6) | (b[i++] & 63);
-      else if (x < 0xf0) c = ((b[i++] & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
-      else c = ((b[i++] & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
+      if (x < 0x80) {
+        c = x;
+        i += 1;
+      } else if (x < 0xe0) {
+        c = ((x & 31) << 6) | (at(i + 1) & 63);
+        i += 2;
+      } else if (x < 0xf0) {
+        c = ((x & 15) << 12) | ((at(i + 1) & 63) << 6) | (at(i + 2) & 63);
+        i += 3;
+      } else {
+        c = ((x & 7) << 18) | ((at(i + 1) & 63) << 12) | ((at(i + 2) & 63) << 6) | (at(i + 3) & 63);
+        i += 4;
+      }
       s += String.fromCodePoint(c);
     }
     return s;
