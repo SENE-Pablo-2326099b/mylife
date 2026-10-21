@@ -5,7 +5,7 @@ import { useLatest } from '../../hooks';
 import { db } from '../../db/db';
 import { changeWithUndo } from '../../db/undo';
 import type { Goal, ManualAsset, Transaction } from '../../db/types';
-import { estimateAnnualSpending, monthsToTarget, fireTarget, realAnnualRate } from '../../domain/fire';
+import { computeFire } from '../../domain/fire';
 import { ASSET_CLASS_LABEL, cashHistory, wealthHistory, type GoalProgress } from '../../domain/wealth';
 import { deleteGoal, recordSnapshot } from '../../domain/wealthDb';
 import { useWealth } from '../../domain/useWealth';
@@ -100,14 +100,12 @@ export default function WealthPage() {
     return items;
   }, [w.worth, w.summaries, t]);
 
+  // Même calcul que l'écran Indépendance financière (exclusions, impôts, frais) : même date affichée.
   const fire = useMemo(() => {
-    const spending = estimateAnnualSpending(txs, cats, settings, today).amount;
-    const target = fireTarget(spending, settings.fire.withdrawalBp);
-    const current = w.worth.investments + w.accounts.filter((a) => a.kind === 'savings' && !a.hidden).reduce((s, a) => s + (a.balance ?? 0), 0);
     const monthly = settings.savings.mode === 'manual' ? settings.savings.manual : plannedMonthlySavings(w.plans, w.goals);
-    const months = monthsToTarget(current, monthly, realAnnualRate(settings.fire), target);
-    return { target, current, months };
-  }, [txs, cats, settings, today, w.worth.investments, w.accounts, w.plans, w.goals]);
+    const r = computeFire({ summaries: w.summaries, savingsAccounts: w.accounts.filter((a) => a.kind === 'savings' && !a.hidden), txs, cats, settings, today, monthly });
+    return { target: r.main.target, current: r.current, months: r.main.months };
+  }, [txs, cats, settings, today, w.summaries, w.accounts, w.plans, w.goals]);
 
   const empty = w.loaded && w.accounts.length === 0 && w.portfolios.length === 0 && w.assets.length === 0 && w.goals.length === 0;
   const totalInvest = w.summaries.reduce((s, p) => s + p.value, 0);

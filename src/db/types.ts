@@ -155,6 +155,20 @@ export interface FireSettings {
   withdrawalBp: number;
   /** Dépenses annuelles visées (null = estimées à partir des dépenses réelles). */
   annualSpendingOverride: number | null;
+  /** Année de naissance (âge à l'indépendance, Coast FI). */
+  birthYear: number | null;
+  /** Âge de la retraite légale (Coast FI, pension). */
+  retirementAge: number;
+  /** Pension nette mensuelle estimée à la retraite, en euros d'aujourd'hui (centimes). */
+  pensionMonthly: number;
+  /** Frais annuels moyens des placements (points de base : 20 = 0,2 %). */
+  feesBp: number;
+  /** Comptes et placements exclus du capital (épargne de précaution, projet…). */
+  excludedIds: string[];
+  /** Catégories « essentielles » (Lean FI) ; null = choix par défaut (charges fixes, courses, santé, transport). */
+  essentialCategoryIds: string[] | null;
+  /** Dernier palier fêté (10 %, 25 %…), pour ne fêter chaque palier qu'une fois. */
+  lastMilestone: number;
 }
 
 export interface Settings {

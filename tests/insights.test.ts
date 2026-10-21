@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InvestmentPlan, Settings } from '../src/db/types';
-import { CAT, DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from '../src/domain/defaults';
+import { CAT, DEFAULT_CATEGORIES, DEFAULT_FIRE, DEFAULT_SETTINGS } from '../src/domain/defaults';
 import { estimateAnnualSpending, fireTarget, monthsToTarget, projectFire, realAnnualRate } from '../src/domain/fire';
 import { averageDailySpend, buildForecast } from '../src/domain/forecast';
 import { detectRecurring, merchantKey, subscriptionsMonthly } from '../src/domain/recurring';
@@ -98,7 +98,7 @@ describe('prévision de trésorerie', () => {
 });
 
 describe('indépendance financière', () => {
-  const f = { annualReturnBp: 500, inflationBp: 200, withdrawalBp: 400, annualSpendingOverride: null };
+  const f = { ...DEFAULT_FIRE, annualReturnBp: 500, inflationBp: 200, withdrawalBp: 400, annualSpendingOverride: null };
 
   it('capital visé = 25 ans de dépenses (4 %) ; rendement réel', () => {
     expect(fireTarget(2400000, 400)).toBe(60000000);

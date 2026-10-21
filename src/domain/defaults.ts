@@ -248,6 +248,13 @@ export const DEFAULT_FIRE: FireSettings = {
   inflationBp: 200,
   withdrawalBp: 400,
   annualSpendingOverride: null,
+  birthYear: null,
+  retirementAge: 64,
+  pensionMonthly: 0,
+  feesBp: 20,
+  excludedIds: [],
+  essentialCategoryIds: null,
+  lastMilestone: 0,
 };
 
 export const DEFAULT_SETTINGS: Settings = {
