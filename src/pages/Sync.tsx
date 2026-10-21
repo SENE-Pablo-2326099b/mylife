@@ -6,8 +6,9 @@ import type { Account, Connection } from '../db/types';
 import { useSettings } from '../hooks';
 import { formatDateTime, relativeTime } from '../lib/relative';
 import { normalizeText } from '../lib/text';
-import { completeBankConnection, disconnectBank, parseCallback, startBankConnection } from '../sync/connect';
-import { EbClient, type BridgeStatus } from '../sync/ebClient';
+import { callbackUrl, completeBankConnection, disconnectBank, parseCallback, startBankConnection } from '../sync/connect';
+import { ebClientFor, type BridgeStatus, type EbClient } from '../sync/ebClient';
+import { useCloud } from '../sync/cloud';
 import type { EbAspsp } from '../sync/ebTypes';
 import { runSync, useSyncState } from '../sync/store';
 import { Badge, Button, Card, deferred, Disclosure, EmptyState, Group, Icon, Money, Reveal, Row, Segmented, SectionTitle, SelectField, Sheet, Tap, TextField, toast } from '../ui/index';
@@ -80,6 +81,106 @@ function BridgeCard({ status, onRefresh }: { status: BridgeStatus | null; onRefr
         </Button>
       )}
     </Card>
+  );
+}
+
+/**
+ * Pour les proches : Enable Banking (accès gratuit « restreint ») ne lit que les comptes liés à
+ * l'application qui fait la demande. Chacun crée donc la sienne ; le relais la scelle pour son compte MyLife.
+ */
+function OwnAppCard({ client, onChange }: { client: EbClient; onChange: () => void }) {
+  const settings = useSettings();
+  const cloud = useCloud();
+  const [appId, setAppId] = useState('');
+  const [pem, setPem] = useState<{ name: string; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const own = settings.ebOwnApp ?? null;
+  if (!cloud.session) return null;
+
+  const save = async () => {
+    if (!pem) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await client.sealCredentials(appId.trim(), pem.text);
+      await updateSettings({ ebOwnApp: { sealed: r.sealed, appId: appId.trim(), name: r.name } });
+      setAppId('');
+      setPem(null);
+      toast({ message: 'Ton application Enable Banking est enregistrée', tone: 'gold' });
+      onChange();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Disclosure title="Ma propre application Enable Banking" summary={own ? own.name || `${own.appId.slice(0, 8)}…` : 'Pour utiliser tes propres banques'} initiallyOpen={false}>
+      <Card>
+        {own ? (
+          <>
+            <p className="t-small text-secondary">
+              Tes banques passent par <strong className="font-semibold text-ink">{own.name || 'ton application'}</strong> ({own.appId.slice(0, 8)}…). La clé privée est scellée par le relais : ni cet appareil ni le serveur de synchro ne peuvent la lire.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2"
+              onClick={() =>
+                void updateSettings({ ebOwnApp: null }).then(() => {
+                  onChange();
+                  toast({ message: 'Application retirée : retour à celle du relais' });
+                })
+              }
+            >
+              Revenir à l’application du relais
+            </Button>
+          </>
+        ) : (
+          <>
+            <p className="t-small text-secondary">Si ce relais appartient à quelqu’un d’autre, Enable Banking ne te laissera lire que les comptes liés à ta propre application (gratuite) :</p>
+            <ol className="t-small mt-2 list-decimal space-y-1 pl-5 text-secondary">
+              <li>Sur enablebanking.com, crée une application « Production ».</li>
+              <li>
+                Dans « Redirect URLs », ajoute <code className="break-all text-ink">{callbackUrl()}</code>
+              </li>
+              <li>Garde le fichier .pem téléchargé à la création.</li>
+              <li>« Link accounts » : lie tes banques à l’application.</li>
+              <li>Renseigne-la ici :</li>
+            </ol>
+            <form
+              className="mt-3 space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void save();
+              }}
+            >
+              <TextField label="Identifiant de l’application" value={appId} onChange={setAppId} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+              <label className="glass flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-4 py-2.5">
+                <Icon name="lock" className="text-accent" />
+                <span className="t-body min-w-0 flex-1 truncate">{pem ? pem.name : 'Choisir la clé privée (.pem)'}</span>
+                <input
+                  type="file"
+                  accept=".pem,application/x-pem-file,text/plain"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void f.text().then((text) => setPem({ name: f.name, text }));
+                  }}
+                />
+              </label>
+              {error && <p className="t-small text-danger">{error}</p>}
+              <Button type="submit" className="w-full" disabled={busy || !pem || appId.trim().length < 36}>
+                {busy ? 'Vérification auprès d’Enable Banking…' : 'Vérifier et enregistrer'}
+              </Button>
+              <p className="t-caption text-muted">La clé ne reste pas sur l’appareil : le relais la vérifie, la chiffre pour ton seul compte et ne renvoie qu’un bloc scellé.</p>
+            </form>
+          </>
+        )}
+      </Card>
+    </Disclosure>
   );
 }
 
@@ -275,7 +376,8 @@ export default function SyncPage() {
   const accounts = useLiveQuery(() => db.accounts.where('source').equals('enablebanking').toArray(), []) ?? [];
   const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
 
-  const probeClient = useMemo(() => new EbClient(settings.bridgePassword), [settings.bridgePassword]);
+  const sealed = settings.ebOwnApp?.sealed;
+  const probeClient = useMemo(() => ebClientFor({ bridgePassword: settings.bridgePassword, ebOwnApp: sealed ? { sealed } : null }), [settings.bridgePassword, sealed]);
   const client = status?.authenticated && status.configured ? probeClient : null;
 
   useEffect(() => {
@@ -313,6 +415,7 @@ export default function SyncPage() {
     >
       <Reveal index={0}>
         <BridgeCard status={status} onRefresh={() => setTick((t) => t + 1)} />
+        <OwnAppCard client={probeClient} onChange={() => setTick((t) => t + 1)} />
       </Reveal>
 
       {sync.error && (

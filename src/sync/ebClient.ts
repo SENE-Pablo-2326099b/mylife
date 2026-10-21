@@ -26,8 +26,17 @@ export function canUseRelay(settings: { bridgePassword: string }): boolean {
   return !!settings.bridgePassword || (typeof localStorage !== 'undefined' && !!currentSession());
 }
 
+/** Client du relais pour ces réglages (avec l'application Enable Banking propre au compte, s'il y en a une). */
+export function ebClientFor(settings: { bridgePassword: string; ebOwnApp?: { sealed: string } | null }): EbClient {
+  return new EbClient(settings.bridgePassword, undefined, settings.ebOwnApp?.sealed);
+}
+
 export class EbClient {
-  constructor(private password: string, private fetchImpl: typeof fetch = (...a) => fetch(...a)) {}
+  constructor(
+    private password: string,
+    private fetchImpl: typeof fetch = (...a) => fetch(...a),
+    private sealed?: string,
+  ) {}
 
   private async call<T>(op: string, payload: Record<string, unknown> = {}): Promise<T> {
     let res: Response;
@@ -35,7 +44,7 @@ export class EbClient {
       res = await this.fetchImpl(BRIDGE_URL, {
         method: 'POST',
         // Connecté à un compte MyLife : le jeton suffit, le mot de passe du relais devient inutile.
-        headers: { 'content-type': 'application/json', 'x-bridge-password': this.password, ...relayAuthorization() },
+        headers: { 'content-type': 'application/json', 'x-bridge-password': this.password, ...relayAuthorization(), ...(this.sealed ? { 'x-eb-credentials': this.sealed } : {}) },
         body: JSON.stringify({ op, ...payload }),
         cache: 'no-store',
       });
@@ -67,6 +76,11 @@ export class EbClient {
       if (err.status === 503) return { configured: false, authenticated: false, reachable: true, error: err.message };
       return { configured: false, authenticated: false, reachable: false, error: err.message };
     }
+  }
+
+  /** Fait vérifier puis sceller par le relais l'application Enable Banking du compte connecté. */
+  sealCredentials(appId: string, privateKey: string) {
+    return this.call<{ sealed: string; name: string }>('sealCredentials', { appId, privateKey });
   }
 
   async aspsps(country = 'FR'): Promise<EbAspsp[]> {

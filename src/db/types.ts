@@ -192,6 +192,11 @@ export interface Settings {
   alerts: AlertSettings;
   /** Mot de passe du relais (stocké uniquement sur l'appareil). */
   bridgePassword: string;
+  /**
+   * Application Enable Banking propre au compte (proches qui ont la leur) : identifiants scellés par le
+   * relais, illisibles ici ; absente = application du relais.
+   */
+  ebOwnApp?: { sealed: string; appId: string; name: string } | null;
   /** Nombre de jours récupérés lors de la première synchro d'un compte. */
   initialSyncDays: number;
   /** Synchro automatique à l'ouverture si la dernière date de plus de N heures (0 = jamais). */

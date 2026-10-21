@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { updateSettings } from '../db/seed';
 import { computeEnvelope, totalFixed, totalIncome } from '../domain/defaults';
 import { loadDemo } from '../domain/demo';
@@ -23,7 +23,9 @@ type Step = (typeof STEPS)[number];
 export default function OnboardingPage() {
   const s = useSettings();
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>('welcome');
+  const [params] = useSearchParams();
+  // Retour du compte MyLife créé depuis l'accueil : on enchaîne sur la suite.
+  const [step, setStep] = useState<Step>(() => (STEPS as readonly string[]).includes(params.get('etape') ?? '') ? (params.get('etape') as Step) : 'welcome');
   const [dir, setDir] = useState(1);
   const [name, setName] = useState('');
   const index = STEPS.indexOf(step);
@@ -75,7 +77,7 @@ export default function OnboardingPage() {
                 </Glass>
                 <p className="t-label text-gold">Bienvenue</p>
                 <h1 className="t-large">{APP_NAME}</h1>
-                <p className="t-body text-secondary">Ton budget au jour près, tes comptes, tes placements et tes objectifs, au même endroit. Tout reste sur ton téléphone : pas de compte, pas de pub, pas de traceur.</p>
+                <p className="t-body text-secondary">Ton budget au jour près, tes comptes, tes placements et tes objectifs, au même endroit. Pas de pub, pas de traceur : tes données sont chiffrées sur ton appareil.</p>
                 <Card className="space-y-2">
                   {[
                     ['flash', 'Combien tu peux dépenser aujourd’hui'],
@@ -89,6 +91,19 @@ export default function OnboardingPage() {
                     </p>
                   ))}
                 </Card>
+                <Card level="raised" className="space-y-3">
+                  <p className="t-body-strong">Commence par ton compte MyLife</p>
+                  <p className="t-small text-secondary">Un compte pour MyFinances et MyPerf, sur tous tes appareils, chiffré de bout en bout. Déjà un compte ? Tout revient sur ce téléphone, réglages compris.</p>
+                  <div className="flex flex-col gap-2">
+                    <Button icon="person" className="w-full" to="/reglages/compte?mode=create">
+                      Créer mon compte
+                    </Button>
+                    <Button variant="secondary" className="w-full" to="/reglages/compte">
+                      J’ai déjà un compte
+                    </Button>
+                  </div>
+                </Card>
+                <p className="t-small px-0.5 text-muted">Sans compte, tout reste sur ce téléphone :</p>
                 <TextField label="Ton prénom (facultatif)" value={s.firstName} onCommit={(firstName) => void updateSettings({ firstName: firstName.trim() })} placeholder="Pour te saluer" autoComplete="given-name" />
               </>
             )}

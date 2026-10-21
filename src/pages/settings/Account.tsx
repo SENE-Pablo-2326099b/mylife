@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useSettings } from '../../hooks';
 import { formatDateTime, relativeTime } from '../../lib/relative';
 import {
   cloudAccountStatus,
@@ -24,7 +26,8 @@ function errorText(e: unknown): string {
 
 /** Connexion, création de compte, clé de secours. */
 function SignInCard({ onRecoveryKey }: { onRecoveryKey: (key: string) => void }) {
-  const [mode, setMode] = useState<Mode>('login');
+  const [params] = useSearchParams();
+  const [mode, setMode] = useState<Mode>(params.get('mode') === 'create' ? 'create' : 'login');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -227,10 +230,11 @@ function ChangePassword() {
 
 export default function AccountPage() {
   const cloud = useCloud();
+  const { onboarded } = useSettings();
   const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
 
   return (
-    <Screen stack title="Compte MyLife" kicker="Synchronisation chiffrée" mood="settings" back="/reglages">
+    <Screen stack title="Compte MyLife" kicker="Synchronisation chiffrée" mood="settings" back={onboarded ? '/reglages' : '/bienvenue'}>
       <Reveal index={0}>
         <Card>
           <div className="flex items-start gap-3">
@@ -275,7 +279,16 @@ export default function AccountPage() {
         )}
       </Reveal>
 
-      {cloud.session && cloud.joined && (
+      {/* Venu de l'accueil avec un compte neuf : on reprend la configuration là où elle en était. */}
+      {cloud.session && cloud.joined && !onboarded && !recoveryKey && (
+        <Reveal index={2} className="mt-3">
+          <Button size="lg" className="w-full" to="/bienvenue?etape=income">
+            Continuer la configuration
+          </Button>
+        </Reveal>
+      )}
+
+      {cloud.session && cloud.joined && onboarded && (
         <Reveal index={2}>
           <SectionTitle>Sur tes autres appareils</SectionTitle>
           <Card>

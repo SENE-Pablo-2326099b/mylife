@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSettings } from '../db/seed';
 import { BASE_PATH } from '../lib/app';
 import { completeBankConnection, getPendingAuth, parseCallback } from '../sync/connect';
-import { canUseRelay, EbClient } from '../sync/ebClient';
+import { canUseRelay, ebClientFor } from '../sync/ebClient';
 import { runSync } from '../sync/store';
 import { Button, Card, EmptyState } from '../ui/index';
 import { Orb } from '../ui/extras';
@@ -24,7 +24,7 @@ export default function CallbackPage() {
     const settings = await getSettings();
     if (!canUseRelay(settings)) return setPhase({ kind: 'foreign' });
     try {
-      const accounts = await completeBankConnection(new EbClient(settings.bridgePassword), code, state);
+      const accounts = await completeBankConnection(ebClientFor(settings), code, state);
       window.history.replaceState(null, '', `${BASE_PATH}/connexion/retour`);
       setPhase({ kind: 'done', count: accounts.length });
       await runSync();

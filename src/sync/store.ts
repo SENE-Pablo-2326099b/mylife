@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { db, getMeta } from '../db/db';
 import { getSettings } from '../db/seed';
-import { canUseRelay, EbClient } from './ebClient';
+import { canUseRelay, ebClientFor, type EbClient } from './ebClient';
 import { syncBankBuys } from '../domain/wealthDb';
 import { EnableBankingSource } from './enableBankingSource';
 import { syncAll, type AccountSyncReport } from './syncEngine';
@@ -33,7 +33,7 @@ export function useSyncState(): SyncState {
 
 export async function getClient(): Promise<EbClient | null> {
   const s = await getSettings();
-  return canUseRelay(s) ? new EbClient(s.bridgePassword) : null;
+  return canUseRelay(s) ? ebClientFor(s) : null;
 }
 
 export async function hasBankAccounts(): Promise<boolean> {
@@ -46,7 +46,7 @@ export async function runSync(): Promise<AccountSyncReport[] | null> {
   try {
     const settings = await getSettings();
     if (!canUseRelay(settings)) throw new Error('Connecte-toi à ton compte MyLife (Réglages → Compte) ou saisis le mot de passe du relais (Banques).');
-    const reports = await syncAll(new EnableBankingSource(new EbClient(settings.bridgePassword)), settings);
+    const reports = await syncAll(new EnableBankingSource(ebClientFor(settings)), settings);
     // Nouveaux prélèvements Bitstack (ou autre ligne reliée à la banque) → achats.
     await syncBankBuys().catch(() => 0);
     set({ syncing: false, reports, finishedAt: Date.now() });

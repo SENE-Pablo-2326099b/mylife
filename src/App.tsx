@@ -120,8 +120,9 @@ function Shell() {
 
   if (onboarded === undefined) return null;
   const welcome = pathname === '/bienvenue';
-  // Premier lancement : l'accueil d'abord (sauf retour de banque, qui doit aboutir).
-  if (!onboarded && !welcome && pathname !== '/connexion/retour') return <Navigate to="/bienvenue" replace />;
+  // Premier lancement : l'accueil d'abord (sauf retour de banque, qui doit aboutir, et compte MyLife,
+  // proposé dès l'accueil : se connecter récupère tout, réglages compris).
+  if (!onboarded && !welcome && pathname !== '/connexion/retour' && pathname !== '/reglages/compte') return <Navigate to="/bienvenue" replace />;
 
   return (
     <>
