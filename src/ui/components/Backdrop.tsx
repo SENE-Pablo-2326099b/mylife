@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -16,6 +16,7 @@ import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Mask, Pattern, 
 
 import { springs } from '../motion';
 import { useTheme } from '../theme';
+import { useAmbient } from '../ambient';
 
 /**
  * The field of light every glass surface is seen against.
@@ -156,6 +157,7 @@ export function Backdrop() {
         end={{ x: 0.5, y: 1 }}
       />
       <DotGrid width={width} height={height} />
+      <AmbientGlow height={height} />
     </View>
   );
 }
@@ -186,5 +188,25 @@ function DotGrid({ width, height }: { width: number; height: number }) {
         <Rect width={width} height={height} fill="url(#dots)" mask="url(#grid-mask)" />
       </Svg>
     </View>
+  );
+}
+
+/** Lumière d'état (séance en cours, séance faite) : monte et s'éteint en fondu en haut du champ. */
+function AmbientGlow({ height }: { height: number }) {
+  const t = useTheme();
+  const ambient = useAmbient();
+  const o = useSharedValue(0);
+  // La couleur reste celle du dernier état pendant le fondu de sortie.
+  const [last, setLast] = useState(ambient);
+  if (ambient !== null && ambient !== last) setLast(ambient);
+  const color = last === 'success' ? t.success : last === 'warning' ? t.warning : last === 'danger' ? t.danger : t.accent;
+  useEffect(() => {
+    o.set(withTiming(ambient ? 1 : 0, { duration: 1100 }));
+  }, [ambient, o]);
+  const style = useAnimatedStyle(() => ({ opacity: o.value }));
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, top: 0, height: height * 0.6 }, style]}>
+      <LinearGradient colors={[`${color}4D`, `${color}00`]} style={StyleSheet.absoluteFill} />
+    </Animated.View>
   );
 }

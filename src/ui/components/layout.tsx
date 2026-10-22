@@ -5,6 +5,7 @@ import Svg, { Circle, Defs, LinearGradient as SvgGradient, Stop } from 'react-na
 import { useBreakpoint } from '../responsive';
 import { family, space, useTheme } from '../theme';
 import { Text } from './primitives';
+import { Rolling } from './Rolling';
 
 /**
  * Side-by-side columns on desktop, stacked elsewhere. `weights` sets each column's share.
@@ -113,9 +114,14 @@ export function Metric({ label, value, unit, hint, tone }: { label: string; valu
         {label}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-        <Text style={{ fontFamily: family.display, fontSize: 30, letterSpacing: -1, color: tone === 'accent' ? t.accent : t.text }} numberOfLines={1} adjustsFontSizeToFit>
-          {value}
-        </Text>
+        {value.length <= 7 ? (
+          // Chiffres courts : ils roulent jusqu'à leur valeur (à l'ouverture et à chaque changement).
+          <Rolling text={value} lineHeight={36} style={{ fontFamily: family.display, fontSize: 30, letterSpacing: -1, color: tone === 'accent' ? t.accent : t.text }} />
+        ) : (
+          <Text style={{ fontFamily: family.display, fontSize: 30, letterSpacing: -1, color: tone === 'accent' ? t.accent : t.text }} numberOfLines={1} adjustsFontSizeToFit>
+            {value}
+          </Text>
+        )}
         {unit !== undefined && (
           <Text variant="small" tone="secondary">
             {unit}

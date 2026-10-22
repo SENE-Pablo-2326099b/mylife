@@ -9,6 +9,7 @@ import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, w
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openFinances } from '@/services/mylifeApps';
+import { MYLIFE_APPS } from '@/vendor/lumen';
 import { useCloud } from '@/services/cloud';
 import { Glass } from '@/ui/components/Glass';
 import { Tap, Text, type IconName } from '@/ui/components/primitives';
@@ -83,13 +84,11 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
     onClose();
     setTimeout(() => router.push(path), 60);
   };
+  // Même rangée dans chaque app : l'assistant, les données propres à l'app, les réglages.
   const actions: [string, IconName, () => void][] = [
-    ['Séance du jour', 'play', () => go('/')],
     ['Coach IA', 'sparkles', () => go('/coach')],
     ['Mesures', 'body-outline', () => go('/body')],
-    ['Planning', 'calendar-clear-outline', () => go('/planning')],
     ['Réglages', 'options-outline', () => go('/settings')],
-    ['Compte', 'lock-closed-outline', () => go('/account')],
   ];
   const cloudLine = !cloud.session ? 'Pas connecté : tout reste sur cet appareil' : !cloud.joined ? 'Connecté, appareil à relier' : cloud.error ? cloud.error : cloud.syncing ? 'Synchro en cours…' : `${cloud.session.login} · synchronisé`;
 
@@ -111,29 +110,15 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
         <Text variant="small" tone="secondary">
           Tes apps, un seul compte, tes données chiffrées.
         </Text>
+        {/* Les apps de MyLife : même ordre et mêmes couleurs dans toutes les apps (paquet partagé). */}
         <View style={{ flexDirection: 'row', gap: space.md }}>
-          <Rise index={1} style={{ flex: 1 }}>
-            <AppCard name="MyPerf" tagline="Séances, progression, coach" icon="barbell" colors={['#FFB86B', '#F0566B']} current onPress={onClose} />
-          </Rise>
-          <Rise index={2} style={{ flex: 1 }}>
-            <AppCard name="MyFinances" tagline="Budget, patrimoine, placements" icon="diamond" colors={[t.accentGradient[0], t.accentGradient[1]]} onPress={openFinances} />
-          </Rise>
+          {MYLIFE_APPS.map((a, i) => (
+            <Rise key={a.id} index={1 + i} style={{ flex: 1 }}>
+              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} onPress={a.id === 'perf' ? onClose : openFinances} />
+            </Rise>
+          ))}
         </View>
         <Rise index={3}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-            {actions.map(([label, icon, run]) => (
-              <Tap key={label} onPress={run} accessibilityRole="button" accessibilityLabel={label} style={{ width: '31.5%', flexGrow: 1, borderRadius: radius.lg }}>
-                <Glass radius={radius.lg} contentStyle={{ alignItems: 'center', gap: 6, paddingVertical: space.md + 2 }}>
-                  <Ionicons name={icon} size={21} color={t.accent} />
-                  <Text variant="small" style={{ fontWeight: '600' }}>
-                    {label}
-                  </Text>
-                </Glass>
-              </Tap>
-            ))}
-          </View>
-        </Rise>
-        <Rise index={4}>
           <Tap onPress={() => go('/account')} accessibilityRole="button" style={{ borderRadius: radius.lg }}>
             <Glass level="raised" radius={radius.lg} contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg }}>
               <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: cloud.error ? t.danger : cloud.joined ? t.success : t.textMuted }} />
@@ -146,6 +131,20 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
               <Ionicons name="chevron-forward" size={17} color={t.textMuted} />
             </Glass>
           </Tap>
+        </Rise>
+        <Rise index={4}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+            {actions.map(([label, icon, run]) => (
+              <Tap key={label} onPress={run} accessibilityRole="button" accessibilityLabel={label} style={{ width: '31.5%', flexGrow: 1, borderRadius: radius.lg }}>
+                <Glass radius={radius.lg} contentStyle={{ alignItems: 'center', gap: 6, paddingVertical: space.md + 2 }}>
+                  <Ionicons name={icon} size={21} color={t.accent} />
+                  <Text variant="small" style={{ fontWeight: '600' }}>
+                    {label}
+                  </Text>
+                </Glass>
+              </Tap>
+            ))}
+          </View>
         </Rise>
       </ScrollView>
     </Modal>

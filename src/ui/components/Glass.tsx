@@ -78,7 +78,8 @@ export function Glass({
         <View style={[StyleSheet.absoluteFill, { backgroundColor: wantsBlur && !LIVE_BLUR ? spec.solidFill : spec.fill }]} />
         <LinearGradient colors={spec.sheen} locations={[0, 0.6]} style={StyleSheet.absoluteFill} />
         <LinearGradient colors={[e.light, 'transparent', e.shade]} locations={[0, 0.5, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        <Image source={GRAIN} resizeMode="repeat" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: e.grain }]} />
+        {/* Grain : sur Android, seulement sur les plaques surélevées et flottantes (une image de moins par carte de liste). */}
+        {(!ANDROID || level !== 'pane') && <Image source={GRAIN} resizeMode="repeat" style={[StyleSheet.absoluteFill, { width: '100%', height: '100%', opacity: e.grain }]} />}
         {toneColor !== null && (
           <LinearGradient
             colors={[`${toneColor}2E`, `${toneColor}08`]}

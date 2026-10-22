@@ -8,6 +8,7 @@ import { formatDecimal, formatWeight } from '@/domain/math';
 import { muscleColor } from '@/features/exercises/ExerciseList';
 import { ConsistencyCard } from '@/features/stats/Consistency';
 import { VolumeTargets } from '@/features/stats/VolumeTargets';
+import { syncCloud } from '@/services/cloud';
 import { statsOverview, weekVolume, type MainLift } from '@/services/statsService';
 import { useSettings } from '@/state/settingsStore';
 import { BarList, Sparkline } from '@/ui/components/charts';
@@ -224,7 +225,7 @@ export default function StatsScreen() {
   );
 
   return (
-    <Screen title="Stats" subtitle="Progression" mood="stats">
+    <Screen title="Stats" subtitle="Progression" mood="stats" onRefresh={() => syncCloud()}>
       <Reveal index={0}>
         <Glass level="raised" radius={radius.xl} contentStyle={{ flexDirection: 'row', padding: space.lg, gap: space.md }}>
           <Metric label="Séances" value={String(overview.workouts30)} hint="30 jours" />

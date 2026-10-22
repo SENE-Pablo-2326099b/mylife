@@ -122,6 +122,11 @@ export function Tap({
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  // Onde de lumière au toucher : créée au premier appui seulement (une liste non touchée ne paie rien).
+  const [rippled, setRippled] = useState(false);
+  const rx = useSharedValue(0);
+  const ry = useSharedValue(0);
+  const rp = useSharedValue(1);
   const { outer, inner } = splitStyle(style);
   const r = highlightRadius ?? (typeof inner.borderRadius === 'number' ? inner.borderRadius : radius.md);
 
@@ -129,6 +134,12 @@ export function Tap({
     transform: [{ translateX: tx.value }, { translateY: ty.value }, { scale: press.value }],
   }));
   const glow = useAnimatedStyle(() => ({ opacity: hover.value }));
+  const ripple = useAnimatedStyle(() => ({
+    left: rx.value - 180,
+    top: ry.value - 180,
+    opacity: (1 - rp.value) * 0.32,
+    transform: [{ scale: 0.1 + rp.value * 0.9 }],
+  }));
 
   return (
     <Pressable
@@ -137,6 +148,13 @@ export function Tap({
       style={[outer, disabled === true && { opacity: 0.4 }]}
       onPressIn={(e) => {
         press.set(withSpring(scaleTo, springs.snappy));
+        if (highlight) {
+          if (!rippled) setRippled(true);
+          rx.set(e.nativeEvent.locationX);
+          ry.set(e.nativeEvent.locationY);
+          rp.set(0);
+          rp.set(withTiming(1, { duration: 650 }));
+        }
         props.onPressIn?.(e);
       }}
       onPressOut={(e) => {
@@ -171,6 +189,11 @@ export function Tap({
             pointerEvents="none"
             style={[StyleSheet.absoluteFill, { borderRadius: r, backgroundColor: t.surfacePressed }, glow]}
           />
+        )}
+        {rippled && (
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: r, overflow: 'hidden' }]}>
+            <Animated.View style={[{ position: 'absolute', width: 360, height: 360, borderRadius: 180, backgroundColor: t.accentGradient[0] }, ripple]} />
+          </View>
         )}
       </Animated.View>
     </Pressable>

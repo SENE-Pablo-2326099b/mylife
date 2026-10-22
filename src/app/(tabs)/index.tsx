@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { addDays, formatLongDate, formatShortDate, startOfWeek, weekday, weekdayShort } from '@/domain/dates';
@@ -15,7 +15,8 @@ import { listPlanned } from '@/db/repos/planning';
 import { listTemplateExercises, listTemplates } from '@/db/repos/templates';
 import { getActiveWorkout, listWorkouts } from '@/db/repos/workouts';
 import { WorkoutView } from '@/features/workout/WorkoutView';
-import { openFinances } from '@/services/mylifeApps';
+import { Orbit } from '@/features/navigation/Orbit';
+import { syncCloud } from '@/services/cloud';
 import { beginWorkout } from '@/services/startFlow';
 import { templatePreview, type TemplatePreviewLine } from '@/services/workoutService';
 import { Glass } from '@/ui/components/Glass';
@@ -27,6 +28,9 @@ import { family, radius, shade, space, useTheme } from '@/ui/theme';
 import { MESO_KIND_COLOR, splitTemplateName } from '@/ui/labels';
 import { useLive } from '@/ui/useLive';
 import { useToday } from '@/ui/useToday';
+import { setAmbient } from '@/ui/ambient';
+import { Tilt } from '@/ui/components/Tilt';
+import { useWorkoutStore } from '@/state/workoutStore';
 
 export default function TodayScreen() {
   const activeId = useLive(() => getActiveWorkout()?.id ?? null, []);
@@ -388,22 +392,37 @@ function TodayOverview() {
   const date = useToday();
   const data = useTodayData(date);
   const [other, setOther] = useState(false);
+  const [spaces, setSpaces] = useState(false);
+  // Lumière d'état : séance en cours (accent), séance du jour faite (vert) — tant que l'accueil est affiché.
+  const live = useWorkoutStore((s) => Object.values(s.docs).some((d) => d.workout.status === 'active'));
+  const done = data.recent.some((w) => w.date === date);
+  const tone = live ? 'accent' : done ? 'success' : null;
+  useFocusEffect(
+    useCallback(() => {
+      setAmbient(tone);
+      return () => setAmbient(null);
+    }, [tone]),
+  );
 
   return (
     <Screen
       title="Aujourd’hui"
       subtitle={formatLongDate(date)}
       mood="today"
+      onRefresh={() => syncCloud()}
       right={
         <View style={{ flexDirection: 'row', gap: space.sm }}>
-          <IconButton icon="wallet-outline" label="Ouvrir MyFinances" glass onPress={openFinances} />
+          {/* Même en-tête dans toutes les apps : le bouton propre à l'app, puis les Espaces MyLife. */}
           <IconButton icon="sparkles" label="Coach IA" glass color={t.accent} onPress={() => router.push('/coach')} />
+          <IconButton icon="apps-outline" label="Espaces MyLife" glass onPress={() => setSpaces(true)} />
         </View>
       }>
       <Columns weights={[1.45, 1]}>
         <View style={{ gap: space.sm }}>
           <Reveal index={0}>
-            <SessionHero data={data} date={date} />
+            <Tilt>
+              <SessionHero data={data} date={date} />
+            </Tilt>
           </Reveal>
           <Button label="Autre séance" icon="list" variant="ghost" onPress={() => setOther(true)} />
         </View>
@@ -414,6 +433,7 @@ function TodayOverview() {
         </View>
       </Columns>
       <OtherSessionSheet visible={other} onClose={() => setOther(false)} templates={data.templates} />
+      <Orbit visible={spaces} onClose={() => setSpaces(false)} />
     </Screen>
   );
 }

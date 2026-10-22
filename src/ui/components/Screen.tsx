@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, RefreshControl, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -70,6 +70,7 @@ export function Screen({
   maxWidth,
   modal = false,
   footer,
+  onRefresh,
 }: {
   title?: string;
   subtitle?: string;
@@ -85,7 +86,10 @@ export function Screen({
   modal?: boolean;
   /** The screen's main action, pinned at the bottom under the thumb (edit screens: « Enregistrer »). */
   footer?: ReactNode;
+  /** Tirer vers le bas pour actualiser (geste natif). */
+  onRefresh?: () => Promise<unknown>;
 }) {
+  const [refreshing, setRefreshing] = useState(false);
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const bp = useBreakpoint();
@@ -193,7 +197,22 @@ export function Screen({
         style={StyleSheet.absoluteFill}
         contentContainerStyle={{ paddingTop: top, paddingBottom: (footer === undefined ? 0 : 80) + (stack ? insets.bottom + space.xl : dockInset + space.xl) }}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={t.accent}
+              colors={[t.accent]}
+              progressBackgroundColor={t.glass.float.solidFill}
+              progressViewOffset={top}
+              onRefresh={() => {
+                setRefreshing(true);
+                void onRefresh().finally(() => setRefreshing(false));
+              }}
+            />
+          ) : undefined
+        }>
         <View style={[column, contentStyle]}>
           {header}
           {children}

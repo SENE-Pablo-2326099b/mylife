@@ -17,6 +17,7 @@ import {
   totalWeeks,
 } from "@/domain/mesocycle";
 import { listMesocycles } from "@/db/repos/cycles";
+import { syncCloud } from "@/services/cloud";
 import {
   addPlanned,
   deletePlanned,
@@ -66,7 +67,7 @@ type Tab = "calendar" | "program";
 export default function PlanningScreen() {
   const [tab, setTab] = useState<Tab>("calendar");
   return (
-    <Screen title="Planning" subtitle="Cycles & semaines" mood="planning">
+    <Screen title="Planning" subtitle="Cycles & semaines" mood="planning" onRefresh={() => syncCloud()}>
       <Segmented
         options={[
           { value: "calendar", label: "Calendrier" },

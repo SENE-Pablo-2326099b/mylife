@@ -211,3 +211,53 @@ export const SERIES_HUES = {
   dark: ['#2DD4BF', '#FBBF24', '#F472B6', '#60A5FA', '#A3E635', '#FB923C', '#C084FC', '#F87171'],
   light: ['#0D9488', '#D97706', '#DB2777', '#2563EB', '#65A30D', '#EA580C', '#9333EA', '#DC2626'],
 } as const;
+
+/**
+ * Les apps de l'écosystème MyLife, dans l'ordre où elles apparaissent partout (Espaces MyLife,
+ * palettes). Chacune a une couleur d'identité fixe, la même quel que soit le thème choisi.
+ * Ajouter une app ici l'ajoute à toutes les autres.
+ */
+export interface MyLifeApp {
+  id: 'finances' | 'perf';
+  name: string;
+  tagline: string;
+  /** Glyphe Ionicons. */
+  icon: 'diamond' | 'barbell';
+  colors: [string, string];
+  /** Chemin sous l'adresse MyLife. */
+  path: string;
+}
+
+export const MYLIFE_APPS: readonly MyLifeApp[] = [
+  { id: 'finances', name: 'MyFinances', tagline: 'Budget, patrimoine, placements', icon: 'diamond', colors: ['#B9A0FF', '#7340FF'], path: '/finances/' },
+  { id: 'perf', name: 'MyPerf', tagline: 'Séances, progression, coach', icon: 'barbell', colors: ['#FFB86B', '#F0566B'], path: '/perf/' },
+];
+
+/**
+ * Apparence partagée entre les apps MyLife servies à la même adresse (web) : le dernier thème choisi
+ * dans une app est repris par les autres à leur lancement. Écrit seulement sur un choix de
+ * l'utilisateur (jamais sur une simple relecture), lu au démarrage.
+ */
+export interface SharedAppearance {
+  theme: ThemeId;
+  followSystem: boolean;
+  at: number;
+}
+const SHARED_APPEARANCE_KEY = 'mylife:appearance';
+
+export function readSharedAppearance(): SharedAppearance | null {
+  try {
+    const raw = JSON.parse(globalThis.localStorage?.getItem(SHARED_APPEARANCE_KEY) ?? 'null') as Partial<SharedAppearance> | null;
+    return raw && isThemeId(raw.theme) && typeof raw.followSystem === 'boolean' && typeof raw.at === 'number' ? (raw as SharedAppearance) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeSharedAppearance(a: { theme: ThemeId; followSystem: boolean }): void {
+  try {
+    globalThis.localStorage?.setItem(SHARED_APPEARANCE_KEY, JSON.stringify({ ...a, at: Date.now() }));
+  } catch {
+    /* stockage indisponible : chaque app garde son thème */
+  }
+}

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatDuration } from '@/domain/dates';
 import { Keypad } from '@/features/workout/Keypad';
+import { CommandPalette } from '@/features/navigation/CommandPalette';
 import { Orbit } from '@/features/navigation/Orbit';
 import { RestTimerBar } from '@/features/workout/RestTimerBar';
 import { useEntry } from '@/state/entryStore';
@@ -21,7 +22,7 @@ import { DOCK_HEIGHT, DOCK_MARGIN, SIDEBAR_WIDTH } from '@/ui/responsive';
 import { family, radius, shade, space, useTheme } from '@/ui/theme';
 
 export const TABS: { name: string; label: string; icon: IconName; active: IconName }[] = [
-  { name: 'index', label: 'Accueil', icon: 'flash-outline', active: 'flash' },
+  { name: 'index', label: 'Aujourd’hui', icon: 'flash-outline', active: 'flash' },
   { name: 'planning', label: 'Planning', icon: 'calendar-clear-outline', active: 'calendar-clear' },
   { name: 'exercises', label: 'Exercices', icon: 'barbell-outline', active: 'barbell' },
   { name: 'stats', label: 'Stats', icon: 'pulse-outline', active: 'pulse' },
@@ -83,7 +84,7 @@ function Orb({ onPress, onLongPress }: { onPress: () => void; onLongPress: () =>
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Espaces MyLife et actions (appui long : coach)"
+      accessibilityLabel="Chercher, aller, agir (appui long : coach)"
       onPress={() => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
@@ -101,7 +102,7 @@ function Orb({ onPress, onLongPress }: { onPress: () => void; onLongPress: () =>
       <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', boxShadow: shade(`0px 8px 24px ${t.accentGlow}`) }}>
         <LinearGradient colors={t.accentGradient} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <LinearGradient colors={['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']} locations={[0, 0.5]} start={{ x: 0.2, y: 0 }} end={{ x: 0.5, y: 0.7 }} style={StyleSheet.absoluteFill} />
-          <Ionicons name="planet" size={24} color={t.onAccent} />
+          <Ionicons name="search" size={23} color={t.onAccent} />
         </LinearGradient>
       </View>
     </Pressable>
@@ -117,6 +118,7 @@ function DockTabs(props: BottomTabBarProps) {
   const press = usePressTab(props);
   const live = useActiveSession() !== null;
   const [orbit, setOrbit] = useState(false);
+  const [palette, setPalette] = useState(false);
   const items = props.state.routes
     .map((route, i) => ({ route, i, tab: TABS.find((x) => x.name === route.name) }))
     .filter((x): x is { route: (typeof props.state.routes)[number]; i: number; tab: (typeof TABS)[number] } => x.tab !== undefined && x.tab.name !== 'settings');
@@ -161,8 +163,9 @@ function DockTabs(props: BottomTabBarProps) {
   return (
     <View style={{ height: DOCK_HEIGHT, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, gap: 2 }}>
       {items.slice(0, half).map(item)}
-      <Orb onPress={() => setOrbit(true)} onLongPress={() => router.push('/coach')} />
+      <Orb onPress={() => setPalette(true)} onLongPress={() => router.push('/coach')} />
       {items.slice(half).map(item)}
+      <CommandPalette visible={palette} onClose={() => setPalette(false)} onSpaces={() => setOrbit(true)} />
       <Orbit visible={orbit} onClose={() => setOrbit(false)} />
     </View>
   );
