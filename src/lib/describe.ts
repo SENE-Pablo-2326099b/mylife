@@ -8,6 +8,9 @@ import type { Member } from '../state/app';
 
 export type Tone = 'ok' | 'warn' | 'danger' | 'muted' | 'info';
 
+/** Couleur (jetons du thème MyLife) de chaque ton d'état. */
+export const TONE: Record<Tone, string> = { ok: 'var(--success)', warn: 'var(--warning)', danger: 'var(--danger)', muted: 'var(--text-muted)', info: 'var(--info)' };
+
 export interface FriendLine {
   state: FriendState;
   freshness: Freshness | null;

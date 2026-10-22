@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useObservable } from '../lib/observable';
-import { api, app, createInvite, deleteGroup, leaveGroup, removeMember, renameMe, setRole, setScreen } from '../state/app';
-import { back, replace } from '../state/nav';
+import { api, app, createInvite, deleteGroup, leaveGroup, removeMember, renameMe, setRole, setScreen, type Member } from '../state/app';
 import type { InviteInfo } from '../lib/api';
-import { remaining, when } from '../ui/format';
-import { Avatar, ErrorLine, Icon, NetBanner, Pending, useAction, useNow } from '../ui/kit';
+import { remaining, when } from '../lib/format';
+import { Avatar, ErrorLine, NetBanner, Pending, useAction, useNow } from '../components/kit';
+import { Button, Card, Chip, EmptyState, Reveal, SectionTitle, TextField, toast } from '../ui/index';
+import { Icon } from '../ui/icons';
+import { Screen } from '../ui/Screen';
 
 const INVITE_TTL = [
   { label: '1 h', ms: 3_600_000 },
@@ -25,97 +28,102 @@ export function Manage() {
 
   if (!group)
     return (
-      <main className="screen">
-        <Top />
-        <p className="muted">Aucun groupe sélectionné.</p>
-      </main>
+      <Screen stack title="Gérer le groupe" mood="activity" back="/">
+        <EmptyState
+          icon="people"
+          title="Aucun groupe sélectionné"
+          action={
+            <Button variant="secondary" to="/groupes">
+              Mes groupes
+            </Button>
+          }
+        />
+      </Screen>
     );
 
   return (
-    <main className="screen">
-      <Top />
-      <NetBanner />
-      <section className="card stack">
-        <span className="label">Groupe</span>
-        <h1 className="h2">{group.name ?? 'Nom illisible'}</h1>
-        <p className="muted small" style={{ margin: 0 }}>
-          Se termine {when(group.expiresAt, now)} ({remaining(group.expiresAt, now)}). Ensuite, le groupe, ses membres et toutes les positions sont effacés du serveur.
-        </p>
-      </section>
+    <Screen stack title={group.name ?? 'Groupe'} kicker="Gérer le groupe" mood="activity" back="/">
+      <div className="flex flex-col gap-3">
+        <NetBanner />
+        <Reveal index={0}>
+          <Card>
+            <p className="t-small text-secondary">
+              Se termine {when(group.expiresAt, now)} ({remaining(group.expiresAt, now)}). Ensuite, le groupe, ses membres et toutes les positions sont effacés du serveur.
+            </p>
+          </Card>
+        </Reveal>
 
-      {me && <Pseudo gid={group.id} current={me.name ?? ''} />}
+        <Reveal index={1}>
+          {admin ? (
+            <Invites gid={group.id} />
+          ) : (
+            <Card>
+              <p className="t-headline">Inviter</p>
+              <p className="t-small mt-1 text-secondary">
+                Seuls les admins du groupe créent des liens d’invitation. Demande à {live?.members.filter((m) => m.role === 'admin' && !m.me).map((m) => m.name ?? 'un admin').join(', ') || 'un admin'}.
+              </p>
+            </Card>
+          )}
+        </Reveal>
 
-      {admin ? <Invites gid={group.id} /> : (
-        <section className="card stack">
-          <span className="label">Inviter</span>
-          <p className="muted small" style={{ margin: 0 }}>
-            Seuls les admins du groupe créent des liens d’invitation. Demande à {live?.members.filter((m) => m.role === 'admin' && !m.me).map((m) => m.name ?? 'un admin').join(', ') || 'un admin'}.
-          </p>
-        </section>
-      )}
+        {me && (
+          <Reveal index={2}>
+            <Pseudo gid={group.id} current={me.name ?? ''} />
+          </Reveal>
+        )}
 
-      <section className="card stack" aria-labelledby="members-title">
-        <h2 id="members-title" className="label">
-          Membres{live ? ` (${live.members.length})` : ''}
-        </h2>
-        {!live || live.status === 'loading' ? <Pending rows={2} label="Chargement des membres" /> : live.members.map((m) => <MemberRow key={m.uid} gid={group.id} m={m} admin={admin} />)}
-      </section>
+        <Reveal index={3}>
+          <SectionTitle>Membres{live ? ` (${live.members.length})` : ''}</SectionTitle>
+          <Card className="flex flex-col gap-4">
+            {!live || live.status === 'loading' ? <Pending label="Chargement des membres" /> : live.members.map((m) => <MemberRow key={m.uid} gid={group.id} m={m} admin={admin} />)}
+          </Card>
+        </Reveal>
 
-      <section className="card stack small">
-        <span className="label">Qui voit quoi</span>
-        <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
-          <li>Ta position n’est visible que par les membres de ce groupe, et seulement pendant que tu la partages.</li>
-          <li>Être dans le même groupe ne donne aucun accès permanent : à l’arrêt du partage, ta position est effacée.</li>
-          <li>Noms, pseudos et positions sont chiffrés sur les téléphones : le serveur ne peut pas les lire.</li>
-          <li>Un membre retiré ou parti perd l’accès immédiatement.</li>
-        </ul>
-      </section>
+        <Reveal index={4}>
+          <SectionTitle>Qui voit quoi</SectionTitle>
+          <Card>
+            <ul className="t-small flex list-disc flex-col gap-1.5 pl-5 text-secondary">
+              <li>Ta position n’est visible que par les membres de ce groupe, et seulement pendant que tu la partages.</li>
+              <li>Être dans le même groupe ne donne aucun accès permanent : à l’arrêt du partage, ta position est effacée.</li>
+              <li>Noms, pseudos et positions sont chiffrés sur les téléphones : le serveur ne peut pas les lire.</li>
+              <li>Un membre retiré ou parti perd l’accès immédiatement.</li>
+            </ul>
+          </Card>
+        </Reveal>
 
-      <Danger gid={group.id} admin={admin} />
-    </main>
-  );
-}
-
-function Top() {
-  return (
-    <header className="topbar">
-      <button type="button" className="icon-btn" onClick={back} aria-label="Revenir">
-        <Icon name="back" />
-      </button>
-      <h1 className="h2 grow">Gérer le groupe</h1>
-    </header>
+        <Reveal index={5}>
+          <Danger gid={group.id} admin={admin} />
+        </Reveal>
+      </div>
+    </Screen>
   );
 }
 
 function Pseudo({ gid, current }: { gid: string; current: string }) {
   const [value, setValue] = useState(current);
   const action = useAction();
-  const [done, setDone] = useState(false);
   useEffect(() => setValue(current), [current]);
   return (
-    <form
-      className="card stack"
-      onSubmit={(e) => {
-        e.preventDefault();
-        setDone(false);
-        void action.run(async () => {
-          await renameMe(gid, value);
-          setDone(true);
-        });
-      }}
-    >
-      <label className="field">
-        <span className="label">Ton pseudo dans ce groupe</span>
-        <input value={value} maxLength={24} onChange={(e) => setValue(e.target.value)} required />
-      </label>
-      <ErrorLine error={action.error} />
-      {value.trim() !== current && (
-        <button type="submit" className="btn" disabled={action.busy || !value.trim()}>
-          Enregistrer
-        </button>
-      )}
-      {done && value.trim() === current && <span className="ok small">Enregistré.</span>}
-    </form>
+    <Card>
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void action.run(async () => {
+            await renameMe(gid, value);
+            toast({ message: 'Pseudo enregistré' });
+          });
+        }}
+      >
+        <TextField label="Ton pseudo dans ce groupe" value={value} onChange={(v) => setValue(v.slice(0, 24))} />
+        <ErrorLine error={action.error} />
+        {value.trim() !== current && (
+          <Button type="submit" variant="secondary" disabled={action.busy || !value.trim()}>
+            Enregistrer
+          </Button>
+        )}
+      </form>
+    </Card>
   );
 }
 
@@ -123,7 +131,6 @@ function Invites({ gid }: { gid: string }) {
   const [ttl, setTtl] = useState<number>(INVITE_TTL[1].ms);
   const [single, setSingle] = useState(false);
   const [link, setLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [list, setList] = useState<InviteInfo[] | null>(null);
   const create = useAction();
   const load = useAction();
@@ -132,6 +139,7 @@ function Invites({ gid }: { gid: string }) {
   const refresh = () => void load.run(async () => setList((await api.invites({ gid })).invites));
   useEffect(refresh, [gid]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const copy = (l: string) => void navigator.clipboard?.writeText(l).then(() => toast({ message: 'Lien copié' }), () => undefined);
   const shareLink = async (l: string) => {
     if (navigator.share) {
       try {
@@ -141,94 +149,84 @@ function Invites({ gid }: { gid: string }) {
         /* partage annulé : on propose la copie */
       }
     }
-    await navigator.clipboard?.writeText(l);
-    setCopied(true);
+    copy(l);
   };
 
   return (
-    <section className="card stack" aria-labelledby="invite-title">
-      <h2 id="invite-title" className="label">
-        Inviter des amis
-      </h2>
-      <div className="chips" role="group" aria-label="Validité du lien">
+    <Card level="raised" className="flex flex-col gap-3">
+      <p className="t-headline">Inviter des amis</p>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Validité du lien">
         {INVITE_TTL.map((t) => (
-          <button key={t.label} type="button" className="chip" aria-pressed={ttl === t.ms} onClick={() => setTtl(t.ms)}>
+          <Chip key={t.label} selected={ttl === t.ms} onClick={() => setTtl(t.ms)}>
             {t.label}
-          </button>
+          </Chip>
         ))}
-        <button type="button" className="chip" aria-pressed={single} onClick={() => setSingle(!single)}>
+        <Chip selected={single} onClick={() => setSingle(!single)}>
           Une seule personne
-        </button>
+        </Chip>
       </div>
       <ErrorLine error={create.error} />
-      <button
-        type="button"
-        className="btn primary block"
+      <Button
+        icon="share"
         disabled={create.busy}
         onClick={() =>
           void create.run(async () => {
             const r = await createInvite(gid, ttl, single ? 1 : null);
             setLink(r.link);
-            setCopied(false);
             refresh();
             await shareLink(r.link).catch(() => undefined);
           })
         }
       >
-        <Icon name="share" /> Créer et partager un lien
-      </button>
+        Créer et partager un lien
+      </Button>
       {link && (
-        <div className="stack">
-          <code className="key" style={{ fontSize: 12.5 }}>
+        <div className="flex flex-col gap-2">
+          <code className="t-caption break-all rounded-md p-3 font-mono" style={{ background: 'var(--surface-alt)' }}>
             {link}
           </code>
-          <div className="row">
-            <button type="button" className="btn small" style={{ flex: 1 }} onClick={() => void shareLink(link)}>
-              <Icon name="share" size={18} /> Partager
-            </button>
-            <button type="button" className="btn small" style={{ flex: 1 }} onClick={() => void navigator.clipboard?.writeText(link).then(() => setCopied(true), () => undefined)}>
-              <Icon name="copy" size={18} /> {copied ? 'Copié' : 'Copier'}
-            </button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="secondary" size="sm" icon="share" onClick={() => void shareLink(link)}>
+              Partager
+            </Button>
+            <Button variant="secondary" size="sm" icon="copy" onClick={() => copy(link)}>
+              Copier
+            </Button>
           </div>
         </div>
       )}
-      <p className="faint tiny" style={{ margin: 0 }}>
-        Le lien contient la clé du groupe : envoie-le seulement à tes amis. Tu peux le révoquer à tout moment.
-      </p>
+      <p className="t-caption text-muted">Le lien contient la clé du groupe : envoie-le seulement à tes amis. Tu peux le révoquer à tout moment.</p>
       {load.error ? (
         <ErrorLine error={load.error} />
       ) : list === null ? null : list.length === 0 ? (
-        <p className="faint small" style={{ margin: 0 }}>
-          Aucun lien actif.
-        </p>
+        <p className="t-small text-muted">Aucun lien actif.</p>
       ) : (
-        <ul className="stack" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        <ul className="flex flex-col gap-3">
           {list.map((i) => (
             <InviteRow key={i.id} gid={gid} invite={i} now={now} onRevoked={refresh} />
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 
 function InviteRow({ gid, invite, now, onRevoked }: { gid: string; invite: InviteInfo; now: number; onRevoked: () => void }) {
   const action = useAction();
   return (
-    <li className="row small">
-      <Icon name="link" size={18} className="faint" />
-      <span className="grow" style={{ flex: 1 }}>
+    <li className="flex items-center gap-3 border-t border-line pt-3">
+      <Icon name="link" size={18} className="text-muted" />
+      <span className="t-small min-w-0 flex-1">
         Lien créé {when(invite.createdAt, now)} · expire {remaining(invite.expiresAt, now)}
-        <br />
-        <span className="faint">
+        <span className="block text-muted">
           {invite.uses} utilisation{invite.uses > 1 ? 's' : ''}
           {invite.maxUses ? ` sur ${invite.maxUses}` : ''}
         </span>
         <ErrorLine error={action.error} />
       </span>
-      <button
-        type="button"
-        className="btn small danger"
+      <Button
+        variant="danger"
+        size="sm"
         disabled={action.busy}
         onClick={() =>
           void action.run(async () => {
@@ -238,37 +236,38 @@ function InviteRow({ gid, invite, now, onRevoked }: { gid: string; invite: Invit
         }
       >
         Révoquer
-      </button>
+      </Button>
     </li>
   );
 }
 
-function MemberRow({ gid, m, admin }: { gid: string; m: NonNullable<ReturnType<typeof app.get>['live']>['members'][number]; admin: boolean }) {
+function MemberRow({ gid, m, admin }: { gid: string; m: Member; admin: boolean }) {
   const action = useAction();
   const [confirm, setConfirm] = useState(false);
   const sharing = m.sharing === 'on' ? 'partage sa position' : m.sharing === 'paused' ? 'partage en pause' : 'ne partage pas';
   return (
-    <div className="stack" style={{ gap: 6 }}>
-      <div className="row">
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
         <Avatar uid={m.uid} name={m.name} />
-        <span className="grow" style={{ flex: 1, minWidth: 0 }}>
-          <b className="ellipsis">{m.name ?? 'Membre'}</b>
-          {m.me && <span className="faint"> (toi)</span>}
-          <br />
-          <span className="faint small">
+        <span className="min-w-0 flex-1">
+          <span className="t-body-strong block truncate">
+            {m.name ?? 'Membre'}
+            {m.me && <span className="font-normal text-muted"> (toi)</span>}
+          </span>
+          <span className="t-small block text-secondary">
             {m.role === 'admin' ? 'admin · ' : ''}
             {sharing}
           </span>
         </span>
       </div>
       {admin && !m.me && (
-        <div className="row">
-          <button type="button" className="btn small" disabled={action.busy} onClick={() => void action.run(() => setRole(gid, m.uid, m.role === 'admin' ? 'member' : 'admin'))}>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="secondary" size="sm" disabled={action.busy} onClick={() => void action.run(() => setRole(gid, m.uid, m.role === 'admin' ? 'member' : 'admin'))}>
             {m.role === 'admin' ? 'Retirer admin' : 'Rendre admin'}
-          </button>
-          <button type="button" className="btn small danger" disabled={action.busy} onClick={() => (confirm ? void action.run(() => removeMember(gid, m.uid)) : setConfirm(true))}>
-            {confirm ? 'Confirmer le retrait' : 'Retirer du groupe'}
-          </button>
+          </Button>
+          <Button variant="danger" size="sm" disabled={action.busy} onClick={() => (confirm ? void action.run(() => removeMember(gid, m.uid)) : setConfirm(true))}>
+            {confirm ? 'Confirmer' : 'Retirer'}
+          </Button>
         </div>
       )}
       <ErrorLine error={action.error} />
@@ -277,21 +276,22 @@ function MemberRow({ gid, m, admin }: { gid: string; m: NonNullable<ReturnType<t
 }
 
 function Danger({ gid, admin }: { gid: string; admin: boolean }) {
+  const navigate = useNavigate();
   const [confirm, setConfirm] = useState<'leave' | 'delete' | null>(null);
   const action = useAction();
-  const done = () => replace({ name: 'home' });
+  const done = () => navigate('/', { replace: true });
   return (
-    <section className="card stack">
-      <span className="label">Partir</span>
+    <Card className="flex flex-col gap-2">
+      <p className="t-headline">Partir</p>
       <ErrorLine error={action.error} />
-      <button type="button" className="btn danger block" disabled={action.busy} onClick={() => (confirm === 'leave' ? void action.run(async () => (await leaveGroup(gid), done())) : setConfirm('leave'))}>
+      <Button variant="danger" disabled={action.busy} onClick={() => (confirm === 'leave' ? void action.run(async () => (await leaveGroup(gid), done())) : setConfirm('leave'))}>
         {confirm === 'leave' ? 'Confirmer : quitter et effacer ma position' : 'Quitter le groupe'}
-      </button>
+      </Button>
       {admin && (
-        <button type="button" className="btn danger block" disabled={action.busy} onClick={() => (confirm === 'delete' ? void action.run(async () => (await deleteGroup(gid), done())) : setConfirm('delete'))}>
+        <Button variant="danger" disabled={action.busy} onClick={() => (confirm === 'delete' ? void action.run(async () => (await deleteGroup(gid), done())) : setConfirm('delete'))}>
           {confirm === 'delete' ? 'Confirmer : supprimer pour tout le monde' : 'Supprimer le groupe'}
-        </button>
+        </Button>
       )}
-    </section>
+    </Card>
   );
 }

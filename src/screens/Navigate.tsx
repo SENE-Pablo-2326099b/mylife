@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useObservable } from '../lib/observable';
 import { app, setScreen, type Member } from '../state/app';
-import { back } from '../state/nav';
 import { location, needLocation, retryLocation } from '../services/location';
 import { compass, compassNeedsGesture, currentHeading, onHeading, requestCompassPermission, holdCompass } from '../services/orientation';
 import { arrowRotationDeg, cardinal, formatDistance } from '../domain/geo';
 import { ageOf, formatAge, freshness, guidance, THRESHOLDS, type Fix, type Guidance } from '../domain/status';
-import { describe, usableMe } from '../ui/describe';
-import { Avatar, Icon, NetBanner, useNow } from '../ui/kit';
+import { describe, TONE, usableMe } from '../lib/describe';
+import { Avatar, Banner, BRAND, NetBanner, useNow } from '../components/kit';
+import { setBeacon } from '../components/Beacon';
+import { Button, Card } from '../ui/index';
+import { Screen } from '../ui/Screen';
 
 type DialMode = 'compass' | 'course' | 'north';
 
@@ -15,13 +18,14 @@ type DialMode = 'compass' | 'course' | 'north';
  * Navigation vers un ami : une flèche, une distance, et la vérité sur la qualité des données.
  * La flèche suit la boussole à chaque image sans passer par React (pas de rendu inutile).
  */
-export function Navigate({ uid }: { uid: string }) {
+export function Navigate() {
+  const uid = useParams().uid ?? '';
+  const navigate = useNavigate();
+  const back = () => navigate('/');
   const s = useObservable(app);
   const loc = useObservable(location);
   const cmp = useObservable(compass);
   const now = useNow(1000);
-  const [beacon, setBeacon] = useState(false);
-
   useEffect(() => setScreen('navigate'), []);
   useEffect(() => needLocation('navigate', 'navigate'), []);
   useEffect(() => holdCompass(), []);
@@ -40,54 +44,47 @@ export function Navigate({ uid }: { uid: string }) {
   const mode: DialMode = compassUp ? 'compass' : course != null ? 'course' : 'north';
 
   return (
-    <main className="screen" style={{ gap: 12 }}>
-      <header className="topbar">
-        <button type="button" className="icon-btn" onClick={back} aria-label="Revenir au groupe">
-          <Icon name="back" />
-        </button>
-        {member && <Avatar uid={member.uid} name={member.name} />}
-        <div className="grow">
-          <h1 className="h2 ellipsis">{member?.name ?? 'Ami'}</h1>
-          {line && <span className={`small ${line.tone}`}>{line.text}</span>}
-        </div>
-      </header>
-      <NetBanner />
+    <Screen stack title={member?.name ?? 'Ami'} kicker={line?.text} mood="focus" back="/">
+      <div className="flex flex-col gap-3" style={{ ['--brand-a' as string]: BRAND[0], ['--brand-b' as string]: BRAND[1] }}>
+        {member && <span className="sr-only">{line?.text}</span>}
+        <NetBanner />
 
-      {!live || live.status === 'loading' ? (
-        <div className="nav-stage" role="status">
-          <p className="muted">Chargement du groupe…</p>
-        </div>
-      ) : !member ? (
-        <div className="nav-stage">
-          <p>Cette personne ne fait plus partie du groupe.</p>
-          <button type="button" className="btn" onClick={back}>
-            Revenir au groupe
-          </button>
-        </div>
-      ) : (
-        <Stage g={g!} member={member} me={me} mode={mode} course={course} now={now} />
-      )}
+        {!live || live.status === 'loading' ? (
+          <div className="nav-stage" role="status">
+            <p className="t-body text-secondary">Chargement du groupe…</p>
+          </div>
+        ) : !member ? (
+          <div className="nav-stage">
+            <p className="t-body">Cette personne ne fait plus partie du groupe.</p>
+            <Button variant="secondary" onClick={back}>
+              Revenir au groupe
+            </Button>
+          </div>
+        ) : (
+          <Stage g={g!} member={member} me={me} mode={mode} course={course} now={now} />
+        )}
 
-      {member && g && (g.kind === 'ok' || g.kind === 'uncertain') && <CompassHelp mode={mode} />}
+        {member && g && (g.kind === 'ok' || g.kind === 'uncertain') && <CompassHelp mode={mode} />}
 
-      {member && (
-        <section className="card stack small" aria-label="Qualité des données">
-          <Fact label="Sa position" value={member.fix ? `${formatAge(ageOf(member.fix, now))} · ± ${Math.round(member.fix.acc)} m` : 'inconnue'} tone={member.fix ? (freshness(ageOf(member.fix, now)) === 'live' ? 'ok' : 'warn') : 'muted'} />
-          <Fact label="Ta position" value={loc.fix ? `${formatAge(Math.max(0, now - loc.fix.at))} · ± ${Math.round(loc.fix.acc)} m` : loc.status === 'denied' ? 'refusée' : 'en cours…'} tone={me ? (me.acc > THRESHOLDS.impreciseM ? 'warn' : 'ok') : 'warn'} />
-          <Fact label="Orientation" value={modeLabel(mode, cmp.status)} tone={mode === 'compass' ? (cmp.status === 'unstable' ? 'warn' : 'ok') : 'warn'} />
-        </section>
-      )}
+        {member && (
+          <Card className="flex flex-col gap-2" label="Qualité des données">
+            <div className="flex items-center gap-3">
+              <Avatar uid={member.uid} name={member.name} size={36} />
+              <span className="t-small min-w-0 flex-1" style={{ color: line ? TONE[line.tone] : undefined }}>
+                {line?.text}
+              </span>
+            </div>
+            <Fact label="Sa position" value={member.fix ? `${formatAge(ageOf(member.fix, now))} · ± ${Math.round(member.fix.acc)} m` : 'inconnue'} tone={member.fix ? (freshness(ageOf(member.fix, now)) === 'live' ? 'ok' : 'warn') : 'muted'} />
+            <Fact label="Ta position" value={loc.fix ? `${formatAge(Math.max(0, now - loc.fix.at))} · ± ${Math.round(loc.fix.acc)} m` : loc.status === 'denied' ? 'refusée' : 'en cours…'} tone={me ? (me.acc > THRESHOLDS.impreciseM ? 'warn' : 'ok') : 'warn'} />
+            <Fact label="Orientation" value={modeLabel(mode, cmp.status)} tone={mode === 'compass' ? (cmp.status === 'unstable' ? 'warn' : 'ok') : 'warn'} />
+          </Card>
+        )}
 
-      <div className="row">
-        <button type="button" className="btn" style={{ flex: 1 }} onClick={back}>
-          <Icon name="back" /> Groupe
-        </button>
-        <button type="button" className="btn" style={{ flex: 1 }} onClick={() => setBeacon(true)}>
+        <Button size="lg" variant="secondary" icon="beacon" onClick={() => setBeacon(true)}>
           Mode phare
-        </button>
+        </Button>
       </div>
-      {beacon && <Beacon onClose={() => setBeacon(false)} />}
-    </main>
+    </Screen>
   );
 }
 
@@ -97,11 +94,11 @@ function modeLabel(mode: DialMode, status: string): string {
   return 'pas de boussole : nord en haut';
 }
 
-function Fact({ label, value, tone }: { label: string; value: string; tone: string }) {
+function Fact({ label, value, tone }: { label: string; value: string; tone: 'ok' | 'warn' | 'muted' }) {
   return (
-    <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-      <span className="faint">{label}</span>
-      <span className={tone} style={{ textAlign: 'right' }}>
+    <div className="t-small flex items-baseline justify-between gap-3 border-t border-line pt-2">
+      <span className="text-muted">{label}</span>
+      <span className="text-right" style={{ color: TONE[tone] }}>
         {value}
       </span>
     </div>
@@ -123,9 +120,7 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
     return (
       <div className="nav-stage">
         <Dial bearing={null} spread={0} mode="north" course={null} dim />
-        <p className="muted" style={{ maxWidth: 340 }}>
-          {msg}
-        </p>
+        <p className="t-body max-w-[340px] text-secondary">{msg}</p>
       </div>
     );
   }
@@ -134,12 +129,9 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
   const fr = freshness(age);
   const stale = fr === 'old' || fr === 'stale';
   const staleNote = stale ? (
-    <div className={`banner ${fr === 'stale' ? 'danger' : 'warn'}`} role="status" style={{ textAlign: 'left' }}>
-      <Icon name="alert" />
-      <span>
-        Dernière position {formatAge(age)} : {name} a pu bouger depuis. La flèche vise cette dernière position connue.
-      </span>
-    </div>
+    <Banner tone={fr === 'stale' ? 'danger' : 'warning'} icon="warning">
+      Dernière position {formatAge(age)} : {name} a pu bouger depuis. La flèche vise cette dernière position connue.
+    </Banner>
   ) : null;
 
   if (g.kind === 'near')
@@ -152,7 +144,7 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
         </div>
         <div>
           <div className="distance">Tout proche</div>
-          <p className="muted" style={{ margin: '6px 0 0' }}>
+          <p className="t-small mt-1.5 text-secondary">
             À moins de ~{formatDistance(Math.max(THRESHOLDS.nearM, g.uncertainty))} : à cette distance le GPS ne sait plus donner de direction. Regarde autour de toi, lève le bras, ou passe en mode phare.
           </p>
         </div>
@@ -167,7 +159,7 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
         <Dial bearing={g.bearing} spread={60} mode={mode} course={course} dim />
         <div>
           <div className="distance">{dist}</div>
-          <p className="warn" style={{ margin: '6px 0 0' }}>
+          <p className="t-small mt-1.5 text-warning">
             Direction incertaine : les positions sont trop imprécises (± {Math.round(g.uncertainty)} m) pour cette distance. Plutôt vers le {cardinal(g.bearing)}.
           </p>
         </div>
@@ -182,12 +174,12 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
         <div className="distance" aria-live="polite">
           {dist}
         </div>
-        <p className="muted" style={{ margin: '4px 0 0' }}>
+        <p className="t-small mt-1 text-secondary">
           à vol d’oiseau, vers le {cardinal(g.bearing)} · les obstacles ne sont pas pris en compte
         </p>
       </div>
       {staleNote}
-      {me && me.acc > THRESHOLDS.impreciseM && <p className="warn small" style={{ margin: 0 }}>Ta position est imprécise (± {Math.round(me.acc)} m).</p>}
+      {me && me.acc > THRESHOLDS.impreciseM && <p className="t-small text-warning">Ta position est imprécise (± {Math.round(me.acc)} m).</p>}
     </div>
   );
 }
@@ -204,27 +196,23 @@ function NoMe({ reason }: { reason: 'locating' | 'denied' | 'unavailable' }) {
       <Dial bearing={null} spread={0} mode="north" course={null} dim />
       {reason === 'denied' ? (
         <>
-          <p className="danger" style={{ margin: 0 }}>
-            Localisation refusée : impossible de calculer la direction.
-          </p>
-          <p className="muted small" style={{ margin: 0, maxWidth: 340 }}>
+          <p className="t-body text-danger">Localisation refusée : impossible de calculer la direction.</p>
+          <p className="t-small max-w-[340px] text-secondary">
             Autorise la localisation pour ce site (icône de cadenas dans la barre d’adresse, ou Réglages → Safari → Localisation sur iPhone), puis réessaie.
           </p>
-          <button type="button" className="btn" onClick={retryLocation}>
-            <Icon name="refresh" /> Réessayer
-          </button>
+          <Button variant="secondary" icon="sync" onClick={retryLocation}>
+            Réessayer
+          </Button>
         </>
       ) : reason === 'unavailable' ? (
-        <p className="danger" style={{ margin: 0, maxWidth: 340 }}>
-          {loc.error ?? 'Localisation indisponible sur cet appareil.'}
-        </p>
+        <p className="t-body max-w-[340px] text-danger">{loc.error ?? 'Localisation indisponible sur cet appareil.'}</p>
       ) : (
         <>
-          <p style={{ margin: 0 }} role="status">
+          <p className="t-body" role="status">
             On cherche ta position…
           </p>
           {slow && (
-            <p className="muted small" style={{ margin: 0, maxWidth: 340 }}>
+            <p className="t-small max-w-[340px] text-secondary">
               Le GPS capte mal sous les structures et à l’intérieur. Sors à découvert si tu peux.
             </p>
           )}
@@ -238,23 +226,26 @@ function CompassHelp({ mode }: { mode: DialMode }) {
   const cmp = useObservable(compass);
   if (cmp.status === 'needs-permission')
     return (
-      <div className="banner info" role="status">
-        <Icon name="compass" />
-        <span>Pour que la flèche suive ton téléphone, autorise l’accès à la boussole.</span>
-        <button type="button" className="btn small primary" onClick={() => void requestCompassPermission()}>
-          Activer
-        </button>
-      </div>
+      <Banner
+        tone="info"
+        icon="compass"
+        action={
+          <Button size="sm" onClick={() => void requestCompassPermission()}>
+            Activer
+          </Button>
+        }
+      >
+        Pour que la flèche suive ton téléphone, autorise l’accès à la boussole.
+      </Banner>
     );
-  if (cmp.status === 'starting') return <p className="faint small" style={{ margin: 0, textAlign: 'center' }}>Activation de la boussole…</p>;
+  if (cmp.status === 'starting') return <p className="t-small text-center text-muted">Activation de la boussole…</p>;
   if (cmp.status === 'unstable')
     return (
-      <div className="banner warn" role="status">
-        <Icon name="alert" />
-        <span>Boussole perturbée : éloigne-toi du métal et des enceintes, puis fais un « 8 » avec le téléphone.</span>
-      </div>
+      <Banner tone="warning" icon="warning">
+        Boussole perturbée : éloigne-toi du métal et des enceintes, puis fais un « 8 » avec le téléphone.
+      </Banner>
     );
-  if (mode === 'compass') return <p className="faint small" style={{ margin: 0, textAlign: 'center' }}>Tiens le téléphone à plat, devant toi.</p>;
+  if (mode === 'compass') return <p className="t-small text-center text-muted">Tiens le téléphone à plat, devant toi.</p>;
   const why =
     cmp.status === 'denied'
       ? compassNeedsGesture()
@@ -262,10 +253,9 @@ function CompassHelp({ mode }: { mode: DialMode }) {
         : 'Accès à la boussole refusé.'
       : 'Pas de boussole disponible sur cet appareil ou ce navigateur.';
   return (
-    <div className="banner warn" role="status">
-      <Icon name="compass" />
-      <span>{mode === 'course' ? `${why} La flèche suit ta direction de marche : continue d’avancer.` : `${why} La flèche est orientée nord en haut : repère le nord avant de la suivre.`}</span>
-    </div>
+    <Banner tone="warning" icon="compass">
+      {mode === 'course' ? `${why} La flèche suit ta direction de marche : continue d’avancer.` : `${why} La flèche est orientée nord en haut : repère le nord avant de la suivre.`}
+    </Banner>
   );
 }
 
@@ -313,7 +303,7 @@ function Dial({ bearing, spread, mode, course, dim }: { bearing: number | null; 
     <div className={`dial${dim ? ' dim' : ''}`} role="img" aria-label={bearing == null ? 'Direction inconnue' : mode === 'north' ? 'Flèche orientée nord en haut' : 'Flèche vers ton ami'}>
       <div className="rotor" ref={rose}>
         <svg viewBox="-120 -120 240 240" aria-hidden>
-          <circle r="112" fill="none" stroke="var(--line-strong)" strokeWidth="2" />
+          <circle r="112" fill="none" stroke="var(--border-strong, var(--border))" strokeWidth="2" />
           {Array.from({ length: 36 }, (_, i) => (
             <line key={i} x1="0" y1={-112} x2="0" y2={i % 9 === 0 ? -98 : -105} stroke={i === 0 ? 'var(--danger)' : 'var(--line-strong)'} strokeWidth={i % 9 === 0 ? 3 : 1.5} transform={`rotate(${i * 10})`} />
           ))}
@@ -337,25 +327,11 @@ function Dial({ bearing, spread, mode, course, dim }: { bearing: number | null; 
             {/* Cône d'incertitude : plus il est large, moins la direction est sûre. */}
             <path d={`M0 0 L${-wx} ${-wy} A100 100 0 0 1 ${wx} ${-wy} Z`} fill="var(--brand-a)" opacity="0.13" />
             <path d="M0 -92 L34 30 L0 12 L-34 30 Z" fill="var(--brand-a)" opacity="0.55" filter="url(#glow)" />
-            <path d="M0 -92 L34 30 L0 12 L-34 30 Z" fill="url(#arrow-g)" stroke="#04140f" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M0 -92 L34 30 L0 12 L-34 30 Z" fill="url(#arrow-g)" stroke="var(--bg)" strokeWidth="2" strokeLinejoin="round" />
           </svg>
         </div>
       )}
     </div>
-  );
-}
-
-/** Écran plein de lumière qui pulse : lever le téléphone pour être repéré dans la foule. */
-function Beacon({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label="Quitter le mode phare"
-      className="beacon"
-    >
-      Lève ton téléphone · touche pour quitter
-    </button>
   );
 }
 

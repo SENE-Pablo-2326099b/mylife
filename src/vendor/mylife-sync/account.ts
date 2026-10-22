@@ -36,7 +36,7 @@ export class MyLifeApi {
     private fetchImpl: typeof fetch = (...a) => fetch(...a),
   ) {}
 
-  async call<T>(path: '/api/auth' | '/api/sync', body: Record<string, unknown>, token?: string): Promise<T> {
+  async call<T>(path: '/api/auth' | '/api/sync' | '/api/raveloc', body: Record<string, unknown>, token?: string): Promise<T> {
     let res: Response;
     try {
       res = await this.fetchImpl(`${this.base}${path}`, {
@@ -64,11 +64,49 @@ export interface Platform {
   random: RandomBytes;
 }
 
-const normalize = (login: string) => login.trim().toLowerCase();
+export const normalizeLogin = (login: string) => login.trim().toLowerCase();
+const normalize = normalizeLogin;
 
-/** Création du compte : renvoie la clé de secours, à montrer UNE fois à l'utilisateur. */
-export async function createAccount(p: Platform, input: { login: string; password: string; invite: string }): Promise<{ session: Session; recoveryKey: string }> {
-  if (input.password.length < 8) throw new ApiError(400, 'Mot de passe trop court : 8 caractères au moins.');
+/** Identifiant accepté par le serveur : 3 à 64 caractères, lettres, chiffres, . _ - @. */
+export function loginIssue(login: string): string | null {
+  const l = normalize(login);
+  if (l.length < 3) return '3 caractères au moins.';
+  if (l.length > 64) return '64 caractères au plus.';
+  if (!/^[a-z0-9]/.test(l)) return 'Commence par une lettre ou un chiffre.';
+  if (!/^[a-z0-9._@-]+$/.test(l)) return 'Lettres, chiffres et . _ - @ seulement (pas d’espace ni d’accent).';
+  return null;
+}
+
+/** Mots de passe trop connus : refusés même s'ils font 8 caractères. */
+const COMMON = new Set(['12345678', '123456789', '1234567890', 'password', 'motdepasse', 'azertyuiop', 'azerty123', 'qwertyuiop', 'qwerty123', '11111111', '00000000', 'iloveyou', 'password1', 'abcd1234', 'aaaaaaaa', '12341234', 'soleil123', 'doudou123', 'marseille', 'loulou123']);
+
+/** Ce qui ne va pas dans un nouveau mot de passe, ou null. Le chiffrement en dépend : il doit tenir. */
+export function passwordIssue(password: string, login = ''): string | null {
+  if (password.length < 8) return '8 caractères au moins.';
+  const lower = password.toLowerCase();
+  if (COMMON.has(lower) || /^(.)\1+$/.test(password)) return 'Trop courant : choisis-en un moins prévisible.';
+  if (login && lower.includes(normalize(login)) && normalize(login).length >= 3) return 'Évite d’y mettre ton identifiant.';
+  return null;
+}
+
+/** Robustesse indicative (0 à 4) : longueur et variété. */
+export function passwordStrength(password: string): 0 | 1 | 2 | 3 | 4 {
+  if (password.length < 8) return 0;
+  const kinds = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(password)).length;
+  const score = (password.length >= 12 ? 2 : 1) + (password.length >= 16 ? 1 : 0) + (kinds >= 3 ? 1 : 0);
+  return Math.min(4, score) as 1 | 2 | 3 | 4;
+}
+
+/** L'identifiant est-il libre ? */
+export async function checkLogin(api: MyLifeApi, login: string): Promise<boolean> {
+  const r = await api.call<{ available: boolean }>('/api/auth', { action: 'available', login: normalize(login) });
+  return r.available;
+}
+
+/** Création du compte : renvoie la clé de secours, à proposer à l'utilisateur de garder. */
+export async function createAccount(p: Platform, input: { login: string; password: string; invite?: string }): Promise<{ session: Session; recoveryKey: string }> {
+  const issue = passwordIssue(input.password, input.login);
+  if (issue) throw new ApiError(400, `Mot de passe : ${issue}`);
   const login = normalize(input.login);
   const salt = bytesToHex(p.random(16));
   const keys = await passwordKeys(input.password, salt, KDF_ITERATIONS);
@@ -78,7 +116,7 @@ export async function createAccount(p: Platform, input: { login: string; passwor
   const r = await p.api.call<{ token: string; login: string }>('/api/auth', {
     action: 'signup',
     login,
-    invite: input.invite,
+    ...(input.invite ? { invite: input.invite } : {}),
     salt,
     iterations: KDF_ITERATIONS,
     authKey: keys.authKey,
@@ -109,7 +147,8 @@ export async function signIn(p: Platform, input: { login: string; password: stri
 
 /** Mot de passe oublié : la clé de secours redonne accès aux données, avec un nouveau mot de passe. */
 export async function recoverAccount(p: Platform, input: { login: string; recoveryKey: string; newPassword: string }): Promise<Session> {
-  if (input.newPassword.length < 8) throw new ApiError(400, 'Mot de passe trop court : 8 caractères au moins.');
+  const issue = passwordIssue(input.newPassword, input.login);
+  if (issue) throw new ApiError(400, `Mot de passe : ${issue}`);
   const login = normalize(input.login);
   let rec: ReturnType<typeof recoveryKeys>;
   try {
@@ -135,10 +174,27 @@ export async function recoverAccount(p: Platform, input: { login: string; recove
 }
 
 export async function changePassword(p: Platform, session: Session, newPassword: string): Promise<void> {
-  if (newPassword.length < 8) throw new ApiError(400, 'Mot de passe trop court : 8 caractères au moins.');
+  const issue = passwordIssue(newPassword, session.login);
+  if (issue) throw new ApiError(400, `Mot de passe : ${issue}`);
   const salt = bytesToHex(p.random(16));
   const keys = await passwordKeys(newPassword, salt, KDF_ITERATIONS);
   await p.api.call('/api/auth', { action: 'password', newSalt: salt, newAuthKey: keys.authKey, newWrappedKey: wrapKey(keys.kek, fromB64(session.dek), p.random) }, session.token);
+}
+
+/** Nouvelle clé de secours : l'ancienne cesse de fonctionner. Renvoie la nouvelle, à garder. */
+export async function renewRecoveryKey(p: Platform, session: Session): Promise<string> {
+  const recoveryKey = newRecoveryKey(p.random);
+  const rec = recoveryKeys(recoveryKey);
+  await p.api.call('/api/auth', { action: 'renewRecovery', recAuth: rec.recAuth, recWrappedKey: wrapKey(rec.recKek, fromB64(session.dek), p.random) }, session.token);
+  return recoveryKey;
+}
+
+/** Supprime le compte et ses données du serveur (mot de passe redemandé) ; les appareils gardent les leurs. */
+export async function deleteAccount(p: Platform, session: Session, password: string): Promise<void> {
+  const { salt, iterations } = await p.api.call<{ salt: string; iterations: number }>('/api/auth', { action: 'salt', login: session.login });
+  const keys = await passwordKeys(password, salt, iterations);
+  await p.api.call('/api/auth', { action: 'deleteAccount', authKey: keys.authKey }, session.token);
+  await p.sessions.set(null);
 }
 
 export const signOut = (p: Platform) => p.sessions.set(null);

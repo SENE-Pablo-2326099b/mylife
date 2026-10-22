@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest';
-import { describe, sortFriends } from '../src/ui/describe';
+import { describe, sortFriends } from '../src/lib/describe';
 import type { Member } from '../src/state/app';
 import type { Fix } from '../src/domain/status';
 

@@ -594,12 +594,17 @@ export function start(): () => void {
   };
 }
 
-/** Déconnexion de MyLife (toutes les apps de l'adresse) : le partage s'arrête d'abord partout. */
-export async function signOut(): Promise<void> {
+/** Avant de quitter le compte (déconnexion, suppression) : le partage s'arrête d'abord partout. */
+export async function stopAllSharing(): Promise<void> {
   const sharing = app.get().groups.list.filter((g) => g.sharing !== 'off');
   await Promise.allSettled(sharing.map((g) => api.share({ gid: g.id, mode: 'off' })));
   for (const release of releases.values()) release();
   releases.clear();
+}
+
+/** Déconnexion de MyLife (toutes les apps de l'adresse) : le partage s'arrête d'abord partout. */
+export async function signOut(): Promise<void> {
+  await stopAllSharing();
   await mylifeSignOut(platform);
 }
 

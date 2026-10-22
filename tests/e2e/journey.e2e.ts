@@ -31,15 +31,14 @@ async function phone(geolocation: typeof ALICE): Promise<[BrowserContext, Page]>
   return [ctx, page];
 }
 
+/** Création du compte MyLife en un écran (identifiant + mot de passe), puis la clé de secours mise de côté. */
 async function signUp(page: Page, login: string) {
-  await page.getByRole('button', { name: 'Créer un compte MyLife' }).click();
   await page.getByLabel('Identifiant').fill(login);
-  await page.getByLabel('Mot de passe').fill('mot-de-passe-de-test');
-  await page.getByLabel(/Code d.invitation MyLife/).fill(server.invite);
-  await page.getByRole('button', { name: 'Créer le compte' }).click();
-  await page.getByText('Ta clé de secours MyLife').waitFor({ timeout: 60_000 });
-  await page.getByLabel(/Je l.ai notée/).check();
-  await page.getByRole('button', { name: 'Continuer' }).click();
+  await page.getByText('Libre').waitFor();
+  await page.getByLabel('Mot de passe', { exact: true }).fill('mot-de-passe-de-test');
+  await page.getByRole('button', { name: 'Créer mon compte' }).click();
+  await page.getByText('Ta clé de secours').waitFor({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
 }
 
 beforeAll(async () => {
@@ -59,22 +58,22 @@ describe('myRaveLoc de bout en bout', () => {
 
   it('connexion avec un compte MyLife, puis création d’un groupe', async () => {
     await alice.goto(`${server.url}/raveloc/`);
-    await alice.getByRole('heading', { name: 'Connexion à MyLife' }).waitFor();
+    await alice.getByText('Crée ton compte').waitFor();
     await shot(alice, '01-connexion');
     await signUp(alice, 'test-e2e-alice');
-    await alice.getByRole('heading', { name: /Aucun groupe/ }).waitFor();
+    await alice.getByText('Aucun groupe pour l’instant').waitFor();
     await shot(alice, '02-aucun-groupe');
-    await alice.getByRole('button', { name: 'Créer un groupe' }).click();
+    await alice.getByRole('link', { name: 'Créer un groupe' }).click();
     await alice.getByRole('button', { name: 'Rave de ce soir' }).click();
     await alice.getByLabel('Ton pseudo').fill('Alice');
     await alice.getByRole('button', { name: 'Créer et inviter' }).click();
-    await alice.getByRole('heading', { name: 'Gérer le groupe' }).waitFor();
+    await alice.getByText('Gérer le groupe').waitFor();
     await alice.getByRole('heading', { name: 'Rave de ce soir' }).waitFor();
   });
 
   it('invitation d’un ami : lien avec la clé dans le fragment', async () => {
     await alice.getByRole('button', { name: /Créer et partager un lien/ }).click();
-    link = (await alice.locator('code.key').textContent())!.trim();
+    link = (await alice.locator('code').first().textContent())!.trim();
     expect(link).toMatch(new RegExp(`^${server.url}/raveloc/#rejoindre=[A-Za-z0-9_-]{22}\\.[A-Za-z0-9_-]{43}$`));
     await alice.getByText(/0 utilisation/).waitFor();
     await shot(alice, '03-gerer-inviter');
@@ -85,7 +84,7 @@ describe('myRaveLoc de bout en bout', () => {
     await bob.getByText(/Tu as reçu une invitation/).waitFor();
     expect(bob.url()).not.toContain('rejoindre'); // la clé a quitté la barre d'adresse
     await signUp(bob, 'test-e2e-bob');
-    await bob.getByRole('heading', { name: 'Rave de ce soir' }).waitFor();
+    await bob.getByText('Rave de ce soir').waitFor();
     await bob.getByLabel('Ton pseudo').fill('Bob');
     await bob.getByRole('button', { name: 'Rejoindre le groupe' }).click();
     await bob.getByText('Ta position n’est pas partagée').waitFor();
@@ -107,7 +106,7 @@ describe('myRaveLoc de bout en bout', () => {
   });
 
   it('l’autre membre reçoit la position, horodatée, avec une distance arrondie', async () => {
-    await alice.getByRole('button', { name: 'Revenir' }).click();
+    await alice.getByRole('button', { name: 'Retour' }).click();
     const card = alice.getByRole('button', { name: /Retrouver Bob — Position à jour/ });
     await card.waitFor({ timeout: 25_000 });
     await alice.getByText(/^≈ 1[0-5]0\s?m$/).waitFor();
@@ -166,12 +165,12 @@ describe('myRaveLoc de bout en bout', () => {
   });
 
   it('retirer un membre : il perd l’accès au groupe', async () => {
-    await alice.getByRole('button', { name: 'Revenir au groupe' }).click();
-    await alice.getByRole('button', { name: 'Gérer' }).click();
-    await alice.getByRole('button', { name: 'Retirer du groupe' }).click();
-    await alice.getByRole('button', { name: 'Confirmer le retrait' }).click();
+    await alice.getByRole('button', { name: 'Retour' }).click();
+    await alice.getByRole('link', { name: 'Gérer' }).click();
+    await alice.getByRole('button', { name: 'Retirer', exact: true }).click();
+    await alice.getByRole('button', { name: 'Confirmer', exact: true }).click();
     await alice.getByText(/Membres \(1\)/).waitFor();
-    await bob.getByRole('heading', { name: /Aucun groupe/ }).waitFor({ timeout: 25_000 });
+    await bob.getByText('Aucun groupe pour l’instant').waitFor({ timeout: 25_000 });
   });
 
   it('lien révoqué : plus utilisable', async () => {
@@ -194,7 +193,7 @@ describe('myRaveLoc de bout en bout', () => {
 
   it('petit écran (320 px) : aucun débordement horizontal', async () => {
     await alice.setViewportSize({ width: 320, height: 640 });
-    await alice.getByRole('button', { name: 'Revenir' }).click();
+    await alice.getByRole('button', { name: 'Retour' }).click();
     const overflow = await alice.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
     await shot(alice, '13-groupe-320px');

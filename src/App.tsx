@@ -1,13 +1,26 @@
-import { Component, useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
+import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { observable, useObservable } from './lib/observable';
 import { inviteParts } from './lib/groupCrypto';
 import { app } from './state/app';
-import { go, route } from './state/nav';
-import { Auth, recovery, RecoveryKey } from './screens/Auth';
+import { Beacon, setBeacon } from './components/Beacon';
+import { RavelocPalette } from './components/Palette';
+import { AuthScreen } from './screens/Auth';
+import { AccountScreen } from './screens/Account';
 import { Home } from './screens/Home';
 import { Navigate } from './screens/Navigate';
 import { Manage } from './screens/Manage';
 import { CreateGroup, Groups, Join } from './screens/Groups';
+import { Backdrop } from './ui/Backdrop';
+import { ErrorBoundary } from './ui/ErrorBoundary';
+import { setGlance } from './ui/glance';
+import { Navigation, type TabDef } from './ui/Navigation';
+import { KeptTabs, PushedScreen } from './ui/PageTransition';
+import { setPaletteOpen } from './ui/paletteStore';
+import { NotFoundScreen } from './ui/Screen';
+import { useSession } from './ui/session';
+import { ThemeProvider } from './ui/ThemeProvider';
+import { ToastHost } from './ui/toast';
 
 const INVITE_KEY = 'raveloc:invite';
 
@@ -46,57 +59,80 @@ export function captureInvite(): void {
 
 if (typeof window !== 'undefined') window.addEventListener('hashchange', captureInvite);
 
-export function App() {
+const TABS: TabDef[] = [
+  { to: '/', label: 'Retrouver', icon: 'navigate-outline', active: 'navigate', match: ['/', '/ami'] },
+  { to: '/groupes', label: 'Groupes', icon: 'people', active: 'people-fill', match: ['/groupes', '/groupe'] },
+];
+const TAB_PATHS = TABS.map((t) => t.to);
+
+/** Aperçu pour l'accueil MyLife et les Espaces : le groupe actif et ce qu'on y partage. */
+function useRavelocGlance() {
   const s = useObservable(app);
-  const r = useObservable(route);
-  const rec = useObservable(recovery);
-  const invite = useObservable(invitation).value;
-  const signedIn = !!s.session && !s.sessionExpired;
-
+  const group = s.groups.list.find((g) => g.id === s.activeId) ?? null;
+  const live = s.live?.gid === group?.id ? s.live : null;
+  const sharingFriends = live ? live.members.filter((m) => !m.me && m.sharing === 'on').length : null;
+  const title = !s.session ? null : group ? (group.name ?? 'Groupe') : s.groups.status === 'ready' ? 'Aucun groupe en cours' : null;
+  const detail = !group
+    ? 'Crée un groupe pour ta prochaine sortie'
+    : `${group.sharing === 'on' ? 'Tu partages ta position' : group.sharing === 'paused' ? 'Partage en pause' : 'Partage coupé'}${sharingFriends ? ` · ${sharingFriends} ami${sharingFriends > 1 ? 's' : ''} visible${sharingFriends > 1 ? 's' : ''}` : ''}`;
+  const tone = group?.sharing === 'on' ? 'success' : group?.sharing === 'paused' ? 'warning' : undefined;
   useEffect(() => {
-    if (!signedIn || !invite || rec.key) return;
-    setInvite(null);
-    go({ name: 'join', token: invite.token, key: invite.key });
-  }, [signedIn, invite?.token, rec.key]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  if (rec.key) return <RecoveryKey />;
-  if (!signedIn) return <Auth expired={s.sessionExpired} invited={!!invite} />;
-  switch (r.name) {
-    case 'navigate':
-      return <Navigate uid={r.uid} />;
-    case 'manage':
-      return <Manage />;
-    case 'groups':
-      return <Groups />;
-    case 'create':
-      return <CreateGroup />;
-    case 'join':
-      return <Join token={r.token} keyText={r.key} />;
-    default:
-      return <Home />;
-  }
+    if (!s.session) setGlance('raveloc', null);
+    else if (title) setGlance('raveloc', { title, detail, tone, until: group?.expiresAt });
+  }, [s.session, title, detail, tone, group?.expiresAt]);
 }
 
-/** Une erreur d'affichage ne laisse jamais un écran vide. */
-export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-  render() {
-    if (!this.state.error) return this.props.children;
-    return (
-      <main className="screen">
-        <div className="card empty">
-          <h1 className="h2">Un problème d’affichage est survenu</h1>
-          <p className="muted small" style={{ margin: 0 }}>
-            {this.state.error.message}
-          </p>
-          <button type="button" className="btn primary" onClick={() => window.location.reload()}>
-            Recharger
-          </button>
-        </div>
-      </main>
-    );
-  }
+export function App() {
+  return (
+    <ThemeProvider>
+      <Backdrop />
+      <Shell />
+      <Beacon />
+      <ToastHost />
+    </ThemeProvider>
+  );
+}
+
+function Shell() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const session = useSession();
+  const s = useObservable(app);
+  const invite = useObservable(invitation).value;
+  const signedIn = !!session && !s.sessionExpired;
+  const { pathname } = location;
+  useRavelocGlance();
+
+  useEffect(() => {
+    if (!signedIn || !invite) return;
+    setInvite(null);
+    navigate('/rejoindre', { state: invite });
+  }, [signedIn, invite?.token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!signedIn && pathname !== '/compte') return <AuthScreen expired={s.sessionExpired} invited={!!invite} />;
+
+  return (
+    <>
+      <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-md focus:px-3 focus:py-2 liquid">
+        Aller au contenu
+      </a>
+      <ErrorBoundary resetKey={pathname}>
+        <KeptTabs pages={{ '/': <Home />, '/groupes': <Groups /> }} />
+        {!TAB_PATHS.includes(pathname) && (
+          <PushedScreen>
+            <Routes location={location}>
+              <Route path="/ami/:uid" element={<Navigate />} />
+              <Route path="/groupe" element={<Manage />} />
+              <Route path="/groupes/nouveau" element={<CreateGroup />} />
+              <Route path="/rejoindre" element={<Join />} />
+              <Route path="/compte" element={<AccountScreen />} />
+              <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
+            </Routes>
+          </PushedScreen>
+        )}
+      </ErrorBoundary>
+      <Navigation tabs={TABS} onSearch={() => setPaletteOpen(true)} onAssistant={() => setBeacon(true)} holdLabel="mode phare" />
+      <RavelocPalette />
+    </>
+  );
 }
