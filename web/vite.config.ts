@@ -37,6 +37,13 @@ export default defineConfig({
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           { src: '/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Fenêtre d'installation enrichie (Android) : à quoi ressemble MyLife.
+        screenshots: [
+          { src: '/screenshots/1-accueil.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'Accueil : tes apps et ce qu’elles ont à te dire' },
+          { src: '/screenshots/2-finances.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyFinances : le budget du jour' },
+          { src: '/screenshots/3-perf.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyPerf : la séance du jour' },
+          { src: '/screenshots/4-raveloc.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'myRaveLoc : retrouver ses amis' },
+        ],
         shortcuts: [
           { name: 'MyFinances', short_name: 'Finances', description: 'Budget du jour, opérations, patrimoine', url: '/finances/', icons: [{ src: '/shortcut-finances.png', sizes: '96x96', type: 'image/png' }] },
           { name: 'MyPerf', short_name: 'Perf', description: 'Séance du jour, planning, progression', url: '/perf/', icons: [{ src: '/shortcut-perf.png', sizes: '96x96', type: 'image/png' }] },
@@ -45,6 +52,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
+        globIgnores: ['screenshots/**'],
         navigateFallback: '/index.html',
         // Les apps ont leur propre service worker et leurs propres pages : celui-ci ne sert que l'accueil.
         navigateFallbackAllowlist: [/^\/$/, /^\/(compte|apparence|installer|bienvenue)(\/|$)/],

@@ -62,8 +62,10 @@ describe('MyLife, une seule app', () => {
   });
 
   it('une seule app installable : le même manifeste (portée /) relié par chaque page', async () => {
-    const manifest = (await (await fetch(`${server.url}/manifest.webmanifest`)).json()) as { id: string; scope: string; shortcuts: { url: string }[] };
+    const manifest = (await (await fetch(`${server.url}/manifest.webmanifest`)).json()) as { id: string; scope: string; shortcuts: { url: string }[]; screenshots: { src: string }[] };
     expect(manifest.id).toBe('/');
+    expect(manifest.screenshots).toHaveLength(4);
+    for (const s of manifest.screenshots) expect((await fetch(`${server.url}${s.src}`)).ok, s.src).toBe(true);
     expect(manifest.scope).toBe('/');
     expect(manifest.shortcuts.map((s) => s.url)).toEqual(['/finances/', '/perf/', '/raveloc/']);
     for (const path of ['/', '/finances/', '/perf/', '/raveloc/']) {
@@ -72,6 +74,13 @@ describe('MyLife, une seule app', () => {
       expect(links, path).toHaveLength(1);
       expect(links[0], path).toContain('href="/manifest.webmanifest"');
     }
+  });
+
+  it('depuis l’accueil, les trois apps se préparent en arrière-plan (hors ligne, ouverture immédiate)', async () => {
+    await page.goto(`${server.url}/`);
+    await expect
+      .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((r) => new URL(r.scope).pathname).sort()), { timeout: 20_000, interval: 500 })
+      .toEqual(['/', '/finances/', '/perf/', '/raveloc/']);
   });
 
   it('myRaveLoc : déjà connecté (même session), même interface', async () => {

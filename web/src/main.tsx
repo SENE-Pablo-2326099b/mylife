@@ -5,12 +5,15 @@ import { BrowserRouter } from 'react-router-dom';
 import './ui/fonts';
 import { bootMyLife } from './ui/boot';
 import { listenForInstall } from './install';
+import { warmUpApps } from './warmup';
 import { App } from './App';
 import './index.css';
 
 bootMyLife('home');
 // L'invitation à installer arrive tôt : on la garde pour le bouton « Installer ».
 listenForInstall();
+// Les trois apps se préparent en arrière-plan : elles s'ouvrent tout de suite, même hors ligne.
+warmUpApps();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
