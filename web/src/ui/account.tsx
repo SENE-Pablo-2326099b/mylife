@@ -144,7 +144,7 @@ export function AccountForms({ initial = 'create', onDone, skip }: { initial?: M
               ? 'Un seul compte pour toutes tes apps MyLife, sur tous tes appareils. Tes données sont chiffrées sur ton téléphone avant d’être sauvegardées.'
               : mode === 'login'
                 ? 'Le même compte pour MyFinances, MyPerf et myRaveLoc.'
-                : 'Ta clé de secours te redonne accès à ton compte, avec un nouveau mot de passe.'}
+                : 'Encore connecté sur un autre appareil ? Change simplement ton mot de passe depuis son écran Compte, sans clé. Sinon, ta clé de secours te redonne accès à ton compte, avec un nouveau mot de passe.'}
           </p>
         </div>
         <TextField

@@ -36,14 +36,31 @@ Note = intérêt pour l'objectif × fiabilité × coût, justifiée.
 
 ## Réalisation, notée après coup
 
-(rempli à chaque itération)
+### Itération 1 (22/10/2026), puis corrections
 
-### Itération 1 (22/10/2026) : état à l'interruption
+| # | Idée | Note | Ce qui est fait, comment c'est vérifié, ce qui manque |
+|---|---|---|---|
+| A | Une seule PWA | **10** | Manifeste unique à `/` (raccourcis vers les 3 apps, captures pour la fenêtre d'installation enrichie, icône MyLife) ; les pages des apps le relient et n'ont plus le leur. Vérifié par le parcours de l'écosystème (manifeste, liens dans les 4 pages, captures servies). Seule chose impossible côté code : les PWA déjà installées à part restent sur le téléphone (l'écran Installer explique comment les retirer). |
+| B | Kit d'interface web partagé | **10** | `packages/ui` (verre, identités, dock, écrans, feuilles, champs, compte, palette, Espaces, thème, polices, Tailwind) recopié dans l'accueil, MyFinances et myRaveLoc. MyFinances : 332 tests + 25 vérifications de bout en bout inchangés. |
+| C | myRaveLoc sur le kit | **10** | Reconstruit (routeur, onglets gardés, dock, en-tête, palette, compte, 12 thèmes clairs et sombres). 13 étapes de bout en bout vertes, aussi parcourues en Perle et en Brut (captures relues). |
+| D | Accueil = vraie app | **10** | `web/` : premier lancement, accueil avec aperçus, compte (états relus en direct), apparence, installation (Chrome/Edge, iPhone, Android, ordinateur), palette. |
+| E | Compte comme une app standard | **10** | Un écran (identifiant libre affiché pendant la saisie, mot de passe avec affichage et jauge, gestionnaires de mots de passe), pas de code, pas de confirmation, dérivation native (~0,1 s), clé de secours après coup avec rappel, mot de passe oublié : depuis un autre appareil connecté sans clé, sinon par la clé ; reliure automatique des apps ; gestion complète (mot de passe, nouvelle clé, déconnexion de toutes les apps, suppression). Identique dans les 4 apps (MyPerf en React Native). Écart assumé avec certaines apps : pas de connexion Google/Apple ni de réinitialisation par courriel, incompatibles avec le chiffrement de bout en bout (personne d'autre ne doit pouvoir rouvrir les données). |
+| E2 | Inscription ouverte protégée | **10** | Comptes par réseau et par jour (empreinte de l'adresse), essais de mot de passe et de clé bornés, quotas par app ; 9 tests serveur dédiés. |
+| G | Transitions entre apps | **9,5** | `@view-transition` dans le kit et dans MyPerf web ; observé dans Chrome (capture prise en plein fondu). −0,5 : Firefox ne le gère pas encore (navigation normale, sans erreur). |
+| H | Apps prêtes à l'avance | **10** | Au repos, l'accueil installe le service worker de chaque app (sauf économie de données) : ouverture immédiate et hors ligne. Vérifié par le parcours (4 portées enregistrées). Remplace les règles de spéculation, inutiles ici (on change d'app par des boutons, pas des liens). |
+| I | Palette transversale | **10** | Dans les 4 apps (registre `MYLIFE_DESTINATIONS`) ; vérifié (« seance » depuis l'accueil → Séance du jour de MyPerf). |
+| J | Aperçus en direct | **10** | MyFinances (reste du jour, valable jusqu'à minuit), MyPerf (séance du jour), myRaveLoc (groupe actif) ; affichés par l'accueil et les Espaces de toutes les apps (web). L'APK MyPerf est hors de l'adresse : ses Espaces montrent les descriptions. |
+| K | Apparence synchronisée entre appareils | **10** | Dernier choix daté gagne ; un appareil neuf n'écrase jamais un vrai choix (défaut trouvé et corrigé par le parcours). Web : vérifié sur deux appareils simulés. APK : même logique (`apps/perf/src/services/cloud/prefs.ts`), compilée ; à constater sur le téléphone après déploiement. |
+| L | MyPerf aligné | **10** | Compte, Espaces (accueil, aperçus, compte), palette, aperçu, manifeste, transitions ; captures des 4 apps dans 6 thèmes (Nuit, Perle, Circuit, Ardoise, Argile, Brut) relues côte à côte. |
+| M | Dépôt GitHub unique + README | **9** | Dépôt unique local (historiques des 4 dépôts gardés), README de présentation et d'utilisation avec captures, `CONTEXTE.md` unique. Reste : la publication sur GitHub (privé), qui demande l'accord de l'utilisateur. |
 
-Fait :
-- B (kit `packages/ui`) : MyFinances l'utilise, avec 332 tests et 25 vérifications de bout en bout au vert. **9/10** : myRaveLoc ne l'utilise pas encore.
-- E / E2 (comptes) : inscription ouverte et protégée côté serveur, dérivation de clé native, écrans communs, reliure automatique ; 42 tests MyLife au vert. **8/10** : MyPerf et myRaveLoc ne sont pas encore branchés.
-- D (accueil) : l'app `web/` se construit (accueil, compte, apparence, installation, bienvenue), avec l'icône MyLife. **Non vérifiée** : la première capture n'a pas trouvé le bouton « Commencer » (à diagnostiquer).
-- I, J, K : palette commune, aperçus et apparence synchronisée sont dans le kit ; seul MyFinances s'en sert.
+**Défauts trouvés et corrigés pendant la vérification** : Tailwind ne générait aucune classe dans l'accueil
+(chemins encodés) ; clé de secours non montrée après la création ; rappel et bandeau réseau affichés deux
+fois (onglet gardé en arrière-plan) ; halo du point « en direct » sur toute la largeur ; dock visible sur un
+écran ouvert directement ; thème écrasé par un appareil neuf ; MyFinances ne lançait pas la synchro de
+l'apparence ; chemins Gradle après le passage au dépôt unique.
 
-Reste : diagnostiquer l'accueil ; relier le manifeste racine depuis chaque app (A) ; myRaveLoc sur le kit (C) ; MyPerf (compte simplifié, aperçu, palette, parité visuelle L) ; transitions (G, H) ; `vercel.json` de MyLife (build `web/`) ; déploiements ; dépôt GitHub privé + README (M) ; nouvelles notes.
+**Tests à la fin de l'itération** : serveur 42, MyFinances 332 + 25, myRaveLoc 83 + 13, MyPerf 214, parcours de
+l'écosystème 13 : tout vert ; APK MyPerf compilée.
+
+**Reste hors de portée de l'outil (permissions)** : déploiement en production et publication GitHub.
