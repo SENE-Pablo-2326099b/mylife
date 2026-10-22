@@ -459,7 +459,8 @@ vers un ami. Détails dans `apps/raveloc/README.md`.
 - comptes : inscription ouverte en un écran, garde-fous serveur, nouvelle clé, suppression, reliure automatique ;
 - apparence commune synchronisée entre appareils (web et APK) ; aperçus des apps ; palette transversale ; transitions entre apps ;
 - **dépôt unique** (historiques conservés) et README de présentation ;
-- tests : serveur 42, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 11 : tout vert.
+- tests : serveur 46, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 13 : tout vert.
+- menu des apps en feuille du bas, cartes en relief (`Tilt`) partout (y compris MyPerf web), rappel de sauvegarde hebdomadaire (MyFinances, MyPerf web), `docs/ARCHITECTURE.md`.
 
 **Dépôt GitHub (privé)** : https://github.com/SENE-Pablo-2326099b/mylife (branche `master`, `git push`).
 

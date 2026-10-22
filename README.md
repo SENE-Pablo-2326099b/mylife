@@ -138,6 +138,7 @@ Garde-fous de l'inscription ouverte : 10 comptes par réseau et par jour (sur un
 par app.
 
 ### Pour aller plus loin
+- `docs/ARCHITECTURE.md` : documentation technique complète (pattern, flux, séquence, automates, modèle de données, algorithmes, avec diagrammes Mermaid).
 - `CONTEXTE.md` : la référence complète (architecture, décisions, règles, état).
 - `docs/UNIFICATION.md` : les idées de l'unification, notées avant et après réalisation, avec les sources.
 - `apps/*/README.md` : le détail de chaque app.
