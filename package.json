@@ -6,7 +6,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "vendor": "node scripts/vendor.mjs",
-    "deploy": "npx --yes vercel@61.1.0 deploy --prod --yes"
+    "deploy": "npx --yes vercel@61.1.0 deploy --prod --yes",
+    "local": "vite-node scripts/local.ts"
   },
   "dependencies": {
     "@vercel/functions": "3.9.11",
@@ -21,5 +22,7 @@
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  }
 }

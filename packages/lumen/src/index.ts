@@ -374,6 +374,78 @@ export const MYLIFE_APPS: readonly MyLifeApp[] = [
   { id: 'raveloc', name: 'myRaveLoc', tagline: 'Retrouver ses amis en festival', icon: 'navigate', colors: ['#5DFFC4', '#1FA3FF'], path: '/raveloc/' },
 ];
 
+/** L'accueil de MyLife (point d'entrée de l'app installée), avec les mêmes champs qu'une app. */
+export const MYLIFE_HOME = { id: 'home', name: 'MyLife', tagline: 'Tes apps, un seul compte', colors: ['#F5C451', '#8B5CFF'] as [string, string], path: '/' } as const;
+
+/**
+ * Où l'on peut aller dans chaque app : la palette de commande de n'importe quelle app les propose
+ * (« séance » depuis MyFinances ouvre MyPerf au bon endroit). Chemins complets sous l'adresse MyLife.
+ */
+export interface MyLifeDestination {
+  app: MyLifeApp['id'] | 'home';
+  title: string;
+  path: string;
+  /** Mots qui mènent ici (sans accents, en minuscules). */
+  keywords: string;
+}
+
+export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
+  { app: 'home', title: 'Accueil MyLife', path: '/', keywords: 'accueil apps toutes maison' },
+  { app: 'home', title: 'Compte MyLife', path: '/compte', keywords: 'compte connexion mot de passe cle secours synchro deconnexion supprimer' },
+  { app: 'home', title: 'Apparence', path: '/apparence', keywords: 'theme couleurs sombre clair identite circuit ardoise argile brut' },
+  { app: 'home', title: 'Installer MyLife', path: '/installer', keywords: 'installer telephone ecran accueil application pwa' },
+  { app: 'finances', title: 'Budget du jour', path: '/finances/', keywords: 'argent depenser reste aujourd hui budget finances' },
+  { app: 'finances', title: 'Budget du cycle', path: '/finances/budget', keywords: 'cycle paie calendrier depenses' },
+  { app: 'finances', title: 'Opérations', path: '/finances/operations', keywords: 'transactions depenses banque achats' },
+  { app: 'finances', title: 'Patrimoine', path: '/finances/patrimoine', keywords: 'patrimoine placements epargne bourse crypto' },
+  { app: 'finances', title: 'Indépendance financière', path: '/finances/independance', keywords: 'fire retraite rente interets composes' },
+  { app: 'finances', title: 'Assistant financier', path: '/finances/assistant', keywords: 'ia claude question argent' },
+  { app: 'perf', title: 'Séance du jour', path: '/perf/', keywords: 'seance entrainement sport muscu aujourd hui demarrer' },
+  { app: 'perf', title: 'Planning d’entraînement', path: '/perf/planning', keywords: 'planning cycle programme semaine' },
+  { app: 'perf', title: 'Exercices', path: '/perf/exercises', keywords: 'exercices bibliotheque 1rm record mouvement' },
+  { app: 'perf', title: 'Statistiques sportives', path: '/perf/stats', keywords: 'stats progression volume force' },
+  { app: 'perf', title: 'Coach', path: '/perf/coach', keywords: 'coach ia conseil entrainement' },
+  { app: 'raveloc', title: 'Retrouver mes amis', path: '/raveloc/', keywords: 'amis festival position fleche retrouver raveloc' },
+  { app: 'raveloc', title: 'Mes groupes', path: '/raveloc/groupes', keywords: 'groupes soiree concert' },
+  { app: 'raveloc', title: 'Créer un groupe', path: '/raveloc/groupes/nouveau', keywords: 'nouveau groupe inviter festival' },
+];
+
+/**
+ * Aperçu d'une app, déposé par l'app elle-même sur l'appareil (jamais envoyé) et affiché par l'accueil
+ * et les Espaces : « 23 € à dépenser aujourd'hui », « Push A · 6 exercices », « Groupe Hellfest · 3 amis ».
+ */
+export interface MyLifeGlance {
+  /** La ligne principale, courte. */
+  title: string;
+  detail?: string;
+  tone?: 'accent' | 'success' | 'warning' | 'danger';
+  /** Après cette date, l'aperçu n'est plus vrai (« reste aujourd'hui » à minuit) : il n'est plus montré. */
+  until?: number;
+  at: number;
+}
+export const glanceKey = (app: MyLifeApp['id']) => `mylife:glance:${app}`;
+
+export function readGlance(app: MyLifeApp['id']): MyLifeGlance | null {
+  try {
+    const g = JSON.parse(globalThis.localStorage?.getItem(glanceKey(app)) ?? 'null') as MyLifeGlance | null;
+    return g && typeof g.title === 'string' && typeof g.at === 'number' && !(typeof g.until === 'number' && g.until < Date.now()) ? g : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Dépose (ou retire, avec null) l'aperçu de l'app ; ne réécrit pas un aperçu identique. */
+export function writeGlance(app: MyLifeApp['id'], glance: Omit<MyLifeGlance, 'at'> | null): void {
+  try {
+    if (!glance) return void globalThis.localStorage?.removeItem(glanceKey(app));
+    const prev = readGlance(app);
+    if (prev && prev.title === glance.title && prev.detail === glance.detail && prev.tone === glance.tone && prev.until === glance.until) return;
+    globalThis.localStorage?.setItem(glanceKey(app), JSON.stringify({ ...glance, at: Date.now() }));
+  } catch {
+    /* stockage indisponible : pas d'aperçu */
+  }
+}
+
 /**
  * Apparence de MyLife : un seul réglage pour toutes les apps. Sur le web, les apps partagent l'adresse,
  * donc ce stockage ; un changement dans une app s'applique tout de suite aux autres onglets ouverts.
