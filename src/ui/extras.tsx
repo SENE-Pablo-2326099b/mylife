@@ -1,9 +1,10 @@
 import { AnimatePresence, m } from 'framer-motion';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Icon } from './icons';
 import { haptic, springs } from './motion';
 import { Glass, Tap } from './primitives';
-import { themePalette, THEMES, type ThemeId } from './themes';
+import { withAlpha } from './theme';
+import { styleOf, themeInfo, themePalette, THEMES, type ThemeId } from './themes';
 
 /** Un reflet qui balaie le verre : « quelque chose arrive ». */
 export function Shimmer({ height, width = '100%', className = 'rounded-sm' }: { height: number; width?: number | string; className?: string }) {
@@ -69,54 +70,104 @@ export function OrbFlash({ show, gold, message }: { show: boolean; gold?: boolea
   );
 }
 
-/** Un thème en miniature : son champ, une carte de verre avec une ligne de titre, une ligne et son accent. */
+/** Le fond, la carte et le bouton d'un thème en miniature, dessinés avec sa propre identité. */
 function ThemePreview({ id }: { id: ThemeId }) {
   const p = themePalette(id);
+  const st = styleOf(id);
+  const ink = p.text;
+  const card: CSSProperties =
+    st.card === 'brutal'
+      ? { background: '#FFFFFF', border: `2px solid ${ink}`, boxShadow: `3px 3px 0 ${ink}`, borderRadius: 5 }
+      : st.card === 'clay'
+        ? { background: p.glass.raised.fill, boxShadow: `4px 5px 10px ${withAlpha(p.accent, 0.2)}, -3px -3px 8px rgba(255,255,255,0.9), inset 2px 2px 4px rgba(255,255,255,0.9)`, borderRadius: 16 }
+        : st.card === 'outline'
+          ? { background: p.glass.raised.solidFill, border: `1px solid ${withAlpha(p.accent, 0.6)}`, boxShadow: `0 0 12px -2px ${p.accentGlow}`, borderRadius: 3 }
+          : st.card === 'solid'
+            ? { background: p.glass.raised.fill, border: `1px solid ${p.glass.raised.rim}`, borderRadius: 6 }
+            : { background: p.glass.raised.solidFill, border: `1px solid ${p.glass.raised.rim}`, borderRadius: 10 };
+  const button: CSSProperties =
+    st.button === 'brutal'
+      ? { background: p.accent, border: `1.5px solid ${ink}`, borderRadius: 999 }
+      : st.button === 'outline'
+        ? { border: `1px solid ${p.accent}`, boxShadow: `0 0 8px ${p.accentGlow}`, borderRadius: 2 }
+        : st.button === 'solid'
+          ? { background: p.accent, borderRadius: 3 }
+          : { background: `linear-gradient(135deg, ${p.accentGradient[0]}, ${p.accentGradient[1]})`, borderRadius: 999 };
+  const field =
+    st.backdrop === 'grid'
+      ? `linear-gradient(${withAlpha(p.accent, 0.16)} 1px, transparent 1px) 0 0 / 12px 12px, linear-gradient(90deg, ${withAlpha(p.accent, 0.16)} 1px, transparent 1px) 0 0 / 12px 12px, ${p.bg}`
+      : st.backdrop === 'plain' && st.id === 'brut'
+        ? `radial-gradient(circle, ${withAlpha(ink, 0.25)} 1px, transparent 1.4px) 0 0 / 9px 9px, ${p.bg}`
+        : `linear-gradient(180deg, ${p.field[0]}, ${p.field[1]} 55%, ${p.field[2]})`;
+  const halos = st.backdrop === 'halos' || st.backdrop === 'blobs';
   return (
-    <div className="relative h-[92px] overflow-hidden rounded-md p-2" style={{ background: `linear-gradient(180deg, ${p.field[0]}, ${p.field[1]} 55%, ${p.field[2]})` }}>
-      <span className="absolute -right-3.5 -top-[18px] h-16 w-16 rounded-full opacity-[0.35]" style={{ background: p.halos.violet }} />
-      <span className="absolute -left-5 top-[18px] h-12 w-12 rounded-full opacity-[0.22]" style={{ background: p.halos.gold }} />
-      <div className="absolute inset-x-2 bottom-2 flex flex-col gap-[5px] rounded-[10px] border p-[7px]" style={{ background: p.glass.raised.solidFill, borderColor: p.glass.raised.rim }}>
-        <span className="h-[5px] w-[62%] rounded-[3px] opacity-85" style={{ background: p.text }} />
+    <div className="relative h-[92px] overflow-hidden rounded-md p-2" style={{ background: field }}>
+      {halos && <span className="absolute -right-3.5 -top-[18px] h-16 w-16 rounded-full opacity-[0.35]" style={{ background: p.halos.violet, filter: st.backdrop === 'blobs' ? 'blur(6px)' : undefined }} />}
+      {halos && <span className="absolute -left-5 top-[18px] h-12 w-12 rounded-full opacity-[0.22]" style={{ background: p.halos.gold, filter: st.backdrop === 'blobs' ? 'blur(6px)' : undefined }} />}
+      <span
+        className="absolute left-2.5 top-1.5 text-[19px] leading-none"
+        style={{ color: ink, fontFamily: `'${st.fonts.display}', sans-serif`, fontWeight: st.titleWeight, textTransform: st.labelCase === 'upper' ? 'uppercase' : undefined }}
+        aria-hidden
+      >
+        Aa
+      </span>
+      <div className="absolute inset-x-2 bottom-2 flex flex-col gap-[5px] p-[7px]" style={card}>
+        <span className="h-[5px] w-[62%] rounded-[3px] opacity-85" style={{ background: ink }} />
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: p.gold }} />
           <span className="h-1 flex-1 rounded-sm" style={{ background: p.textMuted }} />
-          <span className="h-3 w-4 rounded" style={{ background: p.well }} />
-          <span className="h-3 w-3.5 rounded" style={{ background: `linear-gradient(135deg, ${p.accentGradient[0]}, ${p.accentGradient[1]})` }} />
+          <span className="h-3 w-6" style={button} />
         </span>
       </div>
     </div>
   );
 }
 
-/** Choix du thème : chaque thème en miniature ; un tap l'applique tout de suite. */
-export function ThemePicker({ value, onChange }: { value: ThemeId; onChange: (id: ThemeId) => void }) {
+function ThemeTile({ id, selected, onChange }: { id: ThemeId; selected: boolean; onChange: (id: ThemeId) => void }) {
+  const th = themeInfo(id);
   return (
-    <div className="grid grid-cols-2 gap-2 min-[560px]:grid-cols-4" role="radiogroup" aria-label="Thème">
-      {THEMES.map((th) => {
-        const selected = th.id === value;
-        return (
-          <Tap
-            key={th.id}
-            onClick={() => onChange(th.id)}
-            scaleTo={0.96}
-            role="radio"
-            ariaChecked={selected}
-            label={`Thème ${th.name} : ${th.description}`}
-            className="rounded-lg border-2 p-[5px] text-left"
-            style={{ borderColor: selected ? 'var(--accent)' : 'transparent' }}
-          >
-            <ThemePreview id={th.id} />
-            <span className="flex items-center gap-1.5 px-1 pb-0.5 pt-1.5">
-              <span className="min-w-0 flex-1">
-                <span className="t-body-strong block truncate">{th.name}</span>
-                <span className="t-caption block truncate text-muted">{th.description}</span>
-              </span>
-              {selected && <Icon name="check-circle" size={20} className="text-accent" />}
-            </span>
-          </Tap>
-        );
-      })}
+    <Tap
+      onClick={() => onChange(id)}
+      scaleTo={0.96}
+      role="radio"
+      ariaChecked={selected}
+      label={`Thème ${th.name} : ${th.description}`}
+      className="rounded-lg border-2 p-[5px] text-left"
+      style={{ borderColor: selected ? 'var(--accent)' : 'transparent' }}
+    >
+      <ThemePreview id={id} />
+      <span className="flex items-center gap-1.5 px-1 pb-0.5 pt-1.5">
+        <span className="min-w-0 flex-1">
+          <span className="t-body-strong block truncate">{th.name}</span>
+          <span className="t-caption block truncate text-muted">{th.description}</span>
+        </span>
+        {selected && <Icon name="check-circle" size={20} className="text-accent" />}
+      </span>
+    </Tap>
+  );
+}
+
+/**
+ * Choix du thème, en deux familles : les identités (chacune sa forme, sa typographie, sa matière) et
+ * les palettes de Lumen, le verre d'origine. Un tap l'applique tout de suite.
+ */
+export function ThemePicker({ value, onChange }: { value: ThemeId; onChange: (id: ThemeId) => void }) {
+  const identities = THEMES.filter((t) => t.style !== 'lumen');
+  const lumen = THEMES.filter((t) => t.style === 'lumen');
+  return (
+    <div role="radiogroup" aria-label="Thème" className="flex flex-col gap-3">
+      <p className="t-label text-muted">Identités · chacune sa forme, sa typographie, sa matière</p>
+      <div className="grid grid-cols-2 gap-2 min-[560px]:grid-cols-4">
+        {identities.map((th) => (
+          <ThemeTile key={th.id} id={th.id} selected={th.id === value} onChange={onChange} />
+        ))}
+      </div>
+      <p className="t-label mt-2 text-muted">Lumen · verre et lumière</p>
+      <div className="grid grid-cols-2 gap-2 min-[560px]:grid-cols-4">
+        {lumen.map((th) => (
+          <ThemeTile key={th.id} id={th.id} selected={th.id === value} onChange={onChange} />
+        ))}
+      </div>
     </div>
   );
 }

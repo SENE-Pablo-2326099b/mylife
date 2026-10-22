@@ -55,6 +55,7 @@ export function applyPalette(p: Palette): void {
   for (const [k, val] of Object.entries(cssVars(p))) root.style.setProperty(k, val);
   root.style.colorScheme = p.scheme;
   root.dataset.scheme = p.scheme;
+  root.dataset.style = p.style;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', p.bg);
 }
 

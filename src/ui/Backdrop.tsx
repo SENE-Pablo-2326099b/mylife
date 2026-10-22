@@ -4,6 +4,7 @@ import { springs } from './motion';
 import { useWindowHeight, useWindowWidth } from './responsive';
 import { withAlpha } from './theme';
 import { useTheme } from './themeRuntime';
+import type { StyleId } from './themes';
 
 /**
  * Le champ de lumière devant lequel se voit tout le verre.
@@ -63,23 +64,17 @@ const HALOS: HaloSpec[] = [
   },
 ];
 
-function Halo({ spec, width, height, current }: { spec: HaloSpec; width: number; height: number; current: Mood }) {
+function Halo({ spec, width, height, current, gain }: { spec: HaloSpec; width: number; height: number; current: Mood; gain: number }) {
   const t = useTheme();
   const { scrollY } = useScroll();
   const parallax = useTransform(scrollY, (y) => -y * spec.parallax);
   const d = Math.max(width, height) * spec.size;
   const [fx, fy] = spec.at[current];
-  const boost = t.scheme === 'light' ? 1.6 : 1;
+  const boost = (t.scheme === 'light' ? 1.6 : 1) * gain;
   const color = t.halos[spec.color];
   const gradient = `radial-gradient(circle at center, ${withAlpha(color, spec.opacity * boost)} 0%, ${withAlpha(color, spec.opacity * 0.45 * boost)} 45%, ${withAlpha(color, 0)} 70%)`;
   return (
-    <m.div
-      className="absolute left-0 top-0"
-      style={{ width: d, height: d }}
-      initial={false}
-      animate={{ x: fx * width - d / 2, y: fy * height - d / 2 }}
-      transition={springs.soft}
-    >
+    <m.div className="absolute left-0 top-0" style={{ width: d, height: d }} initial={false} animate={{ x: fx * width - d / 2, y: fy * height - d / 2 }} transition={springs.soft}>
       <m.div className="h-full w-full" style={{ y: parallax }}>
         <div className="halo-drift h-full w-full rounded-full" style={{ background: gradient, ['--drift' as string]: `${spec.drift}px`, ['--period' as string]: `${spec.period}s`, animationDelay: `-${spec.period / 3}s` }} />
       </m.div>
@@ -87,39 +82,65 @@ function Halo({ spec, width, height, current }: { spec: HaloSpec; width: number;
   );
 }
 
+/** Intensité des halos selon l'identité : aucune pour les fonds pleins (Ardoise, Brut). */
+const HALO_GAIN: Record<StyleId, number> = { lumen: 1, circuit: 0.55, ardoise: 0, argile: 1.25, brut: 0 };
+
 export function Backdrop() {
   const width = useWindowWidth();
   const height = useWindowHeight();
   const current = useMood();
   const ambient = useAmbient();
+  const style = useTheme().style;
+  const gain = HALO_GAIN[style];
   return (
     // Découpé : les halos sont plus grands que l'écran. Sans ça, un navigateur mobile élargirait la page.
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" style={{ background: 'linear-gradient(180deg, var(--field-0), var(--field-1) 55%, var(--field-2))' }}>
-      {HALOS.map((h) => (
-        <Halo key={h.color} spec={h} width={width} height={height} current={current} />
-      ))}
+      {gain > 0 && HALOS.map((h) => <Halo key={h.color} spec={h} width={width} height={height} current={current} gain={gain} />)}
       {/* Lumière d'état (budget) : monte et s'éteint en fondu. */}
       <m.div
         className="absolute inset-x-0 top-0"
         style={{ height: '70%', background: `radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--${ambient ?? 'accent'}) 30%, transparent), transparent 70%)` }}
         initial={false}
-        animate={{ opacity: ambient ? 1 : 0 }}
+        animate={{ opacity: ambient && style !== 'brut' ? (style === 'ardoise' ? 0.45 : 1) : 0 }}
         transition={{ duration: 1.2, ease: 'easeOut' }}
       />
       {/* Vignette : bords calmes, texte lisible. */}
       <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, var(--veil-0) 35%, var(--veil-1) 100%)' }} />
-      {/* Trame de points, nette autour du verre et adoucie dessous : c'est elle qui fait lire le flou. */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: 'radial-gradient(circle, var(--grid) 1.2px, transparent 1.7px)',
-          backgroundSize: '22px 22px',
-          WebkitMaskImage: 'radial-gradient(ellipse 140% 85% at 50% 0%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 90%)',
-          maskImage: 'radial-gradient(ellipse 140% 85% at 50% 0%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 90%)',
-        }}
-      />
-
+      <Texture style={style} />
     </div>
   );
 }
 
+const FADE_TOP = 'radial-gradient(ellipse 140% 85% at 50% 0%, #000 0%, rgba(0,0,0,0.35) 55%, transparent 90%)';
+
+/** Ce qui fait la matière du fond, propre à chaque identité. */
+function Texture({ style }: { style: StyleId }) {
+  switch (style) {
+    // Trame de points, nette autour du verre et adoucie dessous : c'est elle qui fait lire le flou.
+    case 'lumen':
+      return <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, var(--grid) 1.2px, transparent 1.7px)', backgroundSize: '22px 22px', WebkitMaskImage: FADE_TOP, maskImage: FADE_TOP }} />;
+    // Grille de tracé néon qui s'efface vers le bas, horizon lumineux et lignes de balayage.
+    case 'circuit':
+      return (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: 'linear-gradient(color-mix(in srgb, var(--accent) 13%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--accent) 13%, transparent) 1px, transparent 1px)',
+              backgroundSize: '36px 36px',
+              backgroundPosition: '-1px -1px',
+              WebkitMaskImage: FADE_TOP,
+              maskImage: FADE_TOP,
+            }}
+          />
+          <div className="absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)', boxShadow: '0 0 18px 2px var(--accent-glow)' }} />
+          <div className="absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px)' }} />
+        </>
+      );
+    // Papier : une trame de points noirs nette, régulière jusqu'en bas.
+    case 'brut':
+      return <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, rgba(10,10,10,0.2) 1.1px, transparent 1.5px)', backgroundSize: '20px 20px' }} />;
+    default:
+      return null;
+  }
+}

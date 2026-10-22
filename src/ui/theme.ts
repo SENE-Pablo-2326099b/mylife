@@ -1,4 +1,4 @@
-import { BASE_TEXT } from '../vendor/lumen';
+import { BASE_TEXT, type StyleId } from '../vendor/lumen';
 
 /**
  * LUMEN — le langage visuel de l'app (repris de MyPerf).
@@ -37,6 +37,8 @@ export interface GlassSpec {
 
 export interface Palette {
   scheme: 'dark' | 'light';
+  /** Identité visuelle (forme, matière, typographie) : posée sur <html data-style>, lue par index.css. */
+  style: StyleId;
   /** Champ de fond (haut → bas). */
   field: [string, string, string];
   halos: { violet: string; gold: string; indigo: string; orchid: string };
@@ -91,6 +93,7 @@ export interface Palette {
 
 const dark: Palette = {
   scheme: 'dark',
+  style: 'lumen',
   field: ['#130C2A', '#0B0719', '#07050F'],
   halos: { violet: '#8B5CFF', gold: '#F2B84B', indigo: '#4C4DFF', orchid: '#D25BFF' },
   glass: {
@@ -170,6 +173,7 @@ const dark: Palette = {
 
 const light: Palette = {
   scheme: 'light',
+  style: 'lumen',
   field: ['#FFFFFF', '#F8F6FF', '#F1ECFF'],
   halos: { violet: '#B49BFF', gold: '#FFD66E', indigo: '#A9B6FF', orchid: '#EBA8FF' },
   glass: {
@@ -332,7 +336,17 @@ export function cssVars(p: Palette): Record<string, string> {
   v['--grid'] = withAlpha(p.text, dark ? 0.12 : 0.12);
   v['--corner-light'] = dark ? 'rgba(255,255,255,0.075)' : 'rgba(255,255,255,0.55)';
   v['--corner-shade'] = dark ? 'rgba(0,0,0,0.18)' : withAlpha(p.text, 0.03);
-  v['--grain'] = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 ${dark ? 0.06 : 0.05} 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
+  v['--grain'] =
+    `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 0 ${dark ? 1 : 0} 0 0 0 ${dark ? 0.06 : 0.05} 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`;
+  // Identités sans verre : pas de grain ni de coins éclairés, arêtes à plat (index.css, [data-style]).
+  if (p.style !== 'lumen') {
+    v['--grain'] = 'none';
+    v['--corner-light'] = 'transparent';
+    v['--corner-shade'] = 'transparent';
+  }
+  if (p.style === 'circuit') v['--touch'] = withAlpha(p.accent, 0.22);
+  v['--ink-line'] = p.style === 'brut' ? p.text : withAlpha(p.text, 0.12);
+  v['--clay-in'] = withAlpha(p.text, 0.07);
   // Teintes dérivées de chaque couleur porteuse de sens : lavis du verre, bord, lueur.
   for (const tone of TONES) {
     const hex = p[tone];

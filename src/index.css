@@ -13,6 +13,25 @@
   --field-0: #130c2a;
   --field-1: #0b0719;
   --field-2: #07050f;
+  /* Identité Lumen (par défaut) : redéfinie plus bas pour chaque [data-style]. */
+  --font-display: Sora, Inter, system-ui, sans-serif;
+  --font-body: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-num: Sora, Inter, system-ui, sans-serif;
+  --font-label: var(--font-body);
+  --w-title: 700;
+  --w-title2: 600;
+  --w-label: 500;
+  --track-k: 1;
+  --label-case: none;
+  --label-track: 0.1px;
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --r-pill: 999px;
+  --r-sheet: 32px;
+  --bw: 1px;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -28,7 +47,7 @@ body {
   /* Transparent : le champ de lumière (Backdrop, z-index négatif) se peint entre le fond de <html> et la page. */
   background: transparent;
   color: var(--text);
-  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-body);
   font-size: min(0.9375rem, 19.5px);
   line-height: 1.4;
   -webkit-tap-highlight-color: transparent;
@@ -649,4 +668,452 @@ input[type='number']::-webkit-outer-spin-button {
   background: color-mix(in srgb, var(--bg) 72%, transparent);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
+}
+
+/* Chiffres : la police des nombres de l'identité (mono dans Circuit et Ardoise). */
+.num.font-display {
+  font-family: var(--font-num);
+}
+
+/* ================================================================== Identités
+ *
+ * Un thème est une identité, pas seulement une palette (MyLife/packages/lumen STYLES) : la forme, la
+ * matière des cartes, la typographie, les boutons et le fond changent. Les couleurs viennent toujours
+ * de la palette (themes.ts → stylize) ; ici, seulement la forme et les effets.
+ */
+
+/* ------------------------------------------------------------------ Circuit : interface tête haute */
+[data-style='circuit'] {
+  --font-display: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, monospace;
+  --font-label: 'JetBrains Mono', ui-monospace, monospace;
+  --w-label: 600;
+  --track-k: 0.6;
+  --label-case: uppercase;
+  --label-track: 0.12em;
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+  --r-xl: 8px;
+  --r-pill: 4px;
+  --r-sheet: 10px;
+}
+/* Plaque : fond sombre, bord néon plat, équerres aux quatre coins, trame de balayage. */
+[data-style='circuit'] .glass {
+  --bk: 14px;
+  background:
+    radial-gradient(
+      circle at var(--mx, 50%) var(--my, 50%),
+      transparent calc(var(--rp) * 420px - 40px),
+      color-mix(in srgb, var(--touch, transparent) calc((1 - var(--rp)) * 160%), transparent) calc(var(--rp) * 420px),
+      transparent calc(var(--rp) * 420px + 1.5px)
+    ),
+    radial-gradient(240px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--touch, transparent) calc(var(--gl) * 100%), transparent), transparent 70%),
+    linear-gradient(var(--g-edge), var(--g-edge)) left top / var(--bk) 1.5px no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) left top / 1.5px var(--bk) no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) right top / var(--bk) 1.5px no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) right top / 1.5px var(--bk) no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) left bottom / var(--bk) 1.5px no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) left bottom / 1.5px var(--bk) no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) right bottom / var(--bk) 1.5px no-repeat,
+    linear-gradient(var(--g-edge), var(--g-edge)) right bottom / 1.5px var(--bk) no-repeat,
+    linear-gradient(135deg, var(--g-wash0), var(--g-wash1)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 3px),
+    linear-gradient(var(--g-fill), var(--g-fill));
+  --g-edge: color-mix(in srgb, var(--accent) 85%, transparent);
+  box-shadow:
+    var(--g-shadow),
+    var(--g-glow);
+  -webkit-backdrop-filter: blur(var(--g-blur));
+  backdrop-filter: blur(var(--g-blur));
+}
+[data-style='circuit'] .glass:not(.glass-float):not(.glass-lens) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-style='circuit'] .glass::before {
+  background: var(--g-rim);
+}
+[data-style='circuit'] .glass-glow {
+  --g-glow: 0 0 26px -4px var(--accent-glow), inset 0 0 24px -12px var(--accent-glow);
+}
+[data-style='circuit'] .liquid {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    0 0 20px -4px var(--accent-glow),
+    inset 0 0 14px -6px var(--accent-glow);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+[data-style='circuit'] .liquid-gold {
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold);
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    0 0 20px -4px color-mix(in srgb, var(--gold) 60%, transparent);
+}
+[data-style='circuit'] .bead,
+[data-style='circuit'] .dock-pill {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 0;
+  box-shadow:
+    inset 0 -2px 0 var(--accent),
+    0 0 18px -6px var(--accent-glow);
+}
+[data-style='circuit'] .orb {
+  border-radius: var(--r-md);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg));
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent),
+    0 0 24px -2px var(--accent-glow),
+    inset 0 0 16px -4px var(--accent-glow);
+}
+[data-style='circuit'] .orb-ring {
+  border-radius: var(--r-md);
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+  inset: -5px;
+  animation: none;
+}
+[data-style='circuit'] .etched {
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: none;
+}
+[data-style='circuit'] .field-input {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: none;
+}
+[data-style='circuit'] .field-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 18px -4px var(--accent-glow);
+}
+[data-style='circuit'] .t-large,
+[data-style='circuit'] .t-hero {
+  text-transform: uppercase;
+  text-shadow: 0 0 22px var(--accent-glow);
+}
+[data-style='circuit'] .condense-edge {
+  box-shadow:
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 40%, transparent),
+    0 8px 24px -14px var(--accent-glow);
+}
+
+/* ------------------------------------------------------------------ Ardoise : outil pro mat */
+[data-style='ardoise'] {
+  --font-display: 'IBM Plex Sans', Inter, system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', Inter, system-ui, sans-serif;
+  --font-num: 'IBM Plex Mono', ui-monospace, monospace;
+  --w-title: 600;
+  --w-title2: 600;
+  --track-k: 0.5;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --r-pill: 6px;
+  --r-sheet: 14px;
+}
+[data-style='ardoise'] .glass {
+  background:
+    radial-gradient(
+      circle at var(--mx, 50%) var(--my, 50%),
+      transparent calc(var(--rp) * 420px - 40px),
+      color-mix(in srgb, var(--touch, transparent) calc((1 - var(--rp)) * 100%), transparent) calc(var(--rp) * 420px),
+      transparent calc(var(--rp) * 420px + 1.5px)
+    ),
+    linear-gradient(135deg, var(--g-wash0), var(--g-wash1)),
+    linear-gradient(var(--g-fill), var(--g-fill));
+  box-shadow:
+    inset 0 1px 0 var(--g-spec),
+    var(--g-shadow),
+    var(--g-glow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-style='ardoise'] .glass::before {
+  background: var(--g-rim);
+}
+/* Les teintes restent lisibles par une barre de couleur à gauche, pas par une lueur. */
+[data-style='ardoise'] .glass:is(.tone-accent, .tone-gold, .tone-success, .tone-danger, .tone-warning, .tone-info) {
+  box-shadow:
+    inset 3px 0 0 var(--g-edge),
+    var(--g-shadow);
+}
+[data-style='ardoise'] .glass-glow {
+  --g-glow: 0 0 0 transparent;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+[data-style='ardoise'] .liquid {
+  background: var(--accent);
+  box-shadow: inset 0 1px 0 var(--highlight);
+}
+[data-style='ardoise'] .liquid-gold {
+  background: var(--gold);
+}
+[data-style='ardoise'] .bead,
+[data-style='ardoise'] .dock-pill {
+  background: var(--surface-pressed);
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+[data-style='ardoise'] .orb {
+  border-radius: var(--r-xl);
+  background: var(--accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+[data-style='ardoise'] .orb-ring {
+  display: none;
+}
+[data-style='ardoise'] .field-input {
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: none;
+}
+[data-style='ardoise'] .field-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+[data-style='ardoise'] .condense-bar,
+[data-style='ardoise'] .palette-veil,
+[data-style='ardoise'] .sheet-veil {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-style='ardoise'] .condense-bar {
+  background: color-mix(in srgb, var(--bg) calc(var(--p) * 100%), transparent);
+}
+[data-style='ardoise'] .palette-veil {
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+}
+
+/* ------------------------------------------------------------------ Argile : douceur en relief */
+[data-style='argile'] {
+  --font-display: Nunito, Inter, system-ui, sans-serif;
+  --font-body: Nunito, Inter, system-ui, sans-serif;
+  --font-num: Nunito, Inter, system-ui, sans-serif;
+  --font-label: Nunito, Inter, system-ui, sans-serif;
+  --w-title: 800;
+  --w-title2: 800;
+  --w-label: 700;
+  --track-k: 0.5;
+  --r-xs: 12px;
+  --r-sm: 18px;
+  --r-md: 22px;
+  --r-lg: 30px;
+  --r-xl: 36px;
+  --r-pill: 999px;
+  --r-sheet: 40px;
+}
+[data-style='argile'] body {
+  font-weight: 500;
+}
+[data-style='argile'] .glass {
+  background:
+    radial-gradient(
+      circle at var(--mx, 50%) var(--my, 50%),
+      transparent calc(var(--rp) * 420px - 40px),
+      color-mix(in srgb, var(--touch, transparent) calc((1 - var(--rp)) * 160%), transparent) calc(var(--rp) * 420px),
+      transparent calc(var(--rp) * 420px + 1.5px)
+    ),
+    radial-gradient(260px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--touch, transparent) calc(var(--gl) * 100%), transparent), transparent 70%),
+    linear-gradient(135deg, var(--g-wash0), var(--g-wash1)),
+    linear-gradient(var(--g-fill), var(--g-fill));
+  border: 0;
+  box-shadow:
+    var(--g-shadow),
+    inset 3px 3px 6px var(--g-spec),
+    inset -5px -5px 12px var(--clay-in),
+    var(--g-glow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-style='argile'] .glass::before {
+  display: none;
+}
+[data-style='argile'] .glass-glow {
+  --g-glow: 0 14px 30px -10px var(--accent-glow);
+}
+[data-style='argile'] .liquid,
+[data-style='argile'] .orb {
+  box-shadow:
+    0 12px 24px -8px var(--accent-glow),
+    inset 3px 3px 7px rgba(255, 255, 255, 0.45),
+    inset -4px -5px 10px rgba(0, 0, 0, 0.2);
+}
+[data-style='argile'] .orb-ring {
+  display: none;
+}
+[data-style='argile'] .bead,
+[data-style='argile'] .dock-pill {
+  background: var(--accent-soft);
+  border: 0;
+  box-shadow:
+    inset 2px 2px 5px var(--clay-in),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.8);
+}
+[data-style='argile'] .etched,
+[data-style='argile'] .field-input {
+  background: var(--well);
+  border-color: transparent;
+  box-shadow:
+    inset 3px 3px 7px var(--well-shade),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.85);
+}
+[data-style='argile'] .field-input:focus {
+  box-shadow:
+    inset 3px 3px 7px var(--well-shade),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.85),
+    0 0 0 3px var(--accent-soft);
+}
+[data-style='argile'] .condense-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--bg) calc(var(--p) * 96%), transparent);
+}
+
+/* ------------------------------------------------------------------ Brut : néo-brutalisme */
+[data-style='brut'] {
+  --font-display: Archivo, 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --font-num: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --font-label: 'Space Grotesk', Inter, system-ui, sans-serif;
+  --w-title: 900;
+  --w-title2: 800;
+  --w-label: 700;
+  --track-k: 1.1;
+  --label-case: uppercase;
+  --label-track: 0.06em;
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --r-pill: 999px;
+  --r-sheet: 14px;
+  --bw: 2.5px;
+}
+[data-style='brut'] .glass {
+  background:
+    linear-gradient(var(--g-wash0), var(--g-wash0)),
+    linear-gradient(var(--g-fill), var(--g-fill));
+  border: var(--bw) solid var(--ink-line);
+  box-shadow:
+    var(--g-shadow),
+    var(--g-glow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-style='brut'] .glass::before {
+  display: none;
+}
+/* Appuyer, c'est enfoncer la plaque dans son ombre. */
+[data-style='brut'] .glass.tap {
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out;
+}
+[data-style='brut'] .glass.tap:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 var(--ink-line);
+}
+[data-style='brut'] .glass-glow {
+  --g-glow: 0 0 0 transparent;
+  --g-wash0: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+[data-style='brut'] .glass-lens {
+  border-bottom-width: 0;
+}
+[data-style='brut'] .liquid {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: var(--bw) solid var(--ink-line);
+  box-shadow: 3px 3px 0 var(--ink-line);
+  font-weight: 700;
+}
+[data-style='brut'] .liquid:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink-line);
+}
+[data-style='brut'] .liquid-gold {
+  background: #ffe45c;
+  color: var(--text);
+}
+[data-style='brut'] .bead,
+[data-style='brut'] .dock-pill {
+  background: #ffe45c;
+  border: 2px solid var(--ink-line);
+  box-shadow: none;
+}
+[data-style='brut'] .orb {
+  background: var(--accent);
+  border: var(--bw) solid var(--ink-line);
+  box-shadow: 3px 3px 0 var(--ink-line);
+}
+[data-style='brut'] .orb:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--ink-line);
+}
+[data-style='brut'] .orb-ring {
+  display: none;
+}
+[data-style='brut'] .etched {
+  background: #fff;
+  border: 2px solid var(--ink-line);
+  box-shadow: none;
+}
+[data-style='brut'] .field-input {
+  background: #fff;
+  border: 2px solid var(--ink-line);
+  box-shadow: none;
+  font-weight: 600;
+}
+[data-style='brut'] .field-input:focus {
+  border-color: var(--ink-line);
+  box-shadow: 3px 3px 0 var(--accent);
+}
+[data-style='brut'] .t-large,
+[data-style='brut'] .t-hero {
+  text-transform: uppercase;
+}
+[data-style='brut'] .condense-bar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--bg) calc(var(--p) * 100%), transparent);
+}
+[data-style='brut'] .condense-edge {
+  box-shadow: inset 0 -2.5px 0 var(--ink-line);
+}
+[data-style='brut'] .sheet-veil,
+[data-style='brut'] .palette-veil {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: rgba(10, 10, 10, 0.35);
+}
+[data-style='brut'] :focus-visible {
+  outline: 3px solid var(--ink-line);
+}
+[data-style='brut'] ::selection {
+  background: #ffe45c;
+}
+
+/* Les identités sans verre n'ont pas besoin de la version dense d'Android : elles sont déjà opaques. */
+:is([data-style='ardoise'], [data-style='argile'], [data-style='brut']) .glass {
+  transition: none;
+}
+/* Android garde les ombres de ces identités : franches (Brut) ou qui font le relief (Argile). */
+.android:is([data-style='brut'], [data-style='argile']) .glass:not(.glass-float):not(.glass-lens) {
+  box-shadow: var(--g-shadow), var(--g-glow);
+}
+.android[data-style='argile'] .glass:not(.glass-float):not(.glass-lens) {
+  box-shadow:
+    var(--g-shadow),
+    inset 3px 3px 6px var(--g-spec),
+    inset -5px -5px 12px var(--clay-in);
 }
