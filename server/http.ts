@@ -23,7 +23,7 @@ export async function getDb(): Promise<Db> {
 export function getEnv(): Env {
   const secret = process.env.SESSION_SECRET ?? '';
   if (secret.length < 32) throw new HttpError(503, 'Serveur non configuré : SESSION_SECRET manquant.');
-  return { secret, invite: process.env.INVITE_CODE ?? '' };
+  return { secret, invite: process.env.INVITE_CODE ?? '', signup: process.env.SIGNUP === 'invite' ? 'invite' : 'open' };
 }
 
 type Req = IncomingMessage & { body?: unknown };
@@ -53,6 +53,13 @@ export async function handle(req: Req, res: ServerResponse, fn: (body: Record<st
     console.error(e);
     send(500, { error: 'Erreur interne du serveur.' });
   }
+}
+
+/** Adresse du client vue par Vercel (en-tête posé par la plateforme) : sert seulement aux garde-fous. */
+export function clientIp(req: Req): string {
+  const h = req.headers['x-real-ip'] ?? req.headers['x-forwarded-for'];
+  const v = Array.isArray(h) ? h[0] : h;
+  return (v ?? '').split(',')[0]!.trim();
 }
 
 export function bearer(req: Req): string | undefined {

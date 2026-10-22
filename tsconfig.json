@@ -11,5 +11,5 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["api", "server", "tests", "packages"]
+  "include": ["api", "server", "tests", "packages/sync-client", "packages/lumen"]
 }

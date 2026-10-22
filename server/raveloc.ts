@@ -296,6 +296,15 @@ async function settleAfterDeparture(db: Db, gid: string): Promise<void> {
   if (!rows.some((r) => r.role === 'admin')) await db.query(`UPDATE raveloc_members SET role = 'admin' WHERE group_id = $1 AND user_id = $2`, [gid, rows[0]!.user_id]);
 }
 
+/** Compte supprimé : il quitte tous ses groupes (positions effacées, admin transmis, groupe vide effacé). */
+export async function forgetUser(db: Db, uid: string): Promise<void> {
+  const { rows } = await db.query<{ group_id: string }>('SELECT group_id FROM raveloc_members WHERE user_id = $1', [uid]);
+  for (const r of rows) {
+    await db.query('DELETE FROM raveloc_members WHERE group_id = $1 AND user_id = $2', [r.group_id, uid]);
+    await settleAfterDeparture(db, r.group_id);
+  }
+}
+
 /** Un admin retire un membre : son adhésion et sa position sont effacées, ses accès coupés aussitôt. */
 export async function removeMember(db: Db, uid: string, body: Body, now = Date.now()): Promise<{ ok: true }> {
   await limit(db, uid, 'write', now);

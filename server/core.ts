@@ -17,8 +17,14 @@ export interface Db {
 export interface Env {
   /** Secret du serveur : signe les sessions et « poivre » les empreintes. */
   secret: string;
-  /** Code à fournir pour créer un compte (toi et tes copains). */
+  /** Code d'invitation, exigé seulement quand `signup` vaut 'invite'. */
   invite: string;
+  /**
+   * 'open' (défaut) : tout le monde crée son compte en un écran, comme dans une app ordinaire ; les
+   * abus sont bornés (comptes par réseau et par jour, essais de mot de passe, quotas de stockage).
+   * 'invite' : le code d'invitation est exigé.
+   */
+  signup: 'open' | 'invite';
 }
 
 export class HttpError extends Error {
@@ -30,13 +36,26 @@ export class HttpError extends Error {
   }
 }
 
-export const APPS = ['finances', 'perf'] as const;
+/** `mylife` : réglages communs à toutes les apps (apparence), synchronisés entre appareils. */
+export const APPS = ['finances', 'perf', 'mylife'] as const;
 export type App = (typeof APPS)[number];
 export const KDF_ITERATIONS = 200_000;
 const SESSION_DAYS = 365;
 const MAX_CHANGES = 500;
 const MAX_PAYLOAD = 200_000;
 const PULL_LIMIT = 1000;
+/** Lignes gardées au plus par compte et par app (garde-fou de stockage, très au-delà d'un usage réel). */
+export const ROW_QUOTA: Record<App, number> = { finances: 100_000, perf: 100_000, mylife: 200 };
+
+/** Garde-fous contre les abus (fenêtres simples, par clé). */
+export const RATES = {
+  /** Comptes créés depuis un même réseau (adresse IP, gardée seulement sous forme d'empreinte). */
+  signup: { max: 10, windowMs: 86_400_000 },
+  /** Vérifications de disponibilité d'un identifiant. */
+  available: { max: 120, windowMs: 3_600_000 },
+  /** Mauvais mots de passe (ou clés de secours) pour un même identifiant. */
+  badPassword: { max: 10, windowMs: 15 * 60_000 },
+} as const;
 
 // ---------------------------------------------------------------- schéma
 
@@ -66,6 +85,7 @@ export async function ensureSchema(db: Db): Promise<void> {
     PRIMARY KEY (user_id, app, tbl, rid)
   )`);
   await db.query(`CREATE INDEX IF NOT EXISTS records_by_seq ON records (user_id, app, seq)`);
+  await db.query(`CREATE TABLE IF NOT EXISTS auth_rate (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INTEGER NOT NULL, at BIGINT NOT NULL)`);
 }
 
 // ---------------------------------------------------------------- sessions
@@ -115,6 +135,51 @@ function same(a: string, b: string): boolean {
 }
 const slow = () => new Promise((r) => setTimeout(r, 400));
 
+// ---------------------------------------------------------------- abus
+
+type Rule = { max: number; windowMs: number };
+
+/** Compte un essai dans la fenêtre courante et renvoie le total. */
+async function hit(db: Db, key: string, rule: Rule, now: number): Promise<number> {
+  const win = Math.floor(now / rule.windowMs);
+  const { rows } = await db.query<{ n: number }>(
+    `INSERT INTO auth_rate (k, win, n, at) VALUES ($1, $2, 1, $3)
+     ON CONFLICT (k) DO UPDATE SET n = CASE WHEN auth_rate.win = EXCLUDED.win THEN auth_rate.n + 1 ELSE 1 END, win = EXCLUDED.win, at = EXCLUDED.at
+     RETURNING n`,
+    [key, win, now],
+  );
+  // Ménage occasionnel des fenêtres périmées.
+  if (Math.random() < 0.02) await db.query('DELETE FROM auth_rate WHERE at <= $1', [now - 2 * 86_400_000]);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Essais déjà comptés dans la fenêtre courante, sans en ajouter. */
+async function count(db: Db, key: string, rule: Rule, now: number): Promise<number> {
+  const { rows } = await db.query<{ n: number }>('SELECT n FROM auth_rate WHERE k = $1 AND win = $2', [key, Math.floor(now / rule.windowMs)]);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Empreinte de l'adresse du client : on ne garde jamais l'adresse elle-même. */
+const ipKey = (env: Env, ip: string) => hmac(env.secret, `ip:${ip || 'inconnue'}`).subarray(0, 12).toString('hex');
+
+/** Qui appelle : adresse (pour les garde-fous) et horloge (fixée dans les tests). */
+export interface Client {
+  ip: string;
+  now?: number;
+}
+
+/** Trop de mauvais essais récents pour cet identifiant : on refuse sans même vérifier. */
+async function guardAttempts(db: Db, kind: 'password' | 'recovery', login: string, now: number): Promise<void> {
+  if ((await count(db, `bad-${kind}:${login}`, RATES.badPassword, now)) >= RATES.badPassword.max) {
+    throw new HttpError(429, 'Trop d’essais pour cet identifiant : réessaie dans un quart d’heure.');
+  }
+}
+
+async function failedAttempt(db: Db, kind: 'password' | 'recovery', login: string, now: number): Promise<void> {
+  await hit(db, `bad-${kind}:${login}`, RATES.badPassword, now);
+  await slow();
+}
+
 interface UserRow {
   id: string;
   kdf_salt: string;
@@ -138,13 +203,26 @@ export async function getSalt(db: Db, env: Env, body: Record<string, unknown>): 
   return { salt: hmac(env.secret, `salt:${login}`).subarray(0, 16).toString('hex'), iterations: KDF_ITERATIONS };
 }
 
-export async function signup(db: Db, env: Env, body: Record<string, unknown>, now = Date.now()): Promise<{ token: string; login: string }> {
+/** L'identifiant est-il libre ? (écran de création : réponse pendant la saisie). */
+export async function available(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ available: boolean }> {
+  const now = client.now ?? Date.now();
+  if ((await hit(db, `available:${ipKey(env, client.ip)}`, RATES.available, now)) > RATES.available.max) throw new HttpError(429, 'Trop de vérifications : réessaie dans un moment.');
   const login = loginOf(body);
-  const invite = typeof body.invite === 'string' ? body.invite.trim() : '';
-  if (!env.invite || !same(invite, env.invite)) {
-    await slow();
-    throw new HttpError(403, 'Code d’invitation incorrect.');
+  const { rows } = await db.query('SELECT 1 FROM users WHERE login = $1', [login]);
+  return { available: !rows[0] };
+}
+
+export async function signup(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ token: string; login: string }> {
+  const now = client.now ?? Date.now();
+  const login = loginOf(body);
+  if (env.signup === 'invite') {
+    const invite = typeof body.invite === 'string' ? body.invite.trim() : '';
+    if (!env.invite || !same(invite, env.invite)) {
+      await slow();
+      throw new HttpError(403, 'Code d’invitation incorrect.');
+    }
   }
+  if ((await hit(db, `signup:${ipKey(env, client.ip)}`, RATES.signup, now)) > RATES.signup.max) throw new HttpError(429, 'Trop de comptes créés depuis ce réseau aujourd’hui : réessaie demain.');
   const salt = str(body, 'salt', HEX32);
   const authKey = str(body, 'authKey', HEX64);
   const recAuth = str(body, 'recAuth', HEX64);
@@ -164,27 +242,29 @@ export async function signup(db: Db, env: Env, body: Record<string, unknown>, no
   return { token: signToken(id, env.secret, now), login };
 }
 
-export async function login(db: Db, env: Env, body: Record<string, unknown>): Promise<{ token: string; login: string; wrappedKey: string }> {
+export async function login(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ token: string; login: string; wrappedKey: string }> {
+  const now = client.now ?? Date.now();
   const name = loginOf(body);
   const authKey = str(body, 'authKey', HEX64);
+  await guardAttempts(db, 'password', name, now);
   const { rows } = await db.query<UserRow>('SELECT id, auth_hash, wrapped_key FROM users WHERE login = $1', [name]);
   const user = rows[0];
   if (!user || !same(fingerprint(env, authKey), user.auth_hash)) {
-    await slow();
+    await failedAttempt(db, 'password', name, now);
     throw new HttpError(401, 'Identifiant ou mot de passe incorrect.');
   }
-  return { token: signToken(user.id, env.secret), login: name, wrappedKey: user.wrapped_key };
+  return { token: signToken(user.id, env.secret, now), login: name, wrappedKey: user.wrapped_key };
 }
 
 /** Mot de passe oublié, étape 1 : la clé de secours prouve l'identité et rend la clé de données emballée. */
-export async function recoverStart(db: Db, env: Env, body: Record<string, unknown>): Promise<{ recWrappedKey: string }> {
-  const user = await byRecovery(db, env, body);
+export async function recoverStart(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ recWrappedKey: string }> {
+  const user = await byRecovery(db, env, body, client.now);
   return { recWrappedKey: user.rec_wrapped_key };
 }
 
 /** Étape 2 : nouveau mot de passe (nouvelle clé d'authentification, clé de données ré-emballée). */
-export async function recoverFinish(db: Db, env: Env, body: Record<string, unknown>): Promise<{ token: string; login: string }> {
-  const user = await byRecovery(db, env, body);
+export async function recoverFinish(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ token: string; login: string }> {
+  const user = await byRecovery(db, env, body, client.now);
   await setPassword(db, env, user.id, body);
   return { token: signToken(user.id, env.secret), login: loginOf(body) };
 }
@@ -194,13 +274,14 @@ export async function changePassword(db: Db, env: Env, uid: string, body: Record
   return { ok: true };
 }
 
-async function byRecovery(db: Db, env: Env, body: Record<string, unknown>): Promise<UserRow> {
+async function byRecovery(db: Db, env: Env, body: Record<string, unknown>, now = Date.now()): Promise<UserRow> {
   const name = loginOf(body);
   const recAuth = str(body, 'recAuth', HEX64);
+  await guardAttempts(db, 'recovery', name, now);
   const { rows } = await db.query<UserRow>('SELECT id, rec_hash, rec_wrapped_key FROM users WHERE login = $1', [name]);
   const user = rows[0];
   if (!user || !same(fingerprint(env, recAuth), user.rec_hash)) {
-    await slow();
+    await failedAttempt(db, 'recovery', name, now);
     throw new HttpError(401, 'Identifiant ou clé de secours incorrect.');
   }
   return user;
@@ -211,6 +292,33 @@ async function setPassword(db: Db, env: Env, uid: string, body: Record<string, u
   const authKey = str(body, 'newAuthKey', HEX64);
   const wrappedKey = str(body, 'newWrappedKey', B64);
   await db.query('UPDATE users SET kdf_salt = $2, kdf_iter = $3, auth_hash = $4, wrapped_key = $5 WHERE id = $1', [uid, salt, KDF_ITERATIONS, fingerprint(env, authKey), wrappedKey]);
+}
+
+/** Nouvelle clé de secours (l'ancienne cesse de fonctionner) : la session suffit, comme pour le mot de passe. */
+export async function renewRecovery(db: Db, env: Env, uid: string, body: Record<string, unknown>): Promise<{ ok: true }> {
+  const recAuth = str(body, 'recAuth', HEX64);
+  const recWrappedKey = str(body, 'recWrappedKey', B64);
+  await db.query('UPDATE users SET rec_hash = $2, rec_wrapped_key = $3 WHERE id = $1', [uid, fingerprint(env, recAuth), recWrappedKey]);
+  return { ok: true };
+}
+
+/**
+ * Suppression du compte : le mot de passe est redemandé (preuve fraîche), puis le compte et toutes ses
+ * données synchronisées sont effacés du serveur. Les données restent sur les appareils.
+ */
+export async function deleteAccount(db: Db, env: Env, uid: string, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ ok: true }> {
+  const now = client.now ?? Date.now();
+  const authKey = str(body, 'authKey', HEX64);
+  const { rows } = await db.query<UserRow & { login: string }>('SELECT id, login, auth_hash FROM users WHERE id = $1', [uid]);
+  const user = rows[0];
+  if (!user) throw new HttpError(404, 'Compte introuvable.');
+  await guardAttempts(db, 'password', user.login, now);
+  if (!same(fingerprint(env, authKey), user.auth_hash)) {
+    await failedAttempt(db, 'password', user.login, now);
+    throw new HttpError(401, 'Mot de passe incorrect.');
+  }
+  await db.query('DELETE FROM users WHERE id = $1', [uid]);
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------- synchronisation
@@ -288,6 +396,10 @@ export async function sync(
   const changes = parseChanges(body.changes);
 
   if (body.reset === true) await db.query('DELETE FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
+  if (changes.some((c) => !c.deleted)) {
+    const { rows: n } = await db.query<{ n: string | number }>('SELECT COUNT(*) AS n FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
+    if (Number(n[0]?.n ?? 0) + changes.length > ROW_QUOTA[app]) throw new HttpError(413, 'Espace du compte plein pour cette app : supprime des données anciennes ou écris-nous.');
+  }
 
   let accepted = 0;
   let overruled: RecordRow[] = [];
