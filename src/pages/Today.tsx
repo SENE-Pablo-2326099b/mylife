@@ -22,6 +22,7 @@ import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
+import { useTabActive } from '../ui/tabActive';
 import { useBreakpoint } from '../ui/responsive';
 import { useToClassifyCount } from '../domain/unclassified';
 import { refreshEverything } from '../sync/refresh';
@@ -56,7 +57,8 @@ export default function TodayPage() {
   const serious = alerts.filter((a) => a.level !== 'info');
   const status = STATUS[b.status];
   // Le champ de lumière prend la couleur du budget du jour tant que cet écran est ouvert.
-  const ambientTone = total ? (b.overrun ? 'danger' : status.tone) : null;
+  const active = useTabActive();
+  const ambientTone = total && active ? (b.overrun ? 'danger' : status.tone) : null;
   useEffect(() => {
     setAmbient(ambientTone);
     return () => setAmbient(null);

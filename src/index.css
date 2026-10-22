@@ -614,3 +614,25 @@ input[type='number']::-webkit-outer-spin-button {
     --gl 0.45s ease-out,
     transform 0.08s ease-out;
 }
+
+/* Changement d'onglet : l'écran gardé glisse un peu depuis le côté d'où il vient, sans attendre. */
+.tab-in-right {
+  animation: tab-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.tab-in-left {
+  animation: tab-in-left 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes tab-in-right {
+  from {
+    transform: translateX(22px);
+  }
+}
+@keyframes tab-in-left {
+  from {
+    transform: translateX(-22px);
+  }
+}
+.reduce-motion .tab-in-right,
+.reduce-motion .tab-in-left {
+  animation: none;
+}

@@ -6,6 +6,7 @@ import { setDockHidden } from './dockStore';
 import { Button, EmptyState, IconButton } from './primitives';
 import { useBreakpoint } from './responsive';
 import { PullToRefresh } from './PullToRefresh';
+import { useTabActive } from './tabActive';
 import { APP_NAME } from '../lib/app';
 
 
@@ -90,12 +91,14 @@ export function Screen({
     setCondensed((c) => (c === next ? c : next));
   });
 
+  // Onglet gardé en arrière-plan : il ne pilote ni l'ambiance ni le titre ; il les reprend en revenant.
+  const active = useTabActive();
   useEffect(() => {
-    setMood(mood);
-  }, [mood]);
+    if (active) setMood(mood);
+  }, [mood, active]);
   useEffect(() => {
-    document.title = `${title} · ${APP_NAME}`;
-  }, [title]);
+    if (active) document.title = `${title} · ${APP_NAME}`;
+  }, [title, active]);
   useEffect(() => {
     if (!stack) return;
     setDockHidden(true);
@@ -110,7 +113,7 @@ export function Screen({
 
   return (
     <div className="min-h-[100dvh]" style={{ paddingLeft: 'var(--nav-left, 0px)', paddingTop: `calc(var(--safe-top) + ${stack ? 68 : 16}px)`, paddingBottom: `calc(var(--safe-bottom) + ${bottomPad}px)` }}>
-      <main id="contenu" className={column} tabIndex={-1}>
+      <main id={active ? 'contenu' : undefined} className={column} tabIndex={-1}>
         {!stack && !titleHidden && (
           <header className="mb-4">
             {/* Ligne du haut : sur-titre et actions ; le titre a ensuite toute la largeur (pas de mot coupé à 320 px). */}
@@ -161,7 +164,7 @@ export function Screen({
         </div>
       </m.div>
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-20" style={{ height: 'var(--safe-top)', background: 'var(--status-veil)' }} />
-      {onRefresh && <PullToRefresh onRefresh={onRefresh} />}
+      {onRefresh && active && <PullToRefresh onRefresh={onRefresh} />}
 
       {footer && (
         <div className="pointer-events-none fixed inset-x-0 z-30" style={{ left: 'var(--nav-left, 0px)', bottom: `calc(var(--safe-bottom) + ${docked ? 96 : 12}px)` }}>

@@ -12,7 +12,8 @@ import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
 import { Navigation, type TabDef } from './ui/Navigation';
-import { PageTransition } from './ui/PageTransition';
+import { KeptTabs, PushedScreen } from './ui/PageTransition';
+import { isTabPath } from './ui/tabActive';
 import { setPaletteOpen } from './ui/paletteStore';
 import { CommandPalette } from './components/CommandPalette';
 import { NotFoundScreen } from './ui/Screen';
@@ -167,26 +168,23 @@ function Shell() {
       </a>
       <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={pageFallback}>
-      <PageTransition>
+      <KeptTabs pages={{ '/': <TodayPage />, '/budget': <CyclePage />, '/operations': <TransactionsPage />, '/patrimoine': <WealthPage />, '/reglages': <SettingsPage /> }} />
+      {!isTabPath(pathname) && (
+      <PushedScreen>
       <Routes location={location}>
         <Route path="/bienvenue" element={<OnboardingPage />} />
-        <Route path="/" element={<TodayPage />} />
-        <Route path="/budget" element={<CyclePage />} />
         <Route path="/cycle" element={<Navigate to="/budget" replace />} />
         <Route path="/previsions" element={<ForecastPage />} />
         <Route path="/recurrents" element={<RecurringPage />} />
-        <Route path="/operations" element={<TransactionsPage />} />
         <Route path="/transactions" element={<Navigate to="/operations" replace />} />
         <Route path="/a-classer" element={<QueuePage />} />
         <Route path="/alertes" element={<AlertsPage />} />
         <Route path="/assistant" element={<AssistantPage />} />
-        <Route path="/patrimoine" element={<WealthPage />} />
         <Route path="/patrimoine/placement/:id" element={<PortfolioDetailPage />} />
         <Route path="/patrimoine/import" element={<TrImportPage />} />
         <Route path="/independance" element={<FirePage />} />
         <Route path="/synchro" element={<SyncPage />} />
         <Route path="/connexion/retour" element={<CallbackPage />} />
-        <Route path="/reglages" element={<SettingsPage />} />
         <Route path="/reglages/profil" element={<ProfilePage />} />
         <Route path="/reglages/compte" element={<AccountPage />} />
         <Route path="/reglages/budget" element={<BudgetSettingsPage />} />
@@ -197,7 +195,8 @@ function Shell() {
         <Route path="/reglages/donnees" element={<DataPage />} />
         <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
       </Routes>
-      </PageTransition>
+      </PushedScreen>
+      )}
       </Suspense>
       </ErrorBoundary>
       {!welcome && <Navigation tabs={tabs} onSearch={() => setPaletteOpen(true)} onAssistant={() => navigate('/assistant')} />}

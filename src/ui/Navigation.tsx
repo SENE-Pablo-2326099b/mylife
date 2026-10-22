@@ -1,5 +1,5 @@
 import { m, useMotionValueEvent, useScroll } from 'framer-motion';
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../lib/app';
 import { useDockHidden } from './dockStore';
@@ -47,9 +47,25 @@ function useScrollTucked(): boolean {
   // La position vient de la valeur de défilement partagée de framer (lue une fois par image pour tout
   // l'écran) : pas de lecture de scrollY ici, qui forcerait une mise en page après chaque écriture.
   const { scrollY } = useScroll();
+  const { pathname } = useLocation();
   const [tucked, setTucked] = useState(false);
   const last = useRef(0);
+  // Changement d'écran : le dock reste visible, et le saut de défilement (position retrouvée d'un
+  // onglet, retour en haut) ne compte pas comme un geste vers le bas.
+  const settle = useRef(0);
+  const [seen, setSeen] = useState(pathname);
+  if (seen !== pathname) {
+    setSeen(pathname);
+    setTucked(false);
+  }
+  useEffect(() => {
+    settle.current = performance.now() + 400;
+  }, [pathname]);
   useMotionValueEvent(scrollY, 'change', (y) => {
+    if (performance.now() < settle.current) {
+      last.current = y;
+      return;
+    }
     const dy = y - last.current;
     if (Math.abs(dy) < 8) return;
     last.current = y;
@@ -82,7 +98,14 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
         tabIndex={hidden ? -1 : undefined}
         aria-current={focused ? 'page' : undefined}
         aria-label={t.label}
-        onClick={() => haptic('tap')}
+        onClick={(e) => {
+          haptic('tap');
+          // Onglet déjà ouvert : on remonte en haut au lieu de recharger.
+          if (focused && pathname === t.to) {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
         className="relative flex h-12 items-center justify-center"
       >
         <m.span layout transition={springs.liquid} className={`relative flex h-12 items-center gap-2 ${focused ? 'px-4' : 'px-3.5'}`}>

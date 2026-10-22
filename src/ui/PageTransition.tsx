@@ -1,53 +1,77 @@
-import { AnimatePresence, m, type Variants } from 'framer-motion';
-import { useRef, type ReactNode } from 'react';
-import { useLocation, useNavigationType } from 'react-router-dom';
+import { m, useMotionValueEvent, useScroll } from 'framer-motion';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Routes, Route, useLocation, useNavigationType, type Location } from 'react-router-dom';
+import { isTabPath, TAB_PATHS, TabActive, type TabPath } from './tabActive';
 
 /**
- * Transitions spatiales entre écrans. Les sections principales sont côte à côte : on glisse vers la
- * gauche ou la droite selon leur ordre. Un écran ouvert depuis une section vient par-dessus, de la
- * droite, pendant que l'ancien recule ; le retour fait l'inverse. Le défilement revient en haut une
- * fois l'ancien écran parti.
+ * Navigation sans rechargement, comme une app native.
+ *
+ * - Les onglets restent montés une fois visités : en changer ne fait qu'afficher l'écran déjà prêt
+ *   (aucune relecture des données, aucun écran vide), à la position de défilement où on l'avait
+ *   laissé. Chacun garde sa propre adresse (ses filtres) même quand un autre est affiché.
+ * - Les écrans ouverts depuis un onglet arrivent par la droite (ou reculent au retour), sans attendre
+ *   la sortie de l'écran précédent.
  */
 
-const ROOTS = ['/', '/budget', '/operations', '/patrimoine', '/reglages'];
+export function KeptTabs({ pages }: { pages: Record<TabPath, ReactNode> }) {
+  const location = useLocation();
+  const active = isTabPath(location.pathname) ? location.pathname : null;
+  // Dernière adresse de chaque onglet visité (ses paramètres de filtre restent les siens).
+  const [kept, setKept] = useState<Partial<Record<TabPath, Location>>>(() => (active ? { [active]: location } : {}));
+  if (active && kept[active] !== location) setKept((k) => ({ ...k, [active]: location }));
 
-type Move = { kind: 'tab'; dir: number } | { kind: 'push' } | { kind: 'pop' };
+  // Position de défilement de chaque onglet : retenue en continu, rendue au retour.
+  const scrolls = useRef<Partial<Record<TabPath, number>>>({});
+  const current = useRef<TabPath | null>(active);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, 'change', (y) => {
+    if (current.current) scrolls.current[current.current] = y;
+  });
+  const prevActive = useRef<TabPath | null>(active);
+  const [dir, setDir] = useState(0);
+  useLayoutEffect(() => {
+    current.current = active;
+    if (active) window.scrollTo(0, scrolls.current[active] ?? 0);
+    const a = prevActive.current ? TAB_PATHS.indexOf(prevActive.current) : -1;
+    const b = active ? TAB_PATHS.indexOf(active) : -1;
+    setDir(a >= 0 && b >= 0 ? Math.sign(b - a) : 0);
+    prevActive.current = active;
+  }, [active]);
 
-const variants: Variants = {
-  enter: (m: Move) => (m.kind === 'tab' ? { x: m.dir * 36, opacity: 0 } : m.kind === 'push' ? { x: 56, opacity: 0 } : { scale: 0.96, opacity: 0 }),
-  // Durée fixe et courte (pas de ressort qui s'attarde) : l'écran est utilisable tout de suite.
-  center: { x: 0, scale: 1, opacity: 1, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] } },
-  exit: (m: Move) => ({
-    ...(m.kind === 'tab' ? { x: m.dir * -36 } : m.kind === 'push' ? { scale: 0.96 } : { x: 56 }),
-    opacity: 0,
-    transition: { duration: 0.1, ease: [0.4, 0, 1, 1] },
-  }),
-};
+  return (
+    <>
+      {(Object.keys(kept) as TabPath[]).map((path) => {
+        const on = path === active;
+        return (
+          <div key={path} hidden={!on} className={on && dir !== 0 ? (dir > 0 ? 'tab-in-right' : 'tab-in-left') : undefined}>
+            <TabActive.Provider value={on}>
+              <Routes location={on ? location : kept[path]}>
+                <Route path={path} element={pages[path]} />
+              </Routes>
+            </TabActive.Provider>
+          </div>
+        );
+      })}
+    </>
+  );
+}
 
-export function PageTransition({ children }: { children: ReactNode }) {
+/** Écrans poussés (hors onglets) : entrée par la droite, ou en reculant au retour ; défilement en haut. */
+export function PushedScreen({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const nav = useNavigationType();
-  const prev = useRef(pathname);
-  const move = useRef<Move>({ kind: 'push' });
-  if (prev.current !== pathname) {
-    const a = ROOTS.indexOf(prev.current);
-    const b = ROOTS.indexOf(pathname);
-    move.current = a >= 0 && b >= 0 ? { kind: 'tab', dir: Math.sign(b - a) || 1 } : nav === 'POP' ? { kind: 'pop' } : { kind: 'push' };
-    prev.current = pathname;
-  }
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return (
-    <AnimatePresence mode="wait" initial={false} custom={move.current} onExitComplete={() => window.scrollTo(0, 0)}>
-      <m.div
-        key={pathname}
-        custom={move.current}
-        variants={variants}
-        initial="enter"
-        animate="center"
-        exit="exit"
-        style={{ transformOrigin: '50% 30%' }}
-      >
-        {children}
-      </m.div>
-    </AnimatePresence>
+    <m.div
+      key={pathname}
+      initial={nav === 'POP' ? { scale: 0.97, opacity: 0 } : { x: 48, opacity: 0 }}
+      animate={{ x: 0, scale: 1, opacity: 1 }}
+      transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{ transformOrigin: '50% 30%' }}
+    >
+      {children}
+    </m.div>
   );
 }
