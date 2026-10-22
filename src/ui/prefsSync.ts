@@ -1,5 +1,5 @@
 // GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
-import { autoJoin, join, loadState, syncNow, type LocalStore, type SyncState } from '../vendor/mylife-sync';
+import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/mylife-sync';
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
 import { parseAppearance } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
@@ -72,7 +72,11 @@ export const prefsStore: LocalStore = {
 let running = false;
 let again = false;
 
-/** Un passage : relier si besoin (le plus récent l'emporte, sans question), puis échanger. */
+/**
+ * Un passage. Pas de « reliure » comme pour les données des apps : une seule ligne, datée du choix de
+ * l'utilisateur (`at`), et le serveur garde la plus récente. Un thème jamais choisi (at = 0) n'est
+ * jamais envoyé : un appareil neuf ne peut pas écraser le choix fait ailleurs.
+ */
 export async function syncPrefs(): Promise<void> {
   const session = currentSession();
   if (!session || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
@@ -84,9 +88,9 @@ export async function syncPrefs(): Promise<void> {
   try {
     const state = await loadState(prefsStore, webPlatform.random);
     if (state.joinedAs !== session.login) {
-      const local = getAppearance().at;
-      const r = await autoJoin(prefsStore, webPlatform.api, session, webPlatform.random, async () => local > 0);
-      if (r.action === 'ask') await join(prefsStore, webPlatform.api, session, webPlatform.random, (r.lastUpdated ?? 0) > local ? 'useAccount' : 'useDevice');
+      // Nouveau compte sur cet appareil : tout relire depuis le début, et proposer le choix local.
+      await prefsStore.setState({ ...state, joinedAs: session.login, cursor: 0 });
+      write(PUSHED_KEY, '0');
     }
     await syncNow(prefsStore, webPlatform.api, session, webPlatform.random);
   } catch {
@@ -112,8 +116,9 @@ export function startPrefsSync(): void {
     timer = setTimeout(() => void syncPrefs(), ms);
   };
   onSessionChange(() => soon(300));
-  subscribeAppearance(() => soon());
-  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && soon(500));
+  // Un choix de thème part presque aussitôt : on change souvent d'app juste après.
+  subscribeAppearance(() => soon(150));
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? soon(500) : void syncPrefs()));
   window.addEventListener('online', () => soon(500));
-  soon(2500);
+  soon(400);
 }
