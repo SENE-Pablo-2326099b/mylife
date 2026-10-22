@@ -7,7 +7,7 @@
  * Données seulement : aucun import, aucune dépendance.
  */
 
-export const THEME_IDS = ['nuit', 'ocean', 'braise', 'graphite', 'perle', 'glacier', 'sable', 'craie'] as const;
+export const THEME_IDS = ['nuit', 'ocean', 'braise', 'graphite', 'perle', 'glacier', 'sable', 'craie', 'circuit', 'ardoise', 'argile', 'brut'] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export function isThemeId(v: unknown): v is ThemeId {
@@ -20,20 +20,79 @@ export interface ThemeInfo {
   /** Quelques mots : à quoi il ressemble. */
   description: string;
   scheme: 'dark' | 'light';
-  /** Utilisé à la place quand le téléphone est dans l'autre mode (« Suivre le téléphone »). */
+  /**
+   * Utilisé à la place quand le téléphone est dans l'autre mode (« Suivre le téléphone »). Les thèmes
+   * à identité propre (Circuit, Ardoise, Argile, Brut) n'ont qu'un mode : ils sont leur propre paire.
+   */
   pair: ThemeId;
+  /** Identité visuelle : forme des cartes, typographie, fond, boutons, ombres (voir STYLES). */
+  style: StyleId;
 }
 
 export const THEMES: readonly ThemeInfo[] = [
-  { id: 'nuit', name: 'Nuit', description: 'Indigo, violet électrique, or', scheme: 'dark', pair: 'perle' },
-  { id: 'ocean', name: 'Océan', description: 'Bleu profond, cyan', scheme: 'dark', pair: 'glacier' },
-  { id: 'braise', name: 'Braise', description: 'Charbon, orange braise', scheme: 'dark', pair: 'sable' },
-  { id: 'graphite', name: 'Graphite', description: 'Gris neutre, vert acide', scheme: 'dark', pair: 'craie' },
-  { id: 'perle', name: 'Perle', description: 'Blanc nacré, violet, or', scheme: 'light', pair: 'nuit' },
-  { id: 'glacier', name: 'Glacier', description: 'Blanc bleuté, bleu franc', scheme: 'light', pair: 'ocean' },
-  { id: 'sable', name: 'Sable', description: 'Beige chaud, terre cuite', scheme: 'light', pair: 'braise' },
-  { id: 'craie', name: 'Craie', description: 'Gris clair, encre', scheme: 'light', pair: 'graphite' },
+  { id: 'nuit', name: 'Nuit', description: 'Indigo, violet électrique, or', scheme: 'dark', pair: 'perle', style: 'lumen' },
+  { id: 'ocean', name: 'Océan', description: 'Bleu profond, cyan', scheme: 'dark', pair: 'glacier', style: 'lumen' },
+  { id: 'braise', name: 'Braise', description: 'Charbon, orange braise', scheme: 'dark', pair: 'sable', style: 'lumen' },
+  { id: 'graphite', name: 'Graphite', description: 'Gris neutre, vert acide', scheme: 'dark', pair: 'craie', style: 'lumen' },
+  { id: 'perle', name: 'Perle', description: 'Blanc nacré, violet, or', scheme: 'light', pair: 'nuit', style: 'lumen' },
+  { id: 'glacier', name: 'Glacier', description: 'Blanc bleuté, bleu franc', scheme: 'light', pair: 'ocean', style: 'lumen' },
+  { id: 'sable', name: 'Sable', description: 'Beige chaud, terre cuite', scheme: 'light', pair: 'braise', style: 'lumen' },
+  { id: 'craie', name: 'Craie', description: 'Gris clair, encre', scheme: 'light', pair: 'graphite', style: 'lumen' },
+  { id: 'circuit', name: 'Circuit', description: 'Interface tête haute : néon cyan, grille, chiffres en mono', scheme: 'dark', pair: 'circuit', style: 'circuit' },
+  { id: 'ardoise', name: 'Ardoise', description: 'Outil pro mat : surfaces pleines, sobriété, Plex', scheme: 'dark', pair: 'ardoise', style: 'ardoise' },
+  { id: 'argile', name: 'Argile', description: 'Douceur en relief : pastel, formes rondes, ombres douces', scheme: 'light', pair: 'argile', style: 'argile' },
+  { id: 'brut', name: 'Brut', description: 'Néo-brutalisme : bordures noires, ombres franches, aplats', scheme: 'light', pair: 'brut', style: 'brut' },
 ];
+
+/**
+ * Identités visuelles. Un thème n'est pas qu'une palette : son style fixe la forme et la matière des
+ * cartes, la typographie, le fond, les boutons, les ombres et la densité. Chaque app le traduit avec
+ * ses moyens (CSS pour MyFinances, React Native pour MyPerf) à partir de ces mêmes valeurs : les deux
+ * apps restent identiques d'un thème à l'autre.
+ */
+export type StyleId = 'lumen' | 'circuit' | 'ardoise' | 'argile' | 'brut';
+
+export interface LumenStyle {
+  id: StyleId;
+  /** Familles de caractères (embarquées dans chaque app). */
+  fonts: { display: string; body: string; number: string };
+  /** Graisse des titres. */
+  titleWeight: 600 | 700 | 800 | 900;
+  /** Approche des titres (px pour 30 px). */
+  titleTracking: number;
+  /** Étiquettes (« Reste aujourd'hui », titres de colonnes) : casse normale ou capitales espacées. */
+  labelCase: 'normal' | 'upper';
+  /** Rayons : cartes, contrôles (boutons, champs), pastilles. */
+  radius: { card: number; control: number; chip: number };
+  /** Matière des cartes. */
+  card: 'glass' | 'outline' | 'solid' | 'clay' | 'brutal';
+  /** Épaisseur de la bordure des cartes (px). */
+  border: number;
+  /** Flou de ce qui est derrière les cartes (verre). */
+  blur: boolean;
+  /** Ombres : douces, lueur colorée, aucune, argile (doubles), franches décalées. */
+  shadow: 'soft' | 'glow' | 'none' | 'clay' | 'hard';
+  /** Texture de surface. */
+  texture: 'grain' | 'scanline' | 'none';
+  /** Fond de l'app. */
+  backdrop: 'halos' | 'grid' | 'plain' | 'blobs';
+  /** Bouton principal. */
+  button: 'liquid' | 'outline' | 'solid' | 'clay' | 'brutal';
+  /** Espacements (1 = référence Lumen). */
+  density: number;
+}
+
+export const STYLES: Record<StyleId, LumenStyle> = {
+  lumen: { id: 'lumen', fonts: { display: 'Sora', body: 'Inter', number: 'Sora' }, titleWeight: 700, titleTracking: -0.8, labelCase: 'normal', radius: { card: 22, control: 16, chip: 999 }, card: 'glass', border: 1, blur: true, shadow: 'soft', texture: 'grain', backdrop: 'halos', button: 'liquid', density: 1 },
+  circuit: { id: 'circuit', fonts: { display: 'Space Grotesk', body: 'Inter', number: 'JetBrains Mono' }, titleWeight: 700, titleTracking: -0.6, labelCase: 'upper', radius: { card: 6, control: 4, chip: 4 }, card: 'outline', border: 1, blur: false, shadow: 'glow', texture: 'scanline', backdrop: 'grid', button: 'outline', density: 0.94 },
+  ardoise: { id: 'ardoise', fonts: { display: 'IBM Plex Sans', body: 'IBM Plex Sans', number: 'IBM Plex Mono' }, titleWeight: 600, titleTracking: -0.5, labelCase: 'normal', radius: { card: 10, control: 8, chip: 8 }, card: 'solid', border: 1, blur: false, shadow: 'none', texture: 'none', backdrop: 'plain', button: 'solid', density: 0.92 },
+  argile: { id: 'argile', fonts: { display: 'Nunito', body: 'Nunito', number: 'Nunito' }, titleWeight: 800, titleTracking: -0.4, labelCase: 'normal', radius: { card: 30, control: 22, chip: 999 }, card: 'clay', border: 0, blur: false, shadow: 'clay', texture: 'none', backdrop: 'blobs', button: 'clay', density: 1.12 },
+  brut: { id: 'brut', fonts: { display: 'Archivo', body: 'Space Grotesk', number: 'Space Grotesk' }, titleWeight: 900, titleTracking: -1.2, labelCase: 'upper', radius: { card: 10, control: 8, chip: 8 }, card: 'brutal', border: 2.5, blur: false, shadow: 'hard', texture: 'none', backdrop: 'plain', button: 'brutal', density: 1.04 },
+};
+
+export function styleOf(id: ThemeId): LumenStyle {
+  return STYLES[THEMES.find((t) => t.id === id)?.style ?? 'lumen'];
+}
 
 /**
  * Opacité de l'encre pour les textes secondaires et discrets. Réglée pour que les petits textes
@@ -199,6 +258,88 @@ export const SEEDS: Record<Exclude<ThemeId, 'nuit' | 'perle'>, LumenSeed> = {
     warning: '#C2540A',
     info: '#2563EB',
     drop: '#9333EA',
+  },
+  circuit: {
+    scheme: 'dark',
+    field: ['#071021', '#05080F', '#020409'],
+    halos: { violet: '#00E5FF', gold: '#FF2BD6', indigo: '#3D5AFE', orchid: '#00FFA3' },
+    bg: '#05080F',
+    tint: '#7FF6FF',
+    bodies: { pane: '#08111F', raised: '#0B1628', float: '#071020', lens: '#050B16' },
+    shadow: '#000000',
+    text: '#E6FBFF',
+    accent: '#22E6FF',
+    accentGradient: ['#7CF3FF', '#00A8D6'],
+    onAccent: '#001318',
+    gold: '#FFD23F',
+    goldGradient: ['#FFE48A', '#E0A800'],
+    success: '#2BFF9A',
+    onSuccess: '#00210F',
+    danger: '#FF4D7D',
+    warning: '#FFB020',
+    info: '#7C9CFF',
+    drop: '#FF2BD6',
+  },
+  ardoise: {
+    scheme: 'dark',
+    field: ['#1A1D23', '#15171C', '#111317'],
+    halos: { violet: '#3B4252', gold: '#4C4637', indigo: '#2E3440', orchid: '#3A4A45' },
+    bg: '#15171C',
+    tint: '#C8D0DC',
+    bodies: { pane: '#1D2027', raised: '#23272F', float: '#1A1D23', lens: '#16191E' },
+    shadow: '#000000',
+    text: '#ECEFF4',
+    accent: '#8FB8FF',
+    accentGradient: ['#A9C8FF', '#5B8DEF'],
+    onAccent: '#0B1220',
+    gold: '#E5C07B',
+    goldGradient: ['#F0D9A8', '#C9A24E'],
+    success: '#7BD88F',
+    onSuccess: '#0E2A15',
+    danger: '#FF7A85',
+    warning: '#F0A35E',
+    info: '#7AB8FF',
+    drop: '#C792EA',
+  },
+  argile: {
+    scheme: 'light',
+    field: ['#F6F2FD', '#EEE9F7', '#E6E0F3'],
+    halos: { violet: '#CDB8FF', gold: '#FFD9A8', indigo: '#B9D3FF', orchid: '#BFF0DA' },
+    bg: '#EEE9F7',
+    tint: '#4A3B7A',
+    shadow: '#5A4A9A',
+    text: '#2A2245',
+    accent: '#6D4BD8',
+    accentGradient: ['#9C82F5', '#6141D1'],
+    onAccent: '#FFFFFF',
+    gold: '#9A6100',
+    goldGradient: ['#FFD9A0', '#E8A84A'],
+    success: '#147A4F',
+    onSuccess: '#FFFFFF',
+    danger: '#C5284A',
+    warning: '#B45309',
+    info: '#2F5FD0',
+    drop: '#B04ACB',
+  },
+  brut: {
+    scheme: 'light',
+    field: ['#FAFAF5', '#FAFAF5', '#F2F2EA'],
+    halos: { violet: '#FFE45C', gold: '#FF9EC7', indigo: '#9FD3FF', orchid: '#B8F2C9' },
+    bg: '#FAFAF5',
+    tint: '#0A0A0A',
+    shadow: '#0A0A0A',
+    text: '#0A0A0A',
+    accent: '#2F3CF4',
+    accentGradient: ['#4B57FF', '#2F3CF4'],
+    onAccent: '#FFFFFF',
+    gold: '#9A6700',
+    goldGradient: ['#FFE45C', '#F5B800'],
+    success: '#0F7B3F',
+    onSuccess: '#FFFFFF',
+    danger: '#D61F45',
+    warning: '#B45309',
+    info: '#2F3CF4',
+    drop: '#C026D3',
   },
 };
 
