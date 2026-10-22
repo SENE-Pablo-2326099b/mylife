@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Version web installable (PWA) de MyPerf, servie sous MyLife à l'adresse /perf/.
 // 1. export Expo (baseUrl /perf dans app.json) dans web/perf ;
-// 2. manifeste, icônes, service worker (hors ligne : toute l'app est mise en cache) ;
-// 3. index.html : manifeste, icône iPhone, enregistrement du service worker.
+// 2. service worker (hors ligne : toute l'app est mise en cache) ;
+// 3. index.html : manifeste et icône de MyLife (une seule app installable, portée /), transitions
+//    entre apps, enregistrement du service worker.
 // Usage : npm run build:web   puis   npm run deploy:web
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -15,7 +16,7 @@ const BASE = '/perf/';
 
 rmSync(OUT, { recursive: true, force: true });
 execSync(`npx expo export -p web --output-dir ${OUT}`, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=4096' } });
-cpSync(join(ROOT, 'web', 'static'), OUT, { recursive: true });
+if (existsSync(join(ROOT, 'web', 'static'))) cpSync(join(ROOT, 'web', 'static'), OUT, { recursive: true });
 
 // Vercel n'envoie jamais un dossier nommé node_modules : les polices et icônes qu'Expo y range
 // (assets/node_modules/…) sont déplacées dans assets/nm/ et les références réécrites.
@@ -50,32 +51,6 @@ for (const name of ordered) {
   renameSync(file, join(jsDir, renamed));
   current.set(name, renamed);
 }
-
-writeFileSync(
-  join(OUT, 'manifest.webmanifest'),
-  JSON.stringify(
-    {
-      name: 'MyPerf',
-      short_name: 'MyPerf',
-      description: 'Séances, cycles et progression. Les données restent sur ton appareil.',
-      lang: 'fr',
-      id: BASE,
-      start_url: BASE,
-      scope: BASE,
-      display: 'standalone',
-      orientation: 'portrait',
-      background_color: '#0C0C0F',
-      theme_color: '#0C0C0F',
-      icons: [
-        { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-        { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-        { src: 'maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-      ],
-    },
-    null,
-    2,
-  ),
-);
 
 // Liste des fichiers à mettre en cache, avec une empreinte : un nouveau build = un nouveau cache.
 const files = [];
@@ -136,14 +111,18 @@ writeFileSync(
 );
 
 const indexPath = join(OUT, 'index.html');
+// Passage d'une app MyLife à l'autre en fondu (mêmes règles que packages/ui/src/lumen.css de MyLife).
+const VIEW_TRANSITION = `@view-transition{navigation:auto}::view-transition-old(root){animation:160ms cubic-bezier(.4,0,1,1) both mylife-out}::view-transition-new(root){animation:260ms cubic-bezier(.2,.8,.2,1) both mylife-in}@keyframes mylife-out{to{opacity:0;transform:scale(.985)}}@keyframes mylife-in{from{opacity:0;transform:translateY(14px)}}@media (prefers-reduced-motion:reduce){::view-transition-old(root),::view-transition-new(root){animation:none}}`;
 const head = [
-  `<link rel="manifest" href="${BASE}manifest.webmanifest">`,
-  `<link rel="apple-touch-icon" href="${BASE}apple-touch-icon.png">`,
-  '<meta name="theme-color" content="#0C0C0F">',
+  // Une seule app installable : MyLife (manifeste et icône à la racine de l'adresse).
+  '<link rel="manifest" href="/manifest.webmanifest">',
+  '<link rel="apple-touch-icon" href="/apple-touch-icon.png">',
+  '<meta name="theme-color" content="#0B0719">',
   '<meta name="apple-mobile-web-app-capable" content="yes">',
   '<meta name="mobile-web-app-capable" content="yes">',
   '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">',
-  '<meta name="apple-mobile-web-app-title" content="MyPerf">',
+  '<meta name="apple-mobile-web-app-title" content="MyLife">',
+  `<style>${VIEW_TRANSITION}</style>`,
   `<script src="${BASE}register-sw.js" defer></script>`,
 ].join('');
 writeFileSync(indexPath, readFileSync(indexPath, 'utf8').replace('</head>', `${head}</head>`));

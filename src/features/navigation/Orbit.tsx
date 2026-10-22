@@ -4,12 +4,12 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useEffect, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openMyLifeApp } from '@/services/mylifeApps';
-import { MYLIFE_APPS } from '@/vendor/lumen';
+import { MYLIFE_APPS, MYLIFE_HOME, readGlance, type MyLifeGlance } from '@/vendor/lumen';
 import { useCloud } from '@/services/cloud';
 import { Glass } from '@/ui/components/Glass';
 import { Tap, Text, type IconName } from '@/ui/components/primitives';
@@ -33,7 +33,7 @@ function Rise({ index, children, style }: { index: number; children: ReactNode; 
   return <Animated.View style={[style, anim]}>{children}</Animated.View>;
 }
 
-function AppCard({ name, tagline, icon, colors, current, onPress }: { name: string; tagline: string; icon: IconName; colors: [string, string]; current?: boolean; onPress: () => void }) {
+function AppCard({ name, tagline, icon, colors, current, glance, onPress }: { name: string; tagline: string; icon: IconName; colors: [string, string]; current?: boolean; glance: MyLifeGlance | null; onPress: () => void }) {
   const zoom = useSharedValue(0);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + zoom.value * 3 }], opacity: 1 - zoom.value, zIndex: zoom.value > 0 ? 5 : 1 }));
   return (
@@ -66,9 +66,22 @@ function AppCard({ name, tagline, icon, colors, current, onPress }: { name: stri
             <Text variant="title" style={{ color: '#fff', fontSize: 22, lineHeight: 26 }}>
               {name}
             </Text>
-            <Text variant="small" style={{ color: 'rgba(255,255,255,0.9)' }}>
-              {tagline}
-            </Text>
+            {glance ? (
+              <>
+                <Text variant="bodyStrong" style={{ color: '#fff' }} numberOfLines={2}>
+                  {glance.title}
+                </Text>
+                {glance.detail !== undefined && (
+                  <Text variant="caption" style={{ color: 'rgba(255,255,255,0.9)' }} numberOfLines={2}>
+                    {glance.detail}
+                  </Text>
+                )}
+              </>
+            ) : (
+              <Text variant="small" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                {tagline}
+              </Text>
+            )}
           </View>
         </View>
       </Pressable>
@@ -90,7 +103,13 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
     ['Mesures', 'body-outline', () => go('/body')],
     ['Réglages', 'options-outline', () => go('/settings')],
   ];
-  const cloudLine = !cloud.session ? 'Pas connecté : tout reste sur cet appareil' : !cloud.joined ? 'Connecté, appareil à relier' : cloud.error ? cloud.error : cloud.syncing ? 'Synchro en cours…' : `${cloud.session.login} · synchronisé`;
+  // Comme les Espaces des apps web : le compte, puis l'état de la synchro de l'app.
+  const accountLine = !cloud.session ? 'Pas connecté : tout reste sur cet appareil' : cloud.recovery ? `${cloud.session.login} · clé de secours à mettre de côté` : `${cloud.session.login} · chiffré de bout en bout`;
+  const accountColor = !cloud.session ? t.textMuted : cloud.recovery ? t.danger : t.success;
+  const syncLine = cloud.error ?? (cloud.syncing ? 'Synchro en cours…' : !cloud.joined ? 'Appareil en cours de liaison…' : 'Synchronisé');
+  const syncColor = cloud.error ? t.danger : cloud.syncing || !cloud.joined ? t.accent : t.success;
+  // Aperçus déposés par les apps sur ce navigateur (web seulement : l'app Android n'y a pas accès).
+  const glances = Platform.OS === 'web' && visible ? Object.fromEntries(MYLIFE_APPS.map((a) => [a.id, readGlance(a.id)])) : {};
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -101,11 +120,19 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
           <Rise index={0}>
             <Text variant="large">MyLife</Text>
           </Rise>
-          <Tap onPress={onClose} accessibilityLabel="Fermer" style={{ width: 44, height: 44, borderRadius: 22 }}>
-            <Glass level="float" radius={22} contentStyle={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="close" size={20} color={t.text} />
-            </Glass>
-          </Tap>
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <Tap onPress={() => openMyLifeApp(MYLIFE_HOME.path)} accessibilityRole="button" accessibilityLabel="Accueil" style={{ height: 44, borderRadius: 22 }}>
+              <Glass level="float" radius={22} contentStyle={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: space.lg }}>
+                <Ionicons name="home-outline" size={18} color={t.text} />
+                <Text variant="bodyStrong">Accueil</Text>
+              </Glass>
+            </Tap>
+            <Tap onPress={onClose} accessibilityLabel="Fermer" style={{ width: 44, height: 44, borderRadius: 22 }}>
+              <Glass level="float" radius={22} contentStyle={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="close" size={20} color={t.text} />
+              </Glass>
+            </Tap>
+          </View>
         </View>
         <Text variant="small" tone="secondary">
           Tes apps, un seul compte, tes données chiffrées.
@@ -114,23 +141,32 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
           {MYLIFE_APPS.map((a, i) => (
             <Rise key={a.id} index={1 + i} style={{ width: '47%', flexGrow: 1, maxWidth: '50%' }}>
-              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} onPress={a.id === 'perf' ? onClose : () => openMyLifeApp(a.path)} />
+              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} glance={glances[a.id] ?? null} onPress={a.id === 'perf' ? onClose : () => openMyLifeApp(a.path)} />
             </Rise>
           ))}
         </View>
         <Rise index={3}>
-          <Tap onPress={() => go('/account')} accessibilityRole="button" style={{ borderRadius: radius.lg }}>
-            <Glass level="raised" radius={radius.lg} contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.lg }}>
-              <View style={{ width: 9, height: 9, borderRadius: 5, backgroundColor: cloud.error ? t.danger : cloud.joined ? t.success : t.textMuted }} />
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong">Compte MyLife</Text>
-                <Text variant="small" tone="secondary" numberOfLines={1}>
-                  {cloudLine}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={17} color={t.textMuted} />
-            </Glass>
-          </Tap>
+          <Glass level="raised" radius={radius.lg} contentStyle={{ overflow: 'hidden', borderRadius: radius.lg }}>
+            {[
+              { label: 'Compte MyLife', line: accountLine, color: accountColor, show: true },
+              { label: 'Synchro MyPerf', line: syncLine, color: syncColor, show: !!cloud.session },
+            ]
+              .filter((r) => r.show)
+              .map((r, i) => (
+                <Tap key={r.label} onPress={() => go('/account')} accessibilityRole="button" accessibilityLabel={`${r.label} : ${r.line}`}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md, minHeight: 60, borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: t.border }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color }} />
+                    <View style={{ flex: 1 }}>
+                      <Text variant="bodyStrong">{r.label}</Text>
+                      <Text variant="small" tone="secondary" numberOfLines={1}>
+                        {r.line}
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={17} color={t.textMuted} />
+                  </View>
+                </Tap>
+              ))}
+          </Glass>
         </Rise>
         <Rise index={4}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>

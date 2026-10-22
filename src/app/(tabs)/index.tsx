@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useWindowDimensions, View } from 'react-native';
 
 import { addDays, formatLongDate, formatShortDate, startOfWeek, weekday, weekdayShort } from '@/domain/dates';
@@ -17,6 +17,7 @@ import { getActiveWorkout, listWorkouts } from '@/db/repos/workouts';
 import { WorkoutView } from '@/features/workout/WorkoutView';
 import { Orbit } from '@/features/navigation/Orbit';
 import { syncCloud } from '@/services/cloud';
+import { publishGlance } from '@/services/mylifeApps';
 import { beginWorkout } from '@/services/startFlow';
 import { templatePreview, type TemplatePreviewLine } from '@/services/workoutService';
 import { Glass } from '@/ui/components/Glass';
@@ -88,6 +89,18 @@ function SessionHero({ data, date }: { data: ReturnType<typeof useTodayData>; da
   const targetTemplate = target?.templateId ?? null;
   const targetDate = target?.date ?? date;
   const preview = useLive(() => (targetTemplate === null ? [] : templatePreview(targetTemplate, targetDate)), [targetTemplate, targetDate]);
+  // Aperçu pour l'accueil MyLife (web) : ce que la journée sportive réserve.
+  const done = next === null ? (doneToday[0] ?? null) : null;
+  const glanceTitle = done !== null ? `Séance faite : ${done.name}` : target === null ? 'Repos aujourd’hui' : `${next === null ? 'Prochaine : ' : ''}${splitName(target.title).focus || target.title}`;
+  const glanceDetail =
+    done !== null
+      ? `${doneToday.reduce((n, x) => n + x.setCount, 0)} séries · ${doneToday.reduce((n, x) => n + x.exerciseCount, 0)} exercices`
+      : target === null
+        ? 'Rien de prévu'
+        : `${next === null ? formatShortDate(target.date) : 'Aujourd’hui'} · ${preview.length} exercice${preview.length > 1 ? 's' : ''}`;
+  const glanceTone = done !== null ? 'success' : target === null ? undefined : 'accent';
+  useEffect(() => publishGlance({ title: glanceTitle, detail: glanceDetail, tone: glanceTone }), [glanceTitle, glanceDetail, glanceTone]);
+
   const scheme = (l: TemplatePreviewLine) =>
     // The phase is already on the badge: no « Deload · » prefix per line.
     !l.main ? l.label.replace(/^Deload · /, '') : l.top === null ? 'Top set' : l.lest && l.top.weight === 0 ? `PDC × ${l.top.reps}` : `${l.lest ? '+' : ''}${formatWeight(l.top.weight)} kg × ${l.top.reps}`;

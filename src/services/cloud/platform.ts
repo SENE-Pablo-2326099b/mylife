@@ -29,6 +29,37 @@ export async function currentSession(): Promise<Session | null> {
   return cached;
 }
 
+/** Clé de secours d'un compte neuf pas encore mise de côté (« plus tard ») : gardée jusqu'à confirmation. */
+const RECOVERY_KEY = 'mylife:recovery-pending';
+
+export interface PendingRecovery {
+  login: string;
+  key: string;
+  at: number;
+}
+
+export async function readPendingRecovery(): Promise<PendingRecovery | null> {
+  try {
+    const raw = web ? localStorage.getItem(RECOVERY_KEY) : await SecureStore.getItemAsync(RECOVERY_KEY.replace(':', '.'));
+    return raw ? (JSON.parse(raw) as PendingRecovery) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function writePendingRecovery(p: { login: string; key: string } | null): Promise<void> {
+  const raw = p ? JSON.stringify({ ...p, at: Date.now() }) : null;
+  try {
+    if (web) {
+      if (raw) localStorage.setItem(RECOVERY_KEY, raw);
+      else localStorage.removeItem(RECOVERY_KEY);
+    } else if (raw) await SecureStore.setItemAsync(RECOVERY_KEY.replace(':', '.'), raw);
+    else await SecureStore.deleteItemAsync(RECOVERY_KEY.replace(':', '.'));
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
 export const platform: Platform = {
   api: new MyLifeApi(web ? '' : MYLIFE_URL),
   random: (n) => getRandomBytes(n),

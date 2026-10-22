@@ -619,6 +619,13 @@ export function upgradePersonalData(): boolean {
   return true;
 }
 
+let historyEnd: string | null = null;
+/** Last day of the imported personal history: any session after it was entered on this device. */
+export function personalHistoryEnd(): string {
+  if (historyEnd === null) historyEnd = buildHistory(parseHistoryCsv(HISTORY_CSV).rows).sets.reduce((m, s) => (s.date > m ? s.date : m), '');
+  return historyEnd;
+}
+
 /** First launch: an empty database gets the personal program instead of the bare generic library. */
 export function seedPersonalIfFresh(): ImportReport | null {
   const hasWorkouts = (db().first<{ n: number }>('SELECT COUNT(*) AS n FROM workouts')?.n ?? 0) > 0;

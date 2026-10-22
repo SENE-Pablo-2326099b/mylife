@@ -8,19 +8,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { listExercises } from '@/db/repos/exercises';
 import { searchKey } from '@/domain/text';
-import { openFinances } from '@/services/mylifeApps';
+import { openMyLifeApp } from '@/services/mylifeApps';
+import { MYLIFE_APPS, MYLIFE_DESTINATIONS, MYLIFE_HOME } from '@/vendor/lumen';
 import { Glass } from '@/ui/components/Glass';
 import { Text, type IconName } from '@/ui/components/primitives';
 import { family, LIVE_BLUR, radius, space, useTheme } from '@/ui/theme';
 
 /**
- * Palette de commande : une seule porte vers tout, comme dans MyFinances. On tape quelques lettres et
- * on y est — un écran, une action, un exercice — ou on prépare une question pour le coach.
+ * Palette de commande : une seule porte vers tout, la même que dans les autres apps MyLife (kit web
+ * src/ui/CommandPalette.tsx). On tape quelques lettres et on y est — un écran, une action, un
+ * exercice, un endroit d'une autre app MyLife — ou on prépare une question pour le coach.
  */
+
+const APP_ICON: Record<string, IconName> = { finances: 'diamond-outline', perf: 'barbell-outline', raveloc: 'navigate-outline', home: 'home-outline' };
+const appName = (id: string) => (id === 'home' ? MYLIFE_HOME.name : (MYLIFE_APPS.find((a) => a.id === id)?.name ?? id));
 
 interface Item {
   id: string;
-  group: 'Actions' | 'Aller à' | 'Exercices' | 'Coach';
+  group: 'Actions' | 'Aller à' | 'Exercices' | 'Coach' | 'Tes apps MyLife' | 'Dans tes autres apps';
   icon: IconName;
   title: string;
   hint?: string;
@@ -54,10 +59,6 @@ export function CommandPalette({ visible, onClose, onSpaces }: { visible: boolea
           close();
           setTimeout(onSpaces, 60);
         } },
-      { id: 'a-fin', group: 'Actions', icon: 'wallet-outline', title: 'Ouvrir MyFinances', keywords: 'budget argent', run: () => {
-          close();
-          openFinances();
-        } },
     ];
     const pages: Item[] = [
       { id: 'p-planning', group: 'Aller à', icon: 'calendar-clear-outline', title: 'Planning', keywords: 'cycle semaine mésocycle', run: go('/planning') },
@@ -74,7 +75,18 @@ export function CommandPalette({ visible, onClose, onSpaces }: { visible: boolea
           .map((e) => ({ id: `e-${e.id}`, group: 'Exercices', icon: 'barbell-outline', title: e.name, hint: 'Fiche, historique, 1RM', run: go(`/exercise/${e.id}`) }))
       : [];
     const ask: Item[] = q ? [{ id: 'ask', group: 'Coach', icon: 'sparkles', title: `Demander : « ${query.trim()} »`, hint: 'Préparée dans le coach, tu relis avant d’envoyer', run: go({ pathname: '/coach', params: { q: query.trim() } }) }] : [];
-    return [...actions.filter(match), ...pages.filter(match), ...ex, ...ask];
+    // Les autres apps (sans saisie), ou leurs endroits qui correspondent (avec saisie) : comme partout dans MyLife.
+    const open = (path: string) => () => {
+      close();
+      openMyLifeApp(path);
+    };
+    const others: Item[] = q
+      ? MYLIFE_DESTINATIONS.filter((d) => d.app !== 'perf')
+          .map<Item>((d) => ({ id: `d-${d.path}`, group: 'Dans tes autres apps', icon: APP_ICON[d.app] ?? 'apps-outline', title: d.title, hint: appName(d.app), keywords: `${d.keywords} ${appName(d.app)}`, run: open(d.path) }))
+          .filter(match)
+          .slice(0, 4)
+      : [MYLIFE_HOME, ...MYLIFE_APPS.filter((a) => a.id !== 'perf')].map((a) => ({ id: `app-${a.id}`, group: 'Tes apps MyLife' as const, icon: APP_ICON[a.id] ?? 'apps-outline', title: a.name, hint: a.tagline, run: open(a.path) }));
+    return [...actions.filter(match), ...pages.filter(match), ...ex, ...ask, ...others];
   }, [q, query, exercises]); // eslint-disable-line react-hooks/exhaustive-deps
 
   let lastGroup = '';
