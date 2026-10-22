@@ -1,28 +1,40 @@
 #!/usr/bin/env node
-// Copie les paquets partagés dans chaque app MyLife (MyFinances, MyPerf, myRaveLoc) : une seule source, pas de paquet à publier.
-// - packages/sync-client/src → src/vendor/mylife-sync (compte et synchro chiffrée)
-// - packages/lumen/src       → src/vendor/lumen       (thèmes et jetons Lumen)
-// Relancer après toute modification d'un paquet : npm run vendor
+// Copie les paquets partagés dans chaque app MyLife : une seule source, pas de paquet à publier.
+// - packages/sync-client/src → src/vendor/mylife-sync (compte et synchro chiffrée)        : toutes les apps
+// - packages/lumen/src       → src/vendor/lumen       (thèmes, jetons, registre des apps) : toutes les apps
+// - packages/ui/src          → src/ui                 (kit d'interface web : verre, identités,
+//                                                       navigation, écrans, compte)          : apps web React DOM
+// Relancer après toute modification d'un paquet : npm run vendor (ou npm run vendor -- finances raveloc).
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const here = (p) => new URL(p, import.meta.url).pathname;
 const APPS = {
-  finances: new URL('../../Budget/src/vendor', import.meta.url).pathname,
-  perf: new URL('../../MyPerfV2/src/vendor', import.meta.url).pathname,
-  raveloc: new URL('../../myRaveLoc/src/vendor', import.meta.url).pathname,
+  home: { root: here('../web/src'), web: true },
+  finances: { root: here('../../Budget/src'), web: true },
+  perf: { root: here('../../MyPerfV2/src'), web: false },
+  raveloc: { root: here('../../myRaveLoc/src'), web: true },
 };
-const PACKAGES = { 'sync-client': 'mylife-sync', lumen: 'lumen' };
+const PACKAGES = [
+  { pkg: 'sync-client', dest: 'vendor/mylife-sync', web: false },
+  { pkg: 'lumen', dest: 'vendor/lumen', web: false },
+  { pkg: 'ui', dest: 'ui', web: true },
+];
+const header = (pkg, name) => {
+  const text = `GÉNÉRÉ depuis MyLife/packages/${pkg} — ne pas modifier ici (MyLife : npm run vendor).`;
+  return name.endsWith('.css') ? `/* ${text} */\n` : `// ${text}\n`;
+};
 
-for (const [pkg, folder] of Object.entries(PACKAGES)) {
-  const src = new URL(`../packages/${pkg}/src`, import.meta.url).pathname;
-  const header = `// GÉNÉRÉ depuis MyLife/packages/${pkg} — ne pas modifier ici (MyLife : npm run vendor).\n`;
-  for (const [app, root] of Object.entries(APPS)) {
-    const dir = join(root, folder);
+const only = process.argv.slice(2);
+for (const { pkg, dest, web } of PACKAGES) {
+  const src = here(`../packages/${pkg}/src`);
+  const files = readdirSync(src).filter((n) => /\.(ts|tsx|css|js)$/.test(n) && !n.endsWith('.test.ts'));
+  for (const [app, { root, web: isWeb }] of Object.entries(APPS)) {
+    if ((web && !isWeb) || (only.length && !only.includes(app))) continue;
+    const dir = join(root, dest);
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    for (const name of readdirSync(src).filter((n) => n.endsWith('.ts'))) {
-      writeFileSync(join(dir, name), header + readFileSync(join(src, name), 'utf8'));
-    }
+    for (const name of files) writeFileSync(join(dir, name), header(pkg, name) + readFileSync(join(src, name), 'utf8'));
     console.log(`✓ ${pkg} → ${app} (${dir})`);
   }
 }
