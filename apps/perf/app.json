@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "MyPerf",
+    "slug": "myperf",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myperf",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.myperf.app",
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0C0C0F",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.myperf.app"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png",
+      "name": "MyPerf",
+      "shortName": "MyPerf",
+      "lang": "fr",
+      "themeColor": "#0C0C0F",
+      "backgroundColor": "#0C0C0F"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0C0C0F",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ],
+      "expo-sqlite",
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#C6F24E"
+        }
+      ],
+      "expo-secure-store",
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true,
+      "baseUrl": "/perf"
+    },
+    "backgroundColor": "#0C0C0F"
+  }
+}
