@@ -15,7 +15,12 @@ export interface TabDef {
   /** Préfixes d'URL qui allument l'onglet. */
   match: string[];
   badge?: number;
+  /** false : seulement dans la barre latérale (grand écran) ; sur téléphone, on y va par la palette ou les Espaces. */
+  inDock?: boolean;
 }
+
+/** Le pictogramme de l'app dans la barre latérale. */
+const BRAND_ICON: Record<string, IconName> = { finances: 'diamond-fill', perf: 'barbell', raveloc: 'navigate', home: 'sparkles' };
 
 function activeIndex(tabs: TabDef[], pathname: string): number {
   let best = -1;
@@ -144,7 +149,7 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
         {tabs.slice(0, half).map((t, i) => tab(t, i))}
         <button
           type="button"
-          aria-label="Chercher, aller, agir (appui long : assistant)"
+          aria-label={onOrbHold ? 'Chercher, aller, agir (appui long : assistant)' : 'Chercher, aller, agir'}
           tabIndex={hidden ? -1 : undefined}
           className="orb relative mx-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full"
           onPointerDown={() => {
@@ -182,7 +187,7 @@ export function Sidebar({ tabs, footer, onSearch }: { tabs: TabDef[]; footer?: R
       <div className="glass glass-float flex h-full flex-col rounded-xl p-3">
         <div className="flex items-center gap-2.5 px-2 pb-6 pt-2">
           <span className="liquid flex h-[34px] w-[34px] items-center justify-center rounded-[11px]">
-            <Icon name="diamond-fill" size={18} />
+            <Icon name={BRAND_ICON[kitApp().id] ?? 'sparkles'} size={18} />
           </span>
           <span>
             <span className="t-title block text-[18px]">{kitApp().name}</span>
@@ -217,11 +222,11 @@ export function Sidebar({ tabs, footer, onSearch }: { tabs: TabDef[]; footer?: R
 }
 
 /** Navigation adaptative : capsule en bas sur téléphone et tablette, barre latérale sur grand écran. */
-export function Navigation({ tabs, sidebarFooter, onSearch, onAssistant }: { tabs: TabDef[]; sidebarFooter?: ReactNode; onSearch: () => void; onAssistant: () => void }) {
+export function Navigation({ tabs, sidebarFooter, onSearch, onAssistant }: { tabs: TabDef[]; sidebarFooter?: ReactNode; onSearch: () => void; onAssistant?: () => void }) {
   const bp = useBreakpoint();
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--nav-left', bp === 'expanded' ? `${SIDEBAR_WIDTH + 32}px` : '0px');
   }, [bp]);
   // Le dock garde les sections du quotidien ; les réglages passent par la palette et les espaces MyLife.
-  return bp === 'expanded' ? <Sidebar tabs={tabs} footer={sidebarFooter} onSearch={onSearch} /> : <Dock tabs={tabs.filter((t) => t.to !== '/reglages')} onOrb={onSearch} onOrbHold={onAssistant} />;
+  return bp === 'expanded' ? <Sidebar tabs={tabs} footer={sidebarFooter} onSearch={onSearch} /> : <Dock tabs={tabs.filter((t) => t.inDock !== false)} onOrb={onSearch} onOrbHold={onAssistant} />;
 }

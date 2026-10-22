@@ -37,3 +37,13 @@ Note = intérêt pour l'objectif × fiabilité × coût, justifiée.
 ## Réalisation, notée après coup
 
 (rempli à chaque itération)
+
+### Itération 1 (22/10/2026) : état à l'interruption
+
+Fait :
+- B (kit `packages/ui`) : MyFinances l'utilise, avec 332 tests et 25 vérifications de bout en bout au vert. **9/10** : myRaveLoc ne l'utilise pas encore.
+- E / E2 (comptes) : inscription ouverte et protégée côté serveur, dérivation de clé native, écrans communs, reliure automatique ; 42 tests MyLife au vert. **8/10** : MyPerf et myRaveLoc ne sont pas encore branchés.
+- D (accueil) : l'app `web/` se construit (accueil, compte, apparence, installation, bienvenue), avec l'icône MyLife. **Non vérifiée** : la première capture n'a pas trouvé le bouton « Commencer » (à diagnostiquer).
+- I, J, K : palette commune, aperçus et apparence synchronisée sont dans le kit ; seul MyFinances s'en sert.
+
+Reste : diagnostiquer l'accueil ; relier le manifeste racine depuis chaque app (A) ; myRaveLoc sur le kit (C) ; MyPerf (compte simplifié, aperçu, palette, parité visuelle L) ; transitions (G, H) ; `vercel.json` de MyLife (build `web/`) ; déploiements ; dépôt GitHub privé + README (M) ; nouvelles notes.
