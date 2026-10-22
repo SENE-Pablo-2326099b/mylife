@@ -1,9 +1,10 @@
 import { Platform, useColorScheme } from 'react-native';
+import { create } from 'zustand';
 
 import type { SetType } from '@/domain/types';
 import type { ThemeId } from '@/db/repos/settings';
 import { useSettings } from '@/state/settingsStore';
-import { BASE_TEXT } from '@/vendor/lumen';
+import { BASE_TEXT, STYLES, type StyleId } from '@/vendor/lumen';
 
 import { paletteFor, themeInfo } from './themes';
 
@@ -26,7 +27,7 @@ import { paletteFor, themeInfo } from './themes';
 
 export type GlassLevel = 'pane' | 'raised' | 'float' | 'lens';
 
-interface GlassSpec {
+export interface GlassSpec {
   /** Fill drawn on top of the (optional) blur. */
   fill: string;
   /** Fill used where live blur is unavailable (Android): denser so content stays legible. */
@@ -44,6 +45,8 @@ interface GlassSpec {
 
 export interface Palette {
   scheme: 'dark' | 'light';
+  /** Identité visuelle (forme, matière, typographie) : voir applyIdentity et Glass. */
+  style: StyleId;
   /** Base field behind everything (top → bottom). */
   field: [string, string, string];
   halos: { violet: string; gold: string; indigo: string; orchid: string };
@@ -104,6 +107,7 @@ export interface Palette {
 
 const dark: Palette = {
   scheme: 'dark',
+  style: 'lumen',
   field: ['#130C2A', '#0B0719', '#07050F'],
   halos: { violet: '#8B5CFF', gold: '#F2B84B', indigo: '#4C4DFF', orchid: '#D25BFF' },
   glass: {
@@ -188,6 +192,7 @@ const dark: Palette = {
 
 const light: Palette = {
   scheme: 'light',
+  style: 'lumen',
   field: ['#FFFFFF', '#F8F6FF', '#F1ECFF'],
   halos: { violet: '#B49BFF', gold: '#FFD66E', indigo: '#A9B6FF', orchid: '#EBA8FF' },
   glass: {
@@ -279,11 +284,18 @@ export function resolvePalette(id: ThemeId, followSystem: boolean, system: 'dark
   return paletteFor(chosen, BASE);
 }
 
+/**
+ * Thème réellement affiché. Il suit le réglage, mais ne bascule qu'une fois les polices de la nouvelle
+ * identité chargées (RootLayout) : jamais un écran à moitié dans l'ancien style.
+ */
+export const useShownTheme = create<{ id: ThemeId | null }>(() => ({ id: null }));
+
 export function useTheme(): Palette {
-  const id = useSettings((s) => s.settings.theme);
+  const chosen = useSettings((s) => s.settings.theme);
+  const shown = useShownTheme((s) => s.id);
   const followSystem = useSettings((s) => s.settings.followSystem);
   const system = useColorScheme();
-  return resolvePalette(id, followSystem, system === 'unspecified' ? null : system);
+  return resolvePalette(shown ?? chosen, followSystem, system === 'unspecified' ? null : system);
 }
 
 /** The palette of a theme as such (theme picker previews). */
@@ -313,10 +325,16 @@ export function shade(css: string | undefined, repeated = false): string | undef
 }
 
 export const space = { xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 48 } as const;
-export const radius = { xs: 8, sm: 12, md: 16, lg: 22, xl: 28, pill: 999 } as const;
+/**
+ * Rayons et familles de caractères de l'identité du thème. Ce sont des objets modifiés en place par
+ * applyIdentity (racine de l'app) avant le rendu : les écrans les lisent au rendu, et useTheme rend
+ * une nouvelle palette à chaque changement, donc tout ce qui en dépend se redessine.
+ */
+export const radius: { xs: number; sm: number; md: number; lg: number; xl: number; pill: number } = { xs: 8, sm: 12, md: 16, lg: 22, xl: 28, pill: 999 };
 
-/** Type families (loaded in the root layout). Sora: display + numbers; Inter: interface. */
-export const family = {
+/** Type families (loaded in the root layout). Lumen : Sora (titres, chiffres) + Inter (interface). */
+type Families = { display: string; displaySemi: string; number: string; regular: string; medium: string; semibold: string; bold: string; label: string };
+export const family: Families = {
   display: 'Sora_700Bold',
   displaySemi: 'Sora_600SemiBold',
   number: 'Sora_600SemiBold',
@@ -324,7 +342,37 @@ export const family = {
   medium: 'Inter_500Medium',
   semibold: 'Inter_600SemiBold',
   bold: 'Inter_700Bold',
-} as const;
+  label: 'Inter_500Medium',
+};
+
+const RADII: Record<StyleId, typeof radius> = {
+  lumen: { xs: 8, sm: 12, md: 16, lg: 22, xl: 28, pill: 999 },
+  circuit: { xs: 2, sm: 3, md: 4, lg: 6, xl: 8, pill: 4 },
+  ardoise: { xs: 4, sm: 6, md: 8, lg: 10, xl: 12, pill: 6 },
+  argile: { xs: 12, sm: 18, md: 22, lg: 30, xl: 36, pill: 999 },
+  brut: { xs: 4, sm: 6, md: 8, lg: 10, xl: 12, pill: 999 },
+};
+const FAMILIES: Record<StyleId, Families> = {
+  lumen: { ...family },
+  circuit: { display: 'SpaceGrotesk_700Bold', displaySemi: 'SpaceGrotesk_600SemiBold', number: 'JetBrainsMono_600SemiBold', regular: 'Inter_400Regular', medium: 'Inter_500Medium', semibold: 'Inter_600SemiBold', bold: 'Inter_700Bold', label: 'JetBrainsMono_600SemiBold' },
+  ardoise: { display: 'IBMPlexSans_600SemiBold', displaySemi: 'IBMPlexSans_600SemiBold', number: 'IBMPlexMono_600SemiBold', regular: 'IBMPlexSans_400Regular', medium: 'IBMPlexSans_500Medium', semibold: 'IBMPlexSans_600SemiBold', bold: 'IBMPlexSans_700Bold', label: 'IBMPlexSans_500Medium' },
+  argile: { display: 'Nunito_800ExtraBold', displaySemi: 'Nunito_800ExtraBold', number: 'Nunito_700Bold', regular: 'Nunito_500Medium', medium: 'Nunito_600SemiBold', semibold: 'Nunito_700Bold', bold: 'Nunito_800ExtraBold', label: 'Nunito_700Bold' },
+  brut: { display: 'Archivo_900Black', displaySemi: 'Archivo_800ExtraBold', number: 'SpaceGrotesk_700Bold', regular: 'SpaceGrotesk_400Regular', medium: 'SpaceGrotesk_500Medium', semibold: 'SpaceGrotesk_600SemiBold', bold: 'SpaceGrotesk_700Bold', label: 'SpaceGrotesk_700Bold' },
+};
+
+/** Ce que l'identité change dans la typographie : capitales des étiquettes et des grands titres, approche. */
+export const identity = { style: 'lumen' as StyleId, upperLabels: false, upperTitles: false, tracking: 1 };
+
+/** Pose l'identité d'un style (rayons, familles) ; `fonts` : ses polices sont chargées. */
+export function applyIdentity(style: StyleId, fonts: boolean): void {
+  Object.assign(radius, RADII[style]);
+  Object.assign(family, fonts ? FAMILIES[style] : FAMILIES.lumen);
+  const st = STYLES[style];
+  identity.style = style;
+  identity.upperLabels = st.labelCase === 'upper';
+  identity.upperTitles = style === 'circuit' || style === 'brut';
+  identity.tracking = style === 'lumen' ? 1 : style === 'brut' ? 1.1 : 0.55;
+}
 
 export const font = {
   caption: 12,

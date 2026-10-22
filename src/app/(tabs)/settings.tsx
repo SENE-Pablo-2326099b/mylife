@@ -110,7 +110,11 @@ export default function SettingsScreen() {
           <Group style={{ marginTop: space.md }}>
             <ToggleRow
               title="Suivre le téléphone"
-              subtitle={`Clair ou sombre selon le téléphone (${themeInfo(settings.theme).name} ↔ ${themeInfo(themeInfo(settings.theme).pair).name})`}
+              subtitle={
+                themeInfo(settings.theme).pair === settings.theme
+                  ? `${themeInfo(settings.theme).name} n’a qu’un mode : ce réglage s’applique aux thèmes Lumen`
+                  : `Clair ou sombre selon le téléphone (${themeInfo(settings.theme).name} ↔ ${themeInfo(themeInfo(settings.theme).pair).name})`
+              }
               value={settings.followSystem}
               onChange={(followSystem) => update({ followSystem })}
             />

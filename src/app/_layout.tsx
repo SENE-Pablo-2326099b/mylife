@@ -4,12 +4,12 @@ import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
 import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
 import { Sora_600SemiBold } from '@expo-google-fonts/sora/600SemiBold';
 import { Sora_700Bold } from '@expo-google-fonts/sora/700Bold';
-import { useFonts } from 'expo-font';
+import { loadAsync, useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,7 +29,9 @@ import { Text } from '@/ui/components/primitives';
 import { Backdrop } from '@/ui/components/Backdrop';
 import { ToastHost } from '@/ui/components/ToastHost';
 import { REST_BAR_HEIGHT, useBreakpoint } from '@/ui/responsive';
-import { BOOT_BG, space, useTheme } from '@/ui/theme';
+import { IDENTITY_FONTS } from '@/ui/fonts';
+import { applyIdentity, BOOT_BG, identity, space, useShownTheme, useTheme } from '@/ui/theme';
+import { themeInfo } from '@/ui/themes';
 import { cloudBoot } from '@/services/cloud';
 import { installSyncTriggers } from '@/services/cloud/sqliteStore';
 
@@ -112,6 +114,22 @@ const initial = (): BootState => {
   return error === null ? { kind: 'ready' } : { kind: 'error', message: error };
 };
 
+/**
+ * Web : la base se prépare une seule fois, même si l'effet de démarrage se relance (polices chargées
+ * entre-temps). Une seconde préparation remplaçait la base ouverte par une base vide pendant que la
+ * synchro lisait déjà la première (« no such table: sync_queue » au premier lancement).
+ */
+let booting: Promise<BootState> | null = null;
+function bootOnce(): Promise<BootState> {
+  booting ??= prepareExpoDb()
+    .then((): BootState => {
+      const error = bootstrap();
+      return error === null ? { kind: 'ready' } : { kind: 'error', message: error };
+    })
+    .catch((e: unknown): BootState => ({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
+  return booting;
+}
+
 export default function RootLayout() {
   const [boot, setBoot] = useState(initial);
   const [fontsLoaded, fontError] = useFonts({
@@ -124,14 +142,21 @@ export default function RootLayout() {
   });
   // A missing font must never block training: fall back to system fonts.
   const fontsReady = fontsLoaded || fontError !== null;
+  // Identité du thème : ses polices d'abord, puis rayons et familles, puis la bascule de tout l'écran.
+  const themeId = useSettings((s) => s.settings.theme);
+  const style = themeInfo(themeId).style;
+  const [styleFonts, styleFontError] = useFonts(IDENTITY_FONTS[style]);
+  const styleReady = styleFonts || styleFontError !== null;
+  const [everReady, setEverReady] = useState(false);
+  if (styleReady && !everReady) setEverReady(true);
+  if (styleReady && identity.style !== style) applyIdentity(style, styleFonts);
+  const shown = useShownTheme((s) => s.id);
+  useLayoutEffect(() => {
+    if (styleReady && shown !== themeId) useShownTheme.setState({ id: themeId });
+  }, [styleReady, shown, themeId]);
   useEffect(() => {
     if (boot.kind === 'loading') {
-      prepareExpoDb()
-        .then(() => {
-          const error = bootstrap();
-          setBoot(error === null ? { kind: 'ready' } : { kind: 'error', message: error });
-        })
-        .catch((e: unknown) => setBoot({ kind: 'error', message: e instanceof Error ? e.message : String(e) }));
+      void bootOnce().then(setBoot);
       return;
     }
     if (fontsReady) void SplashScreen.hideAsync();
@@ -140,6 +165,14 @@ export default function RootLayout() {
   useEffect(() => {
     if (boot.kind === 'ready') cloudBoot();
   }, [boot.kind]);
+  // Les polices des autres identités, une fois l'app lancée : aperçus fidèles et bascule immédiate.
+  useEffect(() => {
+    if (boot.kind !== 'ready') return;
+    const id = setTimeout(() => {
+      for (const fonts of Object.values(IDENTITY_FONTS)) void loadAsync(fonts).catch(() => undefined);
+    }, 2500);
+    return () => clearTimeout(id);
+  }, [boot.kind]);
   // Daily safety copy of the whole database, off the first frame's critical path.
   useEffect(() => {
     if (boot.kind !== 'ready') return;
@@ -147,7 +180,7 @@ export default function RootLayout() {
     return () => clearTimeout(id);
   }, [boot.kind]);
 
-  if (boot.kind === 'loading' || !fontsReady) return <View style={{ flex: 1, backgroundColor: BOOT_BG }} />;
+  if (boot.kind === 'loading' || !fontsReady || !everReady) return <View style={{ flex: 1, backgroundColor: BOOT_BG }} />;
   const error = boot.kind === 'error' ? boot.message : null;
 
   if (error !== null) {

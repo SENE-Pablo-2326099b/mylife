@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import Animated, { Easing, FadeIn, LinearTransition, ReduceMotion, useAnimatedStyle, useReducedMotion, useSharedValue, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,7 +19,7 @@ import { Glass } from '@/ui/components/Glass';
 import { Tap, Text, type IconName } from '@/ui/components/primitives';
 import { flowAnim, springs } from '@/ui/motion';
 import { DOCK_HEIGHT, DOCK_MARGIN, SIDEBAR_WIDTH } from '@/ui/responsive';
-import { family, radius, shade, space, useTheme } from '@/ui/theme';
+import { family, radius, shade, space, useTheme, type Palette } from '@/ui/theme';
 
 export const TABS: { name: string; label: string; icon: IconName; active: IconName }[] = [
   { name: 'index', label: 'Aujourd’hui', icon: 'flash-outline', active: 'flash' },
@@ -72,6 +72,22 @@ function LiveDot() {
  * The orb at the centre of the dock: a bead of liquid light ringed by a slowly turning halo. Opens
  * the MyLife spaces; a long press opens the coach.
  */
+/** La capsule de l'onglet actif, dans la forme de l'identité (comme .dock-pill dans MyFinances). */
+function pillStyle(t: Palette): ViewStyle {
+  switch (t.style) {
+    case 'circuit':
+      return { backgroundColor: `${t.accent}1F`, borderBottomWidth: 2, borderColor: t.accent, boxShadow: shade(`0px 0px 18px -6px ${t.accentGlow}`) };
+    case 'ardoise':
+      return { backgroundColor: t.surfacePressed, borderWidth: 1, borderColor: t.border };
+    case 'argile':
+      return { backgroundColor: t.accentSoft, boxShadow: shade(`inset 2px 2px 5px ${t.text}12, inset -2px -2px 5px rgba(255,255,255,0.8)`) };
+    case 'brut':
+      return { backgroundColor: '#FFE45C', borderWidth: 2, borderColor: t.text };
+    default:
+      return { backgroundColor: t.accentSoft, borderWidth: 1, borderColor: `${t.accent}55`, boxShadow: shade(`0px 0px 22px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`) };
+  }
+}
+
 function Orb({ onPress, onLongPress }: { onPress: () => void; onLongPress: () => void }) {
   const t = useTheme();
   const reduce = useReducedMotion();
@@ -94,17 +110,39 @@ function Orb({ onPress, onLongPress }: { onPress: () => void; onLongPress: () =>
         onLongPress();
       }}
       style={({ pressed }) => ({ width: 60, height: 60, marginHorizontal: 2, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.9 : 1 }] })}>
-      <View style={{ position: 'absolute', width: 60, height: 60, borderRadius: 30, overflow: 'hidden', opacity: 0.75 }}>
-        <Animated.View style={[StyleSheet.absoluteFill, ring]}>
-          <LinearGradient colors={[t.accentGradient[0], 'transparent', t.gold, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        </Animated.View>
-      </View>
+      {t.style === 'lumen' && (
+        <View style={{ position: 'absolute', width: 60, height: 60, borderRadius: 30, overflow: 'hidden', opacity: 0.75 }}>
+          <Animated.View style={[StyleSheet.absoluteFill, ring]}>
+            <LinearGradient colors={[t.accentGradient[0], 'transparent', t.gold, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          </Animated.View>
+        </View>
+      )}
+      {t.style === 'circuit' ? (
+        // Circuit : un viseur carré au contour néon.
+        <View style={{ width: 52, height: 52, borderRadius: radius.md, borderWidth: 1.5, borderColor: t.accent, backgroundColor: `${t.accent}24`, alignItems: 'center', justifyContent: 'center', boxShadow: shade(`0px 0px 24px -2px ${t.accentGlow}`) }}>
+          <Ionicons name="search" size={23} color={t.accent} />
+        </View>
+      ) : t.style === 'ardoise' || t.style === 'brut' ? (
+        <View
+          style={{
+            width: 52,
+            height: 52,
+            borderRadius: t.style === 'brut' ? 26 : radius.xl,
+            backgroundColor: t.accent,
+            alignItems: 'center',
+            justifyContent: 'center',
+            ...(t.style === 'brut' ? { borderWidth: 2.5, borderColor: t.text, boxShadow: `3px 3px 0px ${t.text}` } : { boxShadow: shade('0px 4px 14px rgba(0,0,0,0.4)') }),
+          }}>
+          <Ionicons name="search" size={23} color={t.onAccent} />
+        </View>
+      ) : (
       <View style={{ width: 52, height: 52, borderRadius: 26, overflow: 'hidden', boxShadow: shade(`0px 8px 24px ${t.accentGlow}`) }}>
         <LinearGradient colors={t.accentGradient} start={{ x: 0.1, y: 0 }} end={{ x: 0.9, y: 1 }} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <LinearGradient colors={['rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']} locations={[0, 0.5]} start={{ x: 0.2, y: 0 }} end={{ x: 0.5, y: 0.7 }} style={StyleSheet.absoluteFill} />
           <Ionicons name="search" size={23} color={t.onAccent} />
         </LinearGradient>
       </View>
+      )}
     </Pressable>
   );
 }
@@ -137,10 +175,8 @@ function DockTabs(props: BottomTabBarProps) {
             gap: 8,
             height: 48,
             paddingHorizontal: focused ? 16 : 13,
-            borderRadius: 24,
-            ...(focused
-              ? { backgroundColor: t.accentSoft, borderWidth: 1, borderColor: `${t.accent}55`, boxShadow: shade(`0px 0px 22px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`) }
-              : {}),
+            borderRadius: Math.min(24, radius.pill),
+            ...(focused ? pillStyle(t) : {}),
           }}>
           <View>
             <Ionicons name={focused ? tab.active : tab.icon} size={22} color={focused ? t.accent : t.textSecondary} />

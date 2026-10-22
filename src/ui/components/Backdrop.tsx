@@ -15,6 +15,8 @@ import Animated, {
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Mask, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { springs } from '../motion';
+import type { StyleId } from '@/vendor/lumen';
+
 import { useTheme } from '../theme';
 import { useAmbient } from '../ambient';
 
@@ -92,7 +94,7 @@ const HALOS: HaloSpec[] = [
   },
 ];
 
-function Halo({ spec, index, width, height }: { spec: HaloSpec; index: number; width: number; height: number }) {
+function Halo({ spec, index, width, height, gain }: { spec: HaloSpec; index: number; width: number; height: number; gain: number }) {
   const t = useTheme();
   const reduce = useReducedMotion();
   const phase = useSharedValue(0);
@@ -127,8 +129,8 @@ function Halo({ spec, index, width, height }: { spec: HaloSpec; index: number; w
       <Svg width={d} height={d}>
         <Defs>
           <RadialGradient id={id} cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor={color} stopOpacity={spec.opacity * (t.scheme === 'light' ? 1.6 : 1)} />
-            <Stop offset="0.45" stopColor={color} stopOpacity={spec.opacity * 0.45 * (t.scheme === 'light' ? 1.6 : 1)} />
+            <Stop offset="0" stopColor={color} stopOpacity={spec.opacity * (t.scheme === 'light' ? 1.6 : 1) * gain} />
+            <Stop offset="0.45" stopColor={color} stopOpacity={spec.opacity * 0.45 * (t.scheme === 'light' ? 1.6 : 1) * gain} />
             <Stop offset="1" stopColor={color} stopOpacity={0} />
           </RadialGradient>
         </Defs>
@@ -138,6 +140,9 @@ function Halo({ spec, index, width, height }: { spec: HaloSpec; index: number; w
   );
 }
 
+/** Intensité des halos selon l'identité : aucune pour les fonds pleins (Ardoise, Brut), comme MyFinances. */
+const HALO_GAIN: Record<StyleId, number> = { lumen: 1, circuit: 0.55, ardoise: 0, argile: 1.25, brut: 0 };
+
 export function Backdrop() {
   const t = useTheme();
   const { width, height } = useWindowDimensions();
@@ -146,9 +151,7 @@ export function Backdrop() {
     // fit them and zooms the whole app out (content and sheets end up off-screen).
     <View style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]} pointerEvents="none">
       <LinearGradient colors={t.field} style={StyleSheet.absoluteFill} />
-      {HALOS.map((h, i) => (
-        <Halo key={h.color} spec={h} index={i} width={width} height={height} />
-      ))}
+      {HALO_GAIN[t.style] > 0 && HALOS.map((h, i) => <Halo key={h.color} spec={h} index={i} width={width} height={height} gain={HALO_GAIN[t.style]} />)}
       {/* Vignette: keeps edges calm and text legible. */}
       <LinearGradient
         colors={t.veil}
@@ -156,8 +159,10 @@ export function Backdrop() {
         start={{ x: 0.5, y: 0.35 }}
         end={{ x: 0.5, y: 1 }}
       />
-      <DotGrid width={width} height={height} />
-      <AmbientGlow height={height} />
+      {t.style === 'lumen' && <DotGrid width={width} height={height} />}
+      {t.style === 'circuit' && <CircuitGrid width={width} height={height} />}
+      {t.style === 'brut' && <PaperDots width={width} height={height} />}
+      {t.style !== 'brut' && <AmbientGlow height={height} />}
     </View>
   );
 }
@@ -208,5 +213,53 @@ function AmbientGlow({ height }: { height: number }) {
     <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, top: 0, height: height * 0.6 }, style]}>
       <LinearGradient colors={[`${color}4D`, `${color}00`]} style={StyleSheet.absoluteFill} />
     </Animated.View>
+  );
+}
+
+/** Circuit : grille de tracé néon qui s'efface vers le bas, horizon lumineux en haut, lignes de balayage. */
+function CircuitGrid({ width, height }: { width: number; height: number }) {
+  const t = useTheme();
+  const line = `${t.accent}22`;
+  return (
+    <View renderToHardwareTextureAndroid style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <Pattern id="cells" width={36} height={36} patternUnits="userSpaceOnUse">
+            <Rect width={36} height={1} fill={line} />
+            <Rect width={1} height={36} fill={line} />
+          </Pattern>
+          <Pattern id="scan" width={4} height={3} patternUnits="userSpaceOnUse">
+            <Rect width={4} height={1} fill="rgba(0,0,0,0.22)" />
+          </Pattern>
+          <SvgLinearGradient id="cfade" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor="#fff" stopOpacity={1} />
+            <Stop offset="0.55" stopColor="#fff" stopOpacity={0.35} />
+            <Stop offset="0.9" stopColor="#fff" stopOpacity={0} />
+          </SvgLinearGradient>
+          <Mask id="cmask">
+            <Rect width={width} height={height} fill="url(#cfade)" />
+          </Mask>
+        </Defs>
+        <Rect width={width} height={height} fill="url(#cells)" mask="url(#cmask)" />
+        <Rect width={width} height={height} fill="url(#scan)" />
+      </Svg>
+      <LinearGradient colors={['transparent', t.accent, 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 1, boxShadow: `0px 0px 18px 2px ${t.accentGlow}` }} />
+    </View>
+  );
+}
+
+/** Brut : papier, trame de points noirs nette et régulière. */
+function PaperDots({ width, height }: { width: number; height: number }) {
+  return (
+    <View renderToHardwareTextureAndroid style={StyleSheet.absoluteFill}>
+      <Svg width={width} height={height}>
+        <Defs>
+          <Pattern id="paper" width={20} height={20} patternUnits="userSpaceOnUse">
+            <Circle cx={10} cy={10} r={1.1} fill="rgba(10,10,10,0.2)" />
+          </Pattern>
+        </Defs>
+        <Rect width={width} height={height} fill="url(#paper)" />
+      </Svg>
+    </View>
   );
 }

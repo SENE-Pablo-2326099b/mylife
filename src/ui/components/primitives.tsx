@@ -19,7 +19,7 @@ import {
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 
 import { springs } from '../motion';
-import { family, font, HIT, radius, shade, space, useTheme } from '../theme';
+import { family, font, HIT, identity, radius, shade, space, useTheme } from '../theme';
 import { Glass, type GlassTone } from './Glass';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -46,18 +46,34 @@ export function splitStyle(style: StyleProp<ViewStyle>): { outer: ViewStyle; inn
 type TextVariant = 'hero' | 'large' | 'title' | 'headline' | 'body' | 'bodyStrong' | 'small' | 'caption' | 'label' | 'number';
 type TextTone = 'default' | 'secondary' | 'muted' | 'accent' | 'danger' | 'warning' | 'onAccent' | 'info' | 'gold';
 
-const VARIANTS: Record<TextVariant, TextStyle> = {
-  hero: { fontFamily: family.display, fontSize: font.hero, lineHeight: 46, letterSpacing: -1.2 },
-  large: { fontFamily: family.display, fontSize: font.large, lineHeight: 36, letterSpacing: -0.8 },
-  title: { fontFamily: family.displaySemi, fontSize: font.title, lineHeight: 26, letterSpacing: -0.3 },
-  headline: { fontFamily: family.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
-  body: { fontFamily: family.regular, fontSize: font.body, lineHeight: 21 },
-  bodyStrong: { fontFamily: family.semibold, fontSize: font.body, lineHeight: 21 },
-  small: { fontFamily: family.regular, fontSize: font.small, lineHeight: 18 },
-  caption: { fontFamily: family.medium, fontSize: font.caption, lineHeight: 16 },
-  label: { fontFamily: family.medium, fontSize: 12, lineHeight: 16, letterSpacing: 0.1 },
-  number: { fontFamily: family.number, fontSize: font.input, letterSpacing: -0.3 },
-};
+/**
+ * Échelle typographique, recalculée pour chaque identité (familles, approche, capitales) : lue au
+ * rendu, jamais figée au chargement du module.
+ */
+const variantCache = new Map<string, Record<TextVariant, TextStyle>>();
+function variants(style: string): Record<TextVariant, TextStyle> {
+  const key = `${style}:${family.display}`;
+  const cached = variantCache.get(key);
+  if (cached !== undefined) return cached;
+  const k = identity.tracking;
+  const upper = identity.upperTitles ? ({ textTransform: 'uppercase' } as const) : null;
+  const v: Record<TextVariant, TextStyle> = {
+    hero: { fontFamily: family.display, fontSize: font.hero, lineHeight: 46, letterSpacing: -1.2 * k, ...upper },
+    large: { fontFamily: family.display, fontSize: font.large, lineHeight: 36, letterSpacing: -0.8 * k, ...upper },
+    title: { fontFamily: family.displaySemi, fontSize: font.title, lineHeight: 26, letterSpacing: -0.3 * k },
+    headline: { fontFamily: family.semibold, fontSize: 17, lineHeight: 22, letterSpacing: -0.2 },
+    body: { fontFamily: family.regular, fontSize: font.body, lineHeight: 21 },
+    bodyStrong: { fontFamily: family.semibold, fontSize: font.body, lineHeight: 21 },
+    small: { fontFamily: family.regular, fontSize: font.small, lineHeight: 18 },
+    caption: { fontFamily: family.medium, fontSize: font.caption, lineHeight: 16 },
+    label: identity.upperLabels
+      ? { fontFamily: family.label, fontSize: 11, lineHeight: 16, letterSpacing: 1.2, textTransform: 'uppercase' }
+      : { fontFamily: family.label, fontSize: 12, lineHeight: 16, letterSpacing: 0.1 },
+    number: { fontFamily: family.number, fontSize: font.input, letterSpacing: -0.3 * k },
+  };
+  variantCache.set(key, v);
+  return v;
+}
 
 export function Text({
   variant = 'body',
@@ -85,7 +101,7 @@ export function Text({
   // (otherwise big numbers keep the variant's 21px and collide with what is above).
   const flat = StyleSheet.flatten(style);
   const autoLine = flat?.fontSize !== undefined && flat.lineHeight === undefined ? { lineHeight: Math.round(flat.fontSize * 1.22) } : null;
-  return <RNText {...rest} maxFontSizeMultiplier={maxFontSizeMultiplier} style={[VARIANTS[variant], { color: color[tone] }, numeric && { fontVariant: ['tabular-nums'] }, style, autoLine]} />;
+  return <RNText {...rest} maxFontSizeMultiplier={maxFontSizeMultiplier} style={[variants(t.style)[variant], { color: color[tone] }, numeric && { fontVariant: ['tabular-nums'] }, style, autoLine]} />;
 }
 
 export function Icon({ name, size = 20, color, style }: { name: IconName; size?: number; color?: string; style?: StyleProp<TextStyle> }) {
@@ -226,14 +242,17 @@ export function Button({
   const t = useTheme();
   const height = size === 'lg' ? 58 : size === 'sm' ? 38 : 48;
   const r = size === 'lg' ? radius.lg : radius.md;
-  const fg: Record<ButtonVariant, string> = { primary: t.onAccent, secondary: t.text, ghost: t.accent, danger: t.danger };
+  const fg: Record<ButtonVariant, string> = { primary: t.style === 'circuit' ? t.accent : t.onAccent, secondary: t.text, ghost: t.accent, danger: t.danger };
   const content = (
     <View style={{ height, paddingHorizontal: size === 'sm' ? space.md : space.lg + 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm }}>
       {icon !== undefined && <Ionicons name={icon} size={size === 'sm' ? 16 : 19} color={fg[variant]} />}
       <RNText
         numberOfLines={2}
         maxFontSizeMultiplier={1.25}
-        style={{ color: fg[variant], fontFamily: family.semibold, fontSize: size === 'lg' ? 17 : size === 'sm' ? 14 : 15, letterSpacing: -0.1, flexShrink: 1, textAlign: 'center' }}>
+        style={[
+          { color: fg[variant], fontFamily: family.semibold, fontSize: size === 'lg' ? 17 : size === 'sm' ? 14 : 15, letterSpacing: -0.1, flexShrink: 1, textAlign: 'center' },
+          variant === 'primary' && t.style === 'circuit' && { fontFamily: family.label, textTransform: 'uppercase', letterSpacing: 1, fontSize: size === 'lg' ? 15 : 13 },
+        ]}>
         {label}
       </RNText>
     </View>
@@ -250,9 +269,25 @@ export function Button({
       accessibilityLabel={label}
       highlightRadius={r}
       style={[outer, inner]}>
-      {variant === 'primary' ? (
+      {variant === 'primary' && t.style !== 'lumen' && t.style !== 'argile' ? (
+        // Identités : contour néon (Circuit), aplat mat (Ardoise), aplat cerné à ombre franche (Brut).
+        <View
+          style={
+            t.style === 'circuit'
+              ? { borderRadius: r, backgroundColor: `${t.accent}29`, borderWidth: 1, borderColor: t.accent, boxShadow: shade(`0px 0px 20px -4px ${t.accentGlow}`) }
+              : t.style === 'brut'
+                ? { borderRadius: r, backgroundColor: t.accent, borderWidth: 2.5, borderColor: t.text, boxShadow: `3px 3px 0px ${t.text}` }
+                : { borderRadius: r, backgroundColor: t.accent }
+          }>
+          {content}
+        </View>
+      ) : variant === 'primary' ? (
         // Liquid light: a lit gradient body with a bright upper edge and an aura.
-        <View style={{ borderRadius: r, boxShadow: shade(`0px 10px 28px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`) }}>
+        <View
+          style={{
+            borderRadius: r,
+            boxShadow: shade(t.style === 'argile' ? `0px 12px 24px -8px ${t.accentGlow}, inset 3px 3px 7px rgba(255,255,255,0.45), inset -4px -5px 10px rgba(0,0,0,0.2)` : `0px 10px 28px ${t.accentGlow}, inset 0px 1px 0px ${t.highlight}`),
+          }}>
           <LinearGradient colors={t.accentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: r }}>
             <LinearGradient colors={['rgba(255,255,255,0.35)', 'rgba(255,255,255,0)']} locations={[0, 0.55]} style={{ borderRadius: r }}>
               {content}

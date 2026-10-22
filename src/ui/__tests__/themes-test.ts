@@ -33,10 +33,15 @@ function contrast(fg: string, bg: string): number {
 }
 
 describe('colour themes', () => {
-  it('offers at least 6 themes, dark ones first, each with a counterpart of the other scheme', () => {
-    expect(THEMES.length).toBeGreaterThanOrEqual(6);
+  it('offers Lumen palettes paired across schemes, and identities that are their own pair', () => {
+    expect(THEMES.length).toBeGreaterThanOrEqual(12);
     expect(THEMES.map((t) => t.id).sort()).toEqual([...THEME_IDS].sort());
     for (const t of THEMES) {
+      expect(themePalette(t.id).style).toBe(t.style);
+      if (t.style !== 'lumen') {
+        expect(t.pair).toBe(t.id);
+        continue;
+      }
       const pair = THEMES.find((x) => x.id === t.pair);
       expect(pair?.scheme).not.toBe(t.scheme);
       expect(themePalette(t.id).scheme).toBe(t.scheme);
