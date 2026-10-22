@@ -1,0 +1,101 @@
+/* myRaveLoc : le système visuel commun de MyLife (src/ui/lumen.css), plus la boussole et le mode phare. */
+@import './ui/lumen.css';
+
+/* ------------------------------------------------------------ boussole */
+
+.nav-stage {
+  display: flex;
+  min-height: min(62vh, 520px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.dial {
+  position: relative;
+  width: min(78vw, 340px);
+  aspect-ratio: 1;
+}
+
+.dial svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.dial .rotor {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.dial.dim .rotor {
+  opacity: 0.35;
+}
+
+/* La distance : la police des grands titres de l'identité du thème. */
+.distance {
+  font: var(--w-title) clamp(44px, 14vw, 64px) / 1 var(--font-display);
+  letter-spacing: calc(var(--track-k) * -1.5px);
+  font-variant-numeric: tabular-nums;
+}
+
+.near-rings span {
+  position: absolute;
+  inset: 22%;
+  border-radius: 50%;
+  border: 3px solid var(--brand-a);
+  animation: ripple 2.4s ease-out infinite;
+}
+
+.near-rings span:nth-child(2) {
+  animation-delay: 0.8s;
+}
+
+.near-rings span:nth-child(3) {
+  animation-delay: 1.6s;
+}
+
+@keyframes ripple {
+  from {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* Mode phare : tout l'écran clignote aux couleurs de l'app, pour être vu de loin. */
+.beacon {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  border: 0;
+  padding: 24px;
+  background: linear-gradient(160deg, var(--brand-a), var(--brand-b));
+  color: #04140f;
+  font: 800 22px/1.3 var(--font-display);
+  animation: beacon 0.9s steps(2, jump-none) infinite;
+}
+
+@keyframes beacon {
+  50% {
+    filter: brightness(0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .near-rings span {
+    animation: none;
+    opacity: 0.5;
+  }
+  .beacon {
+    animation: none;
+  }
+}
