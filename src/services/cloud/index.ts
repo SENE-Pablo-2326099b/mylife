@@ -9,6 +9,7 @@ import { ApiError, accountStatus, autoJoin, changePassword, createAccount, delet
 import { personalHistoryEnd } from '@/import/importer';
 
 import { currentSession, platform, readPendingRecovery, writePendingRecovery, type PendingRecovery } from './platform';
+import { syncPrefs, syncPrefsSoon, watchAppearance } from './prefs';
 import { pendingCount, sqliteStore } from './sqliteStore';
 
 /**
@@ -38,6 +39,7 @@ const set = (patch: Partial<CloudState>) => useCloud.setState(patch);
 
 async function refreshState() {
   const session = await currentSession();
+  if (session && session.login !== useCloud.getState().session?.login) void syncPrefs();
   const s = await store.getState();
   const recovery = session ? await readPendingRecovery() : null;
   const joined = !!session && s?.joinedAs === session.login;
@@ -127,7 +129,14 @@ export function cloudBoot(): void {
     if (n !== useCloud.getState().pending) set({ pending: n });
     if (n > 0) syncSoon();
   });
-  AppState.addEventListener('change', (s) => s === 'active' && syncSoon(500));
+  AppState.addEventListener('change', (s) => {
+    if (s !== 'active') return;
+    syncSoon(500);
+    syncPrefsSoon(500);
+  });
+  // L'apparence de MyLife suit d'un appareil à l'autre (réglage commun à toutes les apps).
+  watchAppearance();
+  syncPrefsSoon(800);
   if (Platform.OS === 'web') {
     window.addEventListener('online', () => syncSoon(500));
     // Connexion ou déconnexion dans une autre app MyLife du même navigateur.
