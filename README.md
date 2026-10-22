@@ -7,9 +7,11 @@ Point d'entrée commun des apps personnelles, sur **une seule origine** (même a
 | `/` | Accueil (ce dépôt) | `mylife` | `~/PersoDev/MyLife` |
 | `/finances/` | MyFinances (PWA) | `myfinances` | `~/PersoDev/Budget` |
 | `/perf/` | MyPerf (PWA) | `myperf` | `~/PersoDev/MyPerfV2` (`npm run build:web && npm run deploy:web`) |
+| `/raveloc/` | myRaveLoc (PWA) | `myraveloc` | `~/PersoDev/myRaveLoc` (`npm run deploy`) |
+| `/api/raveloc` | API de myRaveLoc (groupes, positions chiffrées) | `mylife` (ce dépôt) | `api/raveloc.ts`, `server/raveloc.ts` |
 | `/api/eb` | Relais Enable Banking + cours | `myfinances` | `~/PersoDev/Budget` |
 
-Les chemins `/finances` et `/perf` sont des réécritures Vercel vers les projets de chaque app : chaque
+Les chemins `/finances`, `/perf` et `/raveloc` sont des réécritures Vercel vers les projets de chaque app : chaque
 app reste un dépôt indépendant, déployable seule, mais le navigateur ne voit qu'une adresse. C'est ce
 qui permettra une connexion unique et la synchronisation chiffrée entre appareils (étapes suivantes).
 
@@ -34,3 +36,11 @@ de l'app (le CDN de MyLife a pu garder un 404 obtenu pendant la mise en ligne), 
 - Client commun : `packages/sync-client` (TypeScript pur, web + React Native), copié dans chaque app par
   `npm run vendor` (`Budget/src/vendor/mylife-sync`, `MyPerfV2/src/vendor/mylife-sync`).
 - Tests : `npm test` (vrai Postgres en mémoire via PGlite, serveur + client de bout en bout).
+
+## API de myRaveLoc (`/api/raveloc`)
+
+Hébergée ici pour réutiliser la session et les secrets de MyLife (voir `~/PersoDev/myRaveLoc/README.md`) :
+groupes temporaires, invitations, partage de position. Le serveur ne lit ni les positions, ni les noms
+de groupe, ni les pseudos (chiffrés par les téléphones avec une clé de groupe qu'il ne connaît pas) ; il
+vérifie l'appartenance au groupe à chaque requête. Tables `raveloc_*` créées au premier appel, une seule
+position par membre et par groupe, tout est effacé à la fin du groupe. Tests : `tests/raveloc.test.ts`.

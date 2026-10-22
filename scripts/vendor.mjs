@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Copie les paquets partagés dans chaque app MyLife : une seule source, pas de paquet à publier.
+// Copie les paquets partagés dans chaque app MyLife (MyFinances, MyPerf, myRaveLoc) : une seule source, pas de paquet à publier.
 // - packages/sync-client/src → src/vendor/mylife-sync (compte et synchro chiffrée)
 // - packages/lumen/src       → src/vendor/lumen       (thèmes et jetons Lumen)
 // Relancer après toute modification d'un paquet : npm run vendor
@@ -9,6 +9,7 @@ import { join } from 'node:path';
 const APPS = {
   finances: new URL('../../Budget/src/vendor', import.meta.url).pathname,
   perf: new URL('../../MyPerfV2/src/vendor', import.meta.url).pathname,
+  raveloc: new URL('../../myRaveLoc/src/vendor', import.meta.url).pathname,
 };
 const PACKAGES = { 'sync-client': 'mylife-sync', lumen: 'lumen' };
 

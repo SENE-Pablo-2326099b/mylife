@@ -29,11 +29,23 @@
     {
       "source": "/perf/:path+",
       "destination": "https://myperf-six.vercel.app/perf/:path+"
+    },
+    {
+      "source": "/raveloc",
+      "destination": "https://myraveloc.vercel.app/raveloc/index.html"
+    },
+    {
+      "source": "/raveloc/",
+      "destination": "https://myraveloc.vercel.app/raveloc/index.html"
+    },
+    {
+      "source": "/raveloc/:path+",
+      "destination": "https://myraveloc.vercel.app/raveloc/:path+"
     }
   ],
   "headers": [
     {
-      "source": "/((?!finances|perf|api).*)",
+      "source": "/((?!finances|perf|raveloc|api).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",

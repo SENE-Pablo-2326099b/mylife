@@ -1,15 +1,16 @@
-# MyLife : contexte complet (MyFinances + MyPerf)
+# MyLife : contexte complet (MyFinances + MyPerf + myRaveLoc)
 
 > **À lire au début d'une nouvelle conversation.** Ce fichier résume l'écosystème : architecture, dépôts,
 > commandes, décisions, contraintes, état actuel au **22/10/2026**.
 > - Fichier de référence : `~/PersoDev/MyLife/CONTEXTE.md`.
-> - Copies : `~/PersoDev/Budget/CONTEXTE.md` et `~/PersoDev/MyPerfV2/CONTEXTE.md`.
+> - Copies : `~/PersoDev/Budget/CONTEXTE.md`, `~/PersoDev/MyPerfV2/CONTEXTE.md` et `~/PersoDev/myRaveLoc/CONTEXTE.md`.
 > - Après une évolution importante, mettre à jour la référence puis recopier.
 >
 > Documents plus détaillés propres à chaque dépôt :
 > - `Budget/README.md`, `Budget/V2.md` ;
 > - `MyPerfV2/CLAUDE.md`, `MyPerfV2/README.md`, `MyPerfV2/ERGONOMIE.md` ;
-> - `MyLife/README.md`.
+> - `MyLife/README.md` ;
+> - `myRaveLoc/README.md` (architecture, sécurité, données visibles par le serveur, limites).
 
 ---
 
@@ -23,6 +24,8 @@
 | `/finances/` | **MyFinances** (budget, banques, patrimoine) | `~/PersoDev/Budget` | `myfinances` (https://myfinances-sepia-sigma.vercel.app) | React 18 + Vite + TS + Tailwind + Dexie (IndexedDB), PWA |
 | `/perf/` | **MyPerf** (musculation / street lifting) | `~/PersoDev/MyPerfV2` | `myperf` (https://myperf-six.vercel.app) | Expo / React Native (React 19, React Compiler) + SQLite ; web (PWA) + APK Android |
 | `/api/eb` | Relais Enable Banking + cours des placements | `~/PersoDev/Budget/api/eb.ts` | `myfinances` | Fonction Vercel |
+| `/raveloc/` | **myRaveLoc** (retrouver ses amis en festival) | `~/PersoDev/myRaveLoc` | `myraveloc` (https://myraveloc.vercel.app) | React 18 + Vite + TS, CSS sans framework, PWA |
+| `/api/raveloc` | API de myRaveLoc (groupes, invitations, positions chiffrées) | `~/PersoDev/MyLife/{api,server}/raveloc.ts` | `mylife` | Fonction Vercel |
 
 **Fonctionnement des chemins :**
 - Ce sont des **réécritures Vercel** déclarées dans `MyLife/vercel.json`.
@@ -64,12 +67,23 @@
 
 Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mémoire (code 137).
 
+### myRaveLoc (`~/PersoDev/myRaveLoc`)
+
+| Action | Commande |
+|---|---|
+| Types | `npx tsc -b --noEmit` |
+| Lint | `npx eslint .` |
+| Tests | `npm test` (vitest, **83 tests** ; importe l'API et l'authentification de `../MyLife`) |
+| **Parcours de bout en bout** | `npm run e2e` : build + deux téléphones simulés (Alice, Bob) dans Chrome système, **13 étapes** (connexion, groupe, invitation, partage, flèche, hors ligne, arrêt, retrait, lien révoqué, session expirée, 320 px). `SHOTS=dossier` pour des captures. |
+| Local | `npm run build && npm run local` → http://localhost:4320/raveloc/ (base en mémoire, code d'invitation `local-invite`) |
+| **Déployer** | `npm run deploy` (vercel@61.1.0) ; l'API part avec MyLife |
+
 ### MyLife (`~/PersoDev/MyLife`)
 
 | Action | Commande |
 |---|---|
-| Tests | `npm test` (Postgres en mémoire via PGlite, serveur + client de bout en bout) |
-| Paquets partagés | `npm run vendor` copie `packages/sync-client` et `packages/lumen` dans `src/vendor/{mylife-sync,lumen}` des **deux** apps. On modifie toujours dans `MyLife/packages/`, **jamais** dans `src/vendor/`. |
+| Tests | `npm test` (Postgres en mémoire via PGlite, serveur + client de bout en bout ; **33 tests** dont 24 pour `/api/raveloc`) |
+| Paquets partagés | `npm run vendor` copie `packages/sync-client` et `packages/lumen` dans `src/vendor/{mylife-sync,lumen}` des **trois** apps. On modifie toujours dans `MyLife/packages/`, **jamais** dans `src/vendor/`. |
 | Déployer | `npm run deploy` (vercel@61.1.0) |
 
 **Après chaque déploiement d'une app, redéployer MyLife.** Sinon le CDN de MyLife peut garder un 404 obtenu pendant la mise en ligne.
@@ -90,7 +104,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 
 - `POST /api/auth` : `salt`, `signup` (code d'invitation), `login`, `recoverStart` / `recoverFinish` (clé de secours), `password`.
 - `POST /api/sync` : `status`, `sync` (envoi + réception, curseur par appareil).
-- Code : `MyLife/api/{auth,sync}.ts`, `MyLife/server/{core,http}.ts`.
+- `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
+- Code : `MyLife/api/{auth,sync,raveloc}.ts`, `MyLife/server/{core,http,raveloc}.ts`.
 
 ### Chiffrement
 
@@ -111,10 +126,10 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 
 ### Base et variables
 
-- Base : Neon Postgres (Marketplace Vercel). Tables `users` et `records`, créées au premier appel.
+- Base : Neon Postgres (Marketplace Vercel). Tables `users` et `records` (et `raveloc_*` pour myRaveLoc), créées au premier appel.
 - Variables d'environnement (**ne jamais afficher leurs valeurs**) :
   - `DATABASE_URL` ;
-  - `SESSION_SECRET`, présente aussi sur `myfinances` (le relais bancaire accepte la session) ;
+  - `SESSION_SECRET`, présente aussi sur `myfinances` (le relais bancaire accepte la session). Variable **sensible** sur Vercel : sa valeur n'est lisible nulle part (pas dans `.env.local`) ; c'est pourquoi l'API de myRaveLoc est hébergée par MyLife plutôt que dans son projet ;
   - `INVITE_CODE`.
 - Fichier local : `MyLife/.env.local`.
 - Code d'invitation actuel : `mylife-5c6bbe-6fb408`.
@@ -165,8 +180,10 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 **Apps et apparence partagées**
 - `MYLIFE_APPS` : registre des apps, dans un ordre et avec des couleurs fixes.
   - `finances` : `['#B9A0FF','#7340FF']`, icône diamant, `/finances/` ;
-  - `perf` : `['#FFB86B','#F0566B']`, icône haltère, `/perf/`.
+  - `perf` : `['#FFB86B','#F0566B']`, icône haltère, `/perf/` ;
+  - `raveloc` : `['#5DFFC4','#1FA3FF']`, icône `navigate`, `/raveloc/`.
   - **Toute nouvelle app s'ajoute ici.**
+- Les lanceurs (« Espaces MyLife ») ouvrent chaque app par son `path` : `openMyLifeApp` (MyPerf, `services/mylifeApps.ts`), `a.icon` mappé vers les icônes de MyFinances (`Spaces.tsx`).
 - `readSharedAppearance` / `writeSharedAppearance` : clé localStorage `mylife:appearance`. Le thème est partagé entre les apps **sur le web**, car elles ont la même origine. L'APK MyPerf garde son propre réglage.
 
 ### `sync-client` → `src/vendor/mylife-sync`
@@ -338,6 +355,18 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 
 ---
 
+## 6 bis. myRaveLoc (`~/PersoDev/myRaveLoc`)
+
+Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, flèche
+vers un ami. Détails dans `myRaveLoc/README.md`.
+
+- **Compte** : celui de MyLife (même session `mylife-session`, même origine) ; connexion et création via `signIn` / `createAccount` du paquet partagé.
+- **Chiffrement** : clé de groupe aléatoire, transmise dans le fragment `#` du lien d'invitation (jamais envoyé au serveur), rangée emballée par la clé de données MyLife de chaque membre. Nom du groupe, pseudos et positions chiffrés (`encryptRow`, liés au groupe et au membre). Le serveur ne voit que des identifiants, des rôles et des horodatages.
+- **Accès** vérifiés côté serveur à chaque requête ; partage coupé par défaut ; une seule position par membre et par groupe, effacée à l'arrêt, au départ, à la fin du partage ou du groupe (14 j max).
+- **Temps réel** : requêtes courtes adaptatives (4 s navigation, 10 s groupe, 30 s ailleurs ; rien en arrière-plan) ; pas de WebSocket (réécriture externe).
+- **Navigateur** : rien n'est envoyé app fermée ou écran éteint (limite des navigateurs mobiles, affichée à l'utilisateur).
+- **Thème** : suit `mylife:appearance` en version sombre ; identité = couleur du registre (vert laser → cyan).
+
 ## 7. Règles d'écosystème (décisions de l'utilisateur)
 
 - **Un seul environnement.** MyFinances et MyPerf doivent se ressentir comme une seule app (« Il y a trop de disparité… l'application entière doit être un système / un environnement »). Elles partagent :
@@ -371,6 +400,9 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 ---
 
 ## 9. Historique récent et état actuel (22/10/2026)
+
+**myRaveLoc (22/10/2026)** : première version. App déployée sur `myraveloc` ; réécritures `/raveloc/*` et API `/api/raveloc` dans MyLife. MyFinances et MyPerf ont reçu le registre à jour (commits locaux `bdb2158` et `7d0db46`) **sans être redéployés** : la carte myRaveLoc apparaîtra dans leurs Espaces à leur prochain déploiement.
+
 
 **Tout est déployé :**
 - MyFinances (commit `29d4909`) ;
