@@ -6,7 +6,7 @@ import { HttpError, signToken, verifyToken, type Db } from '../server/core';
 /**
  * myRaveLoc (/api/raveloc) sur un vrai Postgres en mémoire, avec les vraies sessions de MyLife.
  * Les contenus chiffrés sont des blocs base64 quelconques : le serveur ne sait pas les lire
- * (le chiffrement est testé côté app, dans ~/PersoDev/myRaveLoc).
+ * (le chiffrement est testé côté app, dans apps/raveloc).
  */
 const env = { secret: 's'.repeat(40) };
 const T0 = 1_800_000_000_000;

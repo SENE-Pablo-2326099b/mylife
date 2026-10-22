@@ -1,7 +1,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
-import * as core from '../../MyLife/server/raveloc';
-import { HttpError, signToken, type Db } from '../../MyLife/server/core';
+import * as core from '../../../server/raveloc';
+import { HttpError, signToken, type Db } from '../../../server/core';
 import { ApiError, createApi } from '../src/lib/api';
 import { inviteLink, newGroupId, newGroupKey, openName, openPosition, openProfile, parseInvite, sealName, sealPosition, sealProfile, unwrapGroupKey, wrapGroupKey } from '../src/lib/groupCrypto';
 

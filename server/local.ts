@@ -35,9 +35,9 @@ const here = (p: string) => new URL(p, import.meta.url).pathname;
 /** Où trouver chaque partie construite (dossier qui contient le chemin public). */
 export const BUILDS = {
   home: here('../web/dist'),
-  finances: here('../../Budget/dist'),
-  perf: here('../../MyPerfV2/web'),
-  raveloc: here('../../myRaveLoc/dist'),
+  finances: here('../apps/finances/dist'),
+  perf: here('../apps/perf/web'),
+  raveloc: here('../apps/raveloc/dist'),
 };
 
 export interface LocalServer {

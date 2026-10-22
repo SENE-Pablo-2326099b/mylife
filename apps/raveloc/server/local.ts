@@ -2,7 +2,7 @@
  * Serveur local de myRaveLoc (développement, tests de bout en bout) — jamais déployé : c'est celui de
  * MyLife (accueil, apps construites, vraies API sur une base en mémoire), avec l'app de ce dépôt.
  */
-import { startLocalServer as startMyLife, type LocalServer } from '../../MyLife/server/local';
+import { startLocalServer as startMyLife, type LocalServer } from '../../../server/local';
 
 export type { LocalServer };
 

@@ -11,9 +11,9 @@ import { join } from 'node:path';
 const here = (p) => new URL(p, import.meta.url).pathname;
 const APPS = {
   home: { root: here('../web/src'), web: true },
-  finances: { root: here('../../Budget/src'), web: true },
-  perf: { root: here('../../MyPerfV2/src'), web: false },
-  raveloc: { root: here('../../myRaveLoc/src'), web: true },
+  finances: { root: here('../apps/finances/src'), web: true },
+  perf: { root: here('../apps/perf/src'), web: false },
+  raveloc: { root: here('../apps/raveloc/src'), web: true },
 };
 const PACKAGES = [
   { pkg: 'sync-client', dest: 'vendor/mylife-sync', web: false },
