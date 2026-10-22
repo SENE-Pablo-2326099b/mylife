@@ -11,7 +11,8 @@
     "dev": "vite --config web/vite.config.ts",
     "build": "tsc -p web/tsconfig.json --noEmit && vite build --config web/vite.config.ts",
     "lint": "eslint web/src",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "e2e": "npm run build && vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
     "@vercel/functions": "3.9.11",
