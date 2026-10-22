@@ -8,7 +8,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { openFinances } from '@/services/mylifeApps';
+import { openMyLifeApp } from '@/services/mylifeApps';
 import { MYLIFE_APPS } from '@/vendor/lumen';
 import { useCloud } from '@/services/cloud';
 import { Glass } from '@/ui/components/Glass';
@@ -111,10 +111,10 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
           Tes apps, un seul compte, tes données chiffrées.
         </Text>
         {/* Les apps de MyLife : même ordre et mêmes couleurs dans toutes les apps (paquet partagé). */}
-        <View style={{ flexDirection: 'row', gap: space.md }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
           {MYLIFE_APPS.map((a, i) => (
-            <Rise key={a.id} index={1 + i} style={{ flex: 1 }}>
-              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} onPress={a.id === 'perf' ? onClose : openFinances} />
+            <Rise key={a.id} index={1 + i} style={{ width: '47%', flexGrow: 1, maxWidth: '50%' }}>
+              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} onPress={a.id === 'perf' ? onClose : () => openMyLifeApp(a.path)} />
             </Rise>
           ))}
         </View>

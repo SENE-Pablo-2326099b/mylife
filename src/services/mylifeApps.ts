@@ -10,3 +10,9 @@ export function openFinances(): void {
   if (Platform.OS === 'web') window.location.assign('/finances/');
   else void Linking.openURL(`${MYLIFE_URL}/finances/`);
 }
+
+/** Ouvre une autre app MyLife par son chemin (« /raveloc/ ») : même adresse sur le web, navigateur dans l'app. */
+export function openMyLifeApp(path: string): void {
+  if (Platform.OS === 'web') window.location.assign(path);
+  else void Linking.openURL(`${MYLIFE_URL}${path}`);
+}
