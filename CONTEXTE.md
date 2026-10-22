@@ -461,8 +461,11 @@ vers un ami. Détails dans `apps/raveloc/README.md`.
 - **dépôt unique** (historiques conservés) et README de présentation ;
 - tests : serveur 42, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 11 : tout vert.
 
-**À faire de la main de l'utilisateur (permissions)** : déploiement en production (`npm run deploy:all`)
-et publication du dépôt GitHub privé, si l'outil ne peut pas les lancer.
+**Dépôt GitHub (privé)** : https://github.com/SENE-Pablo-2326099b/mylife (branche `master`, `git push`).
+
+**À faire** : déploiement en production (`npm run deploy:all`), refusé à l'outil par les permissions. Tant
+que MyLife n'est pas redéployé, l'API en ligne est l'ancienne (inscription avec code, pas d'app `mylife`) :
+la nouvelle APK MyPerf (`/mnt/c/Users/qwark/Downloads/MyPerf-MyLife.apk`) en dépend.
 
 **Outils de vérification visuelle** : `npm run local` puis Playwright (Chrome système) ; les parcours de
 bout en bout acceptent `SHOTS=dossier`. Les émojis des catégories s'affichent en carrés dans le Chrome de

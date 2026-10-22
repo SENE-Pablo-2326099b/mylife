@@ -52,7 +52,7 @@ Note = intérêt pour l'objectif × fiabilité × coût, justifiée.
 | J | Aperçus en direct | **10** | MyFinances (reste du jour, valable jusqu'à minuit), MyPerf (séance du jour), myRaveLoc (groupe actif) ; affichés par l'accueil et les Espaces de toutes les apps (web). L'APK MyPerf est hors de l'adresse : ses Espaces montrent les descriptions. |
 | K | Apparence synchronisée entre appareils | **10** | Dernier choix daté gagne ; un appareil neuf n'écrase jamais un vrai choix (défaut trouvé et corrigé par le parcours). Web : vérifié sur deux appareils simulés. APK : même logique (`apps/perf/src/services/cloud/prefs.ts`), compilée ; à constater sur le téléphone après déploiement. |
 | L | MyPerf aligné | **10** | Compte, Espaces (accueil, aperçus, compte), palette, aperçu, manifeste, transitions ; captures des 4 apps dans 6 thèmes (Nuit, Perle, Circuit, Ardoise, Argile, Brut) relues côte à côte. |
-| M | Dépôt GitHub unique + README | **9** | Dépôt unique local (historiques des 4 dépôts gardés), README de présentation et d'utilisation avec captures, `CONTEXTE.md` unique. Reste : la publication sur GitHub (privé), qui demande l'accord de l'utilisateur. |
+| M | Dépôt GitHub unique + README | **10** | Dépôt unique (historiques des 4 dépôts gardés) publié en privé : https://github.com/SENE-Pablo-2326099b/mylife ; README de présentation et d'utilisation avec captures, `CONTEXTE.md` unique. |
 
 **Défauts trouvés et corrigés pendant la vérification** : Tailwind ne générait aucune classe dans l'accueil
 (chemins encodés) ; clé de secours non montrée après la création ; rappel et bandeau réseau affichés deux
@@ -63,4 +63,4 @@ l'apparence ; chemins Gradle après le passage au dépôt unique.
 **Tests à la fin de l'itération** : serveur 42, MyFinances 332 + 25, myRaveLoc 83 + 13, MyPerf 214, parcours de
 l'écosystème 13 : tout vert ; APK MyPerf compilée.
 
-**Reste hors de portée de l'outil (permissions)** : déploiement en production et publication GitHub.
+**Reste hors de portée de l'outil (permission refusée)** : le déploiement en production (`npm run deploy:all`).
