@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confidentialité et conditions — MyFinances</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f6f4fb; --ink: #1d1830; --muted: #5d5873; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0b0719; --ink: #efeaff; --muted: #b3acc9; } }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 1.6rem; line-height: 1.25; } h2 { font-size: 1.15rem; margin-top: 2rem; }
+  p, li { color: var(--muted); } strong { color: var(--ink); } a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Confidentialité et conditions d’utilisation</h1>
+  <p>MyFinances est une application personnelle de suivi de budget et de patrimoine. Elle est fournie gratuitement, sans garantie, pour un usage privé.</p>
+
+  <h2 id="confidentialite">Données personnelles</h2>
+  <ul>
+    <li><strong>Stockage local uniquement.</strong> Les opérations, comptes, réglages et placements sont enregistrés dans le navigateur de ton appareil (IndexedDB). Ils ne sont envoyés à aucun serveur de l’éditeur.</li>
+    <li><strong>Connexion bancaire.</strong> L’accès aux comptes passe par Enable Banking (API DSP2, lecture seule), avec ton consentement explicite donné sur le site de ta banque. Un relais technique sans état signe les requêtes et transmet les réponses à ton appareil ; il ne stocke ni ne journalise aucune donnée bancaire.</li>
+    <li><strong>Cours des placements.</strong> Seuls des symboles (ex. « CW8.PA », « bitcoin ») sont envoyés à Yahoo Finance et CoinGecko, jamais de montant ni d’identité.</li>
+    <li><strong>Aucun suivi.</strong> Ni cookies publicitaires, ni mesure d’audience, ni script tiers.</li>
+    <li><strong>Tes droits.</strong> Tu peux exporter tes données (Réglages → Sauvegarde) ou tout effacer à tout moment ; révoquer l’accès bancaire depuis l’app ou auprès de ta banque.</li>
+  </ul>
+
+  <h2 id="conditions">Conditions d’utilisation</h2>
+  <ul>
+    <li>Les chiffres affichés (budget, prévisions, patrimoine, projections) sont indicatifs et ne constituent pas un conseil financier.</li>
+    <li>L’application est fournie « en l’état ». L’éditeur ne peut être tenu responsable d’une perte de données locale : pense aux sauvegardes.</li>
+    <li>L’accès bancaire est limité à la lecture : l’application ne peut effectuer aucun paiement ni virement.</li>
+  </ul>
+</main>
+</body>
+</html>

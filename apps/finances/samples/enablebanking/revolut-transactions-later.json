@@ -1,0 +1,33 @@
+{
+  "transactions": [
+    {
+      "transaction_id": "rev-6c1e-0006",
+      "transaction_amount": { "currency": "EUR", "amount": "150.00" },
+      "debtor": { "name": "PABLO SENE" },
+      "credit_debit_indicator": "CRDT",
+      "status": "BOOK",
+      "booking_date": "2026-10-14",
+      "remittance_information": ["Top-Up by *1234"]
+    },
+    {
+      "transaction_id": "rev-6c1e-0007-b",
+      "transaction_amount": { "currency": "EUR", "amount": "9.90" },
+      "creditor": { "name": "O'Tacos" },
+      "credit_debit_indicator": "DBIT",
+      "status": "BOOK",
+      "transaction_date": "2026-10-16",
+      "booking_date": "2026-10-17",
+      "remittance_information": ["O'Tacos Aix"]
+    },
+    {
+      "transaction_id": "rev-6c1e-0010",
+      "transaction_amount": { "currency": "EUR", "amount": "6.80" },
+      "creditor": { "name": "Machou" },
+      "credit_debit_indicator": "DBIT",
+      "status": "PDNG",
+      "transaction_date": "2026-10-17",
+      "remittance_information": ["Machou Aix"]
+    }
+  ],
+  "continuation_key": null
+}
