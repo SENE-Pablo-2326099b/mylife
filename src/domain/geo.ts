@@ -71,8 +71,8 @@ const nf = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 });
  */
 export function formatDistance(m: number, uncertaintyM = 0): string {
   const step = Math.max(m < 50 ? 5 : m < 200 ? 10 : m < 1000 ? 50 : 100, roundStep(uncertaintyM / 2));
-  if (m >= 1000) return `${nf.format(Math.round(m / step) * step / 1000)} km`;
-  return `${Math.max(step, Math.round(m / step) * step)} m`;
+  if (m >= 1000) return `${nf.format(Math.round(m / step) * step / 1000)}\u00a0km`;
+  return `${Math.max(step, Math.round(m / step) * step)}\u00a0m`;
 }
 
 function roundStep(x: number): number {

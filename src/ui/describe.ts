@@ -32,7 +32,7 @@ export function describe(m: Member, me: Fix | null, now: number, t: Thresholds =
   const age = fix ? ageOf(fix, now) : null;
   const fr = age == null ? null : freshness(age, t);
   const imprecise = !!fix && fix.acc > t.impreciseM;
-  const precision = fix ? (imprecise ? `imprécise (± ${Math.round(fix.acc)} m)` : `± ${Math.round(fix.acc)} m`) : '';
+  const precision = fix ? (imprecise ? `imprécise (±\u00a0${Math.round(fix.acc)}\u00a0m)` : `±\u00a0${Math.round(fix.acc)}\u00a0m`) : '';
 
   let text: string;
   let tone: Tone;

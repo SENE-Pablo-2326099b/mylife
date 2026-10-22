@@ -70,16 +70,16 @@ describe('angles', () => {
 
 describe('affichage des distances (jamais de fausse précision)', () => {
   it('arrondit selon la distance', () => {
-    expect(formatDistance(23)).toBe('25 m');
-    expect(formatDistance(2)).toBe('5 m');
-    expect(formatDistance(137)).toBe('140 m');
-    expect(formatDistance(642)).toBe('650 m');
-    expect(formatDistance(1530)).toBe('1,5 km');
-    expect(formatDistance(12_345)).toBe('12,3 km');
+    expect(formatDistance(23)).toBe('25\u00a0m');
+    expect(formatDistance(2)).toBe('5\u00a0m');
+    expect(formatDistance(137)).toBe('140\u00a0m');
+    expect(formatDistance(642)).toBe('650\u00a0m');
+    expect(formatDistance(1530)).toBe('1,5\u00a0km');
+    expect(formatDistance(12_345)).toBe('12,3\u00a0km');
   });
   it('arrondit plus grossièrement quand les positions sont imprécises', () => {
-    expect(formatDistance(137, 60)).toBe('150 m');
-    expect(formatDistance(137, 200)).toBe('100 m');
+    expect(formatDistance(137, 60)).toBe('150\u00a0m');
+    expect(formatDistance(137, 200)).toBe('100\u00a0m');
   });
   it('valide les coordonnées', () => {
     expect(isValidLatLon({ lat: 48, lon: 2 })).toBe(true);

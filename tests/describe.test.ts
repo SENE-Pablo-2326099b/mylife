@@ -12,9 +12,9 @@ group('ligne d’un ami', () => {
   it('position à jour : précision et distance arrondie', () => {
     const l = describe({ ...base, fix: fix() }, me, now);
     expect(l.state).toBe('live');
-    expect(l.text).toBe('Position à jour · ± 10 m');
+    expect(l.text).toBe('Position à jour · ±\u00a010\u00a0m');
     expect(l.tone).toBe('ok');
-    expect(l.distance).toMatch(/^≈ 1[34]0 m$/);
+    expect(l.distance).toMatch(/^≈ 1[34]0\u00a0m$/);
   });
   it('position ancienne : annoncée comme telle, jamais « à jour »', () => {
     const l = describe({ ...base, fix: fix({ ageAtReceipt: 90_000 }) }, me, now);
@@ -28,7 +28,7 @@ group('ligne d’un ami', () => {
   it('position imprécise signalée', () => {
     const l = describe({ ...base, fix: fix({ acc: 120 }) }, me, now);
     expect(l.imprecise).toBe(true);
-    expect(l.text).toContain('imprécise (± 120 m)');
+    expect(l.text).toContain('imprécise (±\u00a0120\u00a0m)');
   });
   it('ne partage pas / pause / en attente / illisible : pas de distance inventée', () => {
     expect(describe({ ...base, sharing: 'off' }, me, now)).toMatchObject({ state: 'not-sharing', distance: null });

@@ -110,7 +110,7 @@ describe('myRaveLoc de bout en bout', () => {
     await alice.getByRole('button', { name: 'Revenir' }).click();
     const card = alice.getByRole('button', { name: /Retrouver Bob — Position à jour/ });
     await card.waitFor({ timeout: 25_000 });
-    await alice.getByText(/^≈ 1[0-5]0 m$/).waitFor();
+    await alice.getByText(/^≈ 1[0-5]0\s?m$/).waitFor();
     await shot(alice, '06-groupe-ami-localise');
     await shot(bob, '07-partage-actif');
   });
@@ -118,7 +118,7 @@ describe('myRaveLoc de bout en bout', () => {
   it('sélection d’un ami et navigation directionnelle', async () => {
     await alice.getByRole('button', { name: /Retrouver Bob/ }).click();
     await alice.getByRole('heading', { name: 'Bob' }).waitFor();
-    await alice.locator('.distance').getByText(/^≈ 1[0-5]0 m$/).waitFor();
+    await alice.locator('.distance').getByText(/^≈ 1[0-5]0\s?m$/).waitFor();
     await alice.getByText(/vers le nord-est/).waitFor();
     await shot(alice, '08-navigation-sans-boussole');
     // Pas de capteur dans ce navigateur : on le dit, la flèche est orientée nord en haut.
