@@ -1,4 +1,3 @@
-import { refreshEverything } from '../sync/refresh';
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -12,7 +11,9 @@ import { formatCents } from '../lib/money';
 import { normalizeText } from '../lib/text';
 import { Button, Card, Chip, EmptyState, Group, Icon, Money, Reveal, Segmented, SelectField, Sheet } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Pending } from '../ui/extras';
 import { HeaderActions } from '../components/HeaderActions';
+import { refreshEverything } from '../sync/refresh';
 
 const PERIODS = [
   { value: 'cycle', label: 'Cycle' },
@@ -54,7 +55,8 @@ export default function TransactionsPage() {
     return { start: '0000-01-01', end: '9999-12-31' };
   }, [period, settings.payday]);
 
-  const all = useLiveQuery(() => db.transactions.where('date').between(range.start, range.end, true, true).toArray(), [range.start, range.end]) ?? NO_TX;
+  const allRaw = useLiveQuery(() => db.transactions.where('date').between(range.start, range.end, true, true).toArray(), [range.start, range.end]);
+  const all = allRaw ?? NO_TX;
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
   const accMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
 
@@ -126,7 +128,9 @@ export default function TransactionsPage() {
       )}
 
       <div className="mt-2">
-        {filtered.length === 0 ? (
+        {allRaw === undefined ? (
+          <Pending />
+        ) : filtered.length === 0 ? (
           <Card className="mt-3">
             <EmptyState
               icon="list"

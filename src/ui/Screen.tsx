@@ -1,4 +1,4 @@
-import { motion, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
+import { m, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { useEffect, useState, type ReactNode } from 'react';
 import { setMood, type Mood } from './mood';
 import { useGoBack } from './useGoBack';
@@ -18,8 +18,11 @@ import { APP_NAME } from '../lib/app';
  * Bloc d'écran. L'entrée est orchestrée une seule fois par l'écran entier (Screen) plutôt que bloc par
  * bloc : `index` ne sert plus qu'à garder les appels existants lisibles.
  */
-export function Reveal({ children, className = '' }: { index?: number; children: ReactNode; className?: string }) {
-  return <div className={className}>{children}</div>;
+export function Reveal({ index = 0, children, className = '' }: { index?: number; children: ReactNode; className?: string }) {
+  // Au-delà des deux premiers blocs (toujours visibles à l'ouverture), le navigateur ne met en page
+  // et ne peint un bloc que lorsqu'il approche de l'écran : ouverture d'écran plus rapide, défilement
+  // plus léger, et la taille déjà vue est retenue (pas de saut de la barre de défilement).
+  return <div className={`${index >= 2 ? 'cv-auto' : ''} ${className}`}>{children}</div>;
 }
 
 const COLUMN = { compact: 'max-w-content px-4', medium: 'max-w-content-md px-6', expanded: 'max-w-content-lg px-8' } as const;
@@ -113,22 +116,22 @@ export function Screen({
             {/* Ligne du haut : sur-titre et actions ; le titre a ensuite toute la largeur (pas de mot coupé à 320 px). */}
             {(kicker || right) && (
               <div className="flex min-h-11 items-center gap-2">
-                <motion.p className="t-label min-w-0 flex-1 text-gold" style={{ opacity: titleOpacity }}>
+                <m.p className="t-label min-w-0 flex-1 text-gold" style={{ opacity: titleOpacity }}>
                   {kicker}
-                </motion.p>
+                </m.p>
                 {right && (
-                  <motion.div className="flex shrink-0 items-center gap-1" style={{ opacity: headerActions, pointerEvents: condensed ? 'none' : 'auto' }} aria-hidden={condensed} {...(condensed ? { inert: '' } : {})}>
+                  <m.div className="flex shrink-0 items-center gap-1" style={{ opacity: headerActions, pointerEvents: condensed ? 'none' : 'auto' }} aria-hidden={condensed} {...(condensed ? { inert: '' } : {})}>
                     {right}
-                  </motion.div>
+                  </m.div>
                 )}
               </div>
             )}
-            <motion.h1
+            <m.h1
               className={`${bp === 'expanded' ? 't-hero' : 't-large'} line-clamp-2 origin-bottom-left text-balance first-letter:uppercase will-change-transform`}
               style={{ opacity: titleOpacity, scale: titleScale, y: titleY }}
             >
               {title}
-            </motion.h1>
+            </m.h1>
           </header>
         )}
         {stack && <h1 className="sr-only">{title}</h1>}
@@ -137,26 +140,26 @@ export function Screen({
       </main>
 
       {/* Barre : transparente au repos (les touchers passent au grand titre), verre une fois condensée. */}
-      <motion.div className="condense-bar fixed inset-x-0 top-0 z-30" style={{ ['--p' as string]: glass, left: 'var(--nav-left, 0px)', pointerEvents: condensed ? 'auto' : 'none' }}>
-        <motion.div aria-hidden className="condense-edge pointer-events-none absolute inset-0" style={{ opacity: edgeOpacity }} />
+      <m.div className="condense-bar fixed inset-x-0 top-0 z-30" style={{ ['--p' as string]: glass, left: 'var(--nav-left, 0px)', pointerEvents: condensed ? 'auto' : 'none' }}>
+        <m.div aria-hidden className="condense-edge pointer-events-none absolute inset-0" style={{ opacity: edgeOpacity }} />
         <div className="relative" style={{ paddingTop: 'var(--safe-top)' }}>
           <div className={`${column} flex h-14 items-center gap-1`}>
             {stack && <IconButton icon="chevron-back" label="Retour" tone="ink" onClick={goBack} className="-ml-2" />}
-            <motion.p
+            <m.p
               className={`${longTitle && stack ? 't-body-strong line-clamp-2 leading-tight' : 't-headline truncate'} min-w-0 flex-1 first-letter:uppercase`}
               style={{ opacity: barTitleOpacity, y: barTitleY }}
               aria-hidden={!stack}
             >
               {title}
-            </motion.p>
+            </m.p>
             {right && (
-              <motion.div className="flex shrink-0 items-center gap-1" style={{ opacity: stack ? 1 : barActions }} aria-hidden={!condensed} {...(condensed ? {} : { inert: '' })}>
+              <m.div className="flex shrink-0 items-center gap-1" style={{ opacity: stack ? 1 : barActions }} aria-hidden={!condensed} {...(condensed ? {} : { inert: '' })}>
                 {right}
-              </motion.div>
+              </m.div>
             )}
           </div>
         </div>
-      </motion.div>
+      </m.div>
       <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-20" style={{ height: 'var(--safe-top)', background: 'var(--status-veil)' }} />
       {onRefresh && <PullToRefresh onRefresh={onRefresh} />}
 

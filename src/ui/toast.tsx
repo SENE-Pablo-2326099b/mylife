@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { Icon } from './icons';
 import { Tap } from './primitives';
 import { useBreakpoint } from './responsive';
@@ -15,7 +15,7 @@ export function ToastHost() {
     <div className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4" style={{ bottom: `calc(var(--safe-bottom) + ${bottom}px)`, paddingLeft: 'calc(var(--nav-left, 0px) + 16px)' }} aria-live="polite" role="status">
       <AnimatePresence>
         {t && (
-          <motion.div
+          <m.div
             key={t.id}
             className="pointer-events-auto w-full max-w-[520px]"
             initial={{ opacity: 0, scale: 0.85, y: 12 }}
@@ -41,7 +41,7 @@ export function ToastHost() {
                 </Tap>
               )}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

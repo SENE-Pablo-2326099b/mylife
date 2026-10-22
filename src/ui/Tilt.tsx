@@ -1,4 +1,4 @@
-import { motion, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
+import { m, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
 
 /**
@@ -39,7 +39,7 @@ export function Tilt({ children, className = '' }: { children: ReactNode; classN
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <div style={{ perspective: 900 }} className={className}>
-      <motion.div
+      <m.div
         ref={ref}
         className="relative h-full"
         style={{ rotateX, rotateY }}
@@ -56,8 +56,8 @@ export function Tilt({ children, className = '' }: { children: ReactNode; classN
         }}
       >
         {children}
-        <motion.span aria-hidden className="pointer-events-none absolute inset-0 rounded-lg" style={{ background: glare, mixBlendMode: 'screen' }} />
-      </motion.div>
+        <m.span aria-hidden className="pointer-events-none absolute inset-0 rounded-lg" style={{ background: glare, mixBlendMode: 'screen' }} />
+      </m.div>
     </div>
   );
 }

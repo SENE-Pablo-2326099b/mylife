@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useDragControls, type PanInfo } from 'framer-motion';
+import { AnimatePresence, m, useDragControls, type PanInfo } from 'framer-motion';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './icons';
@@ -66,7 +66,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
 
   return (
     <div className="fixed inset-0 z-50">
-      <motion.div
+      <m.div
         className="absolute inset-0"
         style={{ background: 'var(--overlay)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
         initial={{ opacity: 0 }}
@@ -76,7 +76,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
         aria-hidden
       />
       <div className={`pointer-events-none absolute inset-0 flex justify-center ${wide ? 'items-center p-6' : 'items-end px-2'}`} style={wide ? undefined : { paddingBottom: 'max(calc(var(--safe-bottom) - 4px), 8px)' }}>
-        <motion.div
+        <m.div
           ref={ref}
           role="dialog"
           aria-modal="true"
@@ -110,7 +110,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[18px] pb-4">{children}</div>
           {footer && <div className="shrink-0 border-t px-[18px] pb-4 pt-3" style={{ borderColor: 'var(--border)' }}>{footer}</div>}
-        </motion.div>
+        </m.div>
       </div>
     </div>
   );

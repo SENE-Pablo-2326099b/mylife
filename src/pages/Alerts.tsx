@@ -1,7 +1,8 @@
 import type { AlertLevel } from '../domain/alerts';
-import { useAlerts } from '../domain/useAlerts';
+import { useAlertsState } from '../domain/useAlerts';
 import { Button, Card, EmptyState, Icon, Reveal, type IconName } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Pending } from '../ui/extras';
 
 const STYLE: Record<AlertLevel, { tone: 'danger' | 'warning' | 'info'; icon: IconName; label: string }> = {
   bad: { tone: 'danger', icon: 'warning', label: 'Important' },
@@ -10,10 +11,12 @@ const STYLE: Record<AlertLevel, { tone: 'danger' | 'warning' | 'info'; icon: Ico
 };
 
 export default function AlertsPage() {
-  const alerts = useAlerts();
+  const { alerts, loaded } = useAlertsState();
   return (
     <Screen stack title="Alertes" kicker="Recalculées à chaque synchro" mood="focus" right={<Button variant="ghost" size="sm" to="/reglages/alertes">Régler</Button>}>
-      {alerts.length === 0 ? (
+      {!loaded ? (
+        <Pending cards={1} />
+      ) : alerts.length === 0 ? (
         <Card level="raised" glow>
           <EmptyState icon="check-circle" title="Rien à signaler" body="Tes dépenses sont dans les clous." />
         </Card>

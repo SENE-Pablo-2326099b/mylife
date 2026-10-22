@@ -1,4 +1,4 @@
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { m, useScroll, useTransform } from 'framer-motion';
 import { useAmbient, useMood, type Mood } from './mood';
 import { springs } from './motion';
 import { useWindowHeight, useWindowWidth } from './responsive';
@@ -73,17 +73,17 @@ function Halo({ spec, width, height, current }: { spec: HaloSpec; width: number;
   const color = t.halos[spec.color];
   const gradient = `radial-gradient(circle at center, ${withAlpha(color, spec.opacity * boost)} 0%, ${withAlpha(color, spec.opacity * 0.45 * boost)} 45%, ${withAlpha(color, 0)} 70%)`;
   return (
-    <motion.div
+    <m.div
       className="absolute left-0 top-0"
       style={{ width: d, height: d }}
       initial={false}
       animate={{ x: fx * width - d / 2, y: fy * height - d / 2 }}
       transition={springs.soft}
     >
-      <motion.div className="h-full w-full" style={{ y: parallax }}>
+      <m.div className="h-full w-full" style={{ y: parallax }}>
         <div className="halo-drift h-full w-full rounded-full" style={{ background: gradient, ['--drift' as string]: `${spec.drift}px`, ['--period' as string]: `${spec.period}s`, animationDelay: `-${spec.period / 3}s` }} />
-      </motion.div>
-    </motion.div>
+      </m.div>
+    </m.div>
   );
 }
 
@@ -99,7 +99,7 @@ export function Backdrop() {
         <Halo key={h.color} spec={h} width={width} height={height} current={current} />
       ))}
       {/* Lumière d'état (budget) : monte et s'éteint en fondu. */}
-      <motion.div
+      <m.div
         className="absolute inset-x-0 top-0"
         style={{ height: '70%', background: `radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--${ambient ?? 'accent'}) 30%, transparent), transparent 70%)` }}
         initial={false}

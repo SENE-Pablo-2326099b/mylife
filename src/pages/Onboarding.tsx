@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { updateSettings } from '../db/seed';
@@ -69,7 +69,7 @@ export default function OnboardingPage() {
 
       <main id="contenu" className="relative mt-6 flex-1 overflow-x-clip">
         <AnimatePresence mode="wait" custom={dir} initial={false}>
-          <motion.section key={step} custom={dir} initial={{ opacity: 0, x: 40 * dir }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 * dir }} transition={springs.soft} className="space-y-4">
+          <m.section key={step} custom={dir} initial={{ opacity: 0, x: 40 * dir }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 * dir }} transition={springs.soft} className="space-y-4">
             {step === 'welcome' && (
               <>
                 <Glass level="raised" className="flex h-[72px] w-[72px] items-center justify-center rounded-[24px] text-accent" style={{ boxShadow: '0 0 40px var(--accent-glow), inset 0 1px 0 var(--glass-raised-spec)' }}>
@@ -230,7 +230,7 @@ export default function OnboardingPage() {
                 </div>
               </div>
             )}
-          </motion.section>
+          </m.section>
         </AnimatePresence>
       </main>
 

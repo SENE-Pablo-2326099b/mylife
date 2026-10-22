@@ -1,12 +1,11 @@
 import { useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../db/db';
 import { useAlerts } from '../domain/useAlerts';
 import { useCloud } from '../sync/cloud';
 import { runSync, useSyncState } from '../sync/store';
 import { Group, IconButton, Row, Sheet, toast } from '../ui/index';
 import { Spaces } from './Spaces';
+import { useToClassifyCount } from '../domain/unclassified';
 
 /**
  * Actions de l'en-tête des écrans principaux : alertes, « + » (actions rapides) et lanceur MyLife
@@ -43,7 +42,7 @@ export function HeaderActions() {
 function QuickActions({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
   const bank = useSyncState();
-  const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
+  const toClassify = useToClassifyCount();
   const go = (to: string) => {
     onClose();
     navigate(to);

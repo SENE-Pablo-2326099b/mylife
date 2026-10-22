@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { springs } from './motion';
 import { Glass } from './primitives';
@@ -328,7 +328,7 @@ export function Ring({ value, size = 220, stroke = 14, tone = 'accent', children
         <circle cx={size / 2} cy={size / 2} r={r} stroke={t.well} strokeWidth={stroke - 6} fill="none" />
         {v > 0 && (
           <>
-            <motion.circle
+            <m.circle
               cx={size / 2}
               cy={size / 2}
               r={r}
@@ -343,7 +343,7 @@ export function Ring({ value, size = 220, stroke = 14, tone = 'accent', children
               transition={springs.soft}
               style={{ filter: 'blur(6px)' }}
             />
-            <motion.circle
+            <m.circle
               cx={size / 2}
               cy={size / 2}
               r={r}
@@ -374,7 +374,7 @@ export function AllocationBar({ items, format, label }: { items: { label: string
         {items
           .filter((i) => i.value > 0)
           .map((i) => (
-            <motion.span key={i.label} className="h-full first:rounded-l-pill last:rounded-r-pill" style={{ background: i.color }} initial={{ flexGrow: 0 }} animate={{ flexGrow: i.value }} transition={springs.soft} />
+            <m.span key={i.label} className="h-full first:rounded-l-pill last:rounded-r-pill" style={{ background: i.color }} initial={{ flexGrow: 0 }} animate={{ flexGrow: i.value }} transition={springs.soft} />
           ))}
       </div>
       <ul className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 min-[400px]:grid-cols-2">
@@ -405,7 +405,7 @@ export function ColumnChart({ data, format, height = 150, label }: { data: { lab
           return (
             <div key={`${d.label}${i}`} className="flex min-w-0 flex-1 flex-col items-center justify-end">
               <span className={`num mb-1 truncate font-display text-[11px] font-semibold ${d.lit === false ? 'text-secondary' : ''}`}>{format(d.value)}</span>
-              <motion.span
+              <m.span
                 className="w-[64%] max-w-[28px] rounded-t-[8px]"
                 style={{ background: fill, opacity: d.lit === false ? 0.45 : 1, boxShadow: d.lit === false ? undefined : `0 0 18px var(--${tone}-halo)` }}
                 initial={{ height: 0 }}
@@ -572,6 +572,9 @@ export function StackedColumns({
  * du clair au soutenu), point d'alerte quand le jour a dépassé son budget, contour pointillé pour les
  * jours à venir, anneau pour aujourd'hui. Toucher un jour = son détail sous la grille.
  */
+/** Formateur créé une fois : `toLocaleDateString` en recrée un à chaque appel (31 cases par rendu). */
+const DAY_FORMAT = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+
 export function SpendCalendar({
   days,
   today,
@@ -589,7 +592,7 @@ export function SpendCalendar({
   const first = new Date(`${days[0]!.date}T12:00:00Z`).getUTCDay();
   const lead = (first + 6) % 7;
   const pickedDay = days.find((d) => d.date === picked) ?? null;
-  const fmtDay = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const fmtDay = (iso: string) => DAY_FORMAT.format(new Date(`${iso}T12:00:00Z`));
   return (
     <div>
       <div className="grid grid-cols-7 gap-1.5" role="grid" aria-label={label}>

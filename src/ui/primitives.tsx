@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useMotionValue, useSpring } from 'framer-motion';
+import { AnimatePresence, m, useMotionValue, useSpring } from 'framer-motion';
 import { Children, forwardRef, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { centsToInput, formatCents, tryDecimalToCents } from '../lib/money';
@@ -38,7 +38,6 @@ export const Glass = forwardRef<
 
 // ---------------------------------------------------------------- Tap : la pression physique
 
-const MotionLink = motion.create(Link);
 
 export interface TapProps {
   to?: string;
@@ -88,27 +87,26 @@ export function Tap({
   title,
   id,
 }: TapProps) {
-  const cls = `${highlight ? 'hl' : ''} ${disabled ? 'pointer-events-none opacity-40' : 'cursor-pointer'} ${className}`;
-  const motionProps = {
-    whileTap: disabled ? undefined : { scale: scaleTo, transition: springs.snappy },
-    transition: springs.liquid,
-  };
+  // Enfoncement au toucher en CSS (.tap) : même ressenti qu'un ressort, sans composant animé par
+  // élément — une liste de 150 opérations ne monte plus 150 animateurs.
+  const cls = `tap ${highlight ? 'hl' : ''} ${disabled ? 'pointer-events-none opacity-40' : 'cursor-pointer'} ${className}`;
+  const pressStyle = { ...style, ['--tap-scale' as string]: String(scaleTo) };
   const press = () => {
     if (haptics) haptic('tap');
     onClick?.();
   };
   if (to !== undefined) {
     return (
-      <MotionLink to={to} replace={replace} className={cls} style={style} aria-label={label} aria-current={ariaCurrent} onClick={onClick ? press : haptics ? () => haptic('tap') : undefined} title={title} id={id} {...motionProps}>
+      <Link to={to} replace={replace} className={cls} style={pressStyle} aria-label={label} aria-current={ariaCurrent} onClick={onClick ? press : haptics ? () => haptic('tap') : undefined} title={title} id={id}>
         {children}
-      </MotionLink>
+      </Link>
     );
   }
   return (
-    <motion.button
+    <button
       type={type}
       className={cls}
-      style={style}
+      style={pressStyle}
       onClick={type === 'submit' && !onClick ? undefined : press}
       disabled={disabled}
       aria-label={label}
@@ -120,10 +118,9 @@ export function Tap({
       aria-keyshortcuts={ariaKeyshortcuts}
       title={title}
       id={id}
-      {...motionProps}
     >
       {children}
-    </motion.button>
+    </button>
   );
 }
 
@@ -178,7 +175,7 @@ export function Button({
     </span>
   );
   return (
-    <motion.span
+    <m.span
       className={`inline-flex ${className}`}
       style={magnetic ? { x, y } : undefined}
       onPointerMove={
@@ -202,7 +199,7 @@ export function Button({
       <Tap to={to} onClick={onClick} disabled={disabled} type={type} label={label} className={`flex w-full ${radius} ${look[variant]}`} scaleTo={0.97}>
         {body}
       </Tap>
-    </motion.span>
+    </m.span>
   );
 }
 
@@ -356,9 +353,9 @@ export function Disclosure({ title, summary, children, initiallyOpen = false }: 
       </Tap>
       <AnimatePresence initial={false}>
         {open && (
-          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={springs.soft} className="overflow-hidden">
+          <m.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={springs.soft} className="overflow-hidden">
             <div className="pt-1">{children}</div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>
@@ -464,31 +461,37 @@ export function Rolling({ text, className = '', mount = false }: { text: string;
   }, [text, mount]);
   if (!live) return <span className={className}>{text}</span>;
   const chars = [...shown];
+  // Le texte réel (invisible) porte la ligne de base et la largeur exactes ; les colonnes qui roulent
+  // se posent par-dessus, une ligne de haut chacune (unité lh) : aucun décalage dans une phrase.
   return (
-    <span className={`relative inline-flex ${className}`} aria-label={text} role="text">
-      {chars.map((c, i) => {
-        const fromRight = chars.length - i;
-        if (!/\d/.test(c)) {
+    <span className={`relative inline-block ${className}`} aria-label={text} role="text">
+      <span aria-hidden className="invisible">
+        {text}
+      </span>
+      <span aria-hidden className="absolute inset-0 flex">
+        {chars.map((c, i) => {
+          const fromRight = chars.length - i;
+          if (!/\d/.test(c)) {
+            return (
+              <span key={`s${fromRight}-${c}`} className="whitespace-pre">
+                {c}
+              </span>
+            );
+          }
           return (
-            <span key={`s${fromRight}-${c}`} aria-hidden className="whitespace-pre">
-              {c}
+            <span key={`d${fromRight}`} className="relative inline-block overflow-hidden" style={{ height: '1lh' }}>
+              <span className="invisible">0</span>
+              <span className="roll-column absolute left-0 top-0 flex flex-col" style={{ transform: `translateY(calc(${-Number(c)} * 1lh))` }}>
+                {'0123456789'.split('').map((d) => (
+                  <span key={d} style={{ height: '1lh' }}>
+                    {d}
+                  </span>
+                ))}
+              </span>
             </span>
           );
-        }
-        return (
-          <span key={`d${fromRight}`} aria-hidden className="relative inline-block overflow-hidden align-bottom" style={{ height: '1.15em', lineHeight: '1.15em' }}>
-            {/* Chiffre invisible : donne à la colonne la largeur réelle (police, chasse, approche). */}
-            <span className="invisible">0</span>
-            <span className="roll-column absolute left-0 top-0 flex flex-col" style={{ transform: `translateY(${-Number(c) * 1.15}em)` }}>
-              {'0123456789'.split('').map((d) => (
-                <span key={d} style={{ height: '1.15em' }}>
-                  {d}
-                </span>
-              ))}
-            </span>
-          </span>
-        );
-      })}
+        })}
+      </span>
     </span>
   );
 }
@@ -799,7 +802,7 @@ export function Segmented<T extends string>({ options, value, onChange, label }:
               className={`relative min-h-[36px] flex-1 px-1 py-1 text-center text-[13px] font-semibold leading-tight ${selected ? 'text-ink' : 'text-secondary'}`}
             >
               {selected && (
-                <motion.span
+                <m.span
                   layoutId={`seg-${id}`}
                   transition={springs.liquid}
                   className="absolute inset-0 rounded-[14px]"
@@ -830,8 +833,8 @@ export function Toggle({ checked, onChange, label, labelledBy }: { checked: bool
       }}
       className="etched relative h-[30px] w-[50px] shrink-0 rounded-[15px] p-[3px]"
     >
-      <motion.span className="liquid absolute inset-0 rounded-[15px]" style={{ boxShadow: 'none' }} initial={false} animate={{ opacity: checked ? 1 : 0 }} transition={{ duration: 0.2 }} />
-      <motion.span
+      <m.span className="liquid absolute inset-0 rounded-[15px]" style={{ boxShadow: 'none' }} initial={false} animate={{ opacity: checked ? 1 : 0 }} transition={{ duration: 0.2 }} />
+      <m.span
         className="relative block h-6 w-6 rounded-full"
         style={{ background: 'var(--knob)', boxShadow: '0 2px 6px var(--well-shade)' }}
         initial={false}
@@ -915,7 +918,7 @@ export function ProgressBar({
   return (
     <div className="relative" role={label ? 'img' : undefined} aria-label={label}>
       <div className="etched overflow-hidden rounded-pill" style={{ height }}>
-        <motion.div
+        <m.div
           className="h-full rounded-pill"
           style={{ background: fill, boxShadow: `0 0 10px var(--${tone}-halo)` }}
           initial={{ width: 0 }}

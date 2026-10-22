@@ -1,4 +1,3 @@
-import { refreshEverything } from '../sync/refresh';
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { BudgetExplainer } from '../components/BudgetExplainer';
@@ -21,8 +20,11 @@ import { Icon } from '../ui/icons';
 import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Rolling, Row, SectionTitle, StatTile } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
+import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
 import { useBreakpoint } from '../ui/responsive';
+import { useToClassifyCount } from '../domain/unclassified';
+import { refreshEverything } from '../sync/refresh';
 
 const STATUS: Record<Status, { label: string; tone: 'success' | 'warning' | 'danger'; icon: 'check-circle' | 'warning' }> = {
   good: { label: 'Dans le budget', tone: 'success', icon: 'check-circle' },
@@ -38,10 +40,10 @@ export default function TodayPage() {
   const cats = useCategoryMap();
   const accounts = useAccounts();
   const today = todayISO();
-  const { state: b, txs: windowTxs } = useBudget(today);
+  const { state: b, txs: windowTxs, loading } = useBudget(today);
   const txs = windowTxs.filter((t) => t.date >= b.cycle.start && t.date <= b.cycle.end);
   const total = useLiveQuery(() => db.transactions.count(), []);
-  const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
+  const toClassify = useToClassifyCount();
   const lastSync = useLiveQuery(() => getMeta<number>('lastSyncAt'), []);
   const alerts = useAlerts();
   const sync = useSyncState();
@@ -59,6 +61,15 @@ export default function TodayPage() {
     setAmbient(ambientTone);
     return () => setAmbient(null);
   }, [ambientTone]);
+
+  // Données pas encore lues : ni faux chiffres ni faux « bienvenue ».
+  if (total === undefined || loading) {
+    return (
+      <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />}>
+        <Pending />
+      </Screen>
+    );
+  }
 
   if (total === 0) {
     return (

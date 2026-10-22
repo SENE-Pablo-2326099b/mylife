@@ -31,6 +31,12 @@ export function useAccounts(): Account[] {
   return useLiveQuery(() => db.accounts.toArray(), []) ?? NO_ACCOUNTS;
 }
 
+/** Comptes et état de lecture (pour ne pas conclure « aucun compte » avant d'avoir lu). */
+export function useAccountsState(): { accounts: Account[]; loaded: boolean } {
+  const raw = useLiveQuery(() => db.accounts.toArray(), []);
+  return { accounts: raw ?? NO_ACCOUNTS, loaded: raw !== undefined };
+}
+
 /** Garde la dernière valeur non nulle : une feuille garde son contenu pendant qu'elle redescend. */
 export function useLatest<T>(value: T | null): T | null {
   const ref = useRef(value);

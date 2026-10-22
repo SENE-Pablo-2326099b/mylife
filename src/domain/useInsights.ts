@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useMemo } from 'react';
 import { db } from '../db/db';
 import type { Holding, InvestmentPlan, RecurringOverride, Transaction } from '../db/types';
-import { useAccounts, useCategoryMap, useSettings } from '../hooks';
+import { useAccountsState, useCategoryMap, useSettings } from '../hooks';
 import { cycleFor, todayISO, type ISODate } from '../lib/dates';
 import { averageDailySpend, buildForecast, forecastAccounts, type Forecast } from './forecast';
 import { useRecentTransactions } from './recentTransactions';
@@ -34,11 +34,11 @@ export function useRecurring(): { list: Recurring[]; loaded: boolean; txs: Trans
 }
 
 /** Prévision de trésorerie des comptes courants jusqu'à `until` (par défaut : veille de la prochaine paie). */
-export function useForecast(until?: ISODate): { forecast: Forecast | null; recurring: Recurring[]; hasBalances: boolean; until: ISODate } {
+export function useForecast(until?: ISODate): { forecast: Forecast | null; recurring: Recurring[]; hasBalances: boolean; until: ISODate; loaded: boolean } {
   const settings = useSettings();
   const cats = useCategoryMap();
-  const accounts = useAccounts();
-  const { list, txs } = useRecurring();
+  const { accounts, loaded: accountsLoaded } = useAccountsState();
+  const { list, txs, loaded: txsLoaded } = useRecurring();
   const plans = useLiveQuery(() => db.plans.toArray(), []) ?? NO_PLANS;
   const holdings = useLiveQuery(() => db.holdings.toArray(), []) ?? NO_H;
   const today = todayISO();
@@ -58,5 +58,5 @@ export function useForecast(until?: ISODate): { forecast: Forecast | null; recur
       dailySpend: averageDailySpend(txs, cats, today),
     });
   }, [current, list, cats, settings, plans, holdings, txs, today, end]);
-  return { forecast, recurring: list, hasBalances: current.length > 0, until: end };
+  return { forecast, recurring: list, hasBalances: current.length > 0, until: end, loaded: accountsLoaded && txsLoaded };
 }

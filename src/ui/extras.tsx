@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons';
 import { haptic, springs } from './motion';
@@ -39,7 +39,7 @@ export function Orb({ trigger, gold = false, size = 56 }: { trigger: unknown; go
     setKey((k) => k + 1);
   }, [trigger]);
   return (
-    <motion.span
+    <m.span
       key={key}
       className={`liquid inline-flex items-center justify-center rounded-full ${gold ? 'liquid-gold text-ink' : ''}`}
       style={{ width: size, height: size, boxShadow: `0 0 ${size * 0.6}px ${gold ? 'var(--gold-halo)' : 'var(--accent-glow)'}, inset 0 1px 0 var(--highlight)` }}
@@ -49,7 +49,7 @@ export function Orb({ trigger, gold = false, size = 56 }: { trigger: unknown; go
       aria-hidden
     >
       <Icon name={gold ? 'trophy' : 'check'} size={size * 0.45} />
-    </motion.span>
+    </m.span>
   );
 }
 
@@ -58,12 +58,12 @@ export function OrbFlash({ show, gold, message }: { show: boolean; gold?: boolea
   return (
     <AnimatePresence>
       {show && (
-        <motion.div className="pointer-events-none fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <motion.span initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={springs.liquid}>
+        <m.div className="pointer-events-none fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <m.span initial={{ scale: 0.6 }} animate={{ scale: 1 }} transition={springs.liquid}>
             <Orb trigger={0} gold={gold} size={84} />
-          </motion.span>
+          </m.span>
           {message && <p className="t-headline">{message}</p>}
-        </motion.div>
+        </m.div>
       )}
     </AnimatePresence>
   );
@@ -117,6 +117,26 @@ export function ThemePicker({ value, onChange }: { value: ThemeId; onChange: (id
           </Tap>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * En attendant des données : rien pendant 150 ms (la plupart des lectures locales finissent avant,
+ * donc aucun clignotement), puis un squelette discret si c'est plus long. Jamais d'état « vide » faux.
+ */
+export function Pending({ cards = 2 }: { cards?: number }) {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setLate(true), 150);
+    return () => clearTimeout(id);
+  }, []);
+  if (!late) return null;
+  return (
+    <div className="space-y-3" aria-busy="true">
+      {Array.from({ length: cards }, (_, i) => (
+        <SkeletonCard key={i} tall={i === 0} />
+      ))}
     </div>
   );
 }

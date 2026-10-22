@@ -19,38 +19,72 @@ import { NotFoundScreen } from './ui/Screen';
 import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
 import { toast } from './ui/toastStore';
+import { useToClassifyCount } from './domain/unclassified';
 
 
 // Pages chargées à la demande : l'ouverture de l'app ne télécharge que l'écran Aujourd'hui.
-const AlertsPage = lazy(() => import('./pages/Alerts'));
-const AssistantPage = lazy(() => import('./pages/Assistant'));
-const CallbackPage = lazy(() => import('./pages/Callback'));
-const CyclePage = lazy(() => import('./pages/Cycle'));
-const ForecastPage = lazy(() => import('./pages/insights/Forecast'));
-const FirePage = lazy(() => import('./pages/insights/Fire'));
-const RecurringPage = lazy(() => import('./pages/insights/Recurring'));
-const OnboardingPage = lazy(() => import('./pages/Onboarding'));
-const QueuePage = lazy(() => import('./pages/Queue'));
-const SettingsPage = lazy(() => import('./pages/Settings'));
-const AlertsSettingsPage = lazy(() => import('./pages/settings/AlertsSettings'));
-const AppearancePage = lazy(() => import('./pages/settings/Appearance'));
-const BudgetSettingsPage = lazy(() => import('./pages/settings/BudgetSettings'));
-const CategoriesPage = lazy(() => import('./pages/settings/Categories'));
-const DataPage = lazy(() => import('./pages/settings/Data'));
-const ProfilePage = lazy(() => import('./pages/settings/Profile'));
-const AccountPage = lazy(() => import('./pages/settings/Account'));
-const RulesPage = lazy(() => import('./pages/settings/Rules'));
-const SyncPage = lazy(() => import('./pages/Sync'));
-const TransactionsPage = lazy(() => import('./pages/Transactions'));
-const PortfolioDetailPage = lazy(() => import('./pages/wealth/PortfolioDetail'));
-const TrImportPage = lazy(() => import('./pages/wealth/TrImport'));
-const WealthPage = lazy(() => import('./pages/wealth/Wealth'));
+const load = {
+  AlertsPage: () => import('./pages/Alerts'),
+  AssistantPage: () => import('./pages/Assistant'),
+  CallbackPage: () => import('./pages/Callback'),
+  CyclePage: () => import('./pages/Cycle'),
+  ForecastPage: () => import('./pages/insights/Forecast'),
+  FirePage: () => import('./pages/insights/Fire'),
+  RecurringPage: () => import('./pages/insights/Recurring'),
+  OnboardingPage: () => import('./pages/Onboarding'),
+  QueuePage: () => import('./pages/Queue'),
+  SettingsPage: () => import('./pages/Settings'),
+  AlertsSettingsPage: () => import('./pages/settings/AlertsSettings'),
+  AppearancePage: () => import('./pages/settings/Appearance'),
+  BudgetSettingsPage: () => import('./pages/settings/BudgetSettings'),
+  CategoriesPage: () => import('./pages/settings/Categories'),
+  DataPage: () => import('./pages/settings/Data'),
+  ProfilePage: () => import('./pages/settings/Profile'),
+  AccountPage: () => import('./pages/settings/Account'),
+  RulesPage: () => import('./pages/settings/Rules'),
+  SyncPage: () => import('./pages/Sync'),
+  TransactionsPage: () => import('./pages/Transactions'),
+  PortfolioDetailPage: () => import('./pages/wealth/PortfolioDetail'),
+  TrImportPage: () => import('./pages/wealth/TrImport'),
+  WealthPage: () => import('./pages/wealth/Wealth'),
+};
+const AlertsPage = lazy(load.AlertsPage);
+const AssistantPage = lazy(load.AssistantPage);
+const CallbackPage = lazy(load.CallbackPage);
+const CyclePage = lazy(load.CyclePage);
+const ForecastPage = lazy(load.ForecastPage);
+const FirePage = lazy(load.FirePage);
+const RecurringPage = lazy(load.RecurringPage);
+const OnboardingPage = lazy(load.OnboardingPage);
+const QueuePage = lazy(load.QueuePage);
+const SettingsPage = lazy(load.SettingsPage);
+const AlertsSettingsPage = lazy(load.AlertsSettingsPage);
+const AppearancePage = lazy(load.AppearancePage);
+const BudgetSettingsPage = lazy(load.BudgetSettingsPage);
+const CategoriesPage = lazy(load.CategoriesPage);
+const DataPage = lazy(load.DataPage);
+const ProfilePage = lazy(load.ProfilePage);
+const AccountPage = lazy(load.AccountPage);
+const RulesPage = lazy(load.RulesPage);
+const SyncPage = lazy(load.SyncPage);
+const TransactionsPage = lazy(load.TransactionsPage);
+const PortfolioDetailPage = lazy(load.PortfolioDetailPage);
+const TrImportPage = lazy(load.TrImportPage);
+const WealthPage = lazy(load.WealthPage);
 
-/** Une fois l'app affichée, les onglets principaux se préchargent en tâche de fond (tap instantané). */
-function prefetchTabs() {
-  const run = () => void Promise.all([import('./pages/Cycle'), import('./pages/Transactions'), import('./pages/wealth/Wealth'), import('./pages/Settings')]).catch(() => undefined);
-  if ('requestIdleCallback' in window) window.requestIdleCallback(run, { timeout: 4000 });
-  else setTimeout(run, 2000);
+/**
+ * Une fois l'app affichée, tous les écrans se préchargent en tâche de fond, les onglets d'abord, par
+ * petits lots aux moments creux : aucun écran n'attend son code (ni squelette qui clignote) au toucher.
+ */
+function prefetchPages() {
+  const order = [load.CyclePage, load.TransactionsPage, load.WealthPage, load.SettingsPage, ...Object.values(load)];
+  const idle = (fn: () => void) => ('requestIdleCallback' in window ? window.requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 600));
+  const next = () => {
+    const batch = order.splice(0, 3);
+    if (!batch.length) return;
+    void Promise.all(batch.map((f) => f().catch(() => undefined))).then(() => idle(next));
+  };
+  idle(next);
 }
 
 const pageFallback = (
@@ -96,10 +130,10 @@ function Shell() {
   const { pathname } = location;
   const navigate = useNavigate();
   const onboarded = useLiveQuery(async () => (await db.settings.get('main'))?.onboarded ?? false, []);
-  const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
+  const toClassify = useToClassifyCount();
 
   useEffect(() => {
-    prefetchTabs();
+    prefetchPages();
     // D'abord ce que les autres appareils ont fait (dont leurs synchros bancaires), puis la banque.
     void cloudBoot()
       .catch(() => undefined)

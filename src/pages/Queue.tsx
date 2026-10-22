@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { CategoryPicker, SHORTCUT_KEYS } from '../components/CategoryPicker';
-import { db } from '../db/db';
 import type { Transaction } from '../db/types';
 import { CAT } from '../domain/defaults';
 import { learnFromCorrection } from '../domain/learn';
@@ -10,6 +8,8 @@ import { formatDay } from '../lib/dates';
 import { useAccounts, useCategories } from '../hooks';
 import { Badge, Button, Card, EmptyState, Money, Reveal, toast, Toggle } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Pending } from '../ui/extras';
+import { useUnclassified } from '../domain/unclassified';
 
 const NO_TX: Transaction[] = [];
 
@@ -17,7 +17,8 @@ const NO_TX: Transaction[] = [];
 export default function QueuePage() {
   const categories = useCategories();
   const accounts = useAccounts();
-  const queue = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).toArray(), []) ?? NO_TX;
+  const queueRaw = useUnclassified();
+  const queue = queueRaw ?? NO_TX;
   const sorted = useMemo(() => [...queue].sort((a, b) => b.date.localeCompare(a.date)), [queue]);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [learn, setLearn] = useState(true);
@@ -70,7 +71,9 @@ export default function QueuePage() {
 
   return (
     <Screen stack title="À classer" kicker={`${queue.length} sans catégorie`} mood="activity" back="/operations">
-      {!current ? (
+      {queueRaw === undefined ? (
+        <Pending cards={1} />
+      ) : !current ? (
         <Card level="raised">
           <EmptyState
             icon={queue.length ? 'time' : 'check-circle'}

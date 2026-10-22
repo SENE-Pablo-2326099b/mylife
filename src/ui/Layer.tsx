@@ -1,4 +1,4 @@
-import { motion, useIsPresent, type HTMLMotionProps } from 'framer-motion';
+import { m, useIsPresent, type HTMLMotionProps } from 'framer-motion';
 
 /**
  * Calque plein écran animé par AnimatePresence : dès qu'il commence à partir, il laisse passer les
@@ -6,5 +6,5 @@ import { motion, useIsPresent, type HTMLMotionProps } from 'framer-motion';
  */
 export function Layer({ style, ...props }: HTMLMotionProps<'div'>) {
   const present = useIsPresent();
-  return <motion.div {...props} style={{ ...style, pointerEvents: present ? undefined : 'none' }} />;
+  return <m.div {...props} style={{ ...style, pointerEvents: present ? undefined : 'none' }} />;
 }

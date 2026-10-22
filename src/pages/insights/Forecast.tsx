@@ -6,6 +6,7 @@ import { formatCents } from '../../lib/money';
 import { LineChart } from '../../ui/charts';
 import { Badge, Button, Card, Disclosure, EmptyState, Group, Icon, Metric, Money, Reveal, Row, SectionTitle, Segmented } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
+import { Pending } from '../../ui/extras';
 
 const HORIZONS = [
   { value: 'cycle', label: 'Jusqu’à la paie' },
@@ -21,8 +22,15 @@ export default function ForecastPage() {
   const [h, setH] = useState<(typeof HORIZONS)[number]['value']>('cycle');
   const today = todayISO();
   const until = h === 'cycle' ? cycleFor(today, settings.payday).end : addDays(today, Number(h));
-  const { forecast, hasBalances } = useForecast(until);
+  const { forecast, hasBalances, loaded } = useForecast(until);
 
+  if (!loaded) {
+    return (
+      <Screen stack title="Prévision de trésorerie" mood="budget" back="/budget">
+        <Pending />
+      </Screen>
+    );
+  }
   if (!hasBalances || !forecast) {
     return (
       <Screen stack title="Prévision de trésorerie" mood="budget" back="/budget">

@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -89,9 +89,9 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
           <div className="palette-veil fixed inset-0" onClick={onClose} aria-hidden />
           <div className="relative mx-auto w-full max-w-[560px] px-4" style={{ paddingTop: 'calc(var(--safe-top) + 18px)', paddingBottom: 'calc(var(--safe-bottom) + 24px)' }}>
             <div className="flex items-center justify-between">
-              <motion.p className="t-large" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={springs.soft}>
+              <m.p className="t-large" initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={springs.soft}>
                 MyLife
-              </motion.p>
+              </m.p>
               <button type="button" onClick={onClose} aria-label="Fermer" className="glass glass-float flex h-11 w-11 items-center justify-center rounded-full">
                 <Icon name="close" size={20} />
               </button>
@@ -103,7 +103,7 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
                 const current = s.open === null;
                 const zooming = entering === s.id;
                 return (
-                  <motion.button
+                  <m.button
                     key={s.id}
                     type="button"
                     onClick={() => enter(s)}
@@ -127,12 +127,12 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
                         <span className="mt-0.5 block text-[13px] leading-snug opacity-90">{s.tagline}</span>
                       </span>
                     </span>
-                  </motion.button>
+                  </m.button>
                 );
               })}
             </div>
 
-            <motion.div className="glass glass-raised mt-4 overflow-hidden rounded-lg" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...springs.soft, delay: 0.14 }}>
+            <m.div className="glass glass-raised mt-4 overflow-hidden rounded-lg" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...springs.soft, delay: 0.14 }}>
               <div className="flex min-h-[60px] items-center gap-3 px-4 py-2">
                 {status(!!cloud.joined, cloud.syncing, !!cloud.error)}
                 <button type="button" className="min-w-0 flex-1 text-left" onClick={() => go('/reglages/compte')}>
@@ -156,9 +156,9 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
                   <Icon name="sync" size={19} className={bank.syncing ? 'spin' : ''} />
                 </button>
               </div>
-            </motion.div>
+            </m.div>
 
-            <motion.div className="mt-3 grid grid-cols-3 gap-2" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...springs.soft, delay: 0.2 }}>
+            <m.div className="mt-3 grid grid-cols-3 gap-2" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...springs.soft, delay: 0.2 }}>
               {(
                 [
                   ['Assistant', 'sparkles', '/assistant'],
@@ -171,7 +171,7 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
                   <span className="t-small font-semibold">{label}</span>
                 </button>
               ))}
-            </motion.div>
+            </m.div>
           </div>
         </Layer>
       )}

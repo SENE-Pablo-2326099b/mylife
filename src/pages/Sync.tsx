@@ -14,6 +14,7 @@ import type { EbAspsp } from '../sync/ebTypes';
 import { runSync, useSyncState } from '../sync/store';
 import { Badge, Button, Card, deferred, Disclosure, EmptyState, Group, Icon, Money, Reveal, Row, Segmented, SectionTitle, SelectField, Sheet, Tap, TextField, toast } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { useToClassifyCount } from '../domain/unclassified';
 
 export const COUNTRIES = [
   { value: 'FR', label: 'France' },
@@ -386,7 +387,7 @@ export default function SyncPage() {
   const [picker, setPicker] = useState(false);
   const connections = useLiveQuery(() => db.connections.toArray(), []) ?? [];
   const accounts = useLiveQuery(() => db.accounts.where('source').equals('enablebanking').toArray(), []) ?? [];
-  const toClassify = useLiveQuery(() => db.transactions.filter((t) => t.categoryId === null).count(), []) ?? 0;
+  const toClassify = useToClassifyCount();
 
   const sealed = settings.ebOwnApp?.sealed;
   const probeClient = useMemo(() => ebClientFor({ bridgePassword: settings.bridgePassword, ebOwnApp: sealed ? { sealed } : null }), [settings.bridgePassword, sealed]);

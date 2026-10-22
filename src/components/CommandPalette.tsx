@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -16,6 +16,7 @@ import { haptic, springs } from '../ui/motion';
 import { Layer } from '../ui/Layer';
 import { setPaletteOpen, usePaletteOpen } from '../ui/paletteStore';
 import { toast } from '../ui/toastStore';
+import { useToClassifyCount } from '../domain/unclassified';
 
 /**
  * Palette de commande : une seule porte vers tout. On tape quelques lettres et on y est — un écran,
@@ -75,7 +76,7 @@ export function CommandPalette() {
   const categories = useCategories();
   const q = normalizeText(query.trim());
   const amount = /^\d+([.,]\d{1,2})?$/.test(query.trim()) ? Math.round(Number(query.trim().replace(',', '.')) * 100) : null;
-  const toClassify = useLiveQuery(() => (open ? db.transactions.filter((t) => t.categoryId === null).count() : 0), [open]) ?? 0;
+  const toClassify = useToClassifyCount();
   const ops = useLiveQuery(async (): Promise<Transaction[]> => {
     if (!open || q.length < 2) return [];
     const found = await db.transactions
@@ -186,7 +187,7 @@ export function CommandPalette() {
       {open && (
         <Layer className="fixed inset-0 z-[70]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
           <button type="button" aria-label="Fermer" className="palette-veil absolute inset-0 cursor-default" onClick={() => setPaletteOpen(false)} />
-          <motion.div
+          <m.div
             role="dialog"
             aria-modal="true"
             aria-label="Rechercher et agir"
@@ -250,7 +251,7 @@ export function CommandPalette() {
                 );
               })}
             </div>
-          </motion.div>
+          </m.div>
         </Layer>
       )}
     </AnimatePresence>,

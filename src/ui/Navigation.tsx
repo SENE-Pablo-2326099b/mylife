@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { m, useMotionValueEvent, useScroll } from 'framer-motion';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { APP_NAME, APP_TAGLINE } from '../lib/app';
 import { useDockHidden } from './dockStore';
@@ -44,19 +44,18 @@ function CountBadge({ n }: { n?: number }) {
 
 /** Le dock se range quand on descend dans un écran et revient dès qu'on remonte. */
 function useScrollTucked(): boolean {
+  // La position vient de la valeur de défilement partagée de framer (lue une fois par image pour tout
+  // l'écran) : pas de lecture de scrollY ici, qui forcerait une mise en page après chaque écriture.
+  const { scrollY } = useScroll();
   const [tucked, setTucked] = useState(false);
-  useEffect(() => {
-    let last = window.scrollY;
-    const onScroll = () => {
-      const y = window.scrollY;
-      const dy = y - last;
-      if (Math.abs(dy) < 8) return;
-      setTucked(dy > 0 && y > 120);
-      last = y;
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const last = useRef(0);
+  useMotionValueEvent(scrollY, 'change', (y) => {
+    const dy = y - last.current;
+    if (Math.abs(dy) < 8) return;
+    last.current = y;
+    const next = dy > 0 && y > 120;
+    setTucked((t) => (t === next ? t : next));
+  });
   return tucked;
 }
 
@@ -86,14 +85,14 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
         onClick={() => haptic('tap')}
         className="relative flex h-12 items-center justify-center"
       >
-        <motion.span layout transition={springs.liquid} className={`relative flex h-12 items-center gap-2 ${focused ? 'px-4' : 'px-3.5'}`}>
-          {focused && <motion.span layoutId="dock-pill" className="dock-pill absolute inset-0 rounded-pill" transition={springs.liquid} />}
+        <m.span layout transition={springs.liquid} className={`relative flex h-12 items-center gap-2 ${focused ? 'px-4' : 'px-3.5'}`}>
+          {focused && <m.span layoutId="dock-pill" className="dock-pill absolute inset-0 rounded-pill" transition={springs.liquid} />}
           <span className="relative">
             <Icon name={focused ? t.active : t.icon} size={22} className={focused ? 'text-accent' : 'text-secondary'} />
             <CountBadge n={t.badge} />
           </span>
           {focused && (
-            <motion.span
+            <m.span
               layout="position"
               className="relative whitespace-nowrap text-[13px] font-semibold text-ink"
               initial={{ opacity: 0, x: -6 }}
@@ -101,15 +100,15 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
               transition={{ ...springs.soft, delay: 0.05 }}
             >
               {t.label}
-            </motion.span>
+            </m.span>
           )}
-        </motion.span>
+        </m.span>
       </Link>
     );
   };
 
   return (
-    <motion.nav
+    <m.nav
       aria-label="Navigation principale"
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center"
       style={{ bottom: `max(var(--safe-bottom), ${DOCK_MARGIN}px)`, paddingLeft: DOCK_MARGIN, paddingRight: DOCK_MARGIN }}
@@ -118,7 +117,7 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
       transition={springs.soft}
       aria-hidden={hidden}
     >
-      <motion.div layout transition={springs.liquid} className="glass glass-float dock-shell pointer-events-auto flex items-center gap-0.5 rounded-pill p-1.5" style={{ height: DOCK_HEIGHT }}>
+      <m.div layout transition={springs.liquid} className="glass glass-float dock-shell pointer-events-auto flex items-center gap-0.5 rounded-pill p-1.5" style={{ height: DOCK_HEIGHT }}>
         {tabs.slice(0, half).map((t, i) => tab(t, i))}
         <button
           type="button"
@@ -145,8 +144,8 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
           <Icon name="search" size={22} className="relative" />
         </button>
         {tabs.slice(half).map((t, i) => tab(t, i + half))}
-      </motion.div>
-    </motion.nav>
+      </m.div>
+    </m.nav>
   );
 }
 
@@ -173,7 +172,7 @@ export function Sidebar({ tabs, footer, onSearch }: { tabs: TabDef[]; footer?: R
           <kbd className="t-caption rounded-xs border border-line px-1.5 text-muted">Ctrl K</kbd>
         </button>
         <div className="relative">
-          {index >= 0 && <motion.span aria-hidden className="bead absolute inset-x-0 rounded-md" style={{ height: ROW }} initial={false} animate={{ y: index * ROW }} transition={springs.liquid} />}
+          {index >= 0 && <m.span aria-hidden className="bead absolute inset-x-0 rounded-md" style={{ height: ROW }} initial={false} animate={{ y: index * ROW }} transition={springs.liquid} />}
           {tabs.map((tab, i) => {
             const focused = i === index;
             return (

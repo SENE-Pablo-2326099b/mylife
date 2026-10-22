@@ -1,4 +1,3 @@
-import { refreshEverything } from '../sync/refresh';
 import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -20,7 +19,9 @@ import { biggestExpenses, cycleHeatmap, cycleHistory, topMerchants, weekdayProfi
 import { useRecentTransactions } from '../domain/recentTransactions';
 import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap, useTheme } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Pending } from '../ui/extras';
 import { HeaderActions } from '../components/HeaderActions';
+import { refreshEverything } from '../sync/refresh';
 
 const NO_TX: Transaction[] = [];
 
@@ -44,8 +45,11 @@ export default function CyclePage() {
   const [params, setParams] = useSearchParams();
   const offset = Math.min(0, parseInt(params.get('n') ?? '0', 10) || 0);
   const today = todayISO();
-  const credits = useLiveQuery(() => db.transactions.filter((t) => t.amount > 0 && t.categoryId !== null).toArray(), []) ?? NO_TX;
-  const pays = useMemo(() => payDates(credits, cats, settings), [credits, cats, settings]);
+  // Tout vient de la lecture partagée des 460 derniers jours (déjà en mémoire, aucune requête) ;
+  // seul un cycle plus ancien que cette fenêtre déclenche une lecture dédiée.
+  const recentRaw = useRecentTransactions();
+  const recent = recentRaw ?? NO_TX;
+  const pays = useMemo(() => payDates(recent.filter((t) => t.amount > 0 && t.categoryId !== null), cats, settings), [recent, cats, settings]);
   const current = resolveCycle(today, settings.payday, pays);
   const cycle = shiftCycle(current, offset, settings.payday, pays);
   const prev = shiftCycle(cycle, -1, settings.payday, pays);
@@ -53,7 +57,11 @@ export default function CyclePage() {
   const until = isCurrent ? today : cycle.end;
   const context = useBudgetContext();
 
-  const txs = useLiveQuery(() => db.transactions.where('date').between(prev.start, cycle.end, true, true).toArray(), [prev.start, cycle.end]) ?? NO_TX;
+  const inWindow = prev.start >= addDays(today, -455);
+  const olderRaw = useLiveQuery(() => (inWindow ? NO_TX : db.transactions.where('date').between(prev.start, cycle.end, true, true).toArray()), [inWindow, prev.start, cycle.end]);
+  const fromRecent = useMemo(() => recent.filter((t) => t.date >= prev.start && t.date <= cycle.end), [recent, prev.start, cycle.end]);
+  const txsRaw = inWindow ? (recentRaw === undefined ? undefined : fromRecent) : (olderRaw ?? undefined);
+  const txs = txsRaw ?? NO_TX;
   const envelope = cycleEnvelope({ txs, cats, settings, ...context }, cycle).total;
   const refunds = useLiveQuery(() => db.transactions.where('categoryId').equals('remboursements').toArray(), []) ?? NO_TX;
 
@@ -86,7 +94,6 @@ export default function CyclePage() {
   const accMap = new Map(accounts.map((a) => [a.id, a]));
 
   // Au-delà du total : jour par jour, habitudes, cycle après cycle, où part l'argent.
-  const recent = useRecentTransactions() ?? NO_TX;
   const insights = useMemo(() => {
     const heat = cycleHeatmap(txs, cats, cycle, envelope, until);
     const history = cycleHistory(
@@ -122,6 +129,16 @@ export default function CyclePage() {
   const over = summary.variable > envelope;
   const ahead = summary.variable > expectedNow;
   const maxSpent = Math.max(1, ...lines.map((l) => Math.max(l.spent, l.category?.target ?? 0)));
+
+  // Paies et opérations pas encore lues : le cycle serait d'abord faux (jour de paie théorique) puis
+  // corrigé, et toute la page sauterait. On attend.
+  if (txsRaw === undefined) {
+    return (
+      <Screen title={isCurrent ? 'Ce cycle' : 'Cycle passé'} kicker="Budget" mood="budget" right={isCurrent ? <HeaderActions /> : undefined}>
+        <Pending />
+      </Screen>
+    );
+  }
 
   return (
     <Screen

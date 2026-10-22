@@ -1,4 +1,3 @@
-import { refreshEverything } from '../../sync/refresh';
 import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -20,9 +19,11 @@ import { OrbFlash } from '../../ui/extras';
 import { Badge, Button, Card, EmptyState, Group, Icon, IconBubble, Money, ProgressBar, Reveal, Row, SectionTitle, Segmented, Sheet, StatTile, Tap, toast, useTheme } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 import { Tilt } from '../../ui/Tilt';
+import { Pending } from '../../ui/extras';
 import { seriesColors } from '../../ui/themes';
 import { HeaderActions } from '../../components/HeaderActions';
 import { AssetForm, GoalForm, GoalMoveForm, PortfolioForm } from './forms';
+import { refreshEverything } from '../../sync/refresh';
 
 const NO_TX: Transaction[] = [];
 const RANGES = [
@@ -161,6 +162,14 @@ export default function WealthPage() {
       await recordSnapshot();
     });
   };
+
+  if (!w.loaded) {
+    return (
+      <Screen title="Patrimoine" kicker="Tout ce que tu possèdes" mood="wealth" right={<HeaderActions />}>
+        <Pending />
+      </Screen>
+    );
+  }
 
   return (
     <Screen title="Patrimoine" kicker="Tout ce que tu possèdes" mood="wealth" right={<HeaderActions />} onRefresh={refreshEverything}>

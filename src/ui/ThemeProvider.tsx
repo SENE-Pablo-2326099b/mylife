@@ -1,10 +1,12 @@
-import { MotionConfig } from 'framer-motion';
+import { LazyMotion, MotionConfig } from 'framer-motion';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { db } from '../db/db';
 import { setHapticsEnabled } from './motion';
 import { applyPalette, readMirror, ThemeContext, useSystemScheme, writeMirror } from './themeRuntime';
 import { isThemeId, resolveThemeId, themePalette, type ThemeId } from './themes';
+
+const loadFeatures = () => import('./motionFeatures').then((r) => r.default);
 
 /** Fournit la palette du thème choisi (ou de son équivalent quand l'app suit le téléphone). */
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -30,7 +32,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   return (
     <ThemeContext.Provider value={palette}>
-      <MotionConfig reducedMotion={reduceMotion ? 'always' : 'user'}>{children}</MotionConfig>
+      <MotionConfig reducedMotion={reduceMotion ? 'always' : 'user'}>
+        <LazyMotion features={loadFeatures} strict>
+          {children}
+        </LazyMotion>
+      </MotionConfig>
     </ThemeContext.Provider>
   );
 }

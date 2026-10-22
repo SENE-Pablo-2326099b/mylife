@@ -1,7 +1,6 @@
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { AnimatePresence, m, type Variants } from 'framer-motion';
 import { useRef, type ReactNode } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
-import { springs } from './motion';
 
 /**
  * Transitions spatiales entre écrans. Les sections principales sont côte à côte : on glisse vers la
@@ -16,11 +15,12 @@ type Move = { kind: 'tab'; dir: number } | { kind: 'push' } | { kind: 'pop' };
 
 const variants: Variants = {
   enter: (m: Move) => (m.kind === 'tab' ? { x: m.dir * 36, opacity: 0 } : m.kind === 'push' ? { x: 56, opacity: 0 } : { scale: 0.96, opacity: 0 }),
-  center: { x: 0, scale: 1, opacity: 1, transition: springs.soft },
+  // Durée fixe et courte (pas de ressort qui s'attarde) : l'écran est utilisable tout de suite.
+  center: { x: 0, scale: 1, opacity: 1, transition: { duration: 0.24, ease: [0.2, 0.8, 0.2, 1] } },
   exit: (m: Move) => ({
     ...(m.kind === 'tab' ? { x: m.dir * -36 } : m.kind === 'push' ? { scale: 0.96 } : { x: 56 }),
     opacity: 0,
-    transition: { duration: 0.14, ease: [0.4, 0, 1, 1] },
+    transition: { duration: 0.1, ease: [0.4, 0, 1, 1] },
   }),
 };
 
@@ -37,9 +37,17 @@ export function PageTransition({ children }: { children: ReactNode }) {
   }
   return (
     <AnimatePresence mode="wait" initial={false} custom={move.current} onExitComplete={() => window.scrollTo(0, 0)}>
-      <motion.div key={pathname} custom={move.current} variants={variants} initial="enter" animate="center" exit="exit" style={{ transformOrigin: '50% 30%' }}>
+      <m.div
+        key={pathname}
+        custom={move.current}
+        variants={variants}
+        initial="enter"
+        animate="center"
+        exit="exit"
+        style={{ transformOrigin: '50% 30%' }}
+      >
         {children}
-      </motion.div>
+      </m.div>
     </AnimatePresence>
   );
 }

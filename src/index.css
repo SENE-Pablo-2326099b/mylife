@@ -341,9 +341,16 @@ input[type='number']::-webkit-outer-spin-button {
 
 /* ------------------------------------------------------------------ Champ de lumière */
 
-.halo-drift {
-  animation: halo-drift var(--period, 24s) ease-in-out infinite alternate;
-  will-change: transform;
+/*
+ * Dérive lente des halos : seulement avec une souris (ordinateur). Sur téléphone, une animation
+ * perpétuelle derrière le verre oblige à recalculer le flou de chaque carte à chaque image, même au
+ * repos (batterie, saccades) : les halos y bougent seulement quand on change de section ou qu'on défile.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .halo-drift {
+    animation: halo-drift var(--period, 24s) ease-in-out infinite alternate;
+    will-change: transform;
+  }
 }
 @keyframes halo-drift {
   0% {
@@ -540,7 +547,15 @@ input[type='number']::-webkit-outer-spin-button {
   -webkit-mask: radial-gradient(circle, transparent 62%, #000 64%, #000 70%, transparent 72%);
   mask: radial-gradient(circle, transparent 62%, #000 64%, #000 70%, transparent 72%);
   opacity: 0.7;
-  animation: orb-spin 7s linear infinite;
+}
+/* Le halo de l'orbe tourne en continu avec une souris ; sur téléphone, il fait un tour quand on le touche. */
+@media (hover: hover) and (pointer: fine) {
+  .orb-ring {
+    animation: orb-spin 7s linear infinite;
+  }
+}
+.orb:active .orb-ring {
+  animation: orb-spin 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes orb-spin {
   to {
@@ -568,4 +583,34 @@ input[type='number']::-webkit-outer-spin-button {
   .roll-column {
     transition: none;
   }
+}
+
+/* Blocs d'écran hors de vue : ni mise en page ni peinture tant qu'ils ne s'approchent pas (Reveal). */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+/* Enfoncement au toucher (Tap) : rapide à l'appui, retour amorti au relâcher. */
+.tap {
+  transition: transform 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+.tap:active {
+  transform: scale(var(--tap-scale, 0.965));
+  transition-duration: 0.08s;
+  transition-timing-function: ease-out;
+}
+.reduce-motion .tap:active {
+  transform: none;
+}
+/* Une plaque de verre touchable garde aussi le fondu de sa lumière au contact. */
+.glass.tap {
+  transition:
+    --gl 0.45s ease-out,
+    transform 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.25);
+}
+.glass.tap:active {
+  transition:
+    --gl 0.45s ease-out,
+    transform 0.08s ease-out;
 }

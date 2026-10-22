@@ -1,4 +1,4 @@
-import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
+import { animate, m, useMotionValue, useTransform } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons';
 import { haptic, springs } from './motion';
@@ -70,12 +70,12 @@ export function PullToRefresh({ onRefresh }: { onRefresh: () => Promise<unknown>
   }, [busy, onRefresh, pull]);
 
   return (
-    <motion.div aria-hidden className="pointer-events-none fixed inset-x-0 z-30 flex justify-center" style={{ top: 'var(--safe-top)', y, opacity }}>
-      <motion.span className="glass glass-float flex h-11 w-11 items-center justify-center rounded-full text-accent" style={{ scaleY: stretch }}>
-        <motion.span style={{ rotate }} className={busy ? 'spin' : ''}>
+    <m.div aria-hidden className="pointer-events-none fixed inset-x-0 z-30 flex justify-center" style={{ top: 'var(--safe-top)', y, opacity }}>
+      <m.span className="glass glass-float flex h-11 w-11 items-center justify-center rounded-full text-accent" style={{ scaleY: stretch }}>
+        <m.span style={{ rotate }} className={busy ? 'spin' : ''}>
           <Icon name="sync" size={20} />
-        </motion.span>
-      </motion.span>
-    </motion.div>
+        </m.span>
+      </m.span>
+    </m.div>
   );
 }
