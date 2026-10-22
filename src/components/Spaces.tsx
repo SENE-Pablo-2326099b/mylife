@@ -36,7 +36,7 @@ const SPACES: Space[] = MYLIFE_APPS.map((a) => ({
   id: a.id,
   name: a.name,
   tagline: a.tagline,
-  icon: a.icon === 'diamond' ? 'diamond-fill' : 'barbell',
+  icon: a.icon === 'diamond' ? 'diamond-fill' : a.icon,
   colors: a.colors,
   open: a.id === 'finances' ? null : () => openMyLifeApp(a.path),
 }));
