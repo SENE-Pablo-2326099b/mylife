@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 /**
  * Lumière au contact du verre : sous le pointeur (souris) ou au toucher (doigt), la plaque de verre
  * visée reçoit la position du contact (--mx / --my) et s'éclaire (--gl → 1), puis s'éteint en fondu

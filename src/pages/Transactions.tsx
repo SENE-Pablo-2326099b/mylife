@@ -7,7 +7,7 @@ import { db } from '../db/db';
 import type { Transaction } from '../db/types';
 import { useAccounts, useCategories, useSettings } from '../hooks';
 import { addDays, cycleFor, formatDay, previousCycle, todayISO } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { normalizeText } from '../lib/text';
 import { Button, Card, Chip, EmptyState, Group, Icon, Money, Reveal, Segmented, SelectField, Sheet } from '../ui/index';
 import { Screen } from '../ui/Screen';

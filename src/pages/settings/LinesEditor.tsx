@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { BudgetLine } from '../../db/types';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { uid } from '../../lib/text';
 import { Button, Group, MoneyField, Row, Sheet, Stepper, TextField, Toggle, toast } from '../../ui/index';
 

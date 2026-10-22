@@ -1,7 +1,7 @@
 import type { Account, Category, Transaction } from '../db/types';
 import { isVariable, type BudgetState, type CatMap } from '../domain/budget';
 import { formatShort } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { Button, Card, Divider, Group, Money, SectionTitle, Sheet } from '../ui/index';
 import { TxRow } from './TxRow';
 

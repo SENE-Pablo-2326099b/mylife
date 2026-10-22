@@ -1,7 +1,7 @@
 import { updateSettings } from '../../db/seed';
 import { computeEnvelope, defaultEnvelope, plannedSavings, totalFixed, totalIncome } from '../../domain/defaults';
 import { useSettings } from '../../hooks';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { Card, Divider, Money, MoneyField, Reveal, SectionTitle, Segmented, StepperRow } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 import { LinesEditor } from './LinesEditor';

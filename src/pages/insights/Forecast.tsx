@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForecast } from '../../domain/useInsights';
 import { useSettings } from '../../hooks';
 import { addDays, cycleFor, diffDays, formatDay, formatLong, formatShort, todayISO } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { LineChart } from '../../ui/charts';
 import { Badge, Button, Card, Disclosure, EmptyState, Group, Icon, Metric, Money, Reveal, Row, SectionTitle, Segmented } from '../../ui/index';
 import { Screen } from '../../ui/Screen';

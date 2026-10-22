@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearErrors, isStaleChunk, logError, readErrors } from '../src/lib/errorLog';
+import { clearErrors, isStaleChunk, logError, readErrors } from '../src/ui/errorLog';
 
 // Stockage local minimal (l'environnement de test est Node).
 const mem = new Map<string, string>();

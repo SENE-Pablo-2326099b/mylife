@@ -4,7 +4,7 @@ import { db } from '../../db/db';
 import { getSettings, updateSettings } from '../../db/seed';
 import { backupFileName, exportBackup, importBackup, wipeAll } from '../../domain/backup';
 import { clearDemo, loadDemo } from '../../domain/demo';
-import { clearErrors, readErrors } from '../../lib/errorLog';
+import { clearErrors, readErrors } from '../../ui/errorLog';
 import { useCloud } from '../../sync/cloud';
 import { Button, Card, Reveal, SectionTitle, toast } from '../../ui/index';
 import { Screen } from '../../ui/Screen';

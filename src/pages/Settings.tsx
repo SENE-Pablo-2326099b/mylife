@@ -3,11 +3,11 @@ import { db } from '../db/db';
 import { computeEnvelope, totalIncome } from '../domain/defaults';
 import { useSettings } from '../hooks';
 import { APP_NAME } from '../lib/app';
-import { formatCents } from '../lib/money';
-import { themeInfo, isThemeId } from '../ui/themes';
+import { formatCents } from '../ui/money';
+import { useAppearanceSummary } from '../ui/appearance';
 import { openMyLifeApp } from '../lib/app';
 import { checkForUpdate } from '../lib/pwaUpdate';
-import { relativeTime } from '../lib/relative';
+import { relativeTime } from '../ui/relative';
 import { useCloud } from '../sync/cloud';
 import { Button, Card, Group, Icon, Reveal, Row, SectionTitle } from '../ui/index';
 import { Screen } from '../ui/Screen';
@@ -16,7 +16,7 @@ export default function SettingsPage() {
   const s = useSettings();
   const cloud = useCloud();
   const counts = useLiveQuery(async () => ({ banks: await db.connections.where('status').equals('active').count(), rules: await db.rules.count(), cats: await db.categories.count() }), []);
-  const theme = themeInfo(isThemeId(s.theme) ? s.theme : 'nuit');
+  const appearance = useAppearanceSummary();
   const initial = (s.firstName.trim()[0] ?? '').toUpperCase();
 
   return (
@@ -62,7 +62,7 @@ export default function SettingsPage() {
       <Reveal index={3}>
         <SectionTitle>App</SectionTitle>
         <Group>
-          <Row icon="palette" title="Apparence" subtitle={`${theme.name}${s.followSystem ? ' · suit le téléphone' : ''}`} to="/reglages/apparence" />
+          <Row icon="palette" title="Apparence" subtitle={appearance} to="/reglages/apparence" />
           <Row icon="sparkles" title="Assistant IA" subtitle="Claude, avec ta clé API Anthropic" to="/assistant" />
           <Row icon="bell" title="Alertes" subtitle="Seuils et règles d’alerte" to="/reglages/alertes" />
           <Row icon="shield" title="Sauvegarde et données" subtitle="Export, import, démo, effacement" to="/reglages/donnees" />

@@ -8,11 +8,11 @@ import { CAT } from '../domain/defaults';
 import { learnFromCorrection, type LearnMode } from '../domain/learn';
 import { suggestKeyword } from '../domain/rules';
 import { addDays, formatDay, formatShort } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { Sheet } from '../ui/Sheet';
 import { Badge, Button, Glass, Money, Segmented, SelectField, TextField } from '../ui/primitives';
 import { toast } from '../ui/toastStore';
-import { logError } from '../lib/errorLog';
+import { logError } from '../ui/errorLog';
 import { CategoryPicker } from './CategoryPicker';
 
 /** Feuille d'une opération : catégorie, apprentissage (règle), personne, note. */

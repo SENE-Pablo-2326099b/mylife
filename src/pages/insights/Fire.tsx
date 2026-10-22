@@ -8,7 +8,7 @@ import { useRecurring } from '../../domain/useInsights';
 import { useWealth } from '../../domain/useWealth';
 import { useCategoryMap, useSettings } from '../../hooks';
 import { todayISO } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { StackedColumns } from '../../ui/charts';
 import { Button, Card, Chip, Disclosure, Divider, MoneyField, ProgressBar, Reveal, Rolling, Sheet, StepperRow, ToggleRow, toast, useTheme } from '../../ui/index';
 import { Screen } from '../../ui/Screen';

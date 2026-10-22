@@ -4,7 +4,7 @@ import { db } from '../db/db';
 import { updateSettings } from '../db/seed';
 import type { Account, Connection } from '../db/types';
 import { useSettings } from '../hooks';
-import { formatDateTime, relativeTime } from '../lib/relative';
+import { formatDateTime, relativeTime } from '../ui/relative';
 import { formatShort } from '../lib/dates';
 import { normalizeText } from '../lib/text';
 import { callbackUrl, completeBankConnection, disconnectBank, parseCallback, startBankConnection } from '../sync/connect';

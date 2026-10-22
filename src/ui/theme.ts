@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { BASE_TEXT, type StyleId } from '../vendor/lumen';
 
 /**

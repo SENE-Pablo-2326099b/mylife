@@ -1,6 +1,6 @@
 import type { Account, AccountKind } from '../db/types';
 import { isISODate } from '../lib/dates';
-import { decimalToCents } from '../lib/money';
+import { decimalToCents } from '../ui/money';
 import type { EbBalance, EbSessionAccount, EbTransaction } from './ebTypes';
 import type { IncomingTransaction } from './source';
 

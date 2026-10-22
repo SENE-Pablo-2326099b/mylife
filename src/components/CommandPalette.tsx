@@ -8,7 +8,7 @@ import type { Transaction } from '../db/types';
 import { useCategories } from '../hooks';
 import { formatShort } from '../lib/dates';
 import { openMyLifeApp } from '../lib/app';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { normalizeText } from '../lib/text';
 import { runSync } from '../sync/store';
 import { Icon, type IconName } from '../ui/icons';

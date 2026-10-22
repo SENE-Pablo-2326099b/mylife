@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { m, useMotionValueEvent, useScroll, useTransform } from 'framer-motion';
 import { useEffect, useState, type ReactNode } from 'react';
 import { setMood, type Mood } from './mood';
@@ -7,7 +8,7 @@ import { Button, EmptyState, IconButton } from './primitives';
 import { useBreakpoint } from './responsive';
 import { PullToRefresh } from './PullToRefresh';
 import { useTabActive } from './tabActive';
-import { APP_NAME } from '../lib/app';
+import { kitApp } from './app';
 
 
 /**
@@ -97,7 +98,7 @@ export function Screen({
     if (active) setMood(mood);
   }, [mood, active]);
   useEffect(() => {
-    if (active) document.title = `${title} · ${APP_NAME}`;
+    if (active) document.title = `${title} · ${kitApp().name}`;
   }, [title, active]);
   useEffect(() => {
     if (!stack) return;

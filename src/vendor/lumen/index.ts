@@ -376,30 +376,45 @@ export const MYLIFE_APPS: readonly MyLifeApp[] = [
 ];
 
 /**
- * Apparence partagée entre les apps MyLife servies à la même adresse (web) : le dernier thème choisi
- * dans une app est repris par les autres à leur lancement. Écrit seulement sur un choix de
- * l'utilisateur (jamais sur une simple relecture), lu au démarrage.
+ * Apparence de MyLife : un seul réglage pour toutes les apps. Sur le web, les apps partagent l'adresse,
+ * donc ce stockage ; un changement dans une app s'applique tout de suite aux autres onglets ouverts.
+ * `at` date le choix : entre deux appareils (synchro), le plus récent gagne.
  */
 export interface SharedAppearance {
   theme: ThemeId;
   followSystem: boolean;
+  /** Réduire les animations (en plus du réglage du système). */
+  reduceMotion: boolean;
+  /** Légère vibration au toucher (Android). */
+  haptics: boolean;
   at: number;
 }
-const SHARED_APPEARANCE_KEY = 'mylife:appearance';
+export const SHARED_APPEARANCE_KEY = 'mylife:appearance';
+
+export const DEFAULT_APPEARANCE: SharedAppearance = { theme: 'nuit', followSystem: false, reduceMotion: false, haptics: true, at: 0 };
+
+/** Valide une apparence lue (stockage, synchro) ; les champs ajoutés depuis prennent leur valeur par défaut. */
+export function parseAppearance(raw: unknown): SharedAppearance | null {
+  const r = raw as Partial<SharedAppearance> | null;
+  if (!r || !isThemeId(r.theme) || typeof r.followSystem !== 'boolean' || typeof r.at !== 'number') return null;
+  return { theme: r.theme, followSystem: r.followSystem, reduceMotion: r.reduceMotion === true, haptics: r.haptics !== false, at: r.at };
+}
 
 export function readSharedAppearance(): SharedAppearance | null {
   try {
-    const raw = JSON.parse(globalThis.localStorage?.getItem(SHARED_APPEARANCE_KEY) ?? 'null') as Partial<SharedAppearance> | null;
-    return raw && isThemeId(raw.theme) && typeof raw.followSystem === 'boolean' && typeof raw.at === 'number' ? (raw as SharedAppearance) : null;
+    return parseAppearance(JSON.parse(globalThis.localStorage?.getItem(SHARED_APPEARANCE_KEY) ?? 'null'));
   } catch {
     return null;
   }
 }
 
-export function writeSharedAppearance(a: { theme: ThemeId; followSystem: boolean }): void {
+/** Enregistre un choix de l'utilisateur (daté maintenant, sauf `at` fourni : apparence venue d'un autre appareil). */
+export function writeSharedAppearance(a: Partial<SharedAppearance> & { theme: ThemeId; followSystem: boolean }): SharedAppearance {
+  const next: SharedAppearance = { ...DEFAULT_APPEARANCE, ...(readSharedAppearance() ?? {}), ...a, at: a.at ?? Date.now() };
   try {
-    globalThis.localStorage?.setItem(SHARED_APPEARANCE_KEY, JSON.stringify({ ...a, at: Date.now() }));
+    globalThis.localStorage?.setItem(SHARED_APPEARANCE_KEY, JSON.stringify(next));
   } catch {
-    /* stockage indisponible : chaque app garde son thème */
+    /* stockage indisponible : le choix vaut pour cette session */
   }
+  return next;
 }

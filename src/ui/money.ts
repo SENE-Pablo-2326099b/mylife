@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 /**
  * Toutes les sommes de l'app sont des entiers en centimes.
  * Les seules conversions texte <-> centimes passent par ce module,

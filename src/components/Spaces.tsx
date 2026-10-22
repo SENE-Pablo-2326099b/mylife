@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { getMeta } from '../db/db';
 import { openMyLifeApp } from '../lib/app';
-import { relativeTime } from '../lib/relative';
+import { relativeTime } from '../ui/relative';
 import { syncCloud, useCloud } from '../sync/cloud';
 import { runSync, useSyncState } from '../sync/store';
 import { Icon, type IconName } from '../ui/icons';

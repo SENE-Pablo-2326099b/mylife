@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 /** "à l'instant", "il y a 5 min", "il y a 3 h", "il y a 2 j" */
 export function relativeTime(ts: number | null | undefined, now = Date.now()): string {
   if (!ts) return 'jamais';

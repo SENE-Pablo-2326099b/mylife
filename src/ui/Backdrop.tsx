@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { m, useScroll, useTransform } from 'framer-motion';
 import { useAmbient, useMood, type Mood } from './mood';
 import { springs } from './motion';

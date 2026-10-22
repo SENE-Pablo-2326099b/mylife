@@ -1,5 +1,6 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { Component, type ReactNode } from 'react';
-import { isStaleChunk, logError, reloadForNewVersion } from '../lib/errorLog';
+import { isStaleChunk, logError, reloadForNewVersion } from './errorLog';
 import { Button, EmptyState } from './primitives';
 
 /**

@@ -1,7 +1,8 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { AnimatePresence, m, useMotionValue, useSpring } from 'framer-motion';
 import { Children, forwardRef, useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { centsToInput, formatCents, tryDecimalToCents } from '../lib/money';
+import { centsToInput, formatCents, tryDecimalToCents } from './money';
 import { haptic, springs } from './motion';
 import { Icon, type IconName } from './icons';
 import type { GlassLevel, Tone } from './theme';

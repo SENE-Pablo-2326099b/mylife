@@ -9,7 +9,7 @@ import { useAccounts, useCategories } from '../hooks';
 import { Badge, Button, Card, EmptyState, Money, Reveal, toast, Toggle } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Pending } from '../ui/extras';
-import { logError } from '../lib/errorLog';
+import { logError } from '../ui/errorLog';
 import { useUnclassified } from '../domain/unclassified';
 
 const NO_TX: Transaction[] = [];

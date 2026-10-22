@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decimalToCents, divideCents, formatCents, percent, tryDecimalToCents, centsToInput } from '../src/lib/money';
+import { decimalToCents, divideCents, formatCents, percent, tryDecimalToCents, centsToInput } from '../src/ui/money';
 
 describe('decimalToCents', () => {
   it.each([

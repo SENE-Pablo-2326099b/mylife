@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { animate, m, useMotionValue, useTransform } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './icons';

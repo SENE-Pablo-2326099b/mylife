@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { m, useMotionValue, useSpring, useTransform, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, type ReactNode } from 'react';
 

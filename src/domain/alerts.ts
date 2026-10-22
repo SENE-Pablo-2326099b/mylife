@@ -1,6 +1,6 @@
 import type { Settings, Transaction } from '../db/types';
 import { addDays, formatShort, type ISODate } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { normalizeText } from '../lib/text';
 import { dailySeries, overrunStreaks, spent, isSpending, type CatMap } from './budget';
 import { CAT } from './defaults';

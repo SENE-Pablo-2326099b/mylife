@@ -7,7 +7,7 @@ import { parseTrStatement, type TrStatement } from '../../domain/tradeRepublic';
 import { applyTrImport, cleanName, planKey, planTrImport, resolveQuotes } from '../../domain/trImport';
 import { recordSnapshot, refreshPlannedSavings, refreshQuotes } from '../../domain/wealthDb';
 import { formatShort } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { pdfPages } from '../../lib/pdfText';
 import { canUseRelay, EbClient } from '../../sync/ebClient';
 import { Badge, Button, Card, EmptyState, Group, Money, Reveal, Row, SectionTitle, ToggleRow, undoable } from '../../ui/index';

@@ -9,8 +9,8 @@ import { ASSET_CLASS_LABEL, OP_LABEL, type Position } from '../../domain/wealth'
 import { deleteHolding, deletePortfolio, recordSnapshot, refreshPlannedSavings, refreshQuotes } from '../../domain/wealthDb';
 import { useWealth } from '../../domain/useWealth';
 import { formatShort, todayISO } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
-import { relativeTime } from '../../lib/relative';
+import { formatCents } from '../../ui/money';
+import { relativeTime } from '../../ui/relative';
 import { Badge, Button, Card, EmptyState, Group, IconButton, Metric, Money, Reveal, Row, SectionTitle, Sheet, Tap, toast, ActionList } from '../../ui/index';
 import { NotFoundScreen, Screen } from '../../ui/Screen';
 import { AdjustForm, BankLinkForm, HoldingForm, OpForm, PlanForm, PortfolioForm } from './forms';

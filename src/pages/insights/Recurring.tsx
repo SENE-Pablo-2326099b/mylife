@@ -6,7 +6,7 @@ import { CADENCE_LABEL, subscriptionsMonthly, type Recurring } from '../../domai
 import { useRecurring } from '../../domain/useInsights';
 import { useCategoryMap } from '../../hooks';
 import { formatShort } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { Badge, Button, Card, EmptyState, Group, Metric, Money, Reveal, Row, SectionTitle, Sheet, TextField, toast } from '../../ui/index';
 import { Screen } from '../../ui/Screen';
 

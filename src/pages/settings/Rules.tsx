@@ -7,7 +7,7 @@ import { reapplyRules } from '../../domain/classifyDb';
 import { CAT } from '../../domain/defaults';
 import { countRuleMatches, newRule } from '../../domain/learn';
 import { validatePattern } from '../../domain/rules';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { normalizeText } from '../../lib/text';
 import { useCategories, useRules } from '../../hooks';
 import { Badge, Button, Divider, Field, Group, Icon, MoneyField, Reveal, Segmented, SelectField, Sheet, StepperRow, Tap, TextField, toast, ToggleRow } from '../../ui/index';

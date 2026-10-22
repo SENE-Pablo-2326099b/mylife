@@ -11,7 +11,7 @@ import { useBudgetContext } from '../domain/useBudget';
 import { personBalances } from '../domain/people';
 import { useAccounts, useCategoryMap, useSettings } from '../hooks';
 import { addDays, cycleLength, formatCycle, formatShort, todayISO, type Cycle, type ISODate } from '../lib/dates';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { AllocationBar, ColumnChart, LineChart, SpendCalendar } from '../ui/charts';
 import { seriesColors } from '../ui/themes';
 import { TxRow } from '../components/TxRow';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useSettings } from '../../hooks';
-import { formatDateTime, relativeTime } from '../../lib/relative';
+import { formatDateTime, relativeTime } from '../../ui/relative';
 import {
   cloudAccountStatus,
   cloudChangePassword,

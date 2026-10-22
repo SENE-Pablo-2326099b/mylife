@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './db/db';
-import { adoptSharedAppearance, ensureSeeded } from './db/seed';
+import { ensureSeeded, migrateAppearance } from './db/seed';
 import { wealthHousekeeping } from './domain/wealthDb';
 import TodayPage from './pages/Today';
 import { absorbSetupLink } from './sync/setupLink';
@@ -13,7 +13,6 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
 import { Navigation, type TabDef } from './ui/Navigation';
 import { KeptTabs, PushedScreen } from './ui/PageTransition';
-import { isTabPath } from './ui/tabActive';
 import { setPaletteOpen } from './ui/paletteStore';
 import { CommandPalette } from './components/CommandPalette';
 import { NotFoundScreen } from './ui/Screen';
@@ -22,6 +21,10 @@ import { ToastHost } from './ui/toast';
 import { toast } from './ui/toastStore';
 import { useToClassifyCount } from './domain/unclassified';
 
+
+/** Les onglets (dock) : gardés montés une fois visités. */
+const TAB_PATHS = ['/', '/budget', '/operations', '/patrimoine', '/reglages'];
+const isTabPath = (p: string) => TAB_PATHS.includes(p);
 
 // Pages chargées à la demande : l'ouverture de l'app ne télécharge que l'écran Aujourd'hui.
 const load = {
@@ -101,7 +104,7 @@ export default function App() {
 
   useEffect(() => {
     ensureSeeded()
-      .then(() => adoptSharedAppearance().catch(() => undefined))
+      .then(() => migrateAppearance().catch(() => undefined))
       .then(absorbSetupLink)
       .then((linked) => {
         setReady(true);

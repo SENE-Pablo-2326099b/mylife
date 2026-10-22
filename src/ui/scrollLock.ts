@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 /**
  * Verrou du défilement de la page, partagé par toutes les couches (feuilles, palette, espaces) :
  * un compteur, pas une sauvegarde / restauration. Deux couches qui se chevauchent (l'une se ferme

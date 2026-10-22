@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 /** Les briques Lumen : les écrans n'utilisent que celles-ci. */
 export * from './primitives';
 export { Reveal, Screen, NotFoundScreen } from './Screen';

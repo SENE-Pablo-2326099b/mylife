@@ -3,7 +3,8 @@ import { ADDED_RULE_SEEDS, DEFAULT_CATEGORIES, DEFAULT_SETTINGS, addedRules, bui
 import { normalizeSettings } from '../domain/settingsModel';
 import { db, getMeta, setMeta, type BudgetDB } from './db';
 import type { Settings } from './types';
-import { isThemeId, readSharedAppearance, writeSharedAppearance } from '../vendor/lumen';
+import { setAppearance } from '../ui/appearance';
+import { isThemeId, readSharedAppearance } from '../vendor/lumen';
 
 /** À augmenter quand le classement change : toutes les opérations sont reclassées une fois (corrections manuelles conservées). */
 const CLASSIFIER_VERSION = 2;
@@ -47,17 +48,16 @@ export async function updateSettings(patch: Partial<Settings>, database: BudgetD
   const current = await getSettings(database);
   const next = { ...current, ...patch, id: 'main' as const };
   await database.settings.put(next);
-  // Choix d'apparence : partagé avec les autres apps MyLife (même adresse sur le web).
-  if (database === db && (patch.theme !== undefined || patch.followSystem !== undefined) && isThemeId(next.theme)) {
-    writeSharedAppearance({ theme: next.theme, followSystem: next.followSystem });
-  }
 }
 
-/** Au lancement : reprend le dernier thème choisi dans une autre app MyLife. */
-export async function adoptSharedAppearance(database: BudgetDB = db): Promise<void> {
-  const shared = readSharedAppearance();
-  if (!shared) return;
-  const current = await getSettings(database);
-  if (current.theme === shared.theme && current.followSystem === shared.followSystem) return;
-  await database.settings.put({ ...current, theme: shared.theme, followSystem: shared.followSystem, id: 'main' });
+/**
+ * L'apparence est désormais un réglage commun à toutes les apps MyLife (src/ui/appearance.ts). Une
+ * seule fois : celle que MyFinances gardait dans ses réglages devient l'apparence commune, si aucune
+ * app ne l'a encore fixée.
+ */
+export async function migrateAppearance(database: BudgetDB = db): Promise<void> {
+  if (readSharedAppearance()) return;
+  const s = await getSettings(database);
+  if (!isThemeId(s.theme)) return;
+  setAppearance({ theme: s.theme, followSystem: s.followSystem, reduceMotion: s.reduceMotion, haptics: s.haptics });
 }

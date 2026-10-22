@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { useSyncExternalStore } from 'react';
 
 /** Palette de commande : ouverte depuis l'orbe du dock, la barre latérale ou Ctrl/Cmd + K. */

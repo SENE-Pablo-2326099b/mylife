@@ -1,12 +1,12 @@
-/** Nom affiché de l'app (titre, manifeste, sauvegardes). */
-export const APP_NAME = 'MyFinances';
+import { configureApp } from '../ui/app';
+
+/** MyFinances dans le kit MyLife : nom affiché (titres, sauvegardes), chemin, journal d'erreurs. */
+export const APP = configureApp('finances');
+/** Nom affiché de l'app (titre, sauvegardes). */
+export const APP_NAME = APP.name;
 /**
  * Chemin de l'app sous MyLife (« /finances »), sans barre finale ; vide en test.
  * Toutes les apps MyLife partagent une même origine : une connexion, une synchro.
  */
 export const BASE_PATH = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
-/** Ouvre une autre app MyLife (même adresse : la session et le compte suivent). */
-export function openMyLifeApp(path: string): void {
-  window.location.assign(path);
-}
-export const APP_TAGLINE = 'Budget, patrimoine, placements';
+export { openMyLifeApp } from '../ui/app';

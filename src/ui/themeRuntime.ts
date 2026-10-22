@@ -1,38 +1,14 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { createContext, useContext, useSyncExternalStore } from 'react';
 import { cssVars, type Palette } from './theme';
-import { isThemeId, resolvePalette, themePalette, type ThemeId } from './themes';
+import { getAppearance } from './appearance';
+import { resolvePalette, themePalette } from './themes';
 
 /**
  * Applique le thème : variables CSS sur <html> (lues par Tailwind et le verre), couleur de la barre
  * du navigateur, mode clair / sombre natif, préférences de mouvement et d'haptique.
- * Le choix est recopié dans localStorage pour peindre la bonne couleur dès la première image.
+ * Le choix vient de l'apparence commune de MyLife (appearance.ts) : la bonne couleur dès la première image.
  */
-
-const MIRROR_KEY = 'lumen-appearance';
-
-interface Appearance {
-  theme: ThemeId;
-  followSystem: boolean;
-  reduceMotion: boolean;
-}
-
-export function readMirror(): Appearance {
-  try {
-    const raw = JSON.parse(localStorage.getItem(MIRROR_KEY) ?? 'null') as Partial<Appearance> | null;
-    if (raw && isThemeId(raw.theme)) return { theme: raw.theme, followSystem: !!raw.followSystem, reduceMotion: !!raw.reduceMotion };
-  } catch {
-    /* stockage indisponible (navigation privée) : thème par défaut */
-  }
-  return { theme: 'nuit', followSystem: false, reduceMotion: false };
-}
-
-export function writeMirror(a: Appearance): void {
-  try {
-    localStorage.setItem(MIRROR_KEY, JSON.stringify(a));
-  } catch {
-    /* ignore */
-  }
-}
 
 const DARK_QUERY = '(prefers-color-scheme: dark)';
 
@@ -71,7 +47,7 @@ function applyPlatformClasses(): void {
 /** Avant le premier rendu React : bonnes couleurs dès la première image. */
 export function bootTheme(): void {
   applyPlatformClasses();
-  const m = readMirror();
+  const m = getAppearance();
   const system = window.matchMedia ? (window.matchMedia(DARK_QUERY).matches ? 'dark' : 'light') : null;
   applyPalette(resolvePalette(m.theme, m.followSystem, system));
   document.documentElement.classList.toggle('reduce-motion', m.reduceMotion);

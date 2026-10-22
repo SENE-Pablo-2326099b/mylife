@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { m, useIsPresent, type HTMLMotionProps } from 'framer-motion';
 
 /**

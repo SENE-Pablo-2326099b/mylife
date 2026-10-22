@@ -12,7 +12,7 @@ import { deleteGoal, recordSnapshot } from '../../domain/wealthDb';
 import { useWealth } from '../../domain/useWealth';
 import { useCategoryMap, useSettings } from '../../hooks';
 import { addDays, formatLong, formatShort, todayISO } from '../../lib/dates';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { plannedMonthlySavings } from '../../domain/plans';
 import { AllocationBar, LineChart, Ring } from '../../ui/charts';
 import { OrbFlash } from '../../ui/extras';

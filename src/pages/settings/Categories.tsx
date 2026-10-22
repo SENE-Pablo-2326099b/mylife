@@ -4,7 +4,7 @@ import { db } from '../../db/db';
 import { changeWithUndo } from '../../db/undo';
 import type { Category, CategoryKind } from '../../db/types';
 import { useCategories } from '../../hooks';
-import { formatCents } from '../../lib/money';
+import { formatCents } from '../../ui/money';
 import { uid } from '../../lib/text';
 import { Badge, Button, Divider, Field, Group, IconButton, MoneyField, Reveal, SelectField, Sheet, Tap, TextField, ToggleRow } from '../../ui/index';
 import { Screen } from '../../ui/Screen';

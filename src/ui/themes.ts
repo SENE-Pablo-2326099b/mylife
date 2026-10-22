@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { SEEDS, SERIES_HUES, TEXT_ALPHA, THEMES, type LumenSeed, type StyleId, type ThemeId, type ThemeInfo } from '../vendor/lumen';
 import { BASE_PALETTES, type GlassSpec, type Palette } from './theme';
 

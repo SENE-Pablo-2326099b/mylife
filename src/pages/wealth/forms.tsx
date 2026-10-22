@@ -6,7 +6,7 @@ import { FREQUENCY_LABEL } from '../../domain/plans';
 import { ASSET_CLASS_LABEL } from '../../domain/wealth';
 import { recordSnapshot, refreshPlannedSavings, refreshQuotes, syncBankBuys } from '../../domain/wealthDb';
 import { todayISO } from '../../lib/dates';
-import { centsToInput, formatCents, tryDecimalToCents } from '../../lib/money';
+import { centsToInput, formatCents, tryDecimalToCents } from '../../ui/money';
 import { uid } from '../../lib/text';
 import { canUseRelay, EbClient, type AssetHit } from '../../sync/ebClient';
 import { Badge, Button, Chip, Divider, Field, Icon, MoneyField, Segmented, SelectField, Stepper, Tap, TextField, toast, ToggleRow } from '../../ui/index';

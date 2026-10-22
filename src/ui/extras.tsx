@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Icon } from './icons';

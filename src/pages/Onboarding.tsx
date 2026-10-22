@@ -7,13 +7,13 @@ import { loadDemo } from '../domain/demo';
 import { syncHolderRules } from '../domain/learn';
 import { useSettings } from '../hooks';
 import { APP_NAME } from '../lib/app';
-import { formatCents } from '../lib/money';
+import { formatCents } from '../ui/money';
 import { setMood } from '../ui/mood';
 import { setDockHidden } from '../ui/dockStore';
 import { Orb, ThemePicker } from '../ui/extras';
 import { springs } from '../ui/motion';
 import { Button, Card, Chip, Glass, Icon, MoneyField, Segmented, StepperRow, TextField, toast } from '../ui/index';
-import { isThemeId } from '../ui/themes';
+import { setAppearance, useAppearance } from '../ui/appearance';
 import { LinesEditor } from './settings/LinesEditor';
 
 const STEPS = ['welcome', 'income', 'charges', 'savings', 'names', 'look', 'done'] as const;
@@ -22,6 +22,7 @@ type Step = (typeof STEPS)[number];
 /** Premier lancement : tout ce qui rend l'app personnelle, en quelques écrans, tout modifiable ensuite. */
 export default function OnboardingPage() {
   const s = useSettings();
+  const appearance = useAppearance();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   // Retour du compte MyLife créé depuis l'accueil : on enchaîne sur la suite.
@@ -196,15 +197,15 @@ export default function OnboardingPage() {
               <>
                 <p className="t-label text-gold">5 · Ton ambiance</p>
                 <h1 className="t-large">Choisis ta lumière</h1>
-                <ThemePicker value={isThemeId(s.theme) ? s.theme : 'nuit'} onChange={(theme) => void updateSettings({ theme })} />
+                <ThemePicker value={appearance.theme} onChange={(theme) => setAppearance({ theme })} />
                 <Card>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="t-body-strong">Suivre le téléphone</p>
                       <p className="t-caption text-muted">Clair le jour, sombre le soir, selon ton réglage système.</p>
                     </div>
-                    <Chip selected={s.followSystem} onClick={() => void updateSettings({ followSystem: !s.followSystem })}>
-                      {s.followSystem ? 'Oui' : 'Non'}
+                    <Chip selected={appearance.followSystem} onClick={() => setAppearance({ followSystem: !appearance.followSystem })}>
+                      {appearance.followSystem ? 'Oui' : 'Non'}
                     </Chip>
                   </div>
                 </Card>

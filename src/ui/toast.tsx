@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { AnimatePresence, m } from 'framer-motion';
 import { Icon } from './icons';
 import { Tap } from './primitives';

@@ -1,7 +1,8 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { m, useMotionValueEvent, useScroll } from 'framer-motion';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { APP_NAME, APP_TAGLINE } from '../lib/app';
+import { kitApp } from './app';
 import { useDockHidden } from './dockStore';
 import { Icon, type IconName } from './icons';
 import { haptic, springs } from './motion';
@@ -185,8 +186,8 @@ export function Sidebar({ tabs, footer, onSearch }: { tabs: TabDef[]; footer?: R
             <Icon name="diamond-fill" size={18} />
           </span>
           <span>
-            <span className="t-title block text-[18px]">{APP_NAME}</span>
-            <span className="t-caption block text-muted">{APP_TAGLINE}</span>
+            <span className="t-title block text-[18px]">{kitApp().name}</span>
+            <span className="t-caption block text-muted">{kitApp().tagline}</span>
           </span>
         </div>
         <button type="button" onClick={onSearch} className="hl etched mb-4 flex h-11 items-center gap-2.5 rounded-md px-3 text-left">

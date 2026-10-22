@@ -1,3 +1,4 @@
+// GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { useNavigate } from 'react-router-dom';
 
 /** Retour : l'écran précédent, ou `fallback` quand il n'y en a pas (lien direct, rechargement). */
