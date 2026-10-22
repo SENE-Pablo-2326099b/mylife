@@ -120,7 +120,7 @@ export function AccountForms() {
           </Text>
         </View>
         <View style={{ gap: space.xs + 2 }}>
-          <Field label="Identifiant" value={login} onChangeText={setLogin} autoCapitalize="none" autoCorrect={false} autoComplete="username" textContentType="username" placeholder="ex. pablo" />
+          <Field label="Identifiant" value={login} onChangeText={setLogin} autoCapitalize="none" autoCorrect={false} autoComplete="username" textContentType="username" placeholder="Choisis un identifiant" />
           {(loginProblem || loginHint) && (
             <Text variant="caption" style={{ color: loginProblem || availability === 'taken' ? t.danger : availability === 'free' ? t.success : t.textMuted }}>
               {loginProblem ?? loginHint}

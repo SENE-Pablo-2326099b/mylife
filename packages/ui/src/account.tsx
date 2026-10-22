@@ -153,7 +153,7 @@ export function AccountForms({ initial = 'create', onDone, skip }: { initial?: M
           onChange={setLogin}
           plain
           autoComplete="username"
-          placeholder="ex. pablo"
+          placeholder="Choisis un identifiant"
           hint={loginHint}
           error={(mode === 'create' && loginProblem) || (mode === 'create' && availability === 'taken' ? 'Déjà pris : essaie une variante.' : undefined)}
           enterKeyHint="next"
