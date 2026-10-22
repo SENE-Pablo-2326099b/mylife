@@ -1,92 +1,99 @@
-# MyLife : contexte complet (MyFinances + MyPerf + myRaveLoc)
+# MyLife : contexte complet (accueil + MyFinances + MyPerf + myRaveLoc)
 
-> **À lire au début d'une nouvelle conversation.** Ce fichier résume l'écosystème : architecture, dépôts,
-> commandes, décisions, contraintes, état actuel au **22/10/2026**.
-> - Fichier de référence : `~/PersoDev/MyLife/CONTEXTE.md`.
-> - Copies : `~/PersoDev/Budget/CONTEXTE.md`, `~/PersoDev/MyPerfV2/CONTEXTE.md` et `~/PersoDev/myRaveLoc/CONTEXTE.md`.
-> - Après une évolution importante, mettre à jour la référence puis recopier.
+> **À lire au début d'une nouvelle conversation.** Ce fichier résume l'écosystème : architecture, dépôt,
+> commandes, décisions, contraintes, état actuel au **22/10/2026**. Une seule copie, à la racine du dépôt
+> `~/PersoDev/MyLife` ; la mettre à jour après toute évolution importante.
 >
-> Documents plus détaillés propres à chaque dépôt :
-> - `Budget/README.md`, `Budget/V2.md` ;
-> - `MyPerfV2/CLAUDE.md`, `MyPerfV2/README.md`, `MyPerfV2/ERGONOMIE.md` ;
-> - `MyLife/README.md` ;
-> - `myRaveLoc/README.md` (architecture, sécurité, données visibles par le serveur, limites).
+> Documents plus détaillés :
+> - `README.md` (présentation, utilisation, développement) ; `docs/UNIFICATION.md` (choix notés) ;
+> - `apps/finances/README.md`, `apps/finances/V2.md` ;
+> - `apps/perf/CLAUDE.md`, `apps/perf/README.md`, `apps/perf/ERGONOMIE.md` ;
+> - `apps/raveloc/README.md` (architecture, sécurité, données visibles par le serveur, limites).
 
 ---
 
 ## 1. Vue d'ensemble
 
-**MyLife** regroupe les apps personnelles de l'utilisateur sur **une seule origine** : https://mylife-liart.vercel.app
+**MyLife est une seule app** (une PWA installable, un compte, une identité visuelle) servie sur **une seule
+origine** : https://mylife-liart.vercel.app
 
-| Chemin | App | Dépôt local | Projet Vercel | Techno |
+| Chemin | Partie | Dossier du dépôt | Projet Vercel | Techno |
 |---|---|---|---|---|
-| `/` | Accueil MyLife, API comptes et synchro | `~/PersoDev/MyLife` | `mylife` | HTML statique + fonctions Node |
-| `/finances/` | **MyFinances** (budget, banques, patrimoine) | `~/PersoDev/Budget` | `myfinances` (https://myfinances-sepia-sigma.vercel.app) | React 18 + Vite + TS + Tailwind + Dexie (IndexedDB), PWA |
-| `/perf/` | **MyPerf** (musculation / street lifting) | `~/PersoDev/MyPerfV2` | `myperf` (https://myperf-six.vercel.app) | Expo / React Native (React 19, React Compiler) + SQLite ; web (PWA) + APK Android |
-| `/api/eb` | Relais Enable Banking + cours des placements | `~/PersoDev/Budget/api/eb.ts` | `myfinances` | Fonction Vercel |
-| `/raveloc/` | **myRaveLoc** (retrouver ses amis en festival) | `~/PersoDev/myRaveLoc` | `myraveloc` (https://myraveloc.vercel.app) | React 18 + Vite + TS, CSS sans framework, PWA |
-| `/api/raveloc` | API de myRaveLoc (groupes, invitations, positions chiffrées) | `~/PersoDev/MyLife/{api,server}/raveloc.ts` | `mylife` | Fonction Vercel |
+| `/` | **Accueil MyLife** : apps + aperçus, compte, apparence, installation, premier lancement ; **manifeste unique** (portée `/`, raccourcis vers les 3 apps) | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
+| `/api/auth`, `/api/sync`, `/api/raveloc` | Comptes, synchro chiffrée, API de myRaveLoc | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
+| `/finances/` | **MyFinances** (budget, banques, patrimoine) | `apps/finances` | `myfinances` (https://myfinances-sepia-sigma.vercel.app) | React 18 + Vite + TS + Tailwind + Dexie |
+| `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
+| `/perf/` | **MyPerf** (musculation) | `apps/perf` | `myperf` (https://myperf-six.vercel.app) | Expo / React Native (React 19) + SQLite ; web + APK Android |
+| `/raveloc/` | **myRaveLoc** (retrouver ses amis en festival) | `apps/raveloc` | `myraveloc` (https://myraveloc.vercel.app) | React 18 + Vite + kit `packages/ui` |
 
-**Fonctionnement des chemins :**
-- Ce sont des **réécritures Vercel** déclarées dans `MyLife/vercel.json`.
-- Chaque app reste un **dépôt indépendant**, déployable seul : pas de monorepo, à cause de l'historique, des chemins, des mémoires Claude et de React 18 contre 19.
-- Les dépôts sont locaux (pas de remote git).
+**Fonctionnement :**
+- **Un seul dépôt git** (`~/PersoDev/MyLife`, historiques des quatre anciens dépôts conservés par `git subtree`) ;
+  dépôt GitHub **privé** (il contient le programme et l'historique d'entraînement de l'utilisateur).
+  Les anciens dossiers sont archivés dans `~/PersoDev/_archives/avant-depot-unique/` (plus utilisés).
+- Chaque app reste un **projet Vercel à part**, déployé depuis son dossier ; les chemins sont des
+  **réécritures** déclarées dans `vercel.json` (racine). Pas d'espace de travail npm : chaque dossier a ses
+  `node_modules` (React 18 contre 19).
+- **Une seule app installable** : seul l'accueil a un manifeste ; les pages des apps relient
+  `/manifest.webmanifest` et `/apple-touch-icon.png`. Chaque app garde son service worker (sa portée).
+  Passage d'une app à l'autre en fondu (`@view-transition`, Chrome 126+ / Safari 18.2+).
 
-**Appareils de l'utilisateur :**
-- PC (Windows + WSL) ;
-- Android : MyPerf en APK, MyFinances en PWA ;
-- iPhone plus tard, en PWA gratuite.
+**Appareils de l'utilisateur :** PC (Windows + WSL) ; Android (MyLife en PWA, MyPerf aussi en APK) ;
+iPhone plus tard (PWA).
 
-**Contexte d'usage :** l'utilisateur est seul pour l'instant ; des amis viendront plus tard « avec les mêmes méthodes ».
+**Contexte d'usage :** l'utilisateur et, bientôt, ses amis : l'inscription est ouverte (sans code).
 
 ---
 
 ## 2. Commandes essentielles
 
-### MyFinances (`~/PersoDev/Budget`)
+### Racine (`~/PersoDev/MyLife`)
+
+| Action | Commande |
+|---|---|
+| Dépendances (racine + 3 apps) | `npm run setup` |
+| Copier les paquets partagés | `npm run vendor` (ou `npm run vendor -- finances raveloc`) : `packages/sync-client` → `src/vendor/mylife-sync`, `packages/lumen` → `src/vendor/lumen` (toutes les apps), `packages/ui` → `src/ui` (accueil, MyFinances, myRaveLoc). **On modifie toujours dans `packages/`, jamais dans les copies.** |
+| Tout construire | `npm run build:all` |
+| Tests serveur + paquets | `npm test` (vitest, **42 tests**, Postgres en mémoire via PGlite) |
+| Tous les tests unitaires | `npm run test:all` |
+| **Parcours de bout en bout de tout MyLife** | `npm run e2e` (**11 étapes** : bienvenue, compte en un écran, manifeste unique relié partout, session commune, MyFinances et MyPerf reliés tout seuls, thème commun, Espaces, aperçus, palette vers les autres apps, second appareil dont le thème suit, 320 px). Prérequis : les trois apps construites. |
+| Tous les parcours | `npm run e2e:all` |
+| MyLife en local | `npm run local` → http://localhost:4300 (accueil + apps construites + vraies API, base en mémoire, inscription ouverte) |
+| Accueil en développement | `npm run dev` (port 4310, `/api` relayé vers `npm run local`) |
+| Icônes MyLife | `npm run icons` (depuis `web/public/favicon.svg`) |
+| **Déployer** | `npm run deploy` (MyLife : accueil + API) ; `npm run deploy:all` (les 3 apps puis MyLife) |
+
+**Après chaque déploiement d'une app, redéployer MyLife.** Sinon le CDN de MyLife peut garder un 404 obtenu pendant la mise en ligne.
+
+### MyFinances (`apps/finances`)
 
 | Action | Commande |
 |---|---|
 | Développement | `npm run dev` (lance aussi le relais local) |
-| Types | `npx tsc -b --noEmit` |
-| Lint | `npx eslint src --quiet` |
-| Tests unitaires | `npm test` (vitest, **332 tests**) |
-| **Parcours de bout en bout** | `npm run e2e` : build + Playwright avec Chrome système (`/usr/bin/google-chrome`), **25 vérifications**, dont le changement de catégorie. **À lancer avant tout déploiement d'interface.** |
-| **Déployer** | `npx --yes vercel@latest deploy --prod --yes` |
+| Types / lint | `npx tsc -b --noEmit` / `npx eslint src --quiet` |
+| Tests | `npm test` (**332 tests**) |
+| **Bout en bout** | `npm run e2e` (**25 vérifications**). À lancer avant tout déploiement d'interface. |
+| Déployer | `npm run deploy` |
 
-### MyPerf (`~/PersoDev/MyPerfV2`)
+### MyPerf (`apps/perf`)
 
 | Action | Commande |
 |---|---|
-| Types | `npx tsc --noEmit` |
-| Lint | `npx eslint src --quiet` (ou `npx expo lint`) |
-| Tests | `npx jest` (**214 tests**) |
+| Types / lint / tests | `npx tsc --noEmit` / `npx expo lint` / `npx jest` (**214 tests**) |
 | Aperçu web | `npx expo start --web --port 8090` (sans `CI=1`) |
 | **Web** | `npm run build:web && npm run deploy:web` (sortie dans `web/perf`) |
-| **APK** | `cd android && ANDROID_HOME=~/android-sdk ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --max-workers=2`, puis copier `android/app/build/outputs/apk/release/app-release.apk` vers `/mnt/c/Users/qwark/Downloads/MyPerf-MyLife.apk` |
+| **APK** | `cd android && ANDROID_HOME=~/android-sdk ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --max-workers=2`, puis copier `android/app/build/outputs/apk/release/app-release.apk` vers `/mnt/c/Users/qwark/Downloads/MyPerf-MyLife.apk`. Après le passage au dépôt unique, un `./gradlew clean` peut être nécessaire (chemins absolus en cache). |
 
 Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mémoire (code 137).
 
-### myRaveLoc (`~/PersoDev/myRaveLoc`)
+### myRaveLoc (`apps/raveloc`)
 
 | Action | Commande |
 |---|---|
-| Types | `npx tsc -b --noEmit` |
-| Lint | `npx eslint .` |
-| Tests | `npm test` (vitest, **83 tests** ; importe l'API et l'authentification de `../MyLife`) |
-| **Parcours de bout en bout** | `npm run e2e` : build + deux téléphones simulés (Alice, Bob) dans Chrome système, **13 étapes** (connexion, groupe, invitation, partage, flèche, hors ligne, arrêt, retrait, lien révoqué, session expirée, 320 px). `SHOTS=dossier` pour des captures. |
-| Local | `npm run build && npm run local` → http://localhost:4320/raveloc/ (base en mémoire, code d'invitation `local-invite`) |
-| **Déployer** | `npm run deploy` (vercel@61.1.0) ; l'API part avec MyLife |
-
-### MyLife (`~/PersoDev/MyLife`)
-
-| Action | Commande |
-|---|---|
-| Tests | `npm test` (Postgres en mémoire via PGlite, serveur + client de bout en bout ; **33 tests** dont 24 pour `/api/raveloc`) |
-| Paquets partagés | `npm run vendor` copie `packages/sync-client` et `packages/lumen` dans `src/vendor/{mylife-sync,lumen}` des **trois** apps. On modifie toujours dans `MyLife/packages/`, **jamais** dans `src/vendor/`. |
-| Déployer | `npm run deploy` (vercel@61.1.0) |
-
-**Après chaque déploiement d'une app, redéployer MyLife.** Sinon le CDN de MyLife peut garder un 404 obtenu pendant la mise en ligne.
+| Types / lint | `npx tsc -b --noEmit` / `npx eslint .` |
+| Tests | `npm test` (**83 tests**, importe l'API et l'authentification de la racine) |
+| **Bout en bout** | `npm run e2e` : deux téléphones simulés (Alice, Bob), **13 étapes**. `SHOTS=dossier` pour des captures. |
+| Local | `npm run build && npm run local` → http://localhost:4320/raveloc/ (serveur local de MyLife) |
+| Déployer | `npm run deploy` ; l'API part avec MyLife |
 
 ### Commits
 
@@ -100,61 +107,80 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 
 ## 3. MyLife : comptes et synchronisation chiffrée de bout en bout
 
-### API
+### API (`server/`, points d'entrée dans `api/`)
 
-- `POST /api/auth` : `salt`, `signup` (code d'invitation), `login`, `recoverStart` / `recoverFinish` (clé de secours), `password`.
-- `POST /api/sync` : `status`, `sync` (envoi + réception, curseur par appareil).
+- `POST /api/auth` (`server/auth.ts` → `authDispatch`) : sans session `salt`, `available` (identifiant
+  libre ?), `signup`, `login`, `recoverStart` / `recoverFinish` ; avec session `password`,
+  `renewRecovery` (nouvelle clé de secours), `deleteAccount` (mot de passe redemandé ; efface le compte, ses
+  lignes et quitte ses groupes myRaveLoc).
+- `POST /api/sync` (`server/sync.ts`) : `status`, `sync`. Apps synchronisées : `finances`, `perf`, `mylife`
+  (réglages communs : l'apparence).
 - `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
-- Code : `MyLife/api/{auth,sync,raveloc}.ts`, `MyLife/server/{core,http,raveloc}.ts`.
+- Le même code sert en local (`server/local.ts`, `npm run local`) et dans les tests.
+
+### Inscription « comme une app ordinaire »
+
+- **Un écran** : identifiant (disponibilité affichée pendant la saisie) + mot de passe (bouton afficher,
+  jauge de robustesse, refus des mots de passe trop courants ou contenant l'identifiant ; `autocomplete`
+  `username` / `new-password` pour les gestionnaires). Pas de confirmation, **pas de code d'invitation**
+  (`SIGNUP=open` par défaut ; `SIGNUP=invite` remet le code).
+- La **clé de secours** est montrée juste après la création (copier / enregistrer / partager), et
+  rappelée (« Mets de côté ta clé de secours ») tant que « C'est fait » n'a pas été touché ; elle est gardée
+  sur l'appareil en attendant (`mylife:recovery-pending`).
+- Garde-fous (`RATES` dans `server/core.ts`, table `auth_rate`) : 10 comptes par réseau et par jour (empreinte
+  HMAC de l'adresse, jamais l'adresse), 10 mauvais mots de passe ou clés par quart d'heure et par
+  identifiant (puis 429), 120 vérifications de disponibilité par heure ; quotas `ROW_QUOTA` (100 000 lignes
+  par app, 200 pour `mylife`).
+- Dérivation **native** (WebCrypto) sur le web et dans Node : ~0,1 s ; en JavaScript sur Android (même
+  résultat, testé).
 
 ### Chiffrement
 
-- Le mot de passe ne quitte jamais l'appareil.
-- Dérivation : PBKDF2-SHA256 (200 000 tours) → HKDF. On en tire :
-  - la clé d'authentification, dont le serveur ne garde qu'une empreinte HMAC ;
-  - la clé d'emballage de la **clé de données**, qui est aléatoire.
-- Chaque ligne est chiffrée en AES-256-GCM, liée à `app/table/identifiant`.
-- La clé de secours est un 2ᵉ emballage de la clé de données.
+- Le mot de passe ne quitte jamais l'appareil. PBKDF2-SHA256 (200 000 tours) → HKDF : clé
+  d'authentification (le serveur n'en garde qu'une empreinte HMAC) et clé d'emballage de la **clé de
+  données** (aléatoire). Chaque ligne en AES-256-GCM, liée à `app/table/identifiant`. Clé de secours = 2ᵉ
+  emballage.
 
-### Règles de synchronisation
+### Session et reliure des appareils
 
-- **Conflits :** la modification la plus récente gagne ; une modification refusée reçoit la version du compte.
-- **Rejoindre un compte :**
-  - compte vide → l'appareil l'alimente ;
-  - sinon → l'appareil prend les données du compte, après une copie de sécurité.
-  - **Jamais de fusion** de deux historiques.
+- Sur le web, une session pour toutes les apps (`mylife-session`, `packages/sync-client/src/web.ts`) ; se
+  déconnecter dans une app déconnecte les autres, onglets ouverts compris. Écrans de compte communs :
+  `packages/ui/src/account.tsx` (MyPerf en a la copie React Native, `apps/perf/src/app/account.tsx`).
+- **Reliure automatique** (`autoJoin`) dès qu'une session apparaît : compte vide pour l'app → l'appareil
+  l'alimente ; appareil sans données saisies → il prend celles du compte ; les deux remplis → l'utilisateur
+  choisit (copie de sécurité avant). Jamais de fusion. « Données saisies » : MyFinances = accueil fait ou
+  opérations/placements/banques ; MyPerf = séances après la fin de l'historique personnel importé.
+- Conflits : la modification la plus récente gagne.
+- **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
+  `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
+  thème jamais choisi (at = 0) n'est jamais envoyé.
 
 ### Base et variables
 
-- Base : Neon Postgres (Marketplace Vercel). Tables `users` et `records` (et `raveloc_*` pour myRaveLoc), créées au premier appel.
-- Variables d'environnement (**ne jamais afficher leurs valeurs**) :
-  - `DATABASE_URL` ;
-  - `SESSION_SECRET`, présente aussi sur `myfinances` (le relais bancaire accepte la session). Variable **sensible** sur Vercel : sa valeur n'est lisible nulle part (pas dans `.env.local`) ; c'est pourquoi l'API de myRaveLoc est hébergée par MyLife plutôt que dans son projet ;
-  - `INVITE_CODE`.
-- Fichier local : `MyLife/.env.local`.
-- Code d'invitation actuel : `mylife-5c6bbe-6fb408`.
+- Neon Postgres. Tables `users`, `records`, `auth_rate`, `raveloc_*`, créées au premier appel.
+- Variables (**ne jamais afficher leurs valeurs**) : `DATABASE_URL` ; `SESSION_SECRET` (aussi sur
+  `myfinances` ; sensible, illisible sur Vercel) ; `SIGNUP` ; `INVITE_CODE` (seulement en mode invitation).
+- Fichier local : `.env.local` (racine).
 
 ### Suivi des modifications dans chaque app
 
-- **MyFinances :** middleware Dexie (`src/sync/cloud`).
-- **MyPerf :** déclencheurs SQLite (`src/services/cloud/sqliteStore.ts`, migration 9). Le suivi n'est actif qu'une fois l'appareil relié à un compte.
+- **MyFinances :** middleware Dexie (`src/sync/cloud`). **MyPerf :** déclencheurs SQLite
+  (`src/services/cloud/sqliteStore.ts`), actifs une fois l'appareil relié.
 
 ### Comptes de test
 
-- Ils s'appellent `test-e2e-*` et **doivent être supprimés** après les tests.
-- Suppression avec le client `pg` et `DATABASE_URL` de `MyLife/.env.local` :
-  ```sql
-  DELETE FROM users WHERE login LIKE 'test-e2e-%'
-  ```
+- Ils s'appellent `test-e2e-*` et **doivent être supprimés** après les tests sur la vraie base :
+  `DELETE FROM users WHERE login LIKE 'test-e2e-%'` (client `pg`, `DATABASE_URL` de `.env.local`). Les
+  parcours de bout en bout tournent sur une base en mémoire : rien à nettoyer.
 
 ### Risque connu
 
-- Augmenter `PERSONAL_IMPORT_VERSION` dans MyPerf reconstruit l'historique importé avec des identifiants aléatoires sur chaque appareil.
-- Cela peut créer des doublons entre appareils synchronisés : n'augmenter cette version qu'en connaissance de cause.
+- Augmenter `PERSONAL_IMPORT_VERSION` dans MyPerf reconstruit l'historique importé avec des identifiants
+  aléatoires sur chaque appareil : doublons possibles entre appareils synchronisés.
 
 ---
 
-## 4. Paquets partagés (`MyLife/packages/`)
+## 4. Paquets partagés (`packages/`)
 
 ### `lumen` → `src/vendor/lumen`
 
@@ -177,22 +203,44 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 - `STYLES` / `styleOf(id)` : polices, graisse et approche des titres, casse des étiquettes, rayons (carte, contrôle, pastille), matière (`glass|outline|solid|clay|brutal`), bordure, flou, ombre, texture, fond, bouton, densité.
 - `TEXT_ALPHA`, `BASE_TEXT`, `SERIES_HUES` (couleurs de graphiques validées daltonisme).
 
-**Apps et apparence partagées**
-- `MYLIFE_APPS` : registre des apps, dans un ordre et avec des couleurs fixes.
+**Apps, écrans, aperçus et apparence partagés**
+- `MYLIFE_HOME` (l'accueil) et `MYLIFE_APPS` : registre des apps, dans un ordre et avec des couleurs fixes.
   - `finances` : `['#B9A0FF','#7340FF']`, icône diamant, `/finances/` ;
   - `perf` : `['#FFB86B','#F0566B']`, icône haltère, `/perf/` ;
   - `raveloc` : `['#5DFFC4','#1FA3FF']`, icône `navigate`, `/raveloc/`.
   - **Toute nouvelle app s'ajoute ici.**
-- Les lanceurs (« Espaces MyLife ») ouvrent chaque app par son `path` : `openMyLifeApp` (MyPerf, `services/mylifeApps.ts`), `a.icon` mappé vers les icônes de MyFinances (`Spaces.tsx`).
-- `readSharedAppearance` / `writeSharedAppearance` : clé localStorage `mylife:appearance`. Le thème est partagé entre les apps **sur le web**, car elles ont la même origine. L'APK MyPerf garde son propre réglage.
+- `MYLIFE_DESTINATIONS` : les écrans de chaque app (titre, chemin, mots-clés) que la palette de commande de n'importe quelle app propose.
+- `MyLifeGlance` / `readGlance` / `writeGlance` : aperçus déposés par chaque app sur l'appareil (`mylife:glance:<app>`, avec échéance `until`) et affichés par l'accueil et les Espaces : MyFinances « X € à dépenser aujourd'hui » (Today), MyPerf la séance du jour (web), myRaveLoc le groupe actif.
+- `SharedAppearance` (`theme`, `followSystem`, `reduceMotion`, `haptics`, `at`) : **un seul réglage d'apparence pour toutes les apps** (`mylife:appearance`), synchronisé entre appareils (§ 3).
 
 ### `sync-client` → `src/vendor/mylife-sync`
 
-- Client de synchronisation commun en TypeScript pur (web + React Native) : `account.ts`, `crypto.ts`, `engine.ts`.
+- Client commun en TypeScript pur (web + React Native) : `account.ts` (création, connexion, secours, mot de
+  passe, nouvelle clé, suppression, règles d'identifiant et de mot de passe), `crypto.ts`, `engine.ts`
+  (`join`, `autoJoin`, `syncNow`), `web.ts` (session web commune, clé de secours en attente).
+
+### `ui` → `src/ui` (apps web : accueil, MyFinances, myRaveLoc)
+
+Le **kit d'interface web** de MyLife, extrait de MyFinances : une seule source pour l'apparence.
+- `lumen.css` (verre, identités `[data-style]`, dock, orbe, feuilles, champs, transitions entre apps),
+  `tailwind.preset.js`, `fonts.ts` ; chaque app : `@import './ui/lumen.css'` et `presets: [lumen]`.
+- Thème : `theme.ts`, `themes.ts` (`stylize`), `themeRuntime.ts`, `ThemeProvider.tsx`, `appearance.ts`
+  (apparence commune, en direct entre onglets), `AppearanceSettings.tsx`, `prefsSync.ts`.
+- Coque : `boot.ts` (`bootMyLife(appId)` : nom de l'app, journal d'erreurs, couleurs dès la 1ʳᵉ image,
+  lumière du verre, synchro de l'apparence), `app.ts` (`configureApp`, `openMyLifeApp`), `Navigation.tsx`
+  (dock / barre latérale ; `inDock`, appui long `onAssistant` + `holdLabel`), `PageTransition.tsx`
+  (`KeptTabs` génériques, `PushedScreen`), `Screen.tsx`, `Backdrop.tsx`, `Sheet.tsx`, `primitives.tsx`
+  (dont `TextField` et `PasswordField`), `icons.tsx` (Ionicons), `charts.tsx`, `toast*`, `money.ts`,
+  `relative.ts`, `errorLog.ts`.
+- MyLife commun : `account.tsx` + `session.ts` (compte), `HeaderActions.tsx` + `Spaces.tsx` (en-tête et
+  Espaces, avec lignes d'état et raccourcis fournis par l'app), `CommandPalette.tsx` + `palette.ts`
+  (entrées de l'app + autres apps), `glance.ts`.
+- MyPerf (React Native) ne peut pas l'utiliser : il le reproduit (`Glass`, `Navigation`, `Orbit`,
+  `CommandPalette`, compte) à partir des mêmes jetons ; la parité se vérifie par captures dans chaque thème.
 
 ---
 
-## 5. MyFinances (`~/PersoDev/Budget`)
+## 5. MyFinances (`apps/finances`)
 
 ### Fonctions
 
@@ -234,11 +282,11 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 | Logique métier pure et testée | `src/domain/` |
 | Données | `src/db/` (Dexie, `sharedQuery.ts` pour les lectures partagées, `undo.ts`) |
 | Banques et synchro | `src/sync/` (Enable Banking, `refresh.ts` → `refreshEverything`, `cloud/` = MyLife) |
-| Interface | `src/ui/` (primitives, verre, navigation, thèmes) ; écrans dans `src/pages/` ; composants transverses dans `src/components/` (`TxEditor`, `CommandPalette`, `Spaces`, `HeaderActions`) |
-| Thème | `src/ui/theme.ts` (Palette, `cssVars`) ; `src/ui/themes.ts` (`darkPalette`, `lightPalette`, **`stylize`** par identité, `themePalette`, `resolvePalette`) ; `src/ui/themeRuntime.ts` (`applyPalette` pose les variables CSS et **`data-style`** sur `<html>`, plus `data-scheme`, `.android`, `.no-live-blur`) ; `src/ui/ThemeProvider.tsx` |
-| Styles | `src/index.css` |
+| Interface | `src/ui/` = **copie du kit commun** (`packages/ui`, ne pas modifier ici) ; écrans dans `src/pages/` ; composants propres dans `src/components/` (`TxEditor`, `CommandPalette` = entrées de MyFinances dans la palette commune, `HeaderActions` = en-tête commun + alertes, banques, synchro) |
+| Thème | dans le kit : `theme.ts` (Palette, `cssVars`), `themes.ts` (`darkPalette`, `lightPalette`, **`stylize`**, `themePalette`, `resolvePalette`), `themeRuntime.ts` (`applyPalette` pose les variables CSS et **`data-style`** sur `<html>`, plus `data-scheme`, `.android`, `.no-live-blur`), `ThemeProvider.tsx` (lit l'apparence commune) |
+| Styles | `src/index.css` = `@import './ui/lumen.css'` (le CSS commun) |
 
-**Contenu de `src/index.css`**
+**Contenu de `lumen.css` (kit)**
 - Le verre optique `.glass` : couches de fond, arête biseautée `::before`, lumière au contact `--gl`, onde au toucher `--rp` pilotée par `ui/glassLight.ts`.
 - Niveaux de verre `glass-raised`, `glass-float`, `glass-lens`, teintes `.tone-*`, `.liquid`, `.dock-pill`, `.orb`, `.field-input`.
 - Puis **un bloc par identité** `[data-style='circuit'|'ardoise'|'argile'|'brut']`.
@@ -291,7 +339,7 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 
 ---
 
-## 6. MyPerf (`~/PersoDev/MyPerfV2`)
+## 6. MyPerf (`apps/perf`)
 
 ### Fonctions
 
@@ -307,7 +355,7 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
   - `claude-sonnet-5-5` par défaut, `claude-opus-5-5` en « Analyse poussée » ;
   - les outils d'écriture sont des propositions validées par l'utilisateur ;
   - clé dans expo-secure-store (localStorage sur le web).
-- Règles métier détaillées dans `MyPerfV2/CLAUDE.md` : charges = % du jour × 1RM de référence, lestés sur la masse totale, etc.
+- Règles métier détaillées dans `apps/perf/CLAUDE.md` : charges = % du jour × 1RM de référence, lestés sur la masse totale, etc.
 
 ### Architecture
 
@@ -355,29 +403,32 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
 
 ---
 
-## 6 bis. myRaveLoc (`~/PersoDev/myRaveLoc`)
+## 6 bis. myRaveLoc (`apps/raveloc`)
 
 Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, flèche
-vers un ami. Détails dans `myRaveLoc/README.md`.
+vers un ami. Détails dans `apps/raveloc/README.md`.
 
-- **Compte** : celui de MyLife (même session `mylife-session`, même origine) ; connexion et création via `signIn` / `createAccount` du paquet partagé.
+- **Interface** : le kit commun (`src/ui`) : même en-tête (mode phare + Espaces), même dock (Retrouver · orbe · Groupes ; appui long = mode phare), mêmes cartes, feuilles, identités, clair et sombre ; routeur `react-router` (`/`, `/groupes`, `/groupes/nouveau`, `/groupe`, `/ami/:uid`, `/rejoindre`, `/compte`). Propre à l'app : `src/components` (avatars, bandeaux réseau, phare, palette) et dans `index.css` la boussole (`.dial`) et le phare (`.beacon`).
+- **Compte** : celui de MyLife (même session) ; écrans communs ; se déconnecter ou supprimer le compte coupe d'abord tous les partages (`beforeSignOut`).
 - **Chiffrement** : clé de groupe aléatoire, transmise dans le fragment `#` du lien d'invitation (jamais envoyé au serveur), rangée emballée par la clé de données MyLife de chaque membre. Nom du groupe, pseudos et positions chiffrés (`encryptRow`, liés au groupe et au membre). Le serveur ne voit que des identifiants, des rôles et des horodatages.
 - **Accès** vérifiés côté serveur à chaque requête ; partage coupé par défaut ; une seule position par membre et par groupe, effacée à l'arrêt, au départ, à la fin du partage ou du groupe (14 j max).
 - **Temps réel** : requêtes courtes adaptatives (4 s navigation, 10 s groupe, 30 s ailleurs ; rien en arrière-plan) ; pas de WebSocket (réécriture externe).
 - **Navigateur** : rien n'est envoyé app fermée ou écran éteint (limite des navigateurs mobiles, affichée à l'utilisateur).
-- **Thème** : suit `mylife:appearance` en version sombre ; identité = couleur du registre (vert laser → cyan).
+- **Thème** : l'apparence commune (tous les thèmes) ; la flèche, le phare et la balise gardent la couleur d'identité du registre (vert laser → cyan).
 
 ## 7. Règles d'écosystème (décisions de l'utilisateur)
 
-- **Un seul environnement.** MyFinances et MyPerf doivent se ressentir comme une seule app (« Il y a trop de disparité… l'application entière doit être un système / un environnement »). Elles partagent :
-  - le même dock (capsule + orbe = palette de commande ; appui long = l'IA de l'app) ;
+- **Une seule app, unifiée à 100 %** (demande du 22/10/2026 : « une seule PWA installable », « toute l'identité visuelle unifiée à 100 % »). L'accueil et les trois apps partagent :
+  - une installation (manifeste unique), un compte, une apparence (synchronisée entre appareils) ;
+  - le même dock (capsule + orbe = palette de commande ; appui long = l'action propre de l'app) ;
   - le même en-tête (bouton propre à l'app, puis « Espaces MyLife » en dernier) ;
-  - le même écran Espaces, construit sur `MYLIFE_APPS` ;
-  - les mêmes transitions, le même verre, les mêmes thèmes.
-  - **Toute fonction ajoutée à l'une reçoit son équivalent dans l'autre.**
+  - les mêmes Espaces (apps avec aperçus, bouton Accueil, compte, raccourcis) et la même palette (avec les écrans des autres apps) ;
+  - les mêmes écrans de compte, transitions, verre et thèmes.
+  - **Toute interface web passe par le kit `packages/ui`** ; MyPerf le reproduit en React Native et se vérifie par captures dans chaque thème. **Toute fonction ajoutée à une app reçoit son équivalent dans les autres.**
+- **Compte aussi simple qu'une app ordinaire** : un écran, pas de code, rien d'obligatoire après (la clé de secours peut attendre, avec rappel).
 - **Les thèmes sont de vraies identités.** Changer de thème doit donner l'impression d'une autre app : cartes, typographie, effets, bordures, ombres, fond. Une nouvelle identité se fait en 4 étapes :
   1. graine et `ThemeInfo` (style) + `STYLES` dans lumen ;
-  2. `stylize` dans les deux apps ;
+  2. `stylize` dans le kit et dans MyPerf ;
   3. bloc CSS `[data-style]` (web) et branches `Glass`, `Backdrop`, `Button`, `pillStyle`, `Orb` (React Native) ;
   4. polices.
   - Les tests de contraste des deux apps doivent rester verts : texte ≥ 7:1, secondaire et discret ≥ 4,5:1 dans MyFinances.
@@ -401,49 +452,26 @@ vers un ami. Détails dans `myRaveLoc/README.md`.
 
 ## 9. Historique récent et état actuel (22/10/2026)
 
-**myRaveLoc (22/10/2026)** : première version. App déployée sur `myraveloc` ; réécritures `/raveloc/*` et API `/api/raveloc` dans MyLife. MyFinances et MyPerf ont reçu le registre à jour (commits locaux `bdb2158` et `7d0db46`) **sans être redéployés** : la carte myRaveLoc apparaîtra dans leurs Espaces à leur prochain déploiement.
+**Unification (22/10/2026)**, détaillée et notée dans `docs/UNIFICATION.md` :
+- kit d'interface web commun extrait de MyFinances (`packages/ui`), utilisé par l'accueil, MyFinances et myRaveLoc ;
+- myRaveLoc reconstruit sur le kit (tous les thèmes, dock, en-tête, Espaces, palette, compte) ;
+- accueil MyLife devenu une app (`web/`) et **seule PWA installable** (manifeste `/`, raccourcis, icône MyLife) ;
+- comptes : inscription ouverte en un écran, garde-fous serveur, nouvelle clé, suppression, reliure automatique ;
+- apparence commune synchronisée entre appareils (web et APK) ; aperçus des apps ; palette transversale ; transitions entre apps ;
+- **dépôt unique** (historiques conservés) et README de présentation ;
+- tests : serveur 42, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 11 : tout vert.
 
+**À faire de la main de l'utilisateur (permissions)** : déploiement en production (`npm run deploy:all`)
+et publication du dépôt GitHub privé, si l'outil ne peut pas les lancer.
 
-**Tout est déployé :**
-- MyFinances (commit `29d4909`) ;
-- MyPerf web (commit `e9ea979`) ;
-- MyLife (commit `9555129`, paquet lumen).
-
-L'APK MyPerf a été recompilé avec les identités ; s'il manque, relancer la commande APK du § 2.
-
-**Derniers chantiers :**
-
-1. **Gel au changement de catégorie d'une opération** (MyFinances). Corrigé et couvert par `npm run e2e` (deux tours ; vérifie que `body.style.overflow` est vide et qu'aucune couche `.fixed.inset-0.z-50` ne reste). Causes traitées :
-   - restauration croisée de `body.style.overflow` entre feuilles qui se chevauchent → `scrollLock` à compteur ;
-   - effet de la feuille relancé à chaque rendu (vol de focus) → `onClose` gardé dans une référence ;
-   - lumière et onde animées sur toute la feuille au-dessus d'un flou plein écran sous Android ;
-   - enregistrement non protégé dans `TxEditor` → feuille fermée d'abord, double toucher ignoré, erreur affichée et notée dans le journal (`logError`). Même protection pour la file À classer (`Queue.tsx`).
-2. **Harmonisation des deux apps** : mêmes cartes, boutons, ombres, dock, orbe, fond et thèmes ; vérifiée par captures dans les 4 identités et dans Lumen.
-3. **Vraies identités de thème** : Circuit, Ardoise, Argile, Brut, en plus des 8 palettes Lumen (§ 4), dans les deux apps.
-4. **Bug corrigé dans MyPerf web :**
-   - Symptôme : au premier lancement sur un navigateur où MyFinances avait déjà choisi un autre thème, MyPerf affichait « Impossible d'ouvrir la base de données — no such table: sync_queue ».
-   - Cause : l'effet de démarrage se relançait quand les polices finissaient de charger. La base était préparée une seconde fois (base vide) pendant que la synchro, déjà abonnée, lisait `sync_queue`.
-   - Correctif : `bootOnce()`.
-
-**Navigation (sessions précédentes)**
-- Onglets gardés montés : `KeptTabs`.
-- Dock stable : il ne disparaît plus au changement d'écran.
-- Retoucher l'onglet actif remonte en haut.
-- Palette de commande avec écrans, actions, opérations, catégories et question à l'assistant.
-- Espaces MyLife en plein écran.
-- Chiffres qui roulent (`Rolling`), cartes en relief (`Tilt`), tirer pour actualiser, lumière d'état.
-
-**Outils de vérification visuelle**
-- Scripts Playwright dans le scratchpad de session (perdus au redémarrage, à recréer si besoin).
-- Recette :
-  - MyFinances : `vite preview` sur `/finances`, bouton « Continuer » puis « Passer » dans l'accueil, « Charger la démo » dans `/reglages/donnees`, choix du thème dans `/reglages/apparence` (radios « Thème X : … ») ;
-  - MyPerf : servir `web/` avec un serveur statique (repli sur `perf/index.html`), poser `localStorage['mylife:appearance'] = {"theme":"circuit","followSystem":false,"at":…}` avant le chargement.
-- Les émojis des catégories s'affichent en carrés dans le Chrome sans police émoji de WSL. C'est normal, pas un bug de l'app.
+**Outils de vérification visuelle** : `npm run local` puis Playwright (Chrome système) ; les parcours de
+bout en bout acceptent `SHOTS=dossier`. Les émojis des catégories s'affichent en carrés dans le Chrome de
+WSL (pas de police émoji) : normal.
 
 ---
 
 ## 10. Pistes possibles (non demandées pour l'instant)
 
-- Synchroniser aussi le choix du thème entre appareils (aujourd'hui partagé seulement sur le web, par l'origine commune).
 - Variante « densité » des identités (le champ `density` de `STYLES` n'est pas encore utilisé pour les espacements).
-- Comptes pour les amis : invitation + leur propre application Enable Banking (le mécanisme existe déjà).
+- Comptes pour les amis avec leur propre application Enable Banking (le mécanisme existe déjà).
+- Passkeys pour la connexion le jour où l'extension PRF sera fiable partout (aujourd'hui écartée : voir `docs/UNIFICATION.md`).

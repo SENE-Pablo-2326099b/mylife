@@ -1,46 +1,143 @@
 # MyLife
 
-Point d'entrée commun des apps personnelles, sur **une seule origine** (même adresse) :
+**Tes finances, ton entraînement et tes sorties dans une seule app.** Un compte, une installation, un
+même design d'un bout à l'autre, et des données chiffrées sur ton téléphone avant de le quitter.
 
-| Chemin | App | Projet Vercel | Dépôt |
-|---|---|---|---|
-| `/` | Accueil (ce dépôt) | `mylife` | `~/PersoDev/MyLife` |
-| `/finances/` | MyFinances (PWA) | `myfinances` | `~/PersoDev/Budget` |
-| `/perf/` | MyPerf (PWA) | `myperf` | `~/PersoDev/MyPerfV2` (`npm run build:web && npm run deploy:web`) |
-| `/raveloc/` | myRaveLoc (PWA) | `myraveloc` | `~/PersoDev/myRaveLoc` (`npm run deploy`) |
-| `/api/raveloc` | API de myRaveLoc (groupes, positions chiffrées) | `mylife` (ce dépôt) | `api/raveloc.ts`, `server/raveloc.ts` |
-| `/api/eb` | Relais Enable Banking + cours | `myfinances` | `~/PersoDev/Budget` |
+![Les quatre écrans de MyLife dans le thème Nuit : accueil, MyFinances, MyPerf, myRaveLoc](docs/images/sheet-nuit.png)
 
-Les chemins `/finances`, `/perf` et `/raveloc` sont des réécritures Vercel vers les projets de chaque app : chaque
-app reste un dépôt indépendant, déployable seule, mais le navigateur ne voit qu'une adresse. C'est ce
-qui permettra une connexion unique et la synchronisation chiffrée entre appareils (étapes suivantes).
+| | App | Pour quoi faire |
+|---|---|---|
+| ✦ | **Accueil MyLife** (`/`) | Tes apps et ce qu'elles ont à te dire maintenant (« 25 € à dépenser aujourd'hui », « Jambes · 5 exercices »), ton compte, l'apparence, l'installation. |
+| ◆ | **MyFinances** (`/finances/`) | Le budget au jour près : ce qui reste à dépenser aujourd'hui, le cycle de paie, les opérations (banques en lecture seule), le patrimoine, l'indépendance financière, un assistant IA. |
+| 🏋 | **MyPerf** (`/perf/`) | La musculation : séance du jour, planning en cycles, saisie des séries, 1RM et progression, carte musculaire, coach IA. Aussi en app Android. |
+| ➤ | **myRaveLoc** (`/raveloc/`) | Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, une flèche et une distance, mode phare. |
 
-Déployer l'accueil : `npx vercel@61.1.0 deploy --prod`.
+---
 
-**Après le déploiement d'une app** : si un fichier répond 404 *via MyLife* alors qu'il existe sur l'adresse
-de l'app (le CDN de MyLife a pu garder un 404 obtenu pendant la mise en ligne), redéployer MyLife vide son cache.
+## Utiliser MyLife
 
-## Comptes et synchronisation (chiffrée de bout en bout)
+### Commencer
+1. Ouvre **https://mylife-liart.vercel.app** sur ton téléphone.
+2. Touche **Commencer**, choisis un identifiant et un mot de passe. C'est tout : pas de courriel, pas de code.
+   Le gestionnaire de mots de passe du téléphone peut en proposer un et l'enregistrer.
+3. MyLife te montre ta **clé de secours**. Mets-la de côté (copier, partager, enregistrer). Elle seule
+   permet de retrouver tes données si tu oublies ton mot de passe : personne d'autre ne peut les lire, pas
+   même le serveur. Tu peux aussi le faire plus tard : un rappel reste affiché jusque-là.
 
-- `POST /api/auth` : `salt`, `signup` (code d'invitation `INVITE_CODE`), `login`, `recoverStart` / `recoverFinish`
-  (clé de secours), `password`. `POST /api/sync` : `status`, `sync` (envoi + réception, curseur par appareil).
-- Le mot de passe ne quitte jamais l'appareil : PBKDF2-SHA256 (200 000 tours) → HKDF → clé d'authentification
-  (le serveur n'en garde qu'une empreinte HMAC) et clé d'emballage de la **clé de données** (aléatoire).
-  Chaque ligne est chiffrée en AES-256-GCM, liée à `app/table/identifiant`. Clé de secours = 2ᵉ emballage.
-- Conflits : la modification la plus récente gagne ; une modification refusée reçoit la version du compte.
-- Rejoindre un compte : compte vide → l'appareil l'alimente ; sinon l'appareil prend les données du compte
-  (copie de sécurité d'abord) — jamais de fusion de deux historiques saisis séparément.
-- Base : Neon Postgres (Marketplace Vercel), tables `users` et `records` créées au premier appel.
-- Variables : `DATABASE_URL` (Neon), `SESSION_SECRET` (aussi sur le projet `myfinances` : le relais bancaire
-  accepte la session), `INVITE_CODE`.
-- Client commun : `packages/sync-client` (TypeScript pur, web + React Native), copié dans chaque app par
-  `npm run vendor` (`Budget/src/vendor/mylife-sync`, `MyPerfV2/src/vendor/mylife-sync`).
-- Tests : `npm test` (vrai Postgres en mémoire via PGlite, serveur + client de bout en bout).
+Tu peux aussi tout utiliser **sans compte** : les données restent alors sur cet appareil.
 
-## API de myRaveLoc (`/api/raveloc`)
+### Installer l'app
+- **Android / ordinateur (Chrome, Edge)** : Accueil → **Installe MyLife** → *Installer*.
+- **iPhone (Safari)** : Partager → *Sur l'écran d'accueil*.
 
-Hébergée ici pour réutiliser la session et les secrets de MyLife (voir `~/PersoDev/myRaveLoc/README.md`) :
-groupes temporaires, invitations, partage de position. Le serveur ne lit ni les positions, ni les noms
-de groupe, ni les pseudos (chiffrés par les téléphones avec une clé de groupe qu'il ne connaît pas) ; il
-vérifie l'appartenance au groupe à chaque requête. Tables `raveloc_*` créées au premier appel, une seule
-position par membre et par groupe, tout est effacé à la fin du groupe. Tests : `tests/raveloc.test.ts`.
+Une seule icône pour tout : un **appui long** dessus mène directement à MyFinances, MyPerf ou myRaveLoc.
+Si tu avais installé l'une de ces apps à part, tu peux la désinstaller : MyLife la contient, avec les
+mêmes données.
+
+### Au quotidien
+- **Passer d'une app à l'autre** : bouton ⠿ en haut à droite (*Espaces MyLife*), ou l'orbe 🔍 du dock.
+- **Chercher partout** : l'orbe ouvre la palette ; tape « séance », « budget », « groupe »… elle propose
+  aussi les écrans des autres apps.
+- **Appui long sur l'orbe** : l'assistant (MyFinances), le coach (MyPerf), le mode phare (myRaveLoc).
+- **Apparence** : 12 thèmes, dont 4 identités complètes (Circuit, Ardoise, Argile, Brut). Le thème choisi
+  habille toutes les apps, et suit sur tes autres appareils.
+
+| Brut | Argile | Circuit |
+|---|---|---|
+| ![Thème Brut](docs/images/sheet-brut.png) | ![Thème Argile](docs/images/sheet-argile.png) | ![Thème Circuit](docs/images/sheet-circuit.png) |
+
+### Plusieurs appareils
+Connecte-toi avec le même identifiant : tes données, chiffrées, se synchronisent toutes seules (à
+l'ouverture, quelques secondes après chaque changement, au retour sur l'app). Un appareil neuf récupère
+tout sans question ; MyLife ne demande que dans le cas rare où l'appareil et le compte ont chacun des
+données différentes (et garde une copie avant de remplacer).
+
+### Compte
+Accueil → **Compte** : changer de mot de passe, nouvelle clé de secours, se déconnecter (de toutes les
+apps de l'appareil), **supprimer le compte** (tout ce qu'il sauvegarde est effacé du serveur ; les appareils
+gardent leurs données).
+
+---
+
+## Confidentialité
+
+- **Chiffrement de bout en bout.** Le mot de passe ne quitte jamais l'appareil (PBKDF2-SHA256, 200 000
+  tours, puis HKDF). Chaque donnée est chiffrée en AES-256-GCM avant l'envoi ; le serveur ne range que des
+  blocs illisibles, et ne connaît ni le mot de passe ni le contenu.
+- **myRaveLoc** : noms de groupe, pseudos et positions chiffrés avec une clé de groupe transmise dans le lien
+  d'invitation (jamais au serveur). Partage coupé par défaut, limité dans le temps, effacé à l'arrêt.
+- **Aucune publicité, aucun traceur, aucune analytique.** Les aperçus de l'accueil restent sur l'appareil.
+- Banques : Enable Banking (DSP2), lecture seule, via un relais sans état.
+- Clés d'API Anthropic (assistant, coach) : sur l'appareil seulement.
+
+---
+
+## Développement
+
+### Organisation
+
+```
+MyLife/
+├── web/                 Accueil MyLife (React + Vite) — la seule PWA installable (manifeste, portée /)
+├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc)
+├── packages/
+│   ├── lumen/           Thèmes, identités, registre des apps et de leurs écrans, aperçus, apparence commune
+│   ├── sync-client/     Compte et synchro chiffrée (TypeScript pur : web et React Native)
+│   └── ui/              Kit d'interface web : verre, identités, dock, écrans, feuilles, compte, palette, Espaces
+├── apps/
+│   ├── finances/        MyFinances — React 18 + Vite + Tailwind + Dexie
+│   ├── perf/            MyPerf — Expo / React Native (web + Android) + SQLite
+│   └── raveloc/         myRaveLoc — React 18 + Vite
+├── tests/               Serveur (Postgres en mémoire) et parcours de bout en bout de tout MyLife
+└── docs/                UNIFICATION.md (choix notés), images
+```
+
+**Une adresse, plusieurs déploiements.** Chaque app est un projet Vercel à part ; MyLife (accueil + API)
+les sert sous la même adresse par des réécritures (`vercel.json`). Même adresse = même stockage : une
+seule connexion, un seul thème, une seule app installée.
+
+**Code partagé.** Les paquets de `packages/` sont **recopiés** dans chaque app par `npm run vendor`
+(`src/vendor/lumen`, `src/vendor/mylife-sync`, et `src/ui` pour les apps web). On modifie toujours dans
+`packages/`, jamais dans les copies. MyPerf (React Native) n'utilise pas le kit web : il en reproduit
+l'apparence avec ses propres composants, à partir des mêmes jetons (`lumen`).
+
+### Démarrer
+
+Node 20, Chrome (pour les tests de bout en bout).
+
+```bash
+npm run setup        # dépendances de l'accueil et des trois apps
+npm run build:all    # copie des paquets, puis construction de l'accueil et des trois apps
+npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base en mémoire)
+```
+
+### Commandes
+
+| Action | Commande |
+|---|---|
+| Copier les paquets partagés dans les apps | `npm run vendor` |
+| Tous les tests unitaires | `npm run test:all` (serveur 42, MyFinances 332, myRaveLoc 83, MyPerf 214) |
+| Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, 320 px) |
+| Tous les parcours de bout en bout | `npm run e2e:all` |
+| Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
+| Développer une app | dans `apps/<app>` : `npm run dev` (MyPerf : `npx expo start --web --port 8090`) |
+| Déployer tout | `npm run deploy:all` (les apps d'abord, puis MyLife) |
+| APK MyPerf | `cd apps/perf/android && ANDROID_HOME=~/android-sdk ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --max-workers=2` |
+
+### Variables d'environnement (projet Vercel `mylife`)
+
+| Variable | Rôle |
+|---|---|
+| `DATABASE_URL` | Postgres (Neon) |
+| `SESSION_SECRET` | Signe les sessions (aussi sur `myfinances` pour le relais bancaire) |
+| `SIGNUP` | `open` (défaut : inscription libre, protégée) ou `invite` (code exigé) |
+| `INVITE_CODE` | Code d'invitation, seulement en mode `invite` |
+
+Garde-fous de l'inscription ouverte : 10 comptes par réseau et par jour (sur une empreinte de l'adresse),
+10 essais de mot de passe ou de clé de secours par quart d'heure et par identifiant, quotas de stockage
+par app.
+
+### Pour aller plus loin
+- `CONTEXTE.md` : la référence complète (architecture, décisions, règles, état).
+- `docs/UNIFICATION.md` : les idées de l'unification, notées avant et après réalisation, avec les sources.
+- `apps/*/README.md` : le détail de chaque app.

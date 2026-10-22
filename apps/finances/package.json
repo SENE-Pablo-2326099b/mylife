@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "screenshots": "node scripts/screenshots.mjs",
     "e2e": "npm run build && node scripts/e2e.mjs",
-    "setup": "node scripts/setup.mjs"
+    "setup": "node scripts/setup.mjs",
+    "deploy": "npx --yes vercel@61.1.0 deploy --prod --yes"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

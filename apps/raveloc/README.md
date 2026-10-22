@@ -6,7 +6,7 @@ qualité des données. App web mobile-first (PWA) de l'écosystème **MyLife**, 
 
 | | |
 |---|---|
-| Dépôt | `~/PersoDev/myRaveLoc` (indépendant, comme MyFinances et MyPerf) |
+| Dossier | `apps/raveloc` du dépôt MyLife |
 | Projet Vercel | `myraveloc` (l'app, statique) |
 | Chemin public | `/raveloc/`, réécrit par `MyLife/vercel.json` vers le projet `myraveloc` |
 | API | `POST /api/raveloc`, **hébergée par MyLife** : `MyLife/api/raveloc.ts` + `MyLife/server/raveloc.ts`, tests `MyLife/tests/raveloc.test.ts` |

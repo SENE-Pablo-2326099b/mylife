@@ -2,7 +2,7 @@
 
 # MyPerf — notes projet
 
-- Contexte complet de l'écosystème MyLife (MyFinances + MyPerf) : `CONTEXTE.md`.
+- Contexte complet de l’écosystème MyLife : `../../CONTEXTE.md` (dépôt unique MyLife, MyPerf est dans `apps/perf`).
 - UI en français. Thèmes : `src/ui/themes.ts` (8 palettes Lumen, Nuit sombre par défaut, chaque palette a un équivalent clair/sombre pour « Suivre le téléphone » ; + 4 identités Circuit / Ardoise / Argile / Brut qui changent aussi formes, polices et matière : `stylize`, `applyIdentity`, `Glass`, `Backdrop`), réglages `theme` (ThemeId) + `followSystem`. Jamais de couleur littérale dans un écran : un jeton de `Palette` (en ajouter un dans `theme.ts` + les deux constructeurs de `themes.ts` si besoin) ; contrastes testés par `src/ui/__tests__/themes-test.ts`. Voir README.md pour l'architecture et les décisions métier.
 - Ergonomie (cf. ERGONOMIE.md) : l'essentiel visible, le rare à un tap (`Disclosure`, `Sheet`, écran de détail) ; action principale des écrans d'édition dans `Screen footer` ; options rares d'une série dans la feuille `SetNoteSheet` (toucher le numéro), pas sur la ligne ; en séance seul l'exercice en cours est déplié.
 - Couches : `src/domain` pur (testé), `src/db` (SQL synchrone, migrations append-only dans `migrations.ts`), `src/services`, `src/state`, `src/features`, `src/ui`, `src/app` (routes).
