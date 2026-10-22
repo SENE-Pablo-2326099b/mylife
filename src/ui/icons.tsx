@@ -89,6 +89,8 @@ import {
   IoPlay,
   IoShareOutline,
   IoStop,
+  IoPerson,
+  IoColorPalette,
 } from 'react-icons/io5';
 
 /** Icônes (Ionicons, comme MyPerf). Un nom = une idée ; « …-fill » = variante pleine des onglets actifs. */
@@ -181,6 +183,8 @@ const ICONS = {
   play: IoPlay,
   share: IoShareOutline,
   stop: IoStop,
+  'person-fill': IoPerson,
+  'palette-fill': IoColorPalette,
 } satisfies Record<string, IconType>;
 
 export type IconName = keyof typeof ICONS;

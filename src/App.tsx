@@ -156,7 +156,7 @@ function Shell() {
     { to: '/budget', label: 'Budget', icon: 'pie', active: 'pie-fill', match: ['/budget', '/previsions', '/recurrents'] },
     { to: '/operations', label: 'Opérations', icon: 'list', active: 'list-fill', match: ['/operations', '/a-classer'], badge: toClassify },
     { to: '/patrimoine', label: 'Patrimoine', icon: 'diamond', active: 'diamond-fill', match: ['/patrimoine', '/independance'] },
-    { to: '/reglages', label: 'Réglages', icon: 'options', active: 'options-fill', match: ['/reglages', '/synchro', '/alertes'] },
+    { to: '/reglages', label: 'Réglages', icon: 'options', active: 'options-fill', match: ['/reglages', '/synchro', '/alertes'], inDock: false },
   ];
 
   if (onboarded === undefined) return null;
