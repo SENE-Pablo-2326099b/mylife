@@ -19,6 +19,7 @@ import { setPendingRecovery, webPlatform } from '../vendor/mylife-sync/web';
 import { errorText, usePendingRecovery } from './session';
 import { Icon } from './icons';
 import { Button, Card, PasswordField, TextField } from './primitives';
+import { useTabActive } from './tabActive';
 import { toast } from './toastStore';
 
 /**
@@ -274,6 +275,8 @@ const LATER_KEY = 'mylife:recovery-later';
  */
 export function RecoveryReminder() {
   const pending = usePendingRecovery();
+  // Un onglet gardé en arrière-plan ne la montre pas : une seule fois à l'écran.
+  const visible = useTabActive();
   const [open, setOpen] = useState(() => {
     const p = pending;
     if (!p || Date.now() - p.at > 10 * 60_000) return false;
@@ -283,7 +286,7 @@ export function RecoveryReminder() {
       return true;
     }
   });
-  if (!pending) return null;
+  if (!pending || !visible) return null;
   if (open)
     return (
       <RecoveryKeyPanel
@@ -328,7 +331,18 @@ function Dot({ state }: { state: AccountStatusRow['state'] }) {
 }
 
 /** Le compte ouvert sur cet appareil : état, mot de passe, clé de secours, déconnexion, suppression. */
-export function AccountOverview({ session, rows = [], children }: { session: Session; rows?: AccountStatusRow[]; children?: ReactNode }) {
+export function AccountOverview({
+  session,
+  rows = [],
+  children,
+  beforeSignOut,
+}: {
+  session: Session;
+  rows?: AccountStatusRow[];
+  children?: ReactNode;
+  /** Ce que l'app doit faire tant que la session existe encore (myRaveLoc : couper les partages). */
+  beforeSignOut?: () => Promise<void>;
+}) {
   const [panel, setPanel] = useState<'none' | 'password' | 'recovery' | 'delete'>('none');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -431,7 +445,12 @@ export function AccountOverview({ session, rows = [], children }: { session: Ses
         <AccountAction
           icon="logout"
           label="Se déconnecter"
-          onClick={() => void signOut(webPlatform).then(() => toast({ message: 'Déconnecté de toutes tes apps sur cet appareil. Tes données y restent.' }))}
+          onClick={() =>
+            void (beforeSignOut?.() ?? Promise.resolve())
+              .catch(() => undefined)
+              .then(() => signOut(webPlatform))
+              .then(() => toast({ message: 'Déconnecté de toutes tes apps sur cet appareil. Tes données y restent.' }))
+          }
         />
         <AccountAction icon="trash" label="Supprimer mon compte" danger onClick={() => open('delete')} />
         {panel === 'delete' && (

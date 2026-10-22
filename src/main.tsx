@@ -5,22 +5,15 @@ import { BrowserRouter } from 'react-router-dom';
 import './ui/fonts';
 import App from './App';
 import { BASE_PATH } from './lib/app';
-import { installErrorLog } from './ui/errorLog';
 import { startServiceWorker } from './lib/pwaUpdate';
 // Compte MyLife : installe le suivi des modifications avant l'ouverture de la base.
 import './sync/cloud';
-import { bootTheme } from './ui/themeRuntime';
-import { installGlassLight } from './ui/glassLight';
+import { bootMyLife } from './ui/boot';
 import './index.css';
 
-// Plantages gardés sur l'appareil (jamais envoyés) pour pouvoir les signaler.
-installErrorLog();
-
-// Bonnes couleurs dès la première image (thème recopié au dernier lancement).
-bootTheme();
-
-// Lumière au contact du verre (pointeur, doigt).
-installGlassLight();
+// Démarrage commun des apps MyLife : journal d'erreurs local, bonnes couleurs dès la première image,
+// lumière au contact du verre, apparence synchronisée entre appareils.
+bootMyLife('finances');
 
 // Service worker : l'app fonctionne hors ligne et se met à jour automatiquement.
 startServiceWorker();
