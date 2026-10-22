@@ -1,16 +1,17 @@
 import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
-import * as core from '../server/core';
-import { signToken } from '../../MyLife/server/core';
+import * as core from '../../MyLife/server/raveloc';
+import { HttpError, signToken, type Db } from '../../MyLife/server/core';
 import { ApiError, createApi } from '../src/lib/api';
 import { inviteLink, newGroupId, newGroupKey, openName, openPosition, openProfile, parseInvite, sealName, sealPosition, sealProfile, unwrapGroupKey, wrapGroupKey } from '../src/lib/groupCrypto';
 
 /**
- * Le client de l'app (API + chiffrement) contre le vrai serveur, par un faux réseau qu'on peut couper.
+ * Le client de l'app (API + chiffrement) contre la vraie API (hébergée par MyLife), par un faux réseau
+ * qu'on peut couper.
  * Deux comptes MyLife, chacun avec sa clé de données : la clé de groupe passe uniquement par le lien.
  */
-const env: core.Env = { secret: 'c'.repeat(40) };
-let db: core.Db;
+const env = { secret: 'c'.repeat(40) };
+let db: Db;
 let networkUp = true;
 const seen: string[] = [];
 
@@ -21,18 +22,18 @@ function device(uid: string) {
     if (!networkUp) throw new TypeError('Failed to fetch');
     seen.push(String(init.body));
     try {
-      const out = await core.dispatch(db, env, (init.headers as Record<string, string>).authorization, JSON.parse(String(init.body)));
+      const out = await core.dispatch(db, env.secret, (init.headers as Record<string, string>).authorization, JSON.parse(String(init.body)));
       return new Response(JSON.stringify(out), { status: 200 });
     } catch (e) {
-      return new Response(JSON.stringify({ error: (e as Error).message }), { status: e instanceof core.HttpError ? e.status : 500 });
+      return new Response(JSON.stringify({ error: (e as Error).message }), { status: e instanceof HttpError ? e.status : 500 });
     }
   }) as typeof fetch;
   return { uid, dek, api: createApi(() => token, '', fetchImpl), expire: () => (token = signToken(uid, env.secret, Date.now() - 366 * 86_400_000)) };
 }
 
 beforeEach(async () => {
-  db = new PGlite() as unknown as core.Db;
-  await core.ensureSchema(db);
+  db = new PGlite() as unknown as Db;
+  await core.ensureRavelocSchema(db);
   networkUp = true;
   seen.length = 0;
 });

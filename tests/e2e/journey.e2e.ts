@@ -184,7 +184,7 @@ describe('myRaveLoc de bout en bout', () => {
   it('session expirée : retour à la connexion, sans écran vide', async () => {
     await bob.evaluate(() => {
       const s = JSON.parse(localStorage.getItem('mylife-session')!);
-      s.token = s.token.replace(/.$/, (c: string) => (c === 'A' ? 'B' : 'A'));
+      s.token = `${s.token.split('.')[0]}.${'x'.repeat(43)}`; // signature invalide
       localStorage.setItem('mylife-session', JSON.stringify(s));
     });
     await bob.goto(`${server.url}/raveloc/`);

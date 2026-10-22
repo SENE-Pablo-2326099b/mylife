@@ -7,9 +7,10 @@ qualité des données. App web mobile-first (PWA) de l'écosystème **MyLife**, 
 | | |
 |---|---|
 | Dépôt | `~/PersoDev/myRaveLoc` (indépendant, comme MyFinances et MyPerf) |
-| Projet Vercel | `myraveloc` (app + fonction `/api/raveloc`) |
-| Chemin public | `/raveloc/` et `/api/raveloc`, réécrits par `MyLife/vercel.json` |
-| Techno | React 18 + Vite + TypeScript, CSS sans framework, PWA (vite-plugin-pwa), fonction Node + Neon Postgres |
+| Projet Vercel | `myraveloc` (l'app, statique) |
+| Chemin public | `/raveloc/`, réécrit par `MyLife/vercel.json` vers le projet `myraveloc` |
+| API | `POST /api/raveloc`, **hébergée par MyLife** : `MyLife/api/raveloc.ts` + `MyLife/server/raveloc.ts`, tests `MyLife/tests/raveloc.test.ts` |
+| Techno | React 18 + Vite + TypeScript, CSS sans framework, PWA (vite-plugin-pwa) ; API Node + Neon Postgres dans MyLife |
 | Paquets partagés | `src/vendor/lumen` et `src/vendor/mylife-sync`, copiés par `npm run vendor` dans MyLife (ne jamais les modifier ici) |
 
 ## Commandes
@@ -18,19 +19,21 @@ qualité des données. App web mobile-first (PWA) de l'écosystème **MyLife**, 
 |---|---|
 | Types | `npx tsc -b --noEmit` |
 | Lint | `npx eslint .` |
-| Tests unitaires + intégration | `npm test` (vitest ; Postgres en mémoire via PGlite ; vrai code d'authentification de MyLife) |
+| Tests unitaires + intégration | `npm test` (vitest ; Postgres en mémoire via PGlite ; vraie API et vraie authentification de MyLife). Le serveur seul : `cd ../MyLife && npm test` |
 | Parcours de bout en bout | `npm run e2e` : build + deux téléphones simulés dans Chrome (`/usr/bin/google-chrome`, ou `CHROME_PATH`). `SHOTS=dossier` pour des captures. |
 | Serveur local | `npm run build && npm run local` → http://localhost:4320/raveloc/ (base en mémoire, code d'invitation MyLife `local-invite`) ; `npm run dev` relaie `/api` vers lui |
 | Icônes | `npm run icons` (depuis `public/favicon.svg`) |
-| Déployer | `npm run deploy` (vercel@61.1.0), puis redéployer MyLife (cache CDN, voir MyLife/README) |
+| Déployer l'app | `npm run deploy` (vercel@61.1.0), puis redéployer MyLife (cache CDN, voir MyLife/README) |
+| Déployer l'API | dans MyLife : `npm run deploy` |
 
-Les tests E2E et le serveur local importent `../MyLife/server/core.ts` : les deux dépôts doivent être côte à côte.
+Les tests, le serveur local et l'E2E importent `../MyLife/server/{core,raveloc}.ts` : les deux dépôts
+doivent être côte à côte.
 
 ## Architecture
 
 ```
-Téléphone (navigateur, /raveloc/)                       Serveur (projet myraveloc, /api/raveloc)
-├─ session MyLife (localStorage « mylife-session »)  ──► vérifie le jeton MyLife (même SESSION_SECRET)
+Téléphone (navigateur, /raveloc/)                       Serveur (projet mylife, /api/raveloc)
+├─ session MyLife (localStorage « mylife-session »)  ──► vérifie le jeton (code de MyLife)            
 ├─ clé de groupe (256 bits, aléatoire)                  vérifie l'appartenance au groupe à CHAQUE requête
 │   └─ chiffre : nom du groupe, pseudos, positions ──►  ne range que des blocs chiffrés + métadonnées
 ├─ GPS (watchPosition) ── seulement si partage actif     une seule position par membre et par groupe
@@ -43,10 +46,12 @@ Téléphone (navigateur, /raveloc/)                       Serveur (projet myrave
 - **Comptes : ceux de MyLife.** Même origine que MyFinances et MyPerf, donc même session
   (`mylife-session`) : un utilisateur déjà connecté dans une autre app n'a rien à faire. Connexion et
   création de compte réutilisent `signIn` / `createAccount` du paquet `sync-client` (le mot de passe ne
-  quitte pas l'appareil). Le serveur vérifie les jetons de MyLife avec une copie de `verifyToken`, comme le
-  relais `/api/eb` de MyFinances ; un test signe les jetons avec le vrai `signToken` de MyLife.
-- **API propre à l'app, dans son projet.** Même modèle que `/api/eb` (MyFinances) : chaque app reste
-  déployable seule ; MyLife ne fait que réécrire `/api/raveloc` et `/raveloc/*`.
+  quitte pas l'appareil).
+- **API hébergée par MyLife**, à côté de `/api/auth` et `/api/sync`, avec ses `verifyToken`, `handle`,
+  `getDb` et ses variables d'environnement. Le précédent `/api/eb` (fonction dans le projet de l'app,
+  `SESSION_SECRET` recopié) n'était pas reproductible : `SESSION_SECRET` est une variable « sensible »
+  sur Vercel, illisible, et le changer aurait déconnecté tous les appareils et rendu illisibles les
+  identifiants bancaires scellés de MyFinances. L'app, elle, reste un dépôt et un projet indépendants.
 - **La synchro chiffrée de MyLife ne convient pas aux positions** : elle synchronise les données d'UN
   compte entre SES appareils (curseur, conflits, historique complet), alors qu'une position doit aller à
   d'AUTRES comptes, ne garder que la dernière valeur et disparaître vite. On réutilise en revanche ses
@@ -154,13 +159,13 @@ identité existante n'a été modifiée, et le moteur de thèmes n'est pas dupli
 
 ## Configuration et déploiement
 
-Variables d'environnement du projet Vercel `myraveloc` (**ne jamais afficher leurs valeurs**) :
-`DATABASE_URL` (même base Neon que MyLife), `SESSION_SECRET` (même valeur que le projet `mylife`).
+Aucune variable d'environnement pour le projet `myraveloc` (app statique). L'API utilise celles du
+projet `mylife` (`DATABASE_URL`, `SESSION_SECRET`) ; ses tables `raveloc_*` sont créées au premier appel.
 
-1. `npx tsc -b --noEmit && npx eslint . && npm test && npm run e2e`
-2. `npm run deploy`
-3. Dans MyLife : réécritures `/raveloc`, `/raveloc/`, `/raveloc/:path+`, `/api/raveloc` vers l'adresse du
-   projet `myraveloc` ; `raveloc` exclu des en-têtes de l'accueil ; `npm run deploy`.
+1. myRaveLoc : `npx tsc -b --noEmit && npx eslint . && npm test && npm run e2e` ; MyLife : `npx tsc --noEmit && npm test`
+2. myRaveLoc : `npm run deploy`
+3. MyLife : réécritures `/raveloc`, `/raveloc/`, `/raveloc/:path+` vers le projet `myraveloc` ; `raveloc`
+   exclu des en-têtes de l'accueil ; `npm run deploy` (publie aussi l'API).
 4. Vérifier en production : `/raveloc/` (200), `/raveloc/manifest.webmanifest`, `POST /api/raveloc` sans
    session → 401.
 

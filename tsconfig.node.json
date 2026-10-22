@@ -22,7 +22,6 @@
     "resolveJsonModule": true
   },
   "include": [
-    "api",
     "server",
     "tests",
     "scripts/*.ts",
