@@ -14,7 +14,7 @@ import { SkeletonCard } from './ui/extras';
 import { Navigation, type TabDef } from './ui/Navigation';
 import { KeptTabs, PushedScreen } from './ui/PageTransition';
 import { setPaletteOpen } from './ui/paletteStore';
-import { CommandPalette } from './components/CommandPalette';
+import { FinancesPalette } from './components/CommandPalette';
 import { NotFoundScreen } from './ui/Screen';
 import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
@@ -204,7 +204,7 @@ function Shell() {
       </Suspense>
       </ErrorBoundary>
       {!welcome && <Navigation tabs={tabs} onSearch={() => setPaletteOpen(true)} onAssistant={() => navigate('/assistant')} />}
-      {!welcome && <CommandPalette />}
+      {!welcome && <FinancesPalette />}
       <ToastHost />
     </>
   );

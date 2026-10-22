@@ -543,10 +543,17 @@ export function TextField({
   onCommit,
   placeholder,
   hint,
+  error,
   type = 'text',
   mono,
   autoComplete,
   inputMode,
+  name,
+  plain,
+  trailing,
+  autoFocus,
+  enterKeyHint,
+  passwordRules,
 }: {
   label?: string;
   value: string;
@@ -555,32 +562,121 @@ export function TextField({
   onCommit?: (v: string) => void;
   placeholder?: string;
   hint?: ReactNode;
-  type?: 'text' | 'password' | 'search' | 'date' | 'url';
+  /** Remplace l'aide, en rouge. */
+  error?: ReactNode;
+  type?: 'text' | 'password' | 'search' | 'date' | 'url' | 'email';
   mono?: boolean;
   autoComplete?: string;
-  inputMode?: 'text' | 'decimal' | 'numeric' | 'search';
+  inputMode?: 'text' | 'decimal' | 'numeric' | 'search' | 'email';
+  /** Nom du champ : les gestionnaires de mots de passe s'en servent pour reconnaître le formulaire. */
+  name?: string;
+  /** Identifiant, code : ni majuscule automatique ni correcteur. */
+  plain?: boolean;
+  /** Bouton posé dans le champ, à droite (afficher le mot de passe…). */
+  trailing?: ReactNode;
+  autoFocus?: boolean;
+  enterKeyHint?: 'next' | 'done' | 'go' | 'send';
+  /** Règles proposées au générateur de mots de passe (Safari). */
+  passwordRules?: string;
 }) {
   const [text, setText] = useState(value);
   useEffect(() => setText(value), [value]);
+  const raw = mono || plain;
   return (
-    <Field label={label} hint={hint}>
+    <Field label={label} hint={hint} error={error}>
       {(id) => (
-        <input
-          id={id}
-          type={type}
-          className={`field-input ${mono ? 'font-mono' : ''}`}
-          value={onChange ? value : text}
-          placeholder={placeholder}
-          autoComplete={autoComplete}
-          inputMode={inputMode}
-          autoCapitalize={mono ? 'off' : undefined}
-          spellCheck={mono ? false : undefined}
-          onChange={(e) => (onChange ? onChange(e.target.value) : setText(e.target.value))}
-          onBlur={() => onCommit && text !== value && onCommit(text)}
-          onKeyDown={(e) => e.key === 'Enter' && onCommit && (e.target as HTMLInputElement).blur()}
-        />
+        <div className="relative">
+          <input
+            id={id}
+            name={name}
+            type={type}
+            className={`field-input ${mono ? 'font-mono' : ''} ${trailing ? 'pr-12' : ''}`}
+            value={onChange ? value : text}
+            placeholder={placeholder}
+            autoComplete={autoComplete}
+            inputMode={inputMode}
+            autoCapitalize={raw ? 'none' : undefined}
+            autoCorrect={raw ? 'off' : undefined}
+            spellCheck={raw ? false : undefined}
+            autoFocus={autoFocus}
+            enterKeyHint={enterKeyHint}
+            aria-invalid={error ? true : undefined}
+            {...(passwordRules ? { passwordrules: passwordRules } : {})}
+            onChange={(e) => (onChange ? onChange(e.target.value) : setText(e.target.value))}
+            onBlur={() => onCommit && text !== value && onCommit(text)}
+            onKeyDown={(e) => e.key === 'Enter' && onCommit && (e.target as HTMLInputElement).blur()}
+          />
+          {trailing && <span className="absolute inset-y-0 right-1 flex items-center">{trailing}</span>}
+        </div>
       )}
     </Field>
+  );
+}
+
+/**
+ * Mot de passe : bouton pour l'afficher (pas de second champ « confirmer »), et pour un nouveau mot
+ * de passe, une jauge de robustesse et la raison d'un refus. `autoComplete` new-password : le
+ * gestionnaire du téléphone propose d'en générer un et l'enregistre.
+ */
+export function PasswordField({
+  label = 'Mot de passe',
+  value,
+  onChange,
+  isNew = false,
+  name,
+  strength,
+  issue,
+  hint,
+  autoFocus,
+  enterKeyHint,
+}: {
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  isNew?: boolean;
+  name?: string;
+  /** 0 à 4 (nouveau mot de passe). */
+  strength?: number;
+  /** Raison d'un refus, affichée une fois quelque chose saisi. */
+  issue?: string | null;
+  hint?: ReactNode;
+  autoFocus?: boolean;
+  enterKeyHint?: 'next' | 'done' | 'go' | 'send';
+}) {
+  const [shown, setShown] = useState(false);
+  const words = ['Trop court', 'Faible', 'Correct', 'Solide', 'Excellent'];
+  const tones = ['var(--danger)', 'var(--warning)', 'var(--gold)', 'var(--success)', 'var(--success)'];
+  const s = Math.max(0, Math.min(4, strength ?? 0));
+  const meter =
+    isNew && value ? (
+      <span className="flex items-center gap-2">
+        <span className="flex flex-1 gap-1" aria-hidden>
+          {[1, 2, 3, 4].map((i) => (
+            <span key={i} className="h-1 flex-1 rounded-pill transition-colors" style={{ background: i <= s ? tones[s] : 'var(--border)' }} />
+          ))}
+        </span>
+        <span className="t-caption shrink-0" style={{ color: tones[s] }}>
+          {issue ?? words[s]}
+        </span>
+      </span>
+    ) : (
+      hint
+    );
+  return (
+    <TextField
+      label={label}
+      name={name}
+      type={shown ? 'text' : 'password'}
+      value={value}
+      onChange={onChange}
+      plain
+      autoComplete={isNew ? 'new-password' : 'current-password'}
+      passwordRules={isNew ? 'minlength: 12; required: lower; required: upper; required: digit;' : undefined}
+      hint={meter}
+      autoFocus={autoFocus}
+      enterKeyHint={enterKeyHint}
+      trailing={<IconButton icon={shown ? 'eye-off' : 'eye'} label={shown ? 'Masquer le mot de passe' : 'Afficher le mot de passe'} size={20} tone="muted" onClick={() => setShown((v) => !v)} />}
+    />
   );
 }
 

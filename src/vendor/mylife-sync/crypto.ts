@@ -83,10 +83,27 @@ export interface PasswordKeys {
   kek: Uint8Array;
 }
 
-/** Dérivation lente (PBKDF2) : quelques secondes sur un téléphone, une fois par connexion. */
+/**
+ * Dérivation lente (PBKDF2-SHA256), une fois par connexion. Native quand la plateforme l'offre
+ * (navigateurs, Node : un dixième de seconde), sinon en JavaScript (app Android : quelques secondes).
+ * Les deux donnent exactement la même clé.
+ */
 export async function passwordKeys(password: string, saltHex: string, iterations: number): Promise<PasswordKeys> {
-  const master = await pbkdf2Async(sha256, enc.encode(password.normalize('NFKC')), hexToBytes(saltHex), { c: iterations, dkLen: 32, asyncTick: 20 });
+  const secret = enc.encode(password.normalize('NFKC'));
+  const salt = hexToBytes(saltHex);
+  const master = (await nativePbkdf2(secret, salt, iterations)) ?? (await pbkdf2Async(sha256, secret, salt, { c: iterations, dkLen: 32, asyncTick: 20 }));
   return { authKey: bytesToHex(derive(master, 'auth')), kek: derive(master, 'kek') };
+}
+
+async function nativePbkdf2(secret: Uint8Array, salt: Uint8Array, iterations: number): Promise<Uint8Array | null> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return null;
+  try {
+    const key = await subtle.importKey('raw', secret as BufferSource, 'PBKDF2', false, ['deriveBits']);
+    return new Uint8Array(await subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: salt as BufferSource, iterations }, key, 256));
+  } catch {
+    return null;
+  }
 }
 
 export interface RecoveryKeys {

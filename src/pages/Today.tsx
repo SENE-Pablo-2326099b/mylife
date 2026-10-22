@@ -22,6 +22,7 @@ import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
+import { setGlance } from '../ui/glance';
 import { useTabActive } from '../ui/tabActive';
 import { useBreakpoint } from '../ui/responsive';
 import { useToClassifyCount } from '../domain/unclassified';
@@ -63,6 +64,23 @@ export default function TodayPage() {
     setAmbient(ambientTone);
     return () => setAmbient(null);
   }, [ambientTone]);
+
+  // Aperçu pour l'accueil MyLife et les Espaces (sur l'appareil seulement), valable jusqu'à minuit.
+  const ready = total !== undefined && !loading && total > 0;
+  const glanceTitle = !ready
+    ? null
+    : b.overrun
+      ? `${b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Enveloppe dépassée'} : ${formatCents(b.overrun.deficit)}`
+      : b.remainingToday >= 0
+        ? `${formatCents(b.remainingToday)} à dépenser aujourd’hui`
+        : `${formatCents(-b.remainingToday)} de trop aujourd’hui`;
+  const glanceTone = !ready ? undefined : b.overrun || b.remainingToday < 0 ? 'danger' : status.tone;
+  useEffect(() => {
+    if (!glanceTitle) return;
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0);
+    setGlance('finances', { title: glanceTitle, detail: `${status.label} · ${b.usedPercent} % du budget du jour`, tone: glanceTone, until: midnight.getTime() });
+  }, [glanceTitle, glanceTone, status.label, b.usedPercent]);
 
   // Données pas encore lues : ni faux chiffres ni faux « bienvenue ».
   if (total === undefined || loading) {

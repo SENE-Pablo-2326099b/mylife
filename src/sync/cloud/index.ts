@@ -1,13 +1,16 @@
 import { useSyncExternalStore } from 'react';
 import { db } from '../../db/db';
 import { exportBackup } from '../../domain/backup';
-import { ApiError, accountStatus, changePassword, createAccount, join, recoverAccount, signIn, signOut, syncNow, type JoinMode, type Session } from '../../vendor/mylife-sync';
+import { ApiError, accountStatus, autoJoin, join, syncNow, type JoinMode, type Session } from '../../vendor/mylife-sync';
+import { currentSession, onSessionChange, webPlatform as platform } from '../../vendor/mylife-sync/web';
 import { changeTracker, dexieStore, onLocalChange, pendingCount } from './dexieStore';
-import { currentSession, onSessionChange, platform } from './platform';
 
 /**
  * Compte MyLife et synchronisation chiffrée de MyFinances : état pour l'interface et déclenchement
  * automatique (lancement, après une modification, retour sur l'app, retour du réseau, toutes les 3 min).
+ * Le compte lui-même (création, connexion, gestion) est commun à toutes les apps : src/ui/account.tsx.
+ * Dès qu'une session apparaît (connexion ici ou dans une autre app), l'appareil est relié tout seul
+ * quand il n'y a pas d'ambiguïté ; sinon `choice` demande lequel garder.
  */
 
 // Suivi des modifications : installé avant la première ouverture de la base.
@@ -23,9 +26,11 @@ export interface CloudState {
   error: string | null;
   lastSyncAt: number | null;
   pending: number;
+  /** Compte et appareil ont chacun des données : l'utilisateur choisit lesquelles garder. */
+  choice: { account: number; lastUpdated: number | null } | null;
 }
 
-let state: CloudState = { session: currentSession(), joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0 };
+let state: CloudState = { session: currentSession(), joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0, choice: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<CloudState>) => {
   state = { ...state, ...patch };
@@ -45,7 +50,35 @@ export function useCloud(): CloudState {
 async function refreshState() {
   const session = currentSession();
   const s = await store.getState();
-  set({ session, joined: !!session && s?.joinedAs === session.login, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount() });
+  const joined = !!session && s?.joinedAs === session.login;
+  set({ session, joined, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount(), ...(session ? {} : { choice: null, error: null }) });
+}
+
+/** Des données saisies sur cet appareil (pas seulement les réglages par défaut d'une app neuve) ? */
+async function deviceHasData(): Promise<boolean> {
+  const settings = await db.settings.get('main');
+  return !!settings?.onboarded || (await db.transactions.count()) > 0 || (await db.portfolios.count()) > 0 || (await db.connections.count()) > 0;
+}
+
+let joining = false;
+
+/** Session présente, appareil pas encore relié : on le relie sans rien demander quand c'est sans ambiguïté. */
+async function ensureJoined(): Promise<void> {
+  await refreshState();
+  if (!state.session || state.joined || joining || state.choice) return;
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+  joining = true;
+  set({ syncing: true, error: null });
+  try {
+    const r = await autoJoin(store, platform.api, state.session, platform.random, deviceHasData);
+    if (r.action === 'ask') set({ choice: { account: r.account, lastUpdated: r.lastUpdated } });
+    await refreshState();
+  } catch (e) {
+    set({ error: e instanceof Error ? e.message : String(e) });
+  } finally {
+    joining = false;
+    set({ syncing: false });
+  }
 }
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -61,6 +94,10 @@ export function syncSoon(delay = 4000): void {
 
 export async function syncCloud(): Promise<boolean> {
   await refreshState();
+  if (state.session && !state.joined) {
+    await ensureJoined();
+    return state.joined;
+  }
   if (!state.session || !state.joined || state.syncing) return false;
   if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
   set({ syncing: true, error: null });
@@ -86,44 +123,14 @@ export async function cloudBoot(): Promise<void> {
     set({ pending: pendingCount() });
     syncSoon();
   });
-  onSessionChange(() => void refreshState());
+  onSessionChange(() => void ensureJoined());
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && syncSoon(500));
   window.addEventListener('online', () => syncSoon(500));
   setInterval(() => document.visibilityState === 'visible' && syncSoon(0), 180_000);
   await syncCloud();
 }
 
-// ---------------------------------------------------------------- actions du compte
-
-export async function cloudSignIn(login: string, password: string): Promise<void> {
-  await signIn(platform, { login, password });
-  await refreshState();
-}
-
-export async function cloudCreate(login: string, password: string, invite: string): Promise<string> {
-  const { recoveryKey } = await createAccount(platform, { login, password, invite });
-  await refreshState();
-  return recoveryKey;
-}
-
-export async function cloudRecover(login: string, recoveryKey: string, newPassword: string): Promise<void> {
-  await recoverAccount(platform, { login, recoveryKey, newPassword });
-  await refreshState();
-}
-
-export async function cloudChangePassword(newPassword: string): Promise<void> {
-  const session = currentSession();
-  if (!session) throw new Error('Pas connecté.');
-  await changePassword(platform, session, newPassword);
-}
-
-/** Déconnexion de cet appareil : les données restent sur l'appareil, la synchro s'arrête. */
-export async function cloudSignOut(): Promise<void> {
-  await signOut(platform);
-  const s = await store.getState();
-  if (s) await store.setState({ ...s, joinedAs: null, cursor: 0 });
-  await refreshState();
-}
+// ---------------------------------------------------------------- relier l'appareil
 
 export async function cloudAccountStatus(): Promise<{ count: number; lastUpdated: number | null }> {
   const session = currentSession();
@@ -155,6 +162,7 @@ export async function cloudJoin(mode: JoinMode = 'auto'): Promise<{ action: 'upl
   set({ syncing: true, error: null });
   try {
     const r = await join(store, platform.api, session, platform.random, mode);
+    set({ choice: null });
     await refreshState();
     return r;
   } finally {

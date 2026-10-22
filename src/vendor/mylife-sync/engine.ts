@@ -12,7 +12,8 @@
 import { decryptRow, encryptRow, fromB64, type RandomBytes } from './crypto';
 import { ApiError, type MyLifeApi, type Session } from './account';
 
-export type AppId = 'finances' | 'perf';
+/** `mylife` : réglages communs à toutes les apps (apparence). */
+export type AppId = 'finances' | 'perf' | 'mylife';
 
 export interface PendingChange {
   tbl: string;
@@ -127,6 +128,21 @@ export async function join(store: LocalStore, api: MyLifeApi, session: Session, 
   const cursor = upload ? await uploadAll(store, api, session, state, random) : await downloadAll(store, api, session, state);
   await store.setState({ ...state, cursor, joinedAs: session.login, lastSyncAt: Date.now() });
   return { action: upload ? 'uploaded' : 'downloaded', count: upload ? (await store.snapshot()).length : status.count };
+}
+
+export type AutoJoin = { action: 'uploaded' | 'downloaded'; count: number } | { action: 'ask'; account: number; lastUpdated: number | null };
+
+/**
+ * Relie l'appareil sans rien demander quand c'est sans ambiguïté, comme une app ordinaire après la
+ * connexion : compte vide pour cette app → l'appareil l'alimente ; appareil sans données saisies
+ * (`deviceHasData` faux : app neuve, seulement des valeurs par défaut) → il prend celles du compte.
+ * Les deux remplis : `ask`, l'utilisateur choisit lequel garder (jamais de fusion).
+ */
+export async function autoJoin(store: LocalStore, api: MyLifeApi, session: Session, random: RandomBytes, deviceHasData: () => Promise<boolean>): Promise<AutoJoin> {
+  const status = await accountStatus(api, session, store.app);
+  if (status.count === 0) return join(store, api, session, random, 'useDevice');
+  if (!(await deviceHasData())) return join(store, api, session, random, 'useAccount');
+  return { action: 'ask', account: status.count, lastUpdated: status.lastUpdated };
 }
 
 /** Un passage de synchro : envoie les modifications locales, applique celles des autres appareils. */

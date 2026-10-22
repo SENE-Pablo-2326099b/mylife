@@ -1,5 +1,5 @@
 import type { EbAspsp, EbBalance, EbGetSessionResponse, EbSession, EbStartAuthResponse, EbTransactionsPage } from './ebTypes';
-import { currentSession } from './cloud/platform';
+import { currentSession } from '../vendor/mylife-sync/web';
 import { SourceError } from './source';
 
 /** Le relais est servi sur la même origine que l'app (aucun autre domaine n'est contacté). */

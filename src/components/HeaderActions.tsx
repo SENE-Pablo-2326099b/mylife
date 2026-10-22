@@ -1,37 +1,62 @@
-import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { getMeta } from '../db/db';
 import { useAlerts } from '../domain/useAlerts';
-import { useCloud } from '../sync/cloud';
-import { useSyncState } from '../sync/store';
+import { syncCloud, useCloud } from '../sync/cloud';
+import { runSync, useSyncState } from '../sync/store';
+import { HeaderActions as MyLifeHeader } from '../ui/HeaderActions';
 import { IconButton } from '../ui/index';
-import { Spaces } from './Spaces';
+import { relativeTime } from '../ui/relative';
+import type { SpaceRow } from '../ui/Spaces';
 
 /**
- * En-tête des écrans principaux, le même dans toutes les apps MyLife : à gauche le bouton propre à
- * l'app (ici les alertes ; le coach dans MyPerf), à droite toujours les Espaces MyLife (apps, compte,
- * synchros — leur état se lit sur la pastille). Les actions passent par la palette (orbe du dock).
+ * En-tête commun de MyLife (src/ui/HeaderActions) avec ce qui est propre à MyFinances : le bouton des
+ * alertes, et dans les Espaces l'état de la synchro du compte et des banques.
  */
 export function HeaderActions() {
   const alerts = useAlerts();
   const bank = useSyncState();
   const cloud = useCloud();
-  const [spaces, setSpaces] = useState(false);
+  const lastBank = useLiveQuery(() => getMeta<number>('lastSyncAt'), [bank.finishedAt]);
   const serious = alerts.filter((a) => a.level !== 'info').length;
-  const failing = !!bank.error || !!cloud.error;
-  const busy = bank.syncing || cloud.syncing;
-  const dot = (color: string, pulse = false) => (
-    <span className={`absolute right-2 top-2 h-2 w-2 rounded-full ${pulse ? 'animate-pulse' : ''}`} style={{ background: color, boxShadow: `0 0 8px ${color}` }} />
-  );
+
+  const rows: SpaceRow[] = [];
+  if (cloud.session)
+    rows.push({
+      id: 'cloud',
+      label: 'Synchro MyFinances',
+      detail: cloud.error ?? (cloud.syncing ? 'Synchro en cours…' : !cloud.joined ? 'Appareil en cours de liaison…' : `Synchronisé ${relativeTime(cloud.lastSyncAt)}`),
+      state: cloud.error ? 'error' : cloud.syncing || !cloud.joined ? 'busy' : 'ok',
+      to: '/reglages/compte',
+      onSync: () => void syncCloud(),
+    });
+  rows.push({
+    id: 'banks',
+    label: 'Banques',
+    detail: bank.error ?? (bank.syncing ? 'Interrogation des banques…' : `Synchro ${relativeTime(lastBank)}`),
+    state: bank.error ? 'error' : bank.syncing ? 'busy' : lastBank ? 'ok' : 'off',
+    to: '/synchro',
+    onSync: () => void runSync(),
+  });
+
   return (
-    <>
-      <IconButton icon="bell" label={serious ? `Alertes (${serious})` : 'Alertes'} to="/alertes" glass badge={serious > 0 ? dot('var(--danger)') : undefined} />
-      <IconButton
-        icon="apps"
-        label={failing ? 'Espaces MyLife (erreur de synchro)' : busy ? 'Espaces MyLife (synchro en cours)' : 'Espaces MyLife'}
-        glass
-        onClick={() => setSpaces(true)}
-        badge={failing ? dot('var(--danger)') : busy ? dot('var(--accent)', true) : undefined}
-      />
-      <Spaces open={spaces} onClose={() => setSpaces(false)} />
-    </>
+    <MyLifeHeader
+      appAction={
+        <IconButton
+          icon="bell"
+          label={serious ? `Alertes (${serious})` : 'Alertes'}
+          to="/alertes"
+          glass
+          badge={serious > 0 ? <span className="absolute right-2 top-2 h-2 w-2 rounded-full" style={{ background: 'var(--danger)', boxShadow: '0 0 8px var(--danger)' }} /> : undefined}
+        />
+      }
+      rows={rows}
+      // Même rangée dans chaque app : l'assistant de l'app, ses données propres, ses réglages.
+      shortcuts={[
+        { label: 'Assistant', icon: 'sparkles', to: '/assistant' },
+        { label: 'Banques', icon: 'bank', to: '/synchro' },
+        { label: 'Réglages', icon: 'options', to: '/reglages' },
+      ]}
+      accountPath="/reglages/compte"
+    />
   );
 }
