@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { db } from './db/db';
-import { ensureSeeded } from './db/seed';
+import { adoptSharedAppearance, ensureSeeded } from './db/seed';
 import { wealthHousekeeping } from './domain/wealthDb';
 import TodayPage from './pages/Today';
 import { absorbSetupLink } from './sync/setupLink';
@@ -101,6 +101,7 @@ export default function App() {
 
   useEffect(() => {
     ensureSeeded()
+      .then(() => adoptSharedAppearance().catch(() => undefined))
       .then(absorbSetupLink)
       .then((linked) => {
         setReady(true);

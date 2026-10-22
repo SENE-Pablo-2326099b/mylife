@@ -85,9 +85,10 @@ try {
       await page.getByText('À faire').first().waitFor();
     });
 
-    await step('« + » : nouvel objectif ouvre le formulaire', async () => {
-      await page.getByRole('button', { name: 'Actions rapides' }).click();
-      await page.getByText('Nouvel objectif d’épargne').click();
+    await step('palette : « nouvel objectif » ouvre le formulaire', async () => {
+      await page.keyboard.press('Control+k');
+      await page.getByLabel('Chercher, aller, agir, demander').fill('nouvel objectif');
+      await page.keyboard.press('Enter');
       await page.getByRole('button', { name: 'Créer l’objectif' }).waitFor();
       // Le formulaire s'ouvre et l'adresse redevient celle de l'onglet (le retour arrière ne le rouvre pas).
       await page.waitForURL((u) => u.search === '?vue=objectifs');
@@ -119,7 +120,7 @@ try {
 
     await step('lanceur MyLife : apps et état des synchros', async () => {
       await open('/');
-      await page.getByRole('button', { name: /Apps et synchro/ }).click();
+      await page.getByRole('button', { name: /Espaces MyLife/ }).first().click();
       await page.getByText('MyPerf', { exact: true }).waitFor();
       await page.getByText('Compte MyLife').waitFor();
       await page.keyboard.press('Escape');

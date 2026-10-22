@@ -9,8 +9,8 @@ import { isTabPath, TAB_PATHS, TabActive, type TabPath } from './tabActive';
  * - Les onglets restent montés une fois visités : en changer ne fait qu'afficher l'écran déjà prêt
  *   (aucune relecture des données, aucun écran vide), à la position de défilement où on l'avait
  *   laissé. Chacun garde sa propre adresse (ses filtres) même quand un autre est affiché.
- * - Les écrans ouverts depuis un onglet arrivent par la droite (ou reculent au retour), sans attendre
- *   la sortie de l'écran précédent.
+ * - Les écrans ouverts depuis un onglet montent en fondu (comme dans MyPerf), sans attendre la sortie
+ *   de l'écran précédent ; le retour se pose en reculant.
  */
 
 export function KeptTabs({ pages }: { pages: Record<TabPath, ReactNode> }) {
@@ -66,8 +66,9 @@ export function PushedScreen({ children }: { children: ReactNode }) {
   return (
     <m.div
       key={pathname}
-      initial={nav === 'POP' ? { scale: 0.97, opacity: 0 } : { x: 48, opacity: 0 }}
-      animate={{ x: 0, scale: 1, opacity: 1 }}
+      // Même mouvement que MyPerf : l'écran poussé monte en fondu ; le retour se pose en reculant.
+      initial={nav === 'POP' ? { scale: 0.97, opacity: 0 } : { y: 22, opacity: 0 }}
+      animate={{ y: 0, scale: 1, opacity: 1 }}
       transition={{ duration: 0.24, ease: [0.2, 0.8, 0.2, 1] }}
       style={{ transformOrigin: '50% 30%' }}
     >

@@ -6,7 +6,7 @@ export const APP_NAME = 'MyFinances';
  */
 export const BASE_PATH = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
 /** Ouvre une autre app MyLife (même adresse : la session et le compte suivent). */
-export function openMyLifeApp(path: '/perf/' | '/'): void {
+export function openMyLifeApp(path: string): void {
   window.location.assign(path);
 }
 export const APP_TAGLINE = 'Budget, patrimoine, placements';

@@ -10,6 +10,7 @@ import { syncCloud, useCloud } from '../sync/cloud';
 import { runSync, useSyncState } from '../sync/store';
 import { Icon, type IconName } from '../ui/icons';
 import { haptic, springs } from '../ui/motion';
+import { MYLIFE_APPS } from '../vendor/lumen';
 import { Layer } from '../ui/Layer';
 
 /**
@@ -29,10 +30,15 @@ interface Space {
   open: (() => void) | null;
 }
 
-const SPACES: Space[] = [
-  { id: 'finances', name: 'MyFinances', tagline: 'Budget, patrimoine, placements', icon: 'diamond-fill', colors: ['var(--accent-g0)', 'var(--accent-g1)'], open: null },
-  { id: 'perf', name: 'MyPerf', tagline: 'Séances, progression, coach', icon: 'barbell', colors: ['#FFB86B', '#F0566B'], open: () => openMyLifeApp('/perf/') },
-];
+// Les apps de MyLife, dans le même ordre et aux mêmes couleurs dans toutes les apps (paquet partagé).
+const SPACES: Space[] = MYLIFE_APPS.map((a) => ({
+  id: a.id,
+  name: a.name,
+  tagline: a.tagline,
+  icon: a.icon === 'diamond' ? 'diamond-fill' : 'barbell',
+  colors: a.colors,
+  open: a.id === 'finances' ? null : () => openMyLifeApp(a.path),
+}));
 
 export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }) {
   const navigate = useNavigate();
@@ -161,9 +167,10 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
             <m.div className="mt-3 grid grid-cols-3 gap-2" initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...springs.soft, delay: 0.2 }}>
               {(
                 [
+                  // Même rangée dans chaque app : l'assistant, les données propres à l'app, les réglages.
                   ['Assistant', 'sparkles', '/assistant'],
+                  ['Banques', 'bank', '/synchro'],
                   ['Réglages', 'options', '/reglages'],
-                  ['Apparence', 'palette', '/reglages/apparence'],
                 ] as [string, IconName, string][]
               ).map(([label, icon, to]) => (
                 <button key={to} type="button" onClick={() => go(to)} className="glass flex flex-col items-center gap-1.5 rounded-lg py-3.5">

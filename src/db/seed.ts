@@ -3,6 +3,7 @@ import { ADDED_RULE_SEEDS, DEFAULT_CATEGORIES, DEFAULT_SETTINGS, addedRules, bui
 import { normalizeSettings } from '../domain/settingsModel';
 import { db, getMeta, setMeta, type BudgetDB } from './db';
 import type { Settings } from './types';
+import { isThemeId, readSharedAppearance, writeSharedAppearance } from '../vendor/lumen';
 
 /** À augmenter quand le classement change : toutes les opérations sont reclassées une fois (corrections manuelles conservées). */
 const CLASSIFIER_VERSION = 2;
@@ -44,5 +45,19 @@ export async function getSettings(database: BudgetDB = db): Promise<Settings> {
 
 export async function updateSettings(patch: Partial<Settings>, database: BudgetDB = db): Promise<void> {
   const current = await getSettings(database);
-  await database.settings.put({ ...current, ...patch, id: 'main' });
+  const next = { ...current, ...patch, id: 'main' as const };
+  await database.settings.put(next);
+  // Choix d'apparence : partagé avec les autres apps MyLife (même adresse sur le web).
+  if (database === db && (patch.theme !== undefined || patch.followSystem !== undefined) && isThemeId(next.theme)) {
+    writeSharedAppearance({ theme: next.theme, followSystem: next.followSystem });
+  }
+}
+
+/** Au lancement : reprend le dernier thème choisi dans une autre app MyLife. */
+export async function adoptSharedAppearance(database: BudgetDB = db): Promise<void> {
+  const shared = readSharedAppearance();
+  if (!shared) return;
+  const current = await getSettings(database);
+  if (current.theme === shared.theme && current.followSystem === shared.followSystem) return;
+  await database.settings.put({ ...current, theme: shared.theme, followSystem: shared.followSystem, id: 'main' });
 }
