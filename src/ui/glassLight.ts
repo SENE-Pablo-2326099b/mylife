@@ -6,8 +6,15 @@
  */
 let lit: HTMLElement | null = null;
 
+/**
+ * La plaque éclairée : une carte, jamais une grande surface (feuille, palette, dock, barre) — leur
+ * lumière animée repeindrait tout leur contenu à chaque image, à chaque toucher.
+ */
 function plateAt(target: EventTarget | null): HTMLElement | null {
-  return target instanceof Element ? (target.closest('.glass') as HTMLElement | null) : null;
+  if (!(target instanceof Element)) return null;
+  const plate = target.closest('.glass') as HTMLElement | null;
+  if (!plate || plate.classList.contains('glass-lens') || plate.classList.contains('glass-float') || plate.closest('[role="dialog"]')) return null;
+  return plate;
 }
 
 function light(el: HTMLElement | null, x: number, y: number) {

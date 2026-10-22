@@ -103,6 +103,21 @@ try {
       expect(page.url().includes('vue=placements'), 'onglet perdu');
     });
 
+    await step('changer la catégorie d’une opération : enregistré, feuille fermée, page libre', async () => {
+      await open('/operations');
+      for (let round = 0; round < 2; round++) {
+        await page.locator('main#contenu').getByRole('button').filter({ hasText: /€/ }).nth(round).click();
+        const group = page.getByRole('group', { name: 'Choisir une catégorie' });
+        await group.waitFor();
+        await group.getByRole('button').nth(3 + round).click();
+        await page.getByRole('button', { name: 'Enregistrer' }).click();
+        await group.waitFor({ state: 'detached' });
+        await page.getByText(/Classée en|reclassée/).first().waitFor();
+        const state = await page.evaluate(() => ({ lock: document.body.style.overflow, layers: document.querySelectorAll('.fixed.inset-0.z-50').length }));
+        expect(state.lock === '' && state.layers === 0, `page restée bloquée : ${JSON.stringify(state)}`);
+      }
+    });
+
     await step('palette de commande : chercher une opération, aller à un écran', async () => {
       await open('/');
       if (width < 1000) await page.getByRole('button', { name: /Chercher, aller, agir/ }).click();

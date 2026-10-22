@@ -12,6 +12,7 @@ import { Icon, type IconName } from '../ui/icons';
 import { haptic, springs } from '../ui/motion';
 import { MYLIFE_APPS } from '../vendor/lumen';
 import { Layer } from '../ui/Layer';
+import { lockScroll } from '../ui/scrollLock';
 
 /**
  * Espaces MyLife : l'écosystème en plein écran. Chaque app est une grande carte de verre ; en choisir
@@ -54,11 +55,10 @@ export function Spaces({ open, onClose }: { open: boolean; onClose: () => void }
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
+      unlock();
     };
   }, [open, onClose]);
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CategoryPicker, SHORTCUT_KEYS } from '../components/CategoryPicker';
 import type { Transaction } from '../db/types';
 import { CAT } from '../domain/defaults';
@@ -9,6 +9,7 @@ import { useAccounts, useCategories } from '../hooks';
 import { Badge, Button, Card, EmptyState, Money, Reveal, toast, Toggle } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Pending } from '../ui/extras';
+import { logError } from '../lib/errorLog';
 import { useUnclassified } from '../domain/unclassified';
 
 const NO_TX: Transaction[] = [];
@@ -31,17 +32,32 @@ export default function QueuePage() {
     if (current) setKeyword(suggestKeyword(current.label));
   }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Un classement à la fois (raccourcis clavier rapides, double toucher) ; une erreur est dite.
+  const busy = useRef(false);
   const pick = async (categoryId: string) => {
-    if (!current) return;
-    const others = await learnFromCorrection({
-      txId: current.id,
-      categoryId,
-      mode: learn && keyword.trim() ? 'create' : 'only',
-      keyword,
-      person: categoryId === CAT.remboursements ? current.counterparty : null,
-    });
-    const cat = categories.find((c) => c.id === categoryId);
-    toast({ message: `${current.label} → ${cat?.emoji ?? ''} ${cat?.name ?? ''}${others ? ` (+${others} similaire${others > 1 ? 's' : ''})` : ''}` });
+    if (!current || busy.current) return;
+    busy.current = true;
+    try {
+      const others = await learnFromCorrection({
+        txId: current.id,
+        categoryId,
+        mode: learn && keyword.trim() ? 'create' : 'only',
+        keyword,
+        person: categoryId === CAT.remboursements ? current.counterparty : null,
+      });
+      const cat = categories.find((c) => c.id === categoryId);
+      toast({
+        message: `${current.label} → ${cat?.emoji ?? ''} ${cat?.name ?? ''}${others ? ` (+${others} similaire${others > 1 ? 's' : ''})` : ''}`,
+      });
+    } catch (e) {
+      logError('classement', e);
+      toast({
+        message: `Classement non enregistré : ${e instanceof Error ? e.message : String(e)}`,
+        tone: 'danger',
+      });
+    } finally {
+      busy.current = false;
+    }
   };
 
   useEffect(() => {

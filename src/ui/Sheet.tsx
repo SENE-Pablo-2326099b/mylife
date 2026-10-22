@@ -5,6 +5,7 @@ import { Icon, type IconName } from './icons';
 import { springs } from './motion';
 import { IconButton, Tap } from './primitives';
 import { useBreakpoint } from './responsive';
+import { lockScroll } from './scrollLock';
 
 /**
  * Une lentille de verre qui flotte au-dessus de l'app. Sur téléphone elle monte du bas et se jette
@@ -30,11 +31,15 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // Fermeture lue au moment voulu : l'installation (focus, clavier, verrou du défilement) ne se fait
+  // qu'une fois à l'ouverture, même si l'écran derrière se redessine (sinon le focus est volé en boucle).
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') close.current();
       if (e.key === 'Tab' && ref.current) {
         // Piège à focus : la tabulation reste dans la feuille.
         const focusables = ref.current.querySelectorAll<HTMLElement>('a[href],button:not([disabled]),input,select,textarea,[tabindex]:not([tabindex="-1"])');
@@ -51,14 +56,13 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
       }
     };
     window.addEventListener('keydown', onKey);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = overflow;
+      unlock();
       previous?.focus?.({ preventScroll: true });
     };
-  }, [onClose]);
+  }, []);
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.y > 120 || info.velocity.y > 900) onClose();
@@ -66,15 +70,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
 
   return (
     <div className="fixed inset-0 z-50">
-      <m.div
-        className="absolute inset-0"
-        style={{ background: 'var(--overlay)', backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0, transition: { duration: 0.2 } }}
-        onClick={onClose}
-        aria-hidden
-      />
+      <m.div className="sheet-veil absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.2 } }} onClick={onClose} aria-hidden />
       <div className={`pointer-events-none absolute inset-0 flex justify-center ${wide ? 'items-center p-6' : 'items-end px-2'}`} style={wide ? undefined : { paddingBottom: 'max(calc(var(--safe-bottom) - 4px), 8px)' }}>
         <m.div
           ref={ref}
@@ -86,7 +82,16 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
           className={`glass glass-lens pointer-events-auto flex max-h-[88dvh] w-full flex-col overflow-hidden outline-none ${wide ? 'max-w-[520px] rounded-[32px]' : 'max-w-[640px] rounded-[32px]'}`}
           initial={wide ? { opacity: 0, scale: 0.94, y: 24 } : { y: '100%' }}
           animate={wide ? { opacity: 1, scale: 1, y: 0 } : { y: 0 }}
-          exit={wide ? { opacity: 0, scale: 0.96, y: 16, transition: { duration: 0.18 } } : { y: '110%', transition: { ...springs.snappy, damping: 30 } }}
+          exit={
+            wide
+              ? {
+                  opacity: 0,
+                  scale: 0.96,
+                  y: 16,
+                  transition: { duration: 0.18 },
+                }
+              : { y: '110%', transition: { ...springs.snappy, damping: 30 } }
+          }
           transition={springs.soft}
           drag={wide ? false : 'y'}
           dragControls={controls}
@@ -109,7 +114,11 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-[18px] pb-4">{children}</div>
-          {footer && <div className="shrink-0 border-t px-[18px] pb-4 pt-3" style={{ borderColor: 'var(--border)' }}>{footer}</div>}
+          {footer && (
+            <div className="shrink-0 border-t px-[18px] pb-4 pt-3" style={{ borderColor: 'var(--border)' }}>
+              {footer}
+            </div>
+          )}
         </m.div>
       </div>
     </div>
@@ -140,7 +149,13 @@ export function ActionList({ actions, onClose }: { actions: readonly SheetAction
             scaleTo={0.98}
             className="flex h-[54px] items-center gap-3 rounded-md px-3 text-left"
           >
-            <span className="flex h-[34px] w-[34px] items-center justify-center rounded-sm" style={{ background: a.destructive ? 'var(--danger-soft)' : 'var(--surface-alt)', color: a.destructive ? 'var(--danger)' : 'var(--text)' }}>
+            <span
+              className="flex h-[34px] w-[34px] items-center justify-center rounded-sm"
+              style={{
+                background: a.destructive ? 'var(--danger-soft)' : 'var(--surface-alt)',
+                color: a.destructive ? 'var(--danger)' : 'var(--text)',
+              }}
+            >
               <Icon name={a.icon} size={18} />
             </span>
             <span className={`t-body-strong ${a.destructive ? 'text-danger' : ''}`}>{a.label}</span>

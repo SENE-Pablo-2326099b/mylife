@@ -14,6 +14,7 @@ import { runSync } from '../sync/store';
 import { Icon, type IconName } from '../ui/icons';
 import { haptic, springs } from '../ui/motion';
 import { Layer } from '../ui/Layer';
+import { lockScroll } from '../ui/scrollLock';
 import { setPaletteOpen, usePaletteOpen } from '../ui/paletteStore';
 import { toast } from '../ui/toastStore';
 import { useToClassifyCount } from '../domain/unclassified';
@@ -105,11 +106,10 @@ export function CommandPalette() {
     setQuery('');
     setActive(0);
     const t = setTimeout(() => input.current?.focus(), 30);
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     return () => {
       clearTimeout(t);
-      document.body.style.overflow = overflow;
+      unlock();
     };
   }, [open]);
 

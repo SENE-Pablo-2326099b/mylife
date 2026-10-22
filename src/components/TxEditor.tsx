@@ -12,8 +12,8 @@ import { formatCents } from '../lib/money';
 import { Sheet } from '../ui/Sheet';
 import { Badge, Button, Glass, Money, Segmented, SelectField, TextField } from '../ui/primitives';
 import { toast } from '../ui/toastStore';
+import { logError } from '../lib/errorLog';
 import { CategoryPicker } from './CategoryPicker';
-
 
 /** Feuille d'une opération : catégorie, apprentissage (règle), personne, note. */
 export function TxEditor({ tx, categories, onClose }: { tx: Transaction | null; categories: Category[]; onClose: () => void }) {
@@ -54,25 +54,48 @@ function TxEditorBody({ tx, categories, onClose }: { tx: Transaction; categories
   const refundChanged = refundOf !== (tx.refundOf ?? '');
   const dirty = !!picked || note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '') || refundChanged;
 
+  // La feuille se ferme tout de suite ; le classement (et sa règle) s'applique derrière. Un second
+  // toucher pendant l'enregistrement est ignoré ; une erreur est dite, jamais silencieuse.
+  const [saving, setSaving] = useState(false);
   const save = async () => {
-    if (refundChanged) await db.transactions.update(tx.id, { refundOf: refundOf || null });
-    if (picked) {
-      const changed = await learnFromCorrection({ txId: tx.id, categoryId: picked, mode, keyword, person: picked === CAT.remboursements ? person : null });
-      if (note !== tx.note) await db.transactions.update(tx.id, { note });
-      const cat = categories.find((c) => c.id === picked);
-      toast({ message: changed > 0 ? `${cat?.emoji ?? ''} ${cat?.name ?? ''} · ${changed} autre${changed > 1 ? 's' : ''} reclassée${changed > 1 ? 's' : ''}` : `Classée en ${cat?.emoji ?? ''} ${cat?.name ?? ''}` });
-    } else if (note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '')) {
-      await db.transactions.update(tx.id, { note, ...(tx.categoryId === CAT.remboursements ? { person } : {}) });
-    }
-    if (refundChanged && !picked) toast({ message: refundOf ? 'Remboursement rattaché : la dépense est réduite d’autant' : 'Remboursement détaché' });
+    if (saving) return;
+    setSaving(true);
     onClose();
+    try {
+      if (refundChanged) await db.transactions.update(tx.id, { refundOf: refundOf || null });
+      if (picked) {
+        const changed = await learnFromCorrection({
+          txId: tx.id,
+          categoryId: picked,
+          mode,
+          keyword,
+          person: picked === CAT.remboursements ? person : null,
+        });
+        if (note !== tx.note) await db.transactions.update(tx.id, { note });
+        const cat = categories.find((c) => c.id === picked);
+        toast({
+          message: changed > 0 ? `${cat?.emoji ?? ''} ${cat?.name ?? ''} · ${changed} autre${changed > 1 ? 's' : ''} reclassée${changed > 1 ? 's' : ''}` : `Classée en ${cat?.emoji ?? ''} ${cat?.name ?? ''}`,
+        });
+      } else if (note !== tx.note || person !== (tx.person ?? tx.counterparty ?? '')) {
+        await db.transactions.update(tx.id, {
+          note,
+          ...(tx.categoryId === CAT.remboursements ? { person } : {}),
+        });
+      }
+      if (refundChanged && !picked)
+        toast({
+          message: refundOf ? 'Remboursement rattaché : la dépense est réduite d’autant' : 'Remboursement détaché',
+        });
+    } catch (e) {
+      logError('opération', e);
+      toast({
+        message: `Modification non enregistrée : ${e instanceof Error ? e.message : String(e)}`,
+        tone: 'danger',
+      });
+    }
   };
 
-  const modes = [
-    ...(rule ? [{ value: 'update' as const, label: 'Modifier la règle' }] : []),
-    { value: 'create' as const, label: 'Nouvelle règle' },
-    { value: 'only' as const, label: 'Cette fois' },
-  ];
+  const modes = [...(rule ? [{ value: 'update' as const, label: 'Modifier la règle' }] : []), { value: 'create' as const, label: 'Nouvelle règle' }, { value: 'only' as const, label: 'Cette fois' }];
 
   return (
     <div className="space-y-4">
@@ -121,18 +144,36 @@ function TxEditorBody({ tx, categories, onClose }: { tx: Transaction; categories
           label="Rembourse une dépense"
           value={refundOf}
           onChange={setRefundOf}
-          options={[{ value: '', label: 'Aucune (neutre)' }, ...(candidates ?? []).map((t) => ({ value: t.id, label: `${formatShort(t.date)} · ${t.label} · ${formatCents(-t.amount)}` }))]}
+          options={[
+            { value: '', label: 'Aucune (neutre)' },
+            ...(candidates ?? []).map((t) => ({
+              value: t.id,
+              label: `${formatShort(t.date)} · ${t.label} · ${formatCents(-t.amount)}`,
+            })),
+          ]}
           hint="Ex. un ami te rembourse sa part du resto : la dépense est réduite au lieu de compter en entier."
         />
       )}
       <TextField label="Note" value={note} onChange={setNote} placeholder="Facultatif" />
 
       <div className="flex flex-wrap gap-2 pt-1">
-        <Button className="flex-1" disabled={!dirty} onClick={() => void save()}>
+        <Button className="flex-1" disabled={!dirty || saving} onClick={() => void save()}>
           Enregistrer
         </Button>
         {tx.categorySource === 'manual' && (
-          <Button variant="ghost" onClick={() => void resetToAuto(tx.id).then(onClose)}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onClose();
+              void resetToAuto(tx.id).catch((e: unknown) => {
+                logError('opération', e);
+                toast({
+                  message: 'Retour au classement auto impossible',
+                  tone: 'danger',
+                });
+              });
+            }}
+          >
             Classement auto
           </Button>
         )}

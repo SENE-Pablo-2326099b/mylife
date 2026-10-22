@@ -636,3 +636,17 @@ input[type='number']::-webkit-outer-spin-button {
 .reduce-motion .tab-in-left {
   animation: none;
 }
+
+/* Voile derrière une feuille : flou léger ; sur Android, assombri sans flou (un flou plein écran sous
+   une feuille animée coûtait plusieurs images par toucher). */
+.sheet-veil {
+  background: var(--overlay);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.android .sheet-veil,
+.no-live-blur .sheet-veil {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
