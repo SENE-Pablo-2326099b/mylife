@@ -23,6 +23,8 @@ import { Tilt } from '../ui/Tilt';
 import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
 import { setGlance } from '../ui/glance';
+import { BackupReminder } from '../ui/BackupReminder';
+import { downloadBackup } from '../domain/backupDownload';
 import { useTabActive } from '../ui/tabActive';
 import { useBreakpoint } from '../ui/responsive';
 import { useToClassifyCount } from '../domain/unclassified';
@@ -126,6 +128,9 @@ export default function TodayPage() {
   return (
     <Screen title="Aujourd’hui" kicker={formatDay(today)} mood="today" right={<HeaderActions />} onRefresh={refreshEverything}>
       {/* Grand écran : l'anneau du jour à gauche, les chiffres du cycle empilés à droite. */}
+      <Reveal index={0} className="mb-3 empty:hidden">
+        <BackupReminder app="finances" hasData onBackup={async () => void (await downloadBackup())} />
+      </Reveal>
       <div className={wide ? 'grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-stretch gap-3' : ''}>
       <Reveal index={0} className={wide ? 'flex [&>*]:flex-1' : ''}>
         <Tilt className="h-full">

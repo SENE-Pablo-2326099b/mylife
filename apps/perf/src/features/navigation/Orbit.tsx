@@ -1,11 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useEffect, type ReactNode } from 'react';
+
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openMyLifeApp } from '@/services/mylifeApps';
@@ -13,79 +11,67 @@ import { MYLIFE_APPS, MYLIFE_HOME, readGlance, type MyLifeGlance } from '@/vendo
 import { useCloud } from '@/services/cloud';
 import { Glass } from '@/ui/components/Glass';
 import { Tap, Text, type IconName } from '@/ui/components/primitives';
-import { springs } from '@/ui/motion';
-import { LIVE_BLUR, radius, space, useTheme } from '@/ui/theme';
+import { radius, space, useTheme } from '@/ui/theme';
 
 /**
- * L'orbe du dock ouvre les espaces MyLife, en plein écran : les apps en grandes cartes de verre (en
- * choisir une la fait grandir jusqu'à remplir l'écran, puis on y entre), les actions du quotidien,
- * et l'état du compte. Même geste et même forme que dans MyFinances.
+ * Espaces MyLife : le même menu que dans les apps web (packages/ui/src/Spaces.tsx). Une feuille qui
+ * monte du bas, à portée de pouce : l'accueil et les trois apps en liste (aperçu du moment, app ouverte
+ * marquée « Ici », ordre fixe), puis le compte et la synchro, puis trois raccourcis.
  */
 
-/** Apparition échelonnée (valeur partagée, comme Reveal : sûr sur le web). */
-function Rise({ index, children, style }: { index: number; children: ReactNode; style?: object }) {
-  const reduce = useReducedMotion();
-  const p = useSharedValue(reduce ? 1 : 0);
-  useEffect(() => {
-    if (!reduce) p.set(withDelay(40 + index * 55, withSpring(1, springs.liquid)));
-  }, [index, p, reduce]);
-  const anim = useAnimatedStyle(() => ({ opacity: Math.min(1, p.value * 1.5), transform: [{ translateY: (1 - p.value) * 24 }, { scale: 0.94 + p.value * 0.06 }] }));
-  return <Animated.View style={[style, anim]}>{children}</Animated.View>;
+interface Target {
+  id: string;
+  name: string;
+  line: string;
+  colors: [string, string];
+  icon: IconName;
+  here: boolean;
+  onPress: () => void;
 }
 
-function AppCard({ name, tagline, icon, colors, current, glance, onPress }: { name: string; tagline: string; icon: IconName; colors: [string, string]; current?: boolean; glance: MyLifeGlance | null; onPress: () => void }) {
-  const zoom = useSharedValue(0);
-  const style = useAnimatedStyle(() => ({ transform: [{ scale: 1 + zoom.value * 3 }], opacity: 1 - zoom.value, zIndex: zoom.value > 0 ? 5 : 1 }));
+function TargetRow({ t }: { t: Target }) {
+  const th = useTheme();
   return (
-    <Animated.View style={[{ flex: 1, aspectRatio: 0.8 }, style]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={current ? `${name}, ouverte` : `Ouvrir ${name}`}
-        onPress={() => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          if (current) return onPress();
-          zoom.set(withTiming(1, { duration: 420, easing: Easing.in(Easing.cubic) }));
-          setTimeout(onPress, 380);
-        }}
-        style={{ flex: 1, borderRadius: radius.xl, overflow: 'hidden' }}>
-        <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        <LinearGradient colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0)']} locations={[0, 0.55]} start={{ x: 0.1, y: 0 }} end={{ x: 0.6, y: 0.8 }} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { borderRadius: radius.xl, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', borderTopColor: 'rgba(255,255,255,0.6)' }]} />
-        <View style={{ flex: 1, justifyContent: 'space-between', padding: space.lg }}>
-          <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.22)', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name={icon} size={26} color="#fff" />
-          </View>
-          <View style={{ gap: 2 }}>
-            {current && (
-              <View style={{ alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.25)', marginBottom: 4 }}>
-                <Text variant="caption" style={{ color: '#fff' }}>
-                  Ouverte
-                </Text>
-              </View>
-            )}
-            <Text variant="title" style={{ color: '#fff', fontSize: 22, lineHeight: 26 }}>
-              {name}
-            </Text>
-            {glance ? (
-              <>
-                <Text variant="bodyStrong" style={{ color: '#fff' }} numberOfLines={2}>
-                  {glance.title}
-                </Text>
-                {glance.detail !== undefined && (
-                  <Text variant="caption" style={{ color: 'rgba(255,255,255,0.9)' }} numberOfLines={2}>
-                    {glance.detail}
-                  </Text>
-                )}
-              </>
-            ) : (
-              <Text variant="small" style={{ color: 'rgba(255,255,255,0.9)' }}>
-                {tagline}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${t.here ? 'Rester dans' : 'Ouvrir'} ${t.name} : ${t.line}`}
+      onPress={() => {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        t.onPress();
+      }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: space.md + 2,
+        minHeight: 68,
+        paddingHorizontal: space.md,
+        paddingVertical: space.sm,
+        borderRadius: radius.lg,
+        backgroundColor: t.here ? th.accentSoft : pressed ? th.surfaceAlt : 'transparent',
+        borderWidth: t.here ? 1.5 : 0,
+        borderColor: th.accent,
+      })}>
+      <View style={{ width: 48, height: 48, borderRadius: 15, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}>
+        <LinearGradient colors={t.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <Ionicons name={t.icon} size={24} color="#fff" />
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+          <Text variant="bodyStrong">{t.name}</Text>
+          {t.here && (
+            <View style={{ paddingHorizontal: 8, paddingVertical: 1, borderRadius: 99, backgroundColor: th.accentSoft }}>
+              <Text variant="caption" tone="accent">
+                Ici
               </Text>
-            )}
-          </View>
+            </View>
+          )}
         </View>
-      </Pressable>
-    </Animated.View>
+        <Text variant="small" tone="secondary" numberOfLines={1}>
+          {t.line}
+        </Text>
+      </View>
+      {!t.here && <Ionicons name="chevron-forward" size={18} color={th.textMuted} />}
+    </Pressable>
   );
 }
 
@@ -104,6 +90,7 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
     ['Réglages', 'options-outline', () => go('/settings')],
   ];
   // Comme les Espaces des apps web : le compte, puis l'état de la synchro de l'app.
+  // Comme les Espaces des apps web : le compte, puis l'état de la synchro de l'app.
   const accountLine = !cloud.session ? 'Pas connecté : tout reste sur cet appareil' : cloud.recovery ? `${cloud.session.login} · clé de secours à mettre de côté` : `${cloud.session.login} · chiffré de bout en bout`;
   const accountColor = !cloud.session ? t.textMuted : cloud.recovery ? t.danger : t.success;
   const syncLine = cloud.error ?? (cloud.syncing ? 'Synchro en cours…' : !cloud.joined ? 'Appareil en cours de liaison…' : 'Synchronisé');
@@ -111,78 +98,68 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
   // Aperçus déposés par les apps sur ce navigateur (web seulement : l'app Android n'y a pas accès).
   const glances = Platform.OS === 'web' && visible ? Object.fromEntries(MYLIFE_APPS.map((a) => [a.id, readGlance(a.id)])) : {};
 
+  const targets: Target[] = [
+    { id: 'home', name: MYLIFE_HOME.name, line: 'Tes apps, ton compte, l’apparence', colors: [...MYLIFE_HOME.colors], icon: 'sparkles', here: false, onPress: () => openMyLifeApp(MYLIFE_HOME.path) },
+    ...MYLIFE_APPS.map<Target>((a) => {
+      const g = (glances as Record<string, MyLifeGlance | null>)[a.id] ?? null;
+      return { id: a.id, name: a.name, line: g ? `${g.title}${g.detail !== undefined ? ` · ${g.detail}` : ''}` : a.tagline, colors: a.colors, icon: a.icon, here: a.id === 'perf', onPress: a.id === 'perf' ? onClose : () => openMyLifeApp(a.path) };
+    }),
+  ];
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      {LIVE_BLUR && <BlurView intensity={60} tint={t.blurTint} style={StyleSheet.absoluteFill} />}
-      <Pressable accessibilityLabel="Fermer" onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: LIVE_BLUR ? `${t.bg}99` : `${t.bg}EE` }]} />
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + space.lg, paddingBottom: insets.bottom + space.xl, paddingHorizontal: space.lg, gap: space.md, maxWidth: 560, width: '100%', alignSelf: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Rise index={0}>
-            <Text variant="large">MyLife</Text>
-          </Rise>
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
-            <Tap onPress={() => openMyLifeApp(MYLIFE_HOME.path)} accessibilityRole="button" accessibilityLabel="Accueil" style={{ height: 44, borderRadius: 22 }}>
-              <Glass level="float" radius={22} contentStyle={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: space.lg }}>
-                <Ionicons name="home-outline" size={18} color={t.text} />
-                <Text variant="bodyStrong">Accueil</Text>
-              </Glass>
-            </Tap>
-            <Tap onPress={onClose} accessibilityLabel="Fermer" style={{ width: 44, height: 44, borderRadius: 22 }}>
-              <Glass level="float" radius={22} contentStyle={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name="close" size={20} color={t.text} />
-              </Glass>
-            </Tap>
-          </View>
-        </View>
-        <Text variant="small" tone="secondary">
-          Tes apps, un seul compte, tes données chiffrées.
-        </Text>
-        {/* Les apps de MyLife : même ordre et mêmes couleurs dans toutes les apps (paquet partagé). */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-          {MYLIFE_APPS.map((a, i) => (
-            <Rise key={a.id} index={1 + i} style={{ width: '47%', flexGrow: 1, maxWidth: '50%' }}>
-              <AppCard name={a.name} tagline={a.tagline} icon={a.icon} colors={a.colors} current={a.id === 'perf'} glance={glances[a.id] ?? null} onPress={a.id === 'perf' ? onClose : () => openMyLifeApp(a.path)} />
-            </Rise>
-          ))}
-        </View>
-        <Rise index={3}>
-          <Glass level="raised" radius={radius.lg} contentStyle={{ overflow: 'hidden', borderRadius: radius.lg }}>
-            {[
-              { label: 'Compte MyLife', line: accountLine, color: accountColor, show: true },
-              { label: 'Synchro MyPerf', line: syncLine, color: syncColor, show: !!cloud.session },
-            ]
-              .filter((r) => r.show)
-              .map((r, i) => (
-                <Tap key={r.label} onPress={() => go('/account')} accessibilityRole="button" accessibilityLabel={`${r.label} : ${r.line}`}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md, minHeight: 60, borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: t.border }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color }} />
-                    <View style={{ flex: 1 }}>
-                      <Text variant="bodyStrong">{r.label}</Text>
-                      <Text variant="small" tone="secondary" numberOfLines={1}>
-                        {r.line}
-                      </Text>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <Pressable accessibilityLabel="Fermer" onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: `${t.bg}99` }]} />
+      <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', alignItems: 'center', paddingHorizontal: space.sm, paddingBottom: Math.max(insets.bottom, space.sm) }}>
+        <Glass level="lens" radius={radius.xl} style={{ width: '100%', maxWidth: 560, maxHeight: '90%' }} contentStyle={{ overflow: 'hidden', borderRadius: radius.xl }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onClose} style={{ height: 36, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: t.textMuted, opacity: 0.5 }} />
+          </Pressable>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: space.md, paddingBottom: space.md, gap: 4 }} showsVerticalScrollIndicator={false}>
+            <Text variant="label" tone="muted" style={{ paddingHorizontal: 4, paddingBottom: 4 }}>
+              Aller à
+            </Text>
+            {targets.map((tg) => (
+              <TargetRow key={tg.id} t={tg} />
+            ))}
+            <Text variant="label" tone="muted" style={{ paddingHorizontal: 4, paddingTop: space.md, paddingBottom: 4 }}>
+              Compte et synchro
+            </Text>
+            <View style={{ borderRadius: radius.lg, overflow: 'hidden', backgroundColor: t.surfaceAlt }}>
+              {[
+                { label: 'Compte MyLife', line: accountLine, color: accountColor, show: true },
+                { label: 'Synchro MyPerf', line: syncLine, color: syncColor, show: !!cloud.session },
+              ]
+                .filter((r) => r.show)
+                .map((r, i) => (
+                  <Tap key={r.label} onPress={() => go('/account')} accessibilityRole="button" accessibilityLabel={`${r.label} : ${r.line}`}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.md, minHeight: 58, borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderColor: t.border }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: r.color }} />
+                      <View style={{ flex: 1 }}>
+                        <Text variant="bodyStrong">{r.label}</Text>
+                        <Text variant="small" tone="secondary" numberOfLines={1}>
+                          {r.line}
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={17} color={t.textMuted} />
                     </View>
-                    <Ionicons name="chevron-forward" size={17} color={t.textMuted} />
+                  </Tap>
+                ))}
+            </View>
+            <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
+              {actions.map(([label, icon, run]) => (
+                <Tap key={label} onPress={run} accessibilityRole="button" accessibilityLabel={label} style={{ flex: 1, borderRadius: radius.lg }}>
+                  <View style={{ minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.lg, backgroundColor: t.surfaceAlt }}>
+                    <Ionicons name={icon} size={20} color={t.accent} />
+                    <Text variant="small" style={{ fontWeight: '600' }}>
+                      {label}
+                    </Text>
                   </View>
                 </Tap>
               ))}
-          </Glass>
-        </Rise>
-        <Rise index={4}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-            {actions.map(([label, icon, run]) => (
-              <Tap key={label} onPress={run} accessibilityRole="button" accessibilityLabel={label} style={{ width: '31.5%', flexGrow: 1, borderRadius: radius.lg }}>
-                <Glass radius={radius.lg} contentStyle={{ alignItems: 'center', gap: 6, paddingVertical: space.md + 2 }}>
-                  <Ionicons name={icon} size={21} color={t.accent} />
-                  <Text variant="small" style={{ fontWeight: '600' }}>
-                    {label}
-                  </Text>
-                </Glass>
-              </Tap>
-            ))}
-          </View>
-        </Rise>
-      </ScrollView>
+            </View>
+          </ScrollView>
+        </Glass>
+      </View>
     </Modal>
   );
 }

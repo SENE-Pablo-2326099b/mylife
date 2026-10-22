@@ -11,6 +11,7 @@ import { Avatar, Banner, BRAND, NetBanner, useNow } from '../components/kit';
 import { setBeacon } from '../components/Beacon';
 import { Button, Card } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Tilt } from '../ui/Tilt';
 
 type DialMode = 'compass' | 'course' | 'north';
 
@@ -67,6 +68,7 @@ export function Navigate() {
         {member && g && (g.kind === 'ok' || g.kind === 'uncertain') && <CompassHelp mode={mode} />}
 
         {member && (
+          <Tilt>
           <Card className="flex flex-col gap-2" label="Qualité des données">
             <div className="flex items-center gap-3">
               <Avatar uid={member.uid} name={member.name} size={36} />
@@ -78,6 +80,7 @@ export function Navigate() {
             <Fact label="Ta position" value={loc.fix ? `${formatAge(Math.max(0, now - loc.fix.at))} · ± ${Math.round(loc.fix.acc)} m` : loc.status === 'denied' ? 'refusée' : 'en cours…'} tone={me ? (me.acc > THRESHOLDS.impreciseM ? 'warn' : 'ok') : 'warn'} />
             <Fact label="Orientation" value={modeLabel(mode, cmp.status)} tone={mode === 'compass' ? (cmp.status === 'unstable' ? 'warn' : 'ok') : 'warn'} />
           </Card>
+          </Tilt>
         )}
 
         <Button size="lg" variant="secondary" icon="beacon" onClick={() => setBeacon(true)}>

@@ -5,6 +5,7 @@
  */
 import { today } from '@/domain/dates';
 import { buildBackup, restoreBackup, setsCsv } from '@/db/backup';
+import { markWebBackedUp } from './webBackup';
 
 function download(name: string, content: string, type: string): void {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -19,6 +20,7 @@ function download(name: string, content: string, type: string): void {
 
 export async function exportJson(): Promise<void> {
   download(`myperf-${today()}.json`, JSON.stringify(buildBackup()), 'application/json');
+  markWebBackedUp();
 }
 
 export async function exportCsv(): Promise<void> {

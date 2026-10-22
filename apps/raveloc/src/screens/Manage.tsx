@@ -8,6 +8,7 @@ import { Avatar, ErrorLine, NetBanner, Pending, useAction, useNow } from '../com
 import { Button, Card, Chip, EmptyState, Reveal, SectionTitle, TextField, toast } from '../ui/index';
 import { Icon } from '../ui/icons';
 import { Screen } from '../ui/Screen';
+import { Tilt } from '../ui/Tilt';
 
 const INVITE_TTL = [
   { label: '1 h', ms: 3_600_000 },
@@ -46,11 +47,13 @@ export function Manage() {
       <div className="flex flex-col gap-3">
         <NetBanner />
         <Reveal index={0}>
+          <Tilt>
           <Card>
             <p className="t-small text-secondary">
               Se termine {when(group.expiresAt, now)} ({remaining(group.expiresAt, now)}). Ensuite, le groupe, ses membres et toutes les positions sont effacés du serveur.
             </p>
           </Card>
+          </Tilt>
         </Reveal>
 
         <Reveal index={1}>

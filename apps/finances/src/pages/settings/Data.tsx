@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../db/db';
 import { getSettings, updateSettings } from '../../db/seed';
-import { backupFileName, exportBackup, importBackup, wipeAll } from '../../domain/backup';
+import { exportBackup, importBackup, wipeAll } from '../../domain/backup';
+import { downloadBackup } from '../../domain/backupDownload';
 import { clearDemo, loadDemo } from '../../domain/demo';
 import { clearErrors, readErrors } from '../../ui/errorLog';
 import { useCloud } from '../../sync/cloud';
@@ -53,15 +54,8 @@ export default function DataPage() {
 
   const doExport = () =>
     run(async () => {
-      const backup = await exportBackup();
-      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = backupFileName();
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      toast({ message: `Sauvegarde exportée (${backup.tables.transactions.length} opérations)` });
+      const count = await downloadBackup();
+      toast({ message: `Sauvegarde exportée (${count} opérations)` });
     });
 
   const doImport = (file: File) =>

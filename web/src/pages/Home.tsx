@@ -9,6 +9,7 @@ import { Icon, type IconName } from '../ui/icons';
 import { haptic, springs } from '../ui/motion';
 import { Button, Card, IconButton, Reveal } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { Tilt } from '../ui/Tilt';
 import { useSession } from '../ui/session';
 import { useInstallState } from '../install';
 
@@ -84,6 +85,7 @@ export function HomePage() {
       <div className="flex flex-col gap-3">
         {!session && (
           <Reveal index={0}>
+            <Tilt>
             <Card level="raised" glow>
               <p className="t-title">Un compte pour toutes tes apps</p>
               <p className="t-small mt-1 text-secondary">Retrouve tout sur ton téléphone et ton ordinateur. Tes données sont chiffrées avant de quitter l’appareil : personne d’autre ne peut les lire.</p>
@@ -96,6 +98,7 @@ export function HomePage() {
                 </Button>
               </div>
             </Card>
+            </Tilt>
           </Reveal>
         )}
         <RecoveryReminder />

@@ -12,6 +12,7 @@ import { RecoveryReminder } from '../ui/account';
 import { Badge, Button, Card, Chip, EmptyState, Reveal, SectionTitle, Sheet } from '../ui/index';
 import { Icon } from '../ui/icons';
 import { Screen } from '../ui/Screen';
+import { Tilt } from '../ui/Tilt';
 import { useTabActive } from '../ui/tabActive';
 
 /** Écran principal : le groupe actif, mes amis, et une seule grande action — en retrouver un. */
@@ -99,7 +100,9 @@ export function Home() {
         <NetBanner />
         <RecoveryReminder />
         <Reveal index={0}>
-          <ShareCard group={group} now={now} />
+          <Tilt>
+            <ShareCard group={group} now={now} />
+          </Tilt>
         </Reveal>
 
         <Reveal index={1}>

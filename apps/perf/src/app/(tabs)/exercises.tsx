@@ -16,6 +16,7 @@ import { Screen } from '@/ui/components/Screen';
 import { radius, shade, space, useTheme } from '@/ui/theme';
 import { useLive } from '@/ui/useLive';
 import { useToday } from '@/ui/useToday';
+import { Tilt } from '@/ui/components/Tilt';
 
 type Mode = 'body' | 'list';
 const WINDOWS = [7, 28] as const;
@@ -83,7 +84,7 @@ export default function ExercisesScreen() {
   }
 
   const map = (
-    <Card style={{ gap: space.md }}>
+    <Tilt><Card style={{ gap: space.md }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' }}>
         <Text variant="label" tone="muted" style={{ flex: 1 }}>
           Volume moyen
@@ -107,7 +108,7 @@ export default function ExercisesScreen() {
           </Tap>
         </View>
       )}
-    </Card>
+    </Card></Tilt>
   );
 
   const side =

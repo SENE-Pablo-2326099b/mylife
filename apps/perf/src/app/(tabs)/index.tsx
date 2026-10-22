@@ -30,6 +30,7 @@ import { MESO_KIND_COLOR, splitTemplateName } from '@/ui/labels';
 import { useLive } from '@/ui/useLive';
 import { useToday } from '@/ui/useToday';
 import { setAmbient } from '@/ui/ambient';
+import { BackupReminder } from '@/ui/components/BackupReminder';
 import { Tilt } from '@/ui/components/Tilt';
 import { useWorkoutStore } from '@/state/workoutStore';
 
@@ -430,6 +431,10 @@ function TodayOverview() {
           <IconButton icon="apps-outline" label="Espaces MyLife" glass onPress={() => setSpaces(true)} />
         </View>
       }>
+      {/* Web : une copie des données est proposée chaque semaine (l'app Android se sauvegarde seule). */}
+      <View style={{ marginBottom: space.md }}>
+        <BackupReminder hasData={data.recent.length > 0 || data.planned.length > 0} />
+      </View>
       <Columns weights={[1.45, 1]}>
         <View style={{ gap: space.sm }}>
           <Reveal index={0}>

@@ -61,6 +61,7 @@ import { splitTemplateName } from "@/ui/labels";
 import { blockColors } from "@/ui/themes";
 import { useLive } from "@/ui/useLive";
 import { useToday } from "@/ui/useToday";
+import { Tilt } from '@/ui/components/Tilt';
 
 type Tab = "calendar" | "program";
 
@@ -318,7 +319,7 @@ function CalendarTab() {
         </View>
       )}
       <Columns weights={[1.35, 1]}>
-        <Card level="raised">
+        <Tilt><Card level="raised">
           <MonthGrid
             month={month}
             onMonthChange={setMonth}
@@ -391,7 +392,7 @@ function CalendarTab() {
               )}
             </View>
           )}
-        </Card>
+        </Card></Tilt>
         <View>
           <View
             style={{

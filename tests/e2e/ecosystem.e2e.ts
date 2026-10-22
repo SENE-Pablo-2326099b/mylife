@@ -122,9 +122,13 @@ describe('MyLife, une seule app', () => {
     await page.goto(`${server.url}/raveloc/`);
     await page.getByRole('button', { name: /Espaces MyLife/ }).click();
     await page.getByRole('dialog', { name: 'Espaces MyLife' }).getByText(`${LOGIN} · chiffré de bout en bout`).waitFor();
-    await page.getByRole('button', { name: 'Accueil' }).waitFor();
+    // L'app ouverte est marquée, l'accueil et les deux autres apps sont à un toucher.
+    await page.getByRole('button', { name: /Rester dans myRaveLoc/ }).waitFor();
+    await page.getByRole('button', { name: /Ouvrir MyFinances/ }).waitFor();
+    await page.getByRole('button', { name: /Ouvrir MyPerf/ }).waitFor();
+    await page.waitForTimeout(700);
     await shot(page, '10-espaces-raveloc');
-    await page.getByRole('button', { name: 'Accueil' }).click();
+    await page.getByRole('button', { name: /Ouvrir MyLife/ }).click();
     await page.waitForURL(`${server.url}/`);
     // L'aperçu déposé par myRaveLoc est sur l'accueil.
     await page.getByText('Aucun groupe en cours').waitFor();

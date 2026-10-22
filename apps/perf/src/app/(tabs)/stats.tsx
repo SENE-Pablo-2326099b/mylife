@@ -13,6 +13,7 @@ import { statsOverview, weekVolume, type MainLift } from '@/services/statsServic
 import { useSettings } from '@/state/settingsStore';
 import { BarList, Sparkline } from '@/ui/components/charts';
 import { Glass } from '@/ui/components/Glass';
+import { Tilt } from '@/ui/components/Tilt';
 import { Columns, Metric } from '@/ui/components/layout';
 import { Button, Card, Disclosure, EmptyState, Group, IconButton, Row, SectionTitle, Tap, Text } from '@/ui/components/primitives';
 import { Reveal, Screen } from '@/ui/components/Screen';
@@ -102,11 +103,13 @@ export default function StatsScreen() {
         </Card>
       ) : (
         <Reveal index={1}>
-          <Card style={{ paddingVertical: space.xs }}>
-            {overview.mainLifts.map((l, i) => (
-              <LiftRow key={l.exerciseId} lift={l} first={i === 0} />
-            ))}
-          </Card>
+          <Tilt>
+            <Card style={{ paddingVertical: space.xs }}>
+              {overview.mainLifts.map((l, i) => (
+                <LiftRow key={l.exerciseId} lift={l} first={i === 0} />
+              ))}
+            </Card>
+          </Tilt>
         </Reveal>
       )}
 
@@ -227,12 +230,14 @@ export default function StatsScreen() {
   return (
     <Screen title="Stats" subtitle="Progression" mood="stats" onRefresh={() => syncCloud()}>
       <Reveal index={0}>
-        <Glass level="raised" radius={radius.xl} contentStyle={{ flexDirection: 'row', padding: space.lg, gap: space.md }}>
-          <Metric label="Séances" value={String(overview.workouts30)} hint="30 jours" />
-          <Metric label="Séries" value={String(overview.sets7)} tone="accent" hint="7 jours" />
-          {bp !== 'compact' && <Metric label="Séries" value={fmtSets(totalSets)} hint="cette semaine" />}
-          <Metric label="Semaines" value={String(overview.consistency.streak)} hint="d’affilée" />
-        </Glass>
+        <Tilt>
+          <Glass level="raised" radius={radius.xl} contentStyle={{ flexDirection: 'row', padding: space.lg, gap: space.md }}>
+            <Metric label="Séances" value={String(overview.workouts30)} hint="30 jours" />
+            <Metric label="Séries" value={String(overview.sets7)} tone="accent" hint="7 jours" />
+            {bp !== 'compact' && <Metric label="Séries" value={fmtSets(totalSets)} hint="cette semaine" />}
+            <Metric label="Semaines" value={String(overview.consistency.streak)} hint="d’affilée" />
+          </Glass>
+        </Tilt>
       </Reveal>
       <Columns weights={[1.25, 1]}>
         {left}
