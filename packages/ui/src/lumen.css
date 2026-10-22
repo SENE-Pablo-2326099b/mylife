@@ -1119,3 +1119,37 @@ input[type='number']::-webkit-outer-spin-button {
     inset 3px 3px 6px var(--g-spec),
     inset -5px -5px 12px var(--clay-in);
 }
+
+/* ================================================================== Passage d'une app à l'autre */
+/*
+ * Toutes les apps MyLife sont sur la même adresse : aller de l'accueil à MyFinances, ou de MyPerf à
+ * myRaveLoc, se fait en fondu (Chrome 126+, Safari 18.2+ ; ailleurs, navigation normale). Le fond
+ * reste en place, la nouvelle app monte légèrement.
+ */
+@view-transition {
+  navigation: auto;
+}
+::view-transition-old(root) {
+  animation: 160ms cubic-bezier(0.4, 0, 1, 1) both mylife-out;
+}
+::view-transition-new(root) {
+  animation: 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both mylife-in;
+}
+@keyframes mylife-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+@keyframes mylife-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
