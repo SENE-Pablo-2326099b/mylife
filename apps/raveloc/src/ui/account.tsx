@@ -449,7 +449,7 @@ export function AccountOverview({
             void (beforeSignOut?.() ?? Promise.resolve())
               .catch(() => undefined)
               .then(() => signOut(webPlatform))
-              .then(() => toast({ message: 'Déconnecté de toutes tes apps sur cet appareil. Tes données y restent.' }))
+              .then(() => toast({ message: 'Déconnecté de toutes tes apps sur cet appareil. Tes données restent dans ton compte ; un autre compte connecté ici n’en verra rien.' }))
           }
         />
         <AccountAction icon="trash" label="Supprimer mon compte" danger onClick={() => open('delete')} />

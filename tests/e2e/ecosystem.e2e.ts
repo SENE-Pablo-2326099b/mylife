@@ -195,6 +195,79 @@ describe('MyLife, une seule app', () => {
     }
   });
 
+  it('même navigateur, autre compte : rien du précédent (données, clé d’IA, aperçus)', async () => {
+    // Le premier compte laisse des traces : un prénom dans MyFinances (synchronisé), sa clé d'IA.
+    await page.goto(`${server.url}/finances/`);
+    const firstName = page.getByLabel('Ton prénom (facultatif)');
+    await firstName.fill('Zébulon');
+    await firstName.blur();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => localStorage.setItem('mylife:anthropic-key', 'sk-ant-du-premier'));
+    await page.goto(`${server.url}/finances/reglages/compte`);
+    await page.getByRole('button', { name: 'Se déconnecter' }).click();
+    await page.getByText('Crée ton compte').waitFor();
+    // Un autre compte, dans le même navigateur.
+    const other = `${LOGIN}-b`;
+    await page.getByLabel('Identifiant').fill(other);
+    await page.getByText('Libre').waitFor();
+    await page.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Créer mon compte' }).click();
+    await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
+    await page.goto(`${server.url}/finances/`);
+    await page.getByText(`Connecté à MyLife : ${other}`).waitFor({ timeout: 30_000 });
+    expect(await page.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
+    expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
+    expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
+    await shot(page, '14-autre-compte');
+    // MyPerf : relié au nouveau compte, sans rien du précédent.
+    await page.goto(`${server.url}/perf/account`);
+    await page.getByText(other).first().waitFor({ timeout: 40_000 });
+    await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
+    // Le premier compte, lui, a toujours ses données : il les retrouve en se reconnectant ailleurs.
+    const [, back] = await device();
+    await back.goto(`${server.url}/finances/`);
+    await back.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await back.getByLabel('Identifiant').fill(LOGIN);
+    await back.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await back.getByRole('button', { name: 'Se connecter' }).click();
+    await expect.poll(() => back.getByLabel('Ton prénom (facultatif)').inputValue().catch(() => ''), { timeout: 30_000, interval: 500 }).toBe('Zébulon');
+  });
+
+  it('navigateur avec des données d’avant tout compte : un compte neuf part de zéro (proposé d’abord)', async () => {
+    const [ctx, used] = await device();
+    await used.goto(`${server.url}/finances/`);
+    await used.getByText('Crée ton compte').waitFor();
+    await used.waitForTimeout(1000);
+    // Des réglages saisis sur cet appareil, reliés à aucun compte.
+    await used.evaluate(
+      () =>
+        new Promise((resolve, reject) => {
+          const open = indexedDB.open('myfinances');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction('settings', 'readwrite');
+            const settings = tx.objectStore('settings');
+            const main = settings.get('main');
+            main.onsuccess = () => settings.put({ ...main.result, onboarded: true, firstName: 'Orphelin' });
+            tx.oncomplete = () => resolve(open.result.close());
+            tx.onerror = () => reject(tx.error);
+          };
+        }),
+    );
+    const login = `${LOGIN}-c`;
+    await used.getByLabel('Identifiant').fill(login);
+    await used.getByText('Libre').waitFor();
+    await used.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await used.getByRole('button', { name: 'Créer mon compte' }).click();
+    await used.getByText('Ton compte est neuf').waitFor({ timeout: 30_000 });
+    await shot(used, '15-compte-neuf');
+    await used.getByRole('button', { name: 'Partir de zéro' }).click();
+    await used.getByText(`Connecté à MyLife : ${login}`).waitFor({ timeout: 30_000 });
+    expect(await used.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
+    expect(await used.evaluate(() => document.body.innerText)).not.toContain('Orphelin');
+    await ctx.close();
+  });
+
   it('aucune erreur JavaScript', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });

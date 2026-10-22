@@ -110,11 +110,11 @@ describe('comptes MyLife (chiffrement de bout en bout)', () => {
 
   it('création, connexion sur un autre appareil : même clé de données', async () => {
     const a = new Device();
-    const { session, recoveryKey } = await createAccount(platform(a), { login: 'Pablo', password: 'mot-de-passe-long' });
-    expect(session.login).toBe('pablo');
+    const { session, recoveryKey } = await createAccount(platform(a), { login: 'Camille', password: 'mot-de-passe-long' });
+    expect(session.login).toBe('camille');
     expect(recoveryKey).toMatch(/^([0-9A-Z]{4}-){7}[0-9A-Z]{4}$/);
     const b = new Device();
-    const s2 = await signIn(platform(b), { login: ' PABLO ', password: 'mot-de-passe-long' });
+    const s2 = await signIn(platform(b), { login: ' CAMILLE ', password: 'mot-de-passe-long' });
     expect(s2.dek).toBe(session.dek);
   }, 30_000);
 
@@ -172,7 +172,7 @@ describe('synchronisation entre appareils', () => {
     const srv = await server();
     const phone = new Device();
     const pc = new Device();
-    const { session } = await createAccount({ api: srv.api, sessions: phone.sessions, random }, { login: 'pablo', password: 'mot-de-passe-long' });
+    const { session } = await createAccount({ api: srv.api, sessions: phone.sessions, random }, { login: 'camille', password: 'mot-de-passe-long' });
     // Le téléphone a déjà des données : il alimente le compte vide.
     phone.write('transactions', 't1', { label: 'Carrefour', amount: -2350 });
     phone.write('transactions', 't2', { label: 'Loyer', amount: -40000 });
@@ -277,7 +277,7 @@ describe('compte comme une app ordinaire', () => {
     expect(passwordIssue('court')).toMatch(/8 caractères/);
     expect(passwordIssue('azertyuiop')).toMatch(/courant/);
     expect(passwordIssue('aaaaaaaaaa')).toMatch(/courant/);
-    expect(passwordIssue('pablo-2026!', 'Pablo')).toMatch(/identifiant/);
+    expect(passwordIssue('camille-2026!', 'Camille')).toMatch(/identifiant/);
     expect(passwordIssue('cheval-agrafe-pile')).toBeNull();
     expect(passwordStrength('abc')).toBe(0);
     expect(passwordStrength('cheval-agrafe-pile-Rouge7')).toBe(4);
@@ -332,7 +332,9 @@ describe('compte comme une app ordinaire', () => {
     const a = new Device();
     const { session } = await createAccount({ api: srv.api, sessions: a.sessions, random }, { login: 'eli', password: 'mot-de-passe-long' });
     a.write('workouts', 'w1', { name: 'A' });
-    expect(await autoJoin(a, srv.api, session, random, async () => true)).toEqual({ action: 'uploaded', count: 1 });
+    // Compte neuf, appareil déjà rempli (avant tout compte) : on demande, rien n'est envoyé d'office.
+    expect(await autoJoin(a, srv.api, session, random, async () => true)).toEqual({ action: 'ask', account: 0, lastUpdated: null });
+    expect(await join(a, srv.api, session, random, 'useDevice')).toEqual({ action: 'uploaded', count: 1 });
     const fresh = new Device();
     fresh.write('settings', 'main', { defaults: true });
     expect((await autoJoin(fresh, srv.api, session, random, async () => false)).action).toBe('downloaded');
@@ -341,6 +343,34 @@ describe('compte comme une app ordinaire', () => {
     busy.write('workouts', 'w9', { name: 'B' });
     expect(await autoJoin(busy, srv.api, session, random, async () => true)).toMatchObject({ action: 'ask', account: 1 });
     expect(busy.state?.joinedAs ?? null).toBeNull();
+  }, 60_000);
+
+  it('un autre compte sur le même appareil ne reçoit jamais les données du précédent', async () => {
+    const srv = await server();
+    const d = new Device();
+    let forgotten = 0;
+    d.forget = async () => {
+      forgotten++;
+      d.rows.clear();
+    };
+    const first = await createAccount({ api: srv.api, sessions: d.sessions, random }, { login: 'premier', password: 'mot-de-passe-long' });
+    expect((await autoJoin(d, srv.api, first.session, random, async () => false)).action).toBe('uploaded');
+    d.write('workouts', 'w1', { name: 'Séance du premier' });
+    d.write('settings', 'main', { salaire: 2100 });
+    await syncNow(d, srv.api, first.session, random);
+    // Déconnexion, puis un compte neuf sur le même navigateur : il part de zéro, sans question.
+    const second = await createAccount({ api: srv.api, sessions: d.sessions, random }, { login: 'second', password: 'mot-de-passe-long' });
+    expect(await autoJoin(d, srv.api, second.session, random, async () => true)).toEqual({ action: 'downloaded', count: 0 });
+    expect(forgotten).toBe(1);
+    expect(d.rows.size).toBe(0);
+    expect(d.state?.joinedAs).toBe('second');
+    // Et le compte du second n'a rien reçu du premier.
+    const other = new Device();
+    expect(await join(other, srv.api, second.session, random, 'useAccount')).toEqual({ action: 'downloaded', count: 0 });
+    // Le premier retrouve ses données en se reconnectant.
+    const again = await signIn({ api: srv.api, sessions: d.sessions, random }, { login: 'premier', password: 'mot-de-passe-long' });
+    expect((await autoJoin(d, srv.api, again, random, async () => false)).action).toBe('downloaded');
+    expect(d.rows.get('workouts|w1')).toEqual({ name: 'Séance du premier' });
   }, 60_000);
 
   it('quota de stockage par app', async () => {

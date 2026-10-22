@@ -49,8 +49,12 @@ mêmes données.
 ### Plusieurs appareils
 Connecte-toi avec le même identifiant : tes données, chiffrées, se synchronisent toutes seules (à
 l'ouverture, quelques secondes après chaque changement, au retour sur l'app). Un appareil neuf récupère
-tout sans question ; MyLife ne demande que dans le cas rare où l'appareil et le compte ont chacun des
-données différentes (et garde une copie avant de remplacer).
+tout sans question ; MyLife ne demande que dans le cas rare où l'appareil a des données saisies hors de
+tout compte (un compte neuf propose alors de partir de zéro ; une copie est gardée avant d'effacer).
+
+**Un appareil partagé** (un même navigateur, plusieurs comptes) : un compte ne voit jamais rien d'un autre.
+Quand quelqu'un d'autre se connecte, l'appareil efface les données, la clé d'API et les aperçus du compte
+précédent (qui les retrouve en se reconnectant : elles sont dans son compte).
 
 ### Compte
 Accueil → **Compte** : changer de mot de passe, nouvelle clé de secours, se déconnecter (de toutes les
@@ -116,8 +120,8 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 42, MyFinances 332, myRaveLoc 83, MyPerf 214) |
-| Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, 320 px) |
+| Tous les tests unitaires | `npm run test:all` (serveur 54, MyFinances 334, myRaveLoc 83, MyPerf 214) |
+| Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
 | Développer une app | dans `apps/<app>` : `npm run dev` (MyPerf : `npx expo start --web --port 8090`) |

@@ -193,10 +193,11 @@ Le système contient quatre automates principaux.
 | État initial | Événement / déclencheur | Nouvel état | Action associée |
 |---|---|---|---|
 | Anonyme | Création ou connexion réussie | ConnectéNonRelié | Session écrite (jeton + DEK) ; événement `storage` vers les autres apps |
-| ConnectéNonRelié | `autoJoin` : compte vide pour l'app | Relié | Envoi complet de l'appareil (`uploadAll`, `reset`) |
-| ConnectéNonRelié | `autoJoin` : appareil sans données saisies | Relié | Téléchargement complet du compte (`downloadAll`, remplacement) |
-| ConnectéNonRelié | `autoJoin` : compte et appareil non vides | Choix | Demande « lesquelles garder ? » ; copie de sécurité avant remplacement |
-| Choix | Utilisateur : « garder l'appareil » / « garder le compte » | Relié | `join(useDevice)` / `join(useAccount)` |
+| ConnectéNonRelié | `autoJoin` : appareil relié à un **autre** compte | Relié | `forget()` (tout l'appareil, réglages locaux compris), puis téléchargement du compte (vide s'il est neuf) ; rechargement de la page |
+| ConnectéNonRelié | `autoJoin` : appareil sans données saisies, compte vide | Relié | Envoi des valeurs par défaut (`uploadAll`, `reset`) |
+| ConnectéNonRelié | `autoJoin` : appareil sans données saisies, compte rempli | Relié | Téléchargement complet du compte (`downloadAll`, remplacement) |
+| ConnectéNonRelié | `autoJoin` : données saisies hors de tout compte | Choix | Compte neuf : « Partir de zéro » (d'abord) ou « les mettre dans mon compte » ; compte rempli : « lesquelles garder ? » ; copie de sécurité avant d'effacer |
+| Choix | Utilisateur : « garder l'appareil » / « partir de zéro » ou « garder le compte » | Relié | `join(useDevice)` / `join(useAccount)` |
 | Relié | Modification locale, retour sur l'app, réseau, 3 min | Synchronisation | `syncNow` : envoi des `pending`, application des lignes distantes |
 | Synchronisation | Fin sans erreur | Relié | Curseur avancé, `lastSyncAt` |
 | Synchronisation | Réponse 401 | SessionExpirée | Message « reconnecte-toi » ; données locales intactes |
@@ -208,8 +209,8 @@ Le système contient quatre automates principaux.
 stateDiagram-v2
     [*] --> Anonyme
     Anonyme --> ConnecteNonRelie : création ou connexion
-    ConnecteNonRelie --> Relie : autoJoin (compte vide ou appareil neuf)
-    ConnecteNonRelie --> Choix : autoJoin (les deux ont des données)
+    ConnecteNonRelie --> Relie : autoJoin (appareil neuf, ou données d'un autre compte effacées)
+    ConnecteNonRelie --> Choix : autoJoin (données saisies hors de tout compte)
     Choix --> Relie : garder appareil ou compte
     Relie --> Synchronisation : modification, retour sur l'app, 3 min
     Synchronisation --> Relie : succès, curseur avancé
@@ -408,9 +409,11 @@ DEK (32 octets aléatoires) ──AES-256-GCM, AAD = "app/table/id"──► cha
   `seq > cursor` ET `device <> moi` » : **pas d'écho** de ses propres envois, lecture incrémentale.
 - **Pagination** : jusqu'à 1 000 lignes par réponse (`more`), boucle bornée à 200 itérations.
 - **Idempotence** : rejouer un lot est sans effet (même `updated_at`).
-- **Jointure d'un appareil** (`autoJoin`) : arbre de décision à trois feuilles
-  (compte vide → envoyer ; appareil vide de saisies → recevoir ; sinon → demander). Jamais de fusion de
-  deux historiques indépendants, qui produirait des doublons.
+- **Jointure d'un appareil** (`autoJoin`) : arbre de décision
+  (données d'un autre compte → effacer puis recevoir ; appareil vide de saisies → recevoir, ou envoyer ses
+  valeurs par défaut à un compte neuf ; sinon → demander, « partir de zéro » d'abord pour un compte neuf).
+  Les données d'un compte n'entrent jamais dans un autre. Jamais de fusion de deux historiques
+  indépendants, qui produirait des doublons.
 - **Quota** : `COUNT(*) + nouvelles lignes > ROW_QUOTA[app]` → HTTP 413.
 
 ### 6.3 Limitation de débit (fenêtres fixes)

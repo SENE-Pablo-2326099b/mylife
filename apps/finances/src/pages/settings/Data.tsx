@@ -24,6 +24,8 @@ export default function DataPage() {
     }),
     [],
   );
+  // La démo ne se mélange jamais à de vraies opérations (elle se charge sur un compte encore vide).
+  const realData = (counts?.tx ?? 0) > (counts?.demo ?? 0);
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -99,7 +101,7 @@ export default function DataPage() {
         <Card>
           <p className="t-small text-secondary">Six mois d’une vie fictive : deux banques, un portefeuille d’ETF, du bitcoin en programmé, des objectifs. Pour tout essayer sans connecter de banque.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button disabled={busy || cloud.joined} onClick={() => void run(async () => toast({ message: `${await loadDemo()} opérations de démo chargées`, tone: 'gold' }))}>
+            <Button disabled={busy || realData} onClick={() => void run(async () => toast({ message: `${await loadDemo()} opérations de démo chargées`, tone: 'gold' }))}>
               Charger la démo
             </Button>
             {!!counts?.demo && (
@@ -108,7 +110,9 @@ export default function DataPage() {
               </Button>
             )}
           </div>
-          {cloud.joined && <p className="t-caption mt-2 text-muted">Indisponible tant que cet appareil est synchronisé avec ton compte : la démo irait dans tes vraies données.</p>}
+          <p className="t-caption mt-2 text-muted">
+            {realData ? 'Indisponible : tu as déjà de vraies opérations, la démo s’y mélangerait.' : 'Elle suit sur tes appareils comme le reste ; « Supprimer la démo » l’enlève partout.'}
+          </p>
         </Card>
       </Reveal>
 

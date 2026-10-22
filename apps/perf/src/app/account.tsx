@@ -1,25 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Platform, Share, View } from 'react-native';
 
-import { db } from '@/db/db';
-import { backupBeforeReplace } from '@/services/autoBackup';
 import {
-  cloudAccountStatus,
   cloudChangePassword,
   cloudDeleteAccount,
-  cloudJoin,
   cloudRecoverySaved,
   cloudRenewRecovery,
   cloudSignOut,
-  localItemCount,
   refreshCloud,
   syncCloud,
   useCloud,
 } from '@/services/cloud';
-import { exportJson } from '@/services/exportService';
 import { showToast } from '@/state/toastStore';
 import { Button, Card, Row, Text } from '@/ui/components/primitives';
 import { AccountForms, PasswordField } from '@/features/account/forms';
+import { Join } from '@/features/account/Join';
 import { Screen } from '@/ui/components/Screen';
 import { space, useTheme } from '@/ui/theme';
 import { passwordIssue } from '@/vendor/mylife-sync';
@@ -86,66 +81,6 @@ function RecoveryReminder() {
   );
 }
 
-function Join() {
-  const [status, setStatus] = useState<{ count: number; lastUpdated: number | null } | null>(null);
-  const [local, setLocal] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    cloudAccountStatus().then(setStatus, (e: unknown) => setError(message(e)));
-    void localItemCount().then(setLocal);
-  }, []);
-  // L'appareil le plus complet est proposé en premier : on ne remplace jamais de vraies données par du vide.
-  const deviceRicher = status !== null && local !== null && local > status.count;
-  const run = async (mode: 'useAccount' | 'useDevice') => {
-    setBusy(true);
-    setError(null);
-    try {
-      if (mode === 'useAccount') {
-        // Copie des données de l'appareil avant de les remplacer.
-        if (Platform.OS === 'web') {
-          if ((db().first<{ n: number }>('SELECT COUNT(*) AS n FROM workouts')?.n ?? 0) > 0) await exportJson();
-        } else backupBeforeReplace();
-      }
-      const r = await cloudJoin(mode);
-      showToast({ message: r.action === 'uploaded' ? `Données envoyées (chiffrées) : ${r.count} éléments` : `Données du compte récupérées : ${r.count} éléments` }, 5000);
-    } catch (e) {
-      setError(message(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <Card>
-      <View style={{ gap: space.md }}>
-        <Text variant="headline">Lesquelles garder ?</Text>
-        <Text tone="secondary">
-          Ton compte et cet appareil ont chacun des séances. Cet appareil : {local ?? '…'} éléments · ton compte : {status?.count ?? '…'} éléments{status ? ` (modifiés le ${when(status.lastUpdated)})` : ''}. Un seul des deux est gardé, puis tous tes appareils le partagent.
-        </Text>
-        {deviceRicher ? (
-          <>
-            <Button label={busy ? 'Envoi…' : 'Garder les données de cet appareil'} icon="cloud-upload-outline" onPress={() => void run('useDevice')} disabled={busy} />
-            <Button label="Prendre celles du compte (copie gardée avant)" variant="ghost" onPress={() => void run('useAccount')} disabled={busy} />
-          </>
-        ) : (
-          <>
-            <Button label={busy ? 'Récupération…' : 'Récupérer les données du compte'} icon="cloud-download-outline" onPress={() => void run('useAccount')} disabled={busy} />
-            <Text variant="caption" tone="muted">
-              Une copie des données de cet appareil est gardée avant.
-            </Text>
-            <Button label="Garder plutôt celles de cet appareil (remplace le compte)" variant="ghost" onPress={() => void run('useDevice')} disabled={busy} />
-          </>
-        )}
-        {error !== null && (
-          <Text variant="small" tone="danger">
-            {error}
-          </Text>
-        )}
-      </View>
-    </Card>
-  );
-}
-
 function Overview() {
   const t = useTheme();
   const cloud = useCloud();
@@ -196,7 +131,7 @@ function Overview() {
             </View>
           )}
           <Row icon="key-outline" title="Nouvelle clé de secours" subtitle="L’ancienne cessera de fonctionner." onPress={() => run(cloudRenewRecovery)} />
-          <Row icon="log-out-outline" title="Se déconnecter" onPress={() => run(cloudSignOut, 'Déconnecté. Tes données restent sur cet appareil.')} />
+          <Row icon="log-out-outline" title="Se déconnecter" onPress={() => run(cloudSignOut, 'Déconnecté. Tes données restent dans ton compte ; un autre compte connecté ici n’en verra rien.')} />
           <Row icon="trash-outline" title="Supprimer mon compte" onPress={() => open('delete')} />
           {panel === 'delete' && (
             <View style={{ gap: space.sm }}>

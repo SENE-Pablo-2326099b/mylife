@@ -14,14 +14,14 @@ describe('réglages : personnalisation et migration', () => {
   });
 
   it('réglages v1 (mono-utilisateur) → listes modifiables, sans perte', () => {
-    const s = normalizeSettings({ id: 'main', payday: 26, salary: 153700, apl: 17000, activityBonus: 0, fixedCharges: 35900, investment: 45000, envelopeOverride: null, ownerName: 'PABLO SENE', bridgePassword: 'pw' });
+    const s = normalizeSettings({ id: 'main', payday: 26, salary: 153700, apl: 17000, activityBonus: 0, fixedCharges: 35900, investment: 45000, envelopeOverride: null, ownerName: 'CAMILLE MARTIN', bridgePassword: 'pw' });
     expect(s.incomes).toEqual([
       { id: 'income-salary', label: 'Salaire', amount: 153700, day: 26 },
       { id: 'income-apl', label: 'APL', amount: 17000, day: 5 },
     ]);
     expect(s.fixedCharges).toEqual([{ id: 'fixed-all', label: 'Charges fixes', amount: 35900, day: null }]);
     expect(s.savings).toEqual({ mode: 'manual', manual: 45000 });
-    expect(s.holderNames).toEqual(['PABLO SENE']);
+    expect(s.holderNames).toEqual(['CAMILLE MARTIN']);
     expect(s.onboarded).toBe(true);
     expect(s.bridgePassword).toBe('pw');
     expect(computeEnvelope(s)).toBe(153700 + 17000 - 35900 - 45000);

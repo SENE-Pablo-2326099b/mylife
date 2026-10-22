@@ -51,9 +51,8 @@ try {
     const errors = [];
     page.on('pageerror', (e) => errors.push(`${page.url()} : ${e.message}`));
     page.on('console', (m) => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(`${page.url()} : ${m.text()}`));
-    // La démo est bloquée sur un appareil synchronisé (elle irait dans les vraies données) : pendant ce
-    // parcours seulement, la synchro est coupée ; la création du compte, elle, passe par le vrai serveur.
-    await page.route('**/api/sync', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"synchro coupée pour le test"}' }));
+    // Compte et synchro passent par le vrai serveur local (base en mémoire) : l'appareil est relié au compte
+    // neuf avant que l'app s'ouvre, puis la démo s'y charge (compte encore vide).
     const open = async (path) => {
       await page.goto(BASE + path);
       await page.locator('h1').first().waitFor({ timeout: 8000 });

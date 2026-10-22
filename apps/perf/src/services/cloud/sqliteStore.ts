@@ -148,6 +148,13 @@ export function sqliteStore(): LocalStore {
     async clearPending() {
       db().run('DELETE FROM sync_queue');
     },
+    async forget() {
+      // Données d'un autre compte : tout part, réglages propres à l'appareil compris.
+      writeRemote(() => {
+        for (const table of [...TABLES].reverse()) db().run(`DELETE FROM ${table}`);
+      });
+      db().run('DELETE FROM sync_queue');
+    },
     async getState() {
       const raw = db().first<{ v: string }>("SELECT v FROM sync_state WHERE k = 'state'")?.v;
       return raw ? (JSON.parse(raw) as SyncState) : null;

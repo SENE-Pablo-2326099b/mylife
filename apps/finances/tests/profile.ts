@@ -15,7 +15,7 @@ export const PROFILE: Settings = normalizeSettings({
   activityBonus: 0,
   fixedCharges: 35900,
   investment: 45000,
-  ownerName: 'PABLO SENE',
+  ownerName: 'CAMILLE MARTIN',
   alerts: {
     deliveries: { enabled: true, maxCount: 4 },
     amazon: { enabled: true, minAmount: 0 },

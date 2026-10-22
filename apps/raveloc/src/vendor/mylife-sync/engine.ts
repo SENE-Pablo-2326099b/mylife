@@ -53,6 +53,11 @@ export interface LocalStore {
   clearPending(): Promise<void>;
   getState(): Promise<SyncState | null>;
   setState(state: SyncState): Promise<void>;
+  /**
+   * Efface tout ce que l'appareil garde pour un compte : données synchronisées et réglages propres à
+   * l'appareil (mot de passe du relais…). Appelé quand un autre compte que celui de ces données se connecte.
+   */
+  forget?(): Promise<void>;
 }
 
 interface SyncResponse {
@@ -134,14 +139,22 @@ export type AutoJoin = { action: 'uploaded' | 'downloaded'; count: number } | { 
 
 /**
  * Relie l'appareil sans rien demander quand c'est sans ambiguïté, comme une app ordinaire après la
- * connexion : compte vide pour cette app → l'appareil l'alimente ; appareil sans données saisies
- * (`deviceHasData` faux : app neuve, seulement des valeurs par défaut) → il prend celles du compte.
- * Les deux remplis : `ask`, l'utilisateur choisit lequel garder (jamais de fusion).
+ * connexion :
+ * - données d'un **autre compte** (déconnecté de cet appareil) : effacées, jamais envoyées dans celui-ci ni
+ *   montrées ; l'appareil prend ce que contient le compte (rien pour un compte neuf) ;
+ * - appareil sans données saisies (`deviceHasData` faux : app neuve, seulement des valeurs par défaut) :
+ *   il prend celles du compte, ou y envoie ses valeurs par défaut si le compte est neuf ;
+ * - sinon (données saisies avant tout compte) : `ask`, l'utilisateur choisit (jamais de fusion). Avec un
+ *   compte vide (`account` 0), le choix est « partir de zéro » ou « y mettre ces données ».
  */
 export async function autoJoin(store: LocalStore, api: MyLifeApi, session: Session, random: RandomBytes, deviceHasData: () => Promise<boolean>): Promise<AutoJoin> {
+  const state = await loadState(store, random);
   const status = await accountStatus(api, session, store.app);
-  if (status.count === 0) return join(store, api, session, random, 'useDevice');
-  if (!(await deviceHasData())) return join(store, api, session, random, 'useAccount');
+  if (state.joinedAs !== null && state.joinedAs !== session.login) {
+    await store.forget?.();
+    return join(store, api, session, random, 'useAccount');
+  }
+  if (!(await deviceHasData())) return join(store, api, session, random, status.count === 0 ? 'useDevice' : 'useAccount');
   return { action: 'ask', account: status.count, lastUpdated: status.lastUpdated };
 }
 

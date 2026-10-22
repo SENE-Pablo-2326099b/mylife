@@ -68,7 +68,7 @@ export default function SettingsPage() {
           <Row icon="shield" title="Sauvegarde et données" subtitle="Export, import, démo, effacement" to="/reglages/donnees" />
         </Group>
         <p className="t-caption mt-6 text-center text-muted">
-          {APP_NAME} · tes données restent sur cet appareil. Aucune publicité, aucun traceur.
+          {APP_NAME} · tes données chiffrées, à toi seul. Aucune publicité, aucun traceur.
         </p>
         <p className="t-caption mt-1 text-center text-muted">Version du {__APP_BUILD__} UTC</p>
         <div className="mt-2 flex justify-center">

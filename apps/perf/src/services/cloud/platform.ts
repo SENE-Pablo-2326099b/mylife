@@ -2,7 +2,7 @@ import { getRandomBytes } from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
 import { Platform as RN } from 'react-native';
 
-import { MyLifeApi, type Platform, type Session } from '@/vendor/mylife-sync';
+import { MyLifeApi, adoptDevice, claimDevice, type Platform, type Session } from '@/vendor/mylife-sync';
 
 /**
  * Compte MyLife dans MyPerf. Sur le web (PWA MyLife), même adresse que MyFinances : la session est
@@ -25,7 +25,11 @@ async function read(): Promise<Session | null> {
 
 /** Session courante (relue une fois, puis gardée en mémoire ; le web suit les autres onglets/apps). */
 export async function currentSession(): Promise<Session | null> {
-  if (web || cached === undefined) cached = await read();
+  if (web || cached === undefined) {
+    const first = cached === undefined;
+    cached = await read();
+    if (first && cached) await adoptThisDevice(cached.login);
+  }
   return cached;
 }
 
@@ -60,12 +64,39 @@ export async function writePendingRecovery(p: { login: string; key: string } | n
   }
 }
 
+/**
+ * Un autre compte que le précédent se connecte : la clé d'IA et les traces du précédent sont effacées
+ * (sur le web, `claimDevice` : commun à toutes les apps ; sur le téléphone, le trousseau de MyPerf).
+ */
+const OWNER_KEY = 'mylife.device-owner';
+async function claimThisDevice(login: string): Promise<void> {
+  if (web) return claimDevice(login);
+  try {
+    if ((await SecureStore.getItemAsync(OWNER_KEY)) === login) return;
+    await SecureStore.deleteItemAsync('anthropic_api_key');
+    await SecureStore.setItemAsync(OWNER_KEY, login);
+  } catch {
+    /* trousseau indisponible */
+  }
+}
+
+/** Appareil déjà connecté avant cette règle : la session en cours en est la propriétaire. */
+export async function adoptThisDevice(login: string): Promise<void> {
+  if (web) return adoptDevice(login);
+  try {
+    if ((await SecureStore.getItemAsync(OWNER_KEY)) === null) await SecureStore.setItemAsync(OWNER_KEY, login);
+  } catch {
+    /* trousseau indisponible */
+  }
+}
+
 export const platform: Platform = {
   api: new MyLifeApi(web ? '' : MYLIFE_URL),
   random: (n) => getRandomBytes(n),
   sessions: {
     get: currentSession,
     set: async (s) => {
+      if (s) await claimThisDevice(s.login);
       cached = s;
       const raw = s ? JSON.stringify(s) : null;
       if (web) {

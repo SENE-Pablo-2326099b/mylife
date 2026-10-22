@@ -146,10 +146,21 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 - Sur le web, une session pour toutes les apps (`mylife-session`, `packages/sync-client/src/web.ts`) ; se
   déconnecter dans une app déconnecte les autres, onglets ouverts compris. Écrans de compte communs :
   `packages/ui/src/account.tsx` (MyPerf en a la copie React Native, `apps/perf/src/app/account.tsx`).
-- **Reliure automatique** (`autoJoin`) dès qu'une session apparaît : compte vide pour l'app → l'appareil
-  l'alimente ; appareil sans données saisies → il prend celles du compte ; les deux remplis → l'utilisateur
-  choisit (copie de sécurité avant). Jamais de fusion. « Données saisies » : MyFinances = accueil fait ou
-  opérations/placements/banques ; MyPerf = séances après la fin de l'historique personnel importé.
+- **Reliure automatique** (`autoJoin`) dès qu'une session apparaît : données d'un **autre compte** sur
+  l'appareil → effacées (`LocalStore.forget`, mot de passe du relais compris), jamais envoyées ni montrées,
+  l'appareil prend ce que contient le compte (rien pour un compte neuf) puis la page se recharge ; appareil
+  sans données saisies → il prend celles du compte (ou y envoie ses valeurs par défaut si le compte est
+  neuf) ; données saisies hors de tout compte → l'utilisateur choisit (compte neuf : « Partir de zéro »
+  proposé d'abord, ou « les mettre dans mon compte » ; copie de sécurité avant d'effacer). Jamais de fusion.
+  « Données saisies » : MyFinances = accueil fait ou opérations/placements/banques ; MyPerf = séances après
+  la fin de l'historique personnel importé (build privé). Tant que l'appareil n'est pas relié au compte de la
+  session, le portail (`AccountGate`, `linked`/`linking`) couvre l'app : jamais un écran avec les données
+  d'un autre compte, même un instant.
+- **Un appareil, plusieurs comptes** : à chaque connexion, `claimDevice` (`packages/sync-client/src/device.ts`)
+  efface ce que le navigateur garde pour la personne précédente hors synchro (clé d'API Anthropic, conversation
+  de l'assistant, aperçus de l'accueil, dates de sauvegarde, journaux d'erreurs) ; propriétaire noté dans
+  `mylife:device-owner`. Sur Android, MyPerf efface la clé d'API du trousseau. Avant de se déconnecter, les
+  apps envoient leurs dernières modifications.
 - Conflits : la modification la plus récente gagne.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

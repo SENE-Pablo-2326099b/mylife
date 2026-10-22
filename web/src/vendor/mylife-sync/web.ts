@@ -1,5 +1,6 @@
 // GÉNÉRÉ depuis MyLife/packages/sync-client — ne pas modifier ici (MyLife : npm run vendor).
 import { MyLifeApi, type Platform, type Session } from './account';
+import { adoptDevice, claimDevice } from './device';
 
 /**
  * Compte MyLife sur le web : la session (jeton + clé de données) est gardée dans le stockage de
@@ -31,6 +32,7 @@ function writeJson(key: string, value: unknown): void {
 }
 
 let session: Session | null = read();
+if (session) adoptDevice(session.login);
 
 function read(): Session | null {
   const s = readJson<Partial<Session>>(SESSION_KEY);
@@ -74,6 +76,8 @@ export const webPlatform: Platform = {
   sessions: {
     get: async () => session,
     set: async (s) => {
+      // Un autre compte que le précédent : rien de lui (clé d'IA, aperçus…) ne reste visible ni utilisable.
+      if (s) claimDevice(s.login);
       session = s;
       writeJson(SESSION_KEY, s);
       // Déconnexion : une clé de secours en attente ne doit pas rester sur un appareil partagé.

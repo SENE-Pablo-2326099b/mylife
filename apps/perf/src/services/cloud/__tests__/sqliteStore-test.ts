@@ -10,7 +10,7 @@ function setup(joined = true) {
   createTestDb();
   installSyncTriggers(db());
   const store = sqliteStore();
-  void store.setState({ device: 'test-device', cursor: 0, joinedAs: joined ? 'pablo' : null, lastSyncAt: null });
+  void store.setState({ device: 'test-device', cursor: 0, joinedAs: joined ? 'camille' : null, lastSyncAt: null });
   return store;
 }
 

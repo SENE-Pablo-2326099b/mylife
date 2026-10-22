@@ -18,6 +18,10 @@ import type {
   Transaction,
 } from './types';
 
+/** Nom de la base locale ; `LEGACY_DB_NAME` : celui d'avant, repris une fois (`migrateLegacyDatabase`). */
+export const DB_NAME = 'myfinances';
+const LEGACY_DB_NAME = 'budget-dodge';
+
 export class BudgetDB extends Dexie {
   transactions!: EntityTable<Transaction, 'id'>;
   accounts!: EntityTable<Account, 'id'>;
@@ -36,7 +40,7 @@ export class BudgetDB extends Dexie {
   snapshots!: EntityTable<Snapshot, 'date'>;
   recurring!: EntityTable<RecurringOverride, 'key'>;
 
-  constructor(name = 'budget-dodge') {
+  constructor(name = DB_NAME) {
     super(name);
     this.version(1).stores({
       transactions: 'id, accountId, date, categoryId, source, [accountId+date]',
@@ -63,6 +67,28 @@ export class BudgetDB extends Dexie {
 }
 
 export const db = new BudgetDB();
+
+/**
+ * Base d'avant le nom MyFinances encore présente sur l'appareil : ses données passent dans la base actuelle,
+ * puis elle est supprimée. La copie passe par une instance à part, hors du suivi de la synchro : rien n'est
+ * renvoyé au compte, les modifications en attente restent celles d'avant.
+ */
+export async function migrateLegacyDatabase(target = DB_NAME, legacy = LEGACY_DB_NAME): Promise<boolean> {
+  if (!(await Dexie.exists(legacy))) return false;
+  const from = new BudgetDB(legacy);
+  const to = new BudgetDB(target);
+  try {
+    for (const name of TABLE_NAMES) {
+      const rows = await from.table(name).toArray();
+      if (rows.length) await to.table(name).bulkPut(rows);
+    }
+  } finally {
+    from.close();
+    to.close();
+  }
+  await Dexie.delete(legacy);
+  return true;
+}
 
 export const TABLE_NAMES = [
   'transactions',

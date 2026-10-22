@@ -189,6 +189,14 @@ export function dexieStore(database: BudgetDB = db): LocalStore {
       q().clear();
       saveQueue();
     },
+    async forget() {
+      // Données d'un autre compte : tout part, mot de passe du relais et état local compris.
+      await inRemoteTransaction(database, async () => {
+        for (const name of TABLE_NAMES) await database.table(name).clear();
+      });
+      q().clear();
+      saveQueue();
+    },
     async getState() {
       try {
         const raw = localStorage.getItem(STATE_KEY);

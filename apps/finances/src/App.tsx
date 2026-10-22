@@ -1,14 +1,16 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import { db } from './db/db';
+import { db, migrateLegacyDatabase } from './db/db';
 import { ensureSeeded, migrateAppearance } from './db/seed';
 import { wealthHousekeeping } from './domain/wealthDb';
 import TodayPage from './pages/Today';
 import { absorbSetupLink } from './sync/setupLink';
-import { cloudBoot } from './sync/cloud';
+import { cloudBoot, useCloud } from './sync/cloud';
+import { Linking } from './components/JoinCard';
 import { maybeAutoSync } from './sync/store';
 import { AccountGate } from './ui/AccountGate';
+import { useSession } from './ui/session';
 import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
@@ -102,13 +104,19 @@ const pageFallback = (
 export default function App() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cloud = useCloud();
+  const session = useSession();
 
   useEffect(() => {
-    ensureSeeded()
+    migrateLegacyDatabase()
+      .catch(() => false)
+      .then(() => ensureSeeded())
       .then(() => migrateAppearance().catch(() => undefined))
       .then(absorbSetupLink)
       .then((linked) => {
         setReady(true);
+        // Relier l'appareil au compte avant d'afficher quoi que ce soit (cf. AccountGate).
+        void cloudBoot().catch(() => undefined);
         if (linked) toast({ message: 'Relais configuré sur cet appareil' });
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
@@ -117,7 +125,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <Backdrop />
-      <AccountGate>
+      {/* Relié : à ce compte-ci (l'état peut dater de la session précédente pendant un instant). */}
+      <AccountGate linked={cloud.checked && cloud.session?.login === session?.login ? cloud.joined : null} linking={<Linking />}>
       {error ? (
         <p className="t-body p-6 text-danger">Impossible d’ouvrir la base locale : {error}</p>
       ) : ready ? (

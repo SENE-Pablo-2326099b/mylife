@@ -2,7 +2,9 @@ import { db, TABLE_NAMES, type BudgetDB, type TableName } from '../db/db';
 import { ensureSeeded } from '../db/seed';
 import type { Settings } from '../db/types';
 
-export const BACKUP_FORMAT = 'budget-dodge-backup';
+export const BACKUP_FORMAT = 'myfinances-backup';
+/** Format des sauvegardes d'avant le nom MyFinances : toujours lisibles. */
+const LEGACY_BACKUP_FORMAT = 'budget-dodge-backup';
 /** v2 : patrimoine, objectifs, récurrences. Les sauvegardes v1 restent lisibles (réglages migrés à l'import). */
 export const BACKUP_VERSION = 2;
 
@@ -28,8 +30,9 @@ export class BackupError extends Error {}
 
 export function validateBackup(data: unknown): Backup {
   if (!data || typeof data !== 'object') throw new BackupError('Fichier illisible : ce n’est pas un objet JSON.');
-  const b = data as Partial<Backup>;
-  if (b.format !== BACKUP_FORMAT) throw new BackupError('Ce fichier n’est pas une sauvegarde MyFinances (ni Budget Dodge).');
+  const b = { ...(data as Partial<Backup>) };
+  if ((b.format as string) === LEGACY_BACKUP_FORMAT) b.format = BACKUP_FORMAT;
+  if (b.format !== BACKUP_FORMAT) throw new BackupError('Ce fichier n’est pas une sauvegarde MyFinances.');
   if (typeof b.version !== 'number' || b.version > BACKUP_VERSION) throw new BackupError('Sauvegarde créée par une version plus récente de l’app.');
   if (!b.tables || typeof b.tables !== 'object') throw new BackupError('Sauvegarde incomplète.');
   for (const name of TABLE_NAMES) {

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { db } from '../../db/db';
+import { ensureSeeded } from '../../db/seed';
 import { exportBackup } from '../../domain/backup';
 import { ApiError, accountStatus, autoJoin, join, syncNow, type JoinMode, type Session } from '../../vendor/mylife-sync';
 import { currentSession, onSessionChange, webPlatform as platform } from '../../vendor/mylife-sync/web';
@@ -28,9 +29,11 @@ export interface CloudState {
   pending: number;
   /** Compte et appareil ont chacun des données : l'utilisateur choisit lesquelles garder. */
   choice: { account: number; lastUpdated: number | null } | null;
+  /** L'état de la liaison a été lu au moins une fois (avant : on ne sait pas encore si l'appareil est relié). */
+  checked: boolean;
 }
 
-let state: CloudState = { session: currentSession(), joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0, choice: null };
+let state: CloudState = { session: currentSession(), joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0, choice: null, checked: false };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<CloudState>) => {
   state = { ...state, ...patch };
@@ -51,7 +54,7 @@ async function refreshState() {
   const session = currentSession();
   const s = await store.getState();
   const joined = !!session && s?.joinedAs === session.login;
-  set({ session, joined, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount(), ...(session ? {} : { choice: null, error: null }) });
+  set({ checked: true, session, joined, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount(), ...(session ? {} : { choice: null, error: null }) });
 }
 
 /** Des données saisies sur cet appareil (pas seulement les réglages par défaut d'une app neuve) ? */
@@ -62,6 +65,11 @@ async function deviceHasData(): Promise<boolean> {
 
 let joining = false;
 
+/** Données du compte reçues à la place de celles de l'appareil : catégories et règles de base si le compte n'en a pas. */
+async function afterReplace(): Promise<void> {
+  await ensureSeeded();
+}
+
 /** Session présente, appareil pas encore relié : on le relie sans rien demander quand c'est sans ambiguïté. */
 async function ensureJoined(): Promise<void> {
   await refreshState();
@@ -70,8 +78,13 @@ async function ensureJoined(): Promise<void> {
   joining = true;
   set({ syncing: true, error: null });
   try {
+    const before = (await store.getState())?.joinedAs ?? null;
     const r = await autoJoin(store, platform.api, state.session, platform.random, deviceHasData);
     if (r.action === 'ask') set({ choice: { account: r.account, lastUpdated: r.lastUpdated } });
+    if (r.action === 'downloaded') await afterReplace();
+    // Les données d'un autre compte viennent d'être effacées : la page repart de zéro, sans rien en mémoire
+    // (conversation de l'assistant, écrans déjà calculés…).
+    if (before !== null && before !== state.session.login) return window.location.reload();
     await refreshState();
   } catch (e) {
     set({ error: e instanceof Error ? e.message : String(e) });
@@ -162,6 +175,7 @@ export async function cloudJoin(mode: JoinMode = 'auto'): Promise<{ action: 'upl
   set({ syncing: true, error: null });
   try {
     const r = await join(store, platform.api, session, platform.random, mode);
+    if (r.action === 'downloaded') await afterReplace();
     set({ choice: null });
     await refreshState();
     return r;

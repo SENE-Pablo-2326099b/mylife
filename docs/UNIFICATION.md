@@ -64,3 +64,20 @@ l'apparence ; chemins Gradle après le passage au dépôt unique.
 l'écosystème 13 : tout vert ; APK MyPerf compilée.
 
 **Reste hors de portée de l'outil (permission refusée)** : le déploiement en production (`npm run deploy:all`).
+
+### Itération 2 (23/10/2026) : rien d'un compte chez un autre
+
+Constat de l'utilisateur : un compte créé pour tester affichait ses séances (MyPerf) et ses réglages (salaire,
+aides) dans la configuration de MyFinances. Cause : la production était à jour (plus de programme personnel
+embarqué), mais un compte neuf **reprenait les données déjà présentes dans le navigateur** (compte vide →
+l'appareil l'alimentait), y compris celles d'un autre compte déconnecté.
+
+| Idée | Note avant | Réalisation | Note après |
+|---|---|---|---|
+| Les données d'un autre compte ne sont jamais envoyées ni montrées (effacées, puis le compte est téléchargé ; page rechargée) | 10 | `autoJoin` + `LocalStore.forget` (MyFinances, MyPerf) ; test moteur et parcours « même navigateur, autre compte » | **10** |
+| Portail tant que l'appareil n'est pas relié au compte de la session | 9 | `AccountGate` `linked`/`linking` (kit web), portail React Native de MyPerf | **10** |
+| Compte neuf sur un appareil déjà rempli : « Partir de zéro » proposé d'abord, copie de sécurité avant | 9 | Écrans MyFinances et MyPerf ; parcours « navigateur avec des données d'avant tout compte » | **10** |
+| Clé d'API, conversation de l'assistant, aperçus, dates de sauvegarde : effacés quand un autre compte se connecte | 9 | `claimDevice` (`mylife:device-owner`) ; trousseau Android de MyPerf ; tests | **10** |
+| Plus aucun nom de l'auteur dans ce qui est livré | 9 | Base locale `myfinances` (l'ancienne reprise puis supprimée), format de sauvegarde `myfinances-backup` (l'ancien reste lisible), messages ; tests sans nom réel | **10** |
+
+**Tests** : serveur 54, MyFinances 334 + 27, myRaveLoc 83 + 13, MyPerf 214, parcours de l'écosystème 16 : tout vert.

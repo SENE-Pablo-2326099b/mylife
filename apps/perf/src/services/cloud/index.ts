@@ -2,6 +2,7 @@ import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 
 import { db, subscribeData } from '@/db/db';
+import { seedIfEmpty } from '@/db/seed';
 import { useSettings } from '@/state/settingsStore';
 import { useWorkoutStore } from '@/state/workoutStore';
 import { ApiError, accountStatus, autoJoin, changePassword, createAccount, deleteAccount, join, recoverAccount, renewRecoveryKey, signIn, signOut, syncNow, type JoinMode, type Session } from '@/vendor/mylife-sync';
@@ -71,9 +72,13 @@ async function ensureJoined(): Promise<void> {
   joining = true;
   set({ syncing: true, error: null });
   try {
+    const before = (await store.getState())?.joinedAs ?? null;
     const r = await autoJoin(store, platform.api, session, platform.random, deviceHasData);
     if (r.action === 'ask') set({ choice: { account: r.account, lastUpdated: r.lastUpdated } });
     if (r.action === 'downloaded') reloadStores();
+    // Les données d'un autre compte viennent d'être effacées : sur le web, la page repart de zéro, sans
+    // rien en mémoire (conversation du coach, écrans déjà calculés…).
+    if (before !== null && before !== session.login && Platform.OS === 'web') return window.location.reload();
     await refreshState();
   } catch (e) {
     set({ error: e instanceof Error ? e.message : String(e) });
@@ -85,6 +90,8 @@ async function ensureJoined(): Promise<void> {
 
 /** Après des données reçues : les écrans relisent la base, les stores en mémoire repartent d'elle. */
 function reloadStores() {
+  // Compte neuf (ou effacé) : la bibliothèque d'exercices de base revient, comme à l'installation.
+  seedIfEmpty();
   useSettings.getState().hydrate();
   useWorkoutStore.setState({ docs: {} });
 }
@@ -191,8 +198,12 @@ export async function cloudRecoverySaved() {
   await refreshState();
 }
 
-/** Déconnexion de cet appareil (et des autres apps MyLife du navigateur) : les données restent ici. */
+/**
+ * Déconnexion de cet appareil (et des autres apps MyLife du navigateur). Les dernières modifications partent
+ * d'abord : si un autre compte se connecte ensuite ici, l'appareil est effacé.
+ */
 export async function cloudSignOut() {
+  await syncCloud().catch(() => false);
   await signOut(platform);
   await writePendingRecovery(null);
   await refreshState();

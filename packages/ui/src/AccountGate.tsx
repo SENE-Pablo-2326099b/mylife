@@ -12,10 +12,14 @@ const ICON: Record<string, IconName> = { finances: 'diamond-fill', perf: 'barbel
  * de compte (ou la connexion). Même règle dans les quatre parties de MyLife : un nouvel utilisateur n'a pas
  * d'autre choix que de créer son compte, et ne voit jamais les données de quelqu'un d'autre. La session est
  * gardée sur l'appareil : une fois connecté, l'app s'ouvre ensuite sans réseau.
+ *
+ * Apps à données locales (`linked`) : connecté, le portail reste tant que l'appareil n'est pas relié au
+ * compte (`linking` : préparation, ou choix des données à garder) ; `null` = pas encore lu (fond uni).
  */
-export function AccountGate({ children }: { children: ReactNode }) {
+export function AccountGate({ children, linked = true, linking }: { children: ReactNode; linked?: boolean | null; linking?: ReactNode }) {
   const session = useSession();
-  if (session) return <>{children}</>;
+  if (session && linked === true) return <>{children}</>;
+  if (session && linked === null) return null;
   const app = kitApp();
   const meta = MYLIFE_APPS.find((a) => a.id === app.id);
   return (
@@ -33,7 +37,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
           <p className="t-small text-secondary">{app.tagline}</p>
         </div>
       </div>
-      <AccountForms initial="create" />
+      {session ? linking : <AccountForms initial="create" />}
     </main>
   );
 }
