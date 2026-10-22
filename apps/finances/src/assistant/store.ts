@@ -3,6 +3,7 @@ import { todayISO } from '../lib/dates';
 import { haptic } from '../ui/motion';
 import { advance, repairHistory, resolveApproval, userMessage, type AssistantMode, type CreateMessage, type Msg, type PendingApproval, type TurnOutcome } from './agent';
 import type { AssistantContext } from './tools';
+import { readAiKey, writeAiKey } from '../vendor/mylife-sync/aiKey';
 
 /**
  * État de la conversation avec l'assistant. La clé API, le modèle choisi et l'historique restent sur
@@ -10,7 +11,6 @@ import type { AssistantContext } from './tools';
  * sauvegardes. Seul l'échange avec l'API Claude, fait avec la clé de l'utilisateur, quitte l'appareil.
  */
 
-const KEY = 'myfinances-anthropic-key';
 const HISTORY = 'myfinances-assistant-history';
 const MODE = 'myfinances-assistant-mode';
 
@@ -63,7 +63,7 @@ function restore(): Msg[] {
 const persist = (messages: Msg[]) => write(HISTORY, messages.length === 0 ? null : JSON.stringify(messages));
 
 let state: AssistantState = {
-  apiKey: read(KEY),
+  apiKey: readAiKey(),
   messages: restore(),
   pending: null,
   decisions: {},
@@ -151,7 +151,7 @@ async function run(task: (create: CreateMessage) => Promise<void>) {
 
 export function setApiKey(key: string | null): void {
   const clean = key?.trim() || null;
-  write(KEY, clean);
+  writeAiKey(clean);
   set({ apiKey: clean, error: null });
 }
 

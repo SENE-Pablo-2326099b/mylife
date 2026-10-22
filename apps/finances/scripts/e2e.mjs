@@ -8,8 +8,10 @@ import { chromium } from 'playwright-core';
 const PORT = 4319;
 const BASE = `http://localhost:${PORT}/finances`;
 const executablePath = process.env.CHROME_PATH ?? '/usr/bin/google-chrome';
-// Vite lancé directement (pas via npx) : l'arrêt final le termine vraiment.
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+// Le serveur local de MyLife (accueil, apps construites, vraies API de compte sur une base en mémoire) :
+// l'app exige un compte, qu'on crée ici comme un nouvel utilisateur. Lancé directement (pas via npx).
+const ROOT = new URL('../../..', import.meta.url).pathname;
+const server = spawn(process.execPath, ['node_modules/vite-node/vite-node.mjs', 'scripts/local.ts'], { cwd: ROOT, stdio: 'ignore', env: { ...process.env, PORT: String(PORT) } });
 
 const failures = [];
 let passed = 0;
@@ -48,15 +50,28 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(`${page.url()} : ${e.message}`));
-    page.on('console', (m) => m.type() === 'error' && errors.push(`${page.url()} : ${m.text()}`));
+    page.on('console', (m) => m.type() === 'error' && !/Failed to load resource/.test(m.text()) && errors.push(`${page.url()} : ${m.text()}`));
+    // La démo est bloquée sur un appareil synchronisé (elle irait dans les vraies données) : pendant ce
+    // parcours seulement, la synchro est coupée ; la création du compte, elle, passe par le vrai serveur.
+    await page.route('**/api/sync', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"synchro coupée pour le test"}' }));
     const open = async (path) => {
       await page.goto(BASE + path);
       await page.locator('h1').first().waitFor({ timeout: 8000 });
       await page.waitForTimeout(400);
     };
 
-    await step('accueil puis démo chargée', async () => {
+    await step('nouvel utilisateur : seule la création de compte est possible', async () => {
       await page.goto(BASE + '/');
+      await page.getByText('Crée ton compte').waitFor();
+      expect((await page.getByRole('button', { name: 'Continuer' }).count()) === 0, 'l’app ne doit pas s’ouvrir sans compte');
+      await page.getByLabel('Identifiant').fill(`test-e2e-${width}-${Date.now().toString(36)}`);
+      await page.getByText('Libre').waitFor();
+      await page.getByLabel('Mot de passe', { exact: true }).fill('cheval-Agrafe-2026');
+      await page.getByRole('button', { name: 'Créer mon compte' }).click();
+      await page.getByRole('button', { name: 'Continuer' }).waitFor();
+    });
+
+    await step('accueil puis démo chargée', async () => {
       await page.getByRole('button', { name: 'Continuer' }).click();
       // Étape suivante de l'accueil (animée) : on attend qu'elle soit là avant de la passer.
       await page.waitForTimeout(500);

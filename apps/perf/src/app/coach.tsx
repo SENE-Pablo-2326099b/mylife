@@ -35,7 +35,7 @@ function ApiKeySetup() {
       </View>
       <Text tone="secondary">
         Le coach utilise Claude (Anthropic) avec ta propre clé API. Il lit ton programme, tes séances et tes stats, et te propose des
-        ajustements que tu valides avant qu’ils s’appliquent.
+        ajustements que tu valides avant qu’ils s’appliquent. Sur le web, c’est la même clé que l’assistant de MyFinances : une seule saisie.
       </Text>
       <Field
         label="Clé API Anthropic"

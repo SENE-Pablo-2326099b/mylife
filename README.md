@@ -24,7 +24,7 @@ même design d'un bout à l'autre, et des données chiffrées sur ton téléphon
    permet de retrouver tes données si tu oublies ton mot de passe : personne d'autre ne peut les lire, pas
    même le serveur. Tu peux aussi le faire plus tard : un rappel reste affiché jusque-là.
 
-Tu peux aussi tout utiliser **sans compte** : les données restent alors sur cet appareil.
+Le compte est **obligatoire** dans les quatre parties de MyLife : sans lui, l'app n'affiche que la création de compte. Il est gardé sur l'appareil, donc ensuite tout s'ouvre même sans réseau.
 
 ### Installer l'app
 - **Android / ordinateur (Chrome, Edge)** : Accueil → **Installe MyLife** → *Installer*.

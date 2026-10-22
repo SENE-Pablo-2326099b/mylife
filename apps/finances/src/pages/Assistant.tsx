@@ -183,7 +183,7 @@ function ApiKeySetup({ onDone }: { onDone?: () => void }) {
         Enregistrer la clé
       </Button>
       <p className="t-caption text-muted">
-        La clé reste sur cet appareil, hors des sauvegardes et de la synchro. Ce que l’assistant lit pour te répondre est envoyé à l’API Claude, et les échanges sont facturés sur ton compte Anthropic.
+        La même clé sert à l’assistant de MyFinances et au coach de MyPerf : tu ne la saisis qu’une fois. Elle reste sur cet appareil, hors des sauvegardes et de la synchro. Ce que l’assistant lit pour te répondre est envoyé à l’API Claude, et les échanges sont facturés sur ton compte Anthropic.
       </p>
       <a className="t-small text-accent underline underline-offset-4" href="https://platform.claude.com/settings/keys" target="_blank" rel="noreferrer">
         Créer une clé sur platform.claude.com

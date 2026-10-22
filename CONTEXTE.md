@@ -426,6 +426,9 @@ vers un ami. Détails dans `apps/raveloc/README.md`.
   - les mêmes écrans de compte, transitions, verre et thèmes.
   - **Toute interface web passe par le kit `packages/ui`** ; MyPerf le reproduit en React Native et se vérifie par captures dans chaque thème. **Toute fonction ajoutée à une app reçoit son équivalent dans les autres.**
 - **Compte aussi simple qu'une app ordinaire** : un écran, pas de code, rien d'obligatoire après (la clé de secours peut attendre, avec rappel).
+- **Compte obligatoire** (22/10/2026) : sans session MyLife, chaque partie n'affiche que la création de compte / la connexion (`AccountGate` : kit web, `apps/perf/src/features/account/AccountGate.tsx`, accueil → `/bienvenue`). Un nouvel utilisateur ne voit jamais de données d'autrui ; la session est gardée sur l'appareil (usage hors ligne ensuite). Vérifié par le parcours e2e (4 apps, aucune fuite).
+- **Données personnelles de l'auteur** (programme + historique MyPerf) : **absentes des builds publics**. `apps/perf/src/import/personal.ts` ne charge l'import que si `EXPO_PUBLIC_PERSONAL_DATA=1` au build (privé). Une base vide reçoit la bibliothèque générique. L'auteur récupère ses données par son compte ou en important un JSON (`Réglages → Importer`).
+- **Clé API Anthropic commune** (web) : `mylife:anthropic-key` (`packages/sync-client/src/aiKey.ts`), partagée par l'assistant de MyFinances et le coach de MyPerf, jamais synchronisée ; l'APK garde la sienne (trousseau).
 - **Les thèmes sont de vraies identités.** Changer de thème doit donner l'impression d'une autre app : cartes, typographie, effets, bordures, ombres, fond. Une nouvelle identité se fait en 4 étapes :
   1. graine et `ThemeInfo` (style) + `STYLES` dans lumen ;
   2. `stylize` dans le kit et dans MyPerf ;
@@ -459,7 +462,7 @@ vers un ami. Détails dans `apps/raveloc/README.md`.
 - comptes : inscription ouverte en un écran, garde-fous serveur, nouvelle clé, suppression, reliure automatique ;
 - apparence commune synchronisée entre appareils (web et APK) ; aperçus des apps ; palette transversale ; transitions entre apps ;
 - **dépôt unique** (historiques conservés) et README de présentation ;
-- tests : serveur 46, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 13 : tout vert.
+- tests : serveur 49, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 14 : tout vert.
 - menu des apps en feuille du bas, cartes en relief (`Tilt`) partout (y compris MyPerf web), rappel de sauvegarde hebdomadaire (MyFinances, MyPerf web), `docs/ARCHITECTURE.md`.
 
 **Dépôt GitHub (privé)** : https://github.com/SENE-Pablo-2326099b/mylife (branche `master`, `git push`).

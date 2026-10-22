@@ -8,6 +8,7 @@ import TodayPage from './pages/Today';
 import { absorbSetupLink } from './sync/setupLink';
 import { cloudBoot } from './sync/cloud';
 import { maybeAutoSync } from './sync/store';
+import { AccountGate } from './ui/AccountGate';
 import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { SkeletonCard } from './ui/extras';
@@ -116,6 +117,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <Backdrop />
+      <AccountGate>
       {error ? (
         <p className="t-body p-6 text-danger">Impossible d’ouvrir la base locale : {error}</p>
       ) : ready ? (
@@ -126,6 +128,7 @@ export default function App() {
           <SkeletonCard />
         </div>
       )}
+      </AccountGate>
     </ThemeProvider>
   );
 }

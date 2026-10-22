@@ -17,6 +17,7 @@ export function WelcomePage() {
   const navigate = useNavigate();
   const session = useSession();
   const [step, setStep] = useState<'hello' | 'account'>('hello');
+  const [existing, setExisting] = useState(false);
   useEffect(() => {
     setDockHidden(true);
     return () => setDockHidden(false);
@@ -56,8 +57,14 @@ export function WelcomePage() {
             <Button size="lg" onClick={() => setStep('account')}>
               Commencer
             </Button>
-            <Button variant="ghost" onClick={done}>
-              Plus tard, sans compte
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setExisting(true);
+                setStep('account');
+              }}
+            >
+              J’ai déjà un compte
             </Button>
           </div>
         </>
@@ -66,13 +73,7 @@ export function WelcomePage() {
           <button type="button" onClick={() => setStep('hello')} className="mb-4 flex h-11 w-11 items-center justify-center rounded-full" aria-label="Retour">
             <Icon name="chevron-back" size={22} />
           </button>
-          <AccountForms
-            skip={
-              <Button variant="ghost" size="sm" onClick={done}>
-                Plus tard, sans compte
-              </Button>
-            }
-          />
+          <AccountForms initial={existing ? 'login' : 'create'} />
         </>
       )}
     </main>

@@ -6,7 +6,7 @@ import { Platform, View } from "react-native";
 import { formatClock } from "@/domain/dates";
 import { formatWeight } from "@/domain/math";
 import { MUSCLES, type ExerciseCategory, type Intention, type Muscle } from "@/domain/types";
-import { replaceWithPersonalData } from "@/import/importer";
+import { PERSONAL_BUILD, personalImporter } from "@/import/personal";
 import { backupBeforeReplace, lastAutoBackupAt, shareLatestAutoBackup } from "@/services/autoBackup";
 import { exportCsv, exportJson, importJson } from "@/services/exportService";
 import { requestNotificationPermission } from "@/services/notifications";
@@ -171,12 +171,14 @@ export default function SettingsScreen() {
                 subtitle="Pour un tableur"
                 onPress={run("Export", exportCsv)}
               />
-              <Row
-                icon="reload-outline"
-                title="Recharger mon programme"
-                subtitle="programme-reel.md + historique du Bloc 1 (remplace les données)"
-                onPress={() => setReloading(true)}
-              />
+              {PERSONAL_BUILD && (
+                <Row
+                  icon="reload-outline"
+                  title="Recharger mon programme"
+                  subtitle="programme-reel.md + historique du Bloc 1 (remplace les données)"
+                  onPress={() => setReloading(true)}
+                />
+              )}
             </Group>
           </Disclosure>
           <Text variant="caption" tone="muted" style={{ marginTop: space.sm }}>
@@ -491,7 +493,7 @@ export default function SettingsScreen() {
               setReloading(false);
               const saved = backupBeforeReplace();
               try {
-                const r = replaceWithPersonalData();
+                const r = personalImporter()!.replaceWithPersonalData();
                 useWorkoutStore.setState({ docs: {} });
                 showToast(
                   {

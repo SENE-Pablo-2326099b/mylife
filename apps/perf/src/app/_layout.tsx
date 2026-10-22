@@ -19,7 +19,8 @@ import { upgradeLegacyS4 } from '@/db/repos/cycles';
 import { NEEDS_PREPARE, openExpoDb, prepareExpoDb } from '@/db/expoDriver';
 import { migrate } from '@/db/migrations';
 import { seedIfEmpty } from '@/db/seed';
-import { seedPersonalIfFresh, upgradePersonalData } from '@/import/importer';
+import { AccountGate } from '@/features/account/AccountGate';
+import { personalImporter } from '@/import/personal';
 import { runAutoBackupIfDue } from '@/services/autoBackup';
 import { SessionSummarySheet } from '@/features/workout/SessionSummary';
 import { useEntry } from '@/state/entryStore';
@@ -44,9 +45,11 @@ function bootstrap(): string | null {
     migrate(db);
     // Synchro MyLife : déclencheurs de suivi recréés d'après le schéma (inactifs tant que pas de compte).
     installSyncTriggers(db);
-    // First launch: load the real program + history (programme-reel.md, historique-seances.csv).
-    if (seedPersonalIfFresh() === null) seedIfEmpty();
-    upgradePersonalData();
+    // Premier lancement : base vide + bibliothèque générique. Le programme personnel de l'auteur n'existe
+    // que dans un build privé (import/personal.ts) : jamais chez un nouvel utilisateur.
+    const personal = personalImporter();
+    if (personal === null || personal.seedPersonalIfFresh() === null) seedIfEmpty();
+    personal?.upgradePersonalData();
     upgradeLegacyS4();
     useSettings.getState().hydrate();
     useRestTimer.getState().hydrate();
@@ -101,6 +104,7 @@ function AppStack() {
         </Stack>
         <Toasts />
         <SessionSummarySheet />
+        <AccountGate />
       </View>
     </ThemeProvider>
   );

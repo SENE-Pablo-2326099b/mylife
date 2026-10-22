@@ -43,6 +43,22 @@ afterAll(async () => {
 });
 
 describe('MyLife, une seule app', () => {
+  it('nouvel utilisateur : dans chaque app, seul le compte est possible, et aucune donnée d’autrui n’apparaît', async () => {
+    for (const path of ['/', '/finances/', '/perf/', '/raveloc/']) {
+      const [ctx, fresh] = await device();
+      await fresh.goto(`${server.url}${path}`);
+      // L'accueil commence par une présentation, puis le même formulaire que les apps.
+      if (path === '/') await fresh.getByRole('button', { name: 'Commencer' }).click();
+      await fresh.getByText('Crée ton compte').waitFor({ timeout: 30_000 });
+      await fresh.waitForTimeout(2500);
+      const text = await fresh.evaluate(() => document.body.innerText);
+      for (const leak of ['Jambes', 'Back squat', 'Démarrer la séance', 'Reste aujourd’hui', 'Semaine 2']) expect(text, `${path} : « ${leak} » visible sans compte`).not.toContain(leak);
+      // Aucune donnée d'entraînement n'a été créée dans le navigateur.
+      expect(await fresh.evaluate(() => localStorage.getItem('mylife-session')), path).toBeNull();
+      await ctx.close();
+    }
+  });
+
   it('premier lancement : bienvenue, puis compte créé en un écran', async () => {
     await page.goto(`${server.url}/`);
     await page.getByText('Tes finances, ton entraînement et tes sorties').waitFor();
@@ -154,7 +170,8 @@ describe('MyLife, une seule app', () => {
 
   it('second appareil : connexion, et le thème suit (synchro chiffrée)', async () => {
     const [, other] = await device();
-    await other.goto(`${server.url}/compte?mode=login`);
+    await other.goto(`${server.url}/`);
+    await other.getByRole('button', { name: 'J’ai déjà un compte' }).click();
     await other.getByLabel('Identifiant').fill(LOGIN);
     await other.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await other.getByRole('button', { name: 'Se connecter' }).click();
@@ -165,7 +182,8 @@ describe('MyLife, une seule app', () => {
 
   it('320 px : aucun débordement horizontal, nulle part', async () => {
     const [, small] = await device(320, 640);
-    await small.goto(`${server.url}/compte?mode=login`);
+    await small.goto(`${server.url}/`);
+    await small.getByRole('button', { name: 'J’ai déjà un compte' }).click();
     await small.getByLabel('Identifiant').fill(LOGIN);
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();

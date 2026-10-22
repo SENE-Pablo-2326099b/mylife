@@ -13,7 +13,7 @@ import { AppearancePage } from './pages/Appearance';
 import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
-import { welcomed } from './welcome';
+import { useSession } from './ui/session';
 
 const TABS: TabDef[] = [
   { to: '/', label: 'Accueil', icon: 'home', active: 'home-fill', match: ['/'] },
@@ -27,8 +27,9 @@ export function App() {
   const location = useLocation();
   const { pathname } = location;
   const welcome = pathname === '/bienvenue';
-  // Premier lancement : quelques mots et le compte, une seule fois.
-  if (pathname === '/' && !welcomed()) return <Navigate to="/bienvenue" replace />;
+  const session = useSession();
+  // Pas de compte, pas d'accueil : bienvenue puis création de compte (ou connexion), partout ailleurs aussi.
+  if (!session && !welcome) return <Navigate to="/bienvenue" replace />;
 
   return (
     <ThemeProvider>

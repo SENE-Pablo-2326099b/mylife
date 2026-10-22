@@ -6,7 +6,7 @@ import { useSettings } from '@/state/settingsStore';
 import { useWorkoutStore } from '@/state/workoutStore';
 import { ApiError, accountStatus, autoJoin, changePassword, createAccount, deleteAccount, join, recoverAccount, renewRecoveryKey, signIn, signOut, syncNow, type JoinMode, type Session } from '@/vendor/mylife-sync';
 
-import { personalHistoryEnd } from '@/import/importer';
+import { personalImporter } from '@/import/personal';
 
 import { currentSession, platform, readPendingRecovery, writePendingRecovery, type PendingRecovery } from './platform';
 import { syncPrefs, syncPrefsSoon, watchAppearance } from './prefs';
@@ -32,9 +32,11 @@ export interface CloudState {
   choice: { account: number; lastUpdated: number | null } | null;
   /** Clé de secours pas encore mise de côté. */
   recovery: PendingRecovery | null;
+  /** La session a été lue au moins une fois (avant : on ne sait pas encore si l'utilisateur est connecté). */
+  checked: boolean;
 }
 
-export const useCloud = create<CloudState>(() => ({ session: null, joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0, choice: null, recovery: null }));
+export const useCloud = create<CloudState>(() => ({ session: null, joined: false, syncing: false, error: null, lastSyncAt: null, pending: 0, choice: null, recovery: null, checked: false }));
 const set = (patch: Partial<CloudState>) => useCloud.setState(patch);
 
 async function refreshState() {
@@ -43,7 +45,7 @@ async function refreshState() {
   const s = await store.getState();
   const recovery = session ? await readPendingRecovery() : null;
   const joined = !!session && s?.joinedAs === session.login;
-  set({ session, joined, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount(), recovery: recovery?.login === session?.login ? recovery : null, ...(session ? {} : { choice: null, error: null }) });
+  set({ checked: true, session, joined, lastSyncAt: s?.lastSyncAt ?? null, pending: pendingCount(), recovery: recovery?.login === session?.login ? recovery : null, ...(session ? {} : { choice: null, error: null }) });
   // L'accueil MyLife (même adresse sur le web) affiche l'état de la synchro de chaque app.
   if (Platform.OS === 'web') {
     try {
@@ -56,7 +58,7 @@ async function refreshState() {
 
 /** Des séances saisies sur cet appareil (au-delà de l'historique personnel importé à l'installation) ? */
 async function deviceHasData(): Promise<boolean> {
-  return (db().first<{ n: number }>('SELECT COUNT(*) AS n FROM workouts WHERE date > ?', [personalHistoryEnd()])?.n ?? 0) > 0;
+  return (db().first<{ n: number }>('SELECT COUNT(*) AS n FROM workouts WHERE date > ?', [personalImporter()?.personalHistoryEnd() ?? ''])?.n ?? 0) > 0;
 }
 
 let joining = false;

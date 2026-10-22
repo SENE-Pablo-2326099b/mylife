@@ -1,19 +1,13 @@
-const KEY = 'myperf_anthropic_api_key';
+import { readAiKey, writeAiKey } from '@/vendor/mylife-sync/aiKey';
 
-/** Web preview: browser storage (the native app uses the OS keychain). */
+/**
+ * Web (PWA MyLife) : la même clé que l'assistant de MyFinances, saisie une seule fois (même adresse, même
+ * stockage). L'app Android garde la sienne dans le trousseau du système.
+ */
 export async function loadApiKey(): Promise<string | null> {
-  try {
-    return window.localStorage.getItem(KEY);
-  } catch {
-    return null;
-  }
+  return readAiKey();
 }
 
 export async function saveApiKey(value: string | null): Promise<void> {
-  try {
-    if (value === null || value.trim() === '') window.localStorage.removeItem(KEY);
-    else window.localStorage.setItem(KEY, value.trim());
-  } catch {
-    // Storage blocked: the key just won't persist.
-  }
+  writeAiKey(value);
 }

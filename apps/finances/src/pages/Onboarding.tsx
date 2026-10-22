@@ -94,28 +94,15 @@ export default function OnboardingPage() {
                     </p>
                   ))}
                 </Card>
-                {session ? (
+                {session && (
                   <Card level="raised" className="flex items-center gap-3">
                     <Icon name="check-circle" className="text-success" />
                     <p className="t-small flex-1 text-secondary">
                       Connecté à MyLife : <strong className="text-ink">{session.login}</strong>. Tes données MyFinances se sauvegardent, chiffrées, sur ton compte.
                     </p>
                   </Card>
-                ) : (
-                  <Card level="raised" className="space-y-3">
-                    <p className="t-body-strong">Commence par ton compte MyLife</p>
-                    <p className="t-small text-secondary">Un compte pour toutes tes apps, sur tous tes appareils, chiffré de bout en bout. Déjà un compte ? Tout revient sur ce téléphone, réglages compris.</p>
-                    <div className="flex flex-col gap-2">
-                      <Button icon="person" className="w-full" to="/reglages/compte">
-                        Créer mon compte
-                      </Button>
-                      <Button variant="secondary" className="w-full" to="/reglages/compte?mode=login">
-                        J’ai déjà un compte
-                      </Button>
-                    </div>
-                  </Card>
                 )}
-                <p className="t-small px-0.5 text-muted">{session ? "Pour te saluer :" : "Sans compte, tout reste sur ce téléphone :"}</p>
+                <p className="t-small px-0.5 text-muted">Pour te saluer :</p>
                 <TextField label="Ton prénom (facultatif)" value={s.firstName} onCommit={(firstName) => void updateSettings({ firstName: firstName.trim() })} placeholder="Pour te saluer" autoComplete="given-name" />
               </>
             )}
