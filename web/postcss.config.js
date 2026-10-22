@@ -1,3 +1,6 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export default {
-  plugins: { tailwindcss: { config: new URL('./tailwind.config.js', import.meta.url).pathname }, autoprefixer: {} },
+  plugins: { tailwindcss: { config: join(dirname(fileURLToPath(import.meta.url)), 'tailwind.config.js') }, autoprefixer: {} },
 };
