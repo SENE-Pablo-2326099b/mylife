@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { MYLIFE_APPS } from '../vendor/lumen';
 import { AccountForms, AccountOverview, type AccountStatusRow } from '../ui/account';
@@ -39,6 +40,13 @@ function rows(login: string): AccountStatusRow[] {
 export function AccountPage() {
   const session = useSession();
   const [params] = useSearchParams();
+  // Les états viennent du stockage des apps (et de la synchro de l'apparence) : relus toutes les quelques secondes.
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!session) return;
+    const id = setInterval(() => document.visibilityState === 'visible' && tick((n) => n + 1), 3000);
+    return () => clearInterval(id);
+  }, [session]);
   return (
     <Screen title="Compte" kicker="MyLife" mood="settings">
       <Reveal index={0}>{session ? <AccountOverview session={session} rows={rows(session.login)} /> : <AccountForms initial={params.get('mode') === 'login' ? 'login' : 'create'} />}</Reveal>

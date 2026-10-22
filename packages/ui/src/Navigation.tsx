@@ -140,7 +140,9 @@ export function Dock({ tabs, onOrb, onOrbHold, holdLabel = 'assistant' }: { tabs
       aria-label="Navigation principale"
       className="pointer-events-none fixed inset-x-0 z-40 flex justify-center"
       style={{ bottom: `max(var(--safe-bottom), ${DOCK_MARGIN}px)`, paddingLeft: DOCK_MARGIN, paddingRight: DOCK_MARGIN }}
-      initial={false}
+      // Posé dès le premier rendu (avant le chargement des animations) : un écran ouvert directement
+      // (lien, palette d'une autre app) n'affiche jamais le dock qu'il doit masquer.
+      initial={{ y: hidden ? 130 : 0, opacity: hidden ? 0 : 1, scale: 1 }}
       animate={{ y: hidden ? 130 : tucked ? 96 : 0, opacity: hidden ? 0 : 1, scale: tucked ? 0.92 : 1 }}
       transition={springs.soft}
       aria-hidden={hidden}

@@ -139,6 +139,15 @@ describe('MyLife, une seule app', () => {
     await page.keyboard.press('Escape');
   });
 
+  it('un écran ouvert directement (palette d’une autre app, lien) masque le dock', async () => {
+    for (const path of ['/installer', '/raveloc/groupes/nouveau']) {
+      await page.goto(`${server.url}${path}`);
+      await page.waitForTimeout(1500);
+      const dock = await page.locator('nav[aria-label="Navigation principale"]').evaluate((n) => getComputedStyle(n).opacity);
+      expect(dock, path).toBe('0');
+    }
+  });
+
   it('second appareil : connexion, et le thème suit (synchro chiffrée)', async () => {
     const [, other] = await device();
     await other.goto(`${server.url}/compte?mode=login`);

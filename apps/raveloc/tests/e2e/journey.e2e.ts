@@ -25,6 +25,8 @@ const shot = async (page: Page, name: string) => void (process.env.SHOTS && (awa
 async function phone(geolocation: typeof ALICE): Promise<[BrowserContext, Page]> {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'fr-FR', geolocation, permissions: ['geolocation'] });
   ctx.setDefaultTimeout(20_000);
+  // THEME=brut (par exemple) : tout le parcours dans ce thème (revue visuelle des identités).
+  if (process.env.THEME) await ctx.addInitScript((t) => localStorage.setItem('mylife:appearance', JSON.stringify({ theme: t, followSystem: false, reduceMotion: true, haptics: true, at: 1 })), process.env.THEME);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && !/Failed to load resource|ERR_INTERNET_DISCONNECTED/.test(m.text()) && errors.push(m.text()));
