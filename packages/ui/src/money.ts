@@ -38,8 +38,8 @@ export function decimalToCents(input: string | number): number {
     if (parts.length > 2) {
       intPart = parts.join(''); // "1.234.567" : séparateurs de milliers
     } else {
-      intPart = parts[0];
-      fracPart = parts[1];
+      intPart = parts[0] ?? '';
+      fracPart = parts[1] ?? '';
     }
   }
   intPart = intPart.replace(/[.,']/g, '');
@@ -53,7 +53,7 @@ export function decimalToCents(input: string | number): number {
   } else {
     // arrondi au centime le plus proche (demi vers le haut)
     const firstTwo = parseInt(fracPart.slice(0, 2), 10);
-    cents = firstTwo + (parseInt(fracPart[2], 10) >= 5 ? 1 : 0);
+    cents = firstTwo + (parseInt(fracPart.charAt(2), 10) >= 5 ? 1 : 0);
   }
   const total = euros * 100 + cents;
   return negative ? -total : total;

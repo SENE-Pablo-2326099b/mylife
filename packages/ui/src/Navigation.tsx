@@ -85,7 +85,7 @@ function useScrollTucked(): boolean {
  * (icône + nom), les autres restent des icônes ; au centre, l'orbe ouvre la palette de commande
  * (appui long : l'assistant). Le dock se range au défilement et revient en remontant.
  */
-export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => void; onOrbHold?: () => void }) {
+export function Dock({ tabs, onOrb, onOrbHold, holdLabel = 'assistant' }: { tabs: TabDef[]; onOrb: () => void; onOrbHold?: () => void; holdLabel?: string }) {
   const { pathname } = useLocation();
   const hidden = useDockHidden();
   const tucked = useScrollTucked();
@@ -149,7 +149,7 @@ export function Dock({ tabs, onOrb, onOrbHold }: { tabs: TabDef[]; onOrb: () => 
         {tabs.slice(0, half).map((t, i) => tab(t, i))}
         <button
           type="button"
-          aria-label={onOrbHold ? 'Chercher, aller, agir (appui long : assistant)' : 'Chercher, aller, agir'}
+          aria-label={onOrbHold ? `Chercher, aller, agir (appui long : ${holdLabel})` : 'Chercher, aller, agir'}
           tabIndex={hidden ? -1 : undefined}
           className="orb relative mx-1 flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full"
           onPointerDown={() => {
@@ -222,11 +222,24 @@ export function Sidebar({ tabs, footer, onSearch }: { tabs: TabDef[]; footer?: R
 }
 
 /** Navigation adaptative : capsule en bas sur téléphone et tablette, barre latérale sur grand écran. */
-export function Navigation({ tabs, sidebarFooter, onSearch, onAssistant }: { tabs: TabDef[]; sidebarFooter?: ReactNode; onSearch: () => void; onAssistant?: () => void }) {
+export function Navigation({
+  tabs,
+  sidebarFooter,
+  onSearch,
+  onAssistant,
+  holdLabel,
+}: {
+  tabs: TabDef[];
+  sidebarFooter?: ReactNode;
+  onSearch: () => void;
+  /** Appui long sur l'orbe : l'action propre de l'app (assistant, coach, phare). */
+  onAssistant?: () => void;
+  holdLabel?: string;
+}) {
   const bp = useBreakpoint();
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--nav-left', bp === 'expanded' ? `${SIDEBAR_WIDTH + 32}px` : '0px');
   }, [bp]);
   // Le dock garde les sections du quotidien ; les réglages passent par la palette et les espaces MyLife.
-  return bp === 'expanded' ? <Sidebar tabs={tabs} footer={sidebarFooter} onSearch={onSearch} /> : <Dock tabs={tabs.filter((t) => t.inDock !== false)} onOrb={onSearch} onOrbHold={onAssistant} />;
+  return bp === 'expanded' ? <Sidebar tabs={tabs} footer={sidebarFooter} onSearch={onSearch} /> : <Dock tabs={tabs.filter((t) => t.inDock !== false)} onOrb={onSearch} onOrbHold={onAssistant} holdLabel={holdLabel} />;
 }

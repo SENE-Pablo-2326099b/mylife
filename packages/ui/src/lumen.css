@@ -411,7 +411,10 @@ input[type='number']::-webkit-outer-spin-button {
   }
 }
 
-/* Point vivant (synchro en cours). */
+/* Point vivant (synchro en cours, position en direct). Son halo reste autour du point. */
+.live-dot {
+  position: relative;
+}
 .live-dot::before {
   content: '';
   position: absolute;
