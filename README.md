@@ -64,6 +64,12 @@ Tes stats Spotify quand tu veux : demande ton export de données à Spotify, ouv
 et morceaux du mois et de l'année, ton obsession du moment, ton heure d'écoute, tes séries, tes découvertes, et la
 stat Culture de ton personnage. Le fichier est lu sur ton téléphone : seul un résumé est gardé, chiffré.
 
+### Mes apps
+Crée tes propres petites apps de suivi, sans code : lecture, eau, sommeil, humeur, méditation, une habitude… Pars d'un
+modèle, ou décris ce que tu veux à n'importe quelle IA gratuite (MyLife te donne la demande à copier) et colle sa
+réponse : MyLife la vérifie, puis l'app est prête (saisies, objectif, série, stats, graphique). Partage une app par un
+lien : il contient l'app, jamais tes saisies. Tes saisies sont chiffrées dans ton compte et Copilot peut les lire.
+
 ### MyGames et « Où va ton temps ? »
 Tes heures de jeu : depuis Steam (profil public), ou notées à la main pour la console et le mobile. Et une vue
 honnête de ton temps : sport, musique, jeu, côte à côte. Le jeu ne rapporte pas de points à ton personnage.
@@ -159,7 +165,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 113, MyFinances 337, myRaveLoc 83, MyPerf 235) |
+| Tous les tests unitaires | `npm run test:all` (serveur 122, MyFinances 337, myRaveLoc 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

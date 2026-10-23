@@ -2,13 +2,14 @@ import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/m
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
 import { STATS_APPS, parseAppearance, readStats, type StatsApp } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
-import { adoptCharacterPrefs, adoptGames, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readGames, readMusic } from './stats';
+import { adoptCharacterPrefs, adoptGames, adoptMiniApp, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readGames, readMiniApps, readMusic } from './stats';
 
 /**
  * Réglages communs de MyLife synchronisés entre appareils par le compte, chiffrés comme le reste (app
  * `mylife` du serveur) : l'apparence (`prefs/appearance`), les compteurs du Personnage de chaque app
  * (`stats/<app>`), ses préférences (`prefs/character`) et le résumé d'écoute de MyMusique (`music/summary`) et
- * les heures de jeu de MyGames (`games/data`).
+ * les heures de jeu de MyGames (`games/data`) et chaque app sans code de « Mes apps » (`miniapp/<id>`, une
+ * app supprimée reste une trace vide pour que la suppression suive).
  * Chaque ligne est datée, la plus récente gagne :
  * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web ; l'app Android fait
  * de même de son côté.
@@ -19,6 +20,7 @@ const statsPushedKey = (app: StatsApp) => `mylife:stats-pushed:${app}`;
 const CHARACTER_PUSHED_KEY = 'mylife:character-pushed';
 const MUSIC_PUSHED_KEY = 'mylife:music-pushed';
 const GAMES_PUSHED_KEY = 'mylife:games-pushed';
+const miniPushedKey = (id: string) => `mylife:miniapps-pushed:${id}`;
 const isStatsApp = (rid: string): rid is StatsApp => (STATS_APPS as readonly string[]).includes(rid);
 
 const readNum = (k: string) => {
@@ -51,6 +53,7 @@ function rows(): { tbl: string; rid: string; at: number; pushedKey: string; row:
   if (music) out.push({ tbl: 'music', rid: 'summary', at: music.at, pushedKey: MUSIC_PUSHED_KEY, row: music });
   const games = readGames();
   if (games && games.at > 0) out.push({ tbl: 'games', rid: 'data', at: games.at, pushedKey: GAMES_PUSHED_KEY, row: games });
+  for (const app of Object.values(readMiniApps())) out.push({ tbl: 'miniapp', rid: app.id, at: app.at, pushedKey: miniPushedKey(app.id), row: app });
   return out;
 }
 
@@ -87,6 +90,8 @@ export const prefsStore: LocalStore = {
         if (adoptMusic(r.row)) write(MUSIC_PUSHED_KEY, String(readMusic()?.at ?? 0));
       } else if (r.tbl === 'games' && r.rid === 'data') {
         if (adoptGames(r.row)) write(GAMES_PUSHED_KEY, String(readGames()?.at ?? 0));
+      } else if (r.tbl === 'miniapp') {
+        if (adoptMiniApp(r.row)) write(miniPushedKey(r.rid), String(readMiniApps()[r.rid]?.at ?? 0));
       }
     }
   },

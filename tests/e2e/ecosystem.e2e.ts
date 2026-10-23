@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -706,6 +706,89 @@ describe('MyLife, une seule app', () => {
     expect(file.suggestedFilename()).toMatch(/^mylife-wrapped-\d{4}-\d{2}\.png$/);
     if (process.env.SHOTS) await file.saveAs(`${process.env.SHOTS}/21-wrapped-image.png`);
     await ctx.close();
+  });
+
+  it('Mes apps : un modèle, une réponse d’IA collée, un lien partagé (sans les saisies), un second appareil, une suppression', async () => {
+    const login = async (p: Page) => {
+      await p.goto(`${server.url}/`);
+      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+      await p.getByLabel('Identifiant').fill(LOGIN);
+      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+      await p.getByRole('button', { name: 'Se connecter' }).click();
+      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    };
+    const [ctx, p] = await device();
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.url });
+    await login(p);
+    await p.getByRole('link', { name: /Mes apps : crée tes propres apps/ }).click();
+    await p.getByText('Crée tes propres apps').waitFor();
+    await p.getByRole('link', { name: 'Créer une app' }).click();
+    // Un modèle : aperçu, puis l'app.
+    await p.getByRole('button', { name: 'Modèle Lecture' }).click();
+    await p.getByText('Objectif : 150 pages par semaine').waitFor();
+    await shot(p, '32-mes-apps-apercu');
+    await p.getByRole('button', { name: 'Créer cette app' }).click();
+    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
+    // Saisie refusée sans le champ obligatoire, puis notée.
+    await p.getByLabel('Livre (facultatif)').fill('Dune');
+    await p.getByRole('button', { name: 'Noter' }).click();
+    await p.getByText('« Pages lues » est à remplir.').waitFor();
+    await p.getByLabel('Pages lues (pages)').fill('40');
+    await p.getByRole('button', { name: 'Noter' }).click();
+    await p.getByText('Noté', { exact: true }).waitFor();
+    await p.getByText('sur 150 pages par semaine').waitFor();
+    await p.getByText('Dune').first().waitFor();
+    await p.evaluate(() => window.scrollTo(0, 0));
+    await p.waitForTimeout(400);
+    await shot(p, '33-mes-apps-lecture');
+
+    // Partager : le lien porte l'app, pas les saisies.
+    await p.getByRole('button', { name: 'Partager l’app (sans mes saisies)' }).click();
+    const link = await p.evaluate(() => navigator.clipboard.readText());
+    expect(link).toMatch(/\/mes-apps\/nouvelle#app=[A-Za-z0-9_-]+$/);
+    const shared = JSON.parse(Buffer.from(link.split('#app=')[1]!, 'base64url').toString('utf8')) as Record<string, unknown>;
+    expect(shared.name).toBe('Lecture');
+    expect(JSON.stringify(shared)).not.toContain('Dune');
+
+    // Une réponse d'IA collée (avec du texte autour) : vérifiée, puis créée.
+    await p.goto(`${server.url}/mes-apps/nouvelle`);
+    await p.getByLabel('Ce que tu veux suivre').fill('mes séances de piano');
+    await p.getByRole('button', { name: 'Copier la demande' }).click();
+    expect(await p.evaluate(() => navigator.clipboard.readText())).toContain('mes séances de piano');
+    await p.getByLabel('Réponse de l’IA').fill('Voici :\n```json\n{"format":"mylife-app","v":1,"name":"Piano","icon":"time","color":"violet","fields":[{"id":"duree","label":"Durée","type":"duration"},{"id":"ressenti","label":"Ressenti","type":"rating"}],"goal":{"agg":"count","per":"week","target":3},"stats":[{"label":"Minutes cette semaine","agg":"sum","field":"duree","period":"week"}],"chart":{"agg":"sum","field":"duree"}}\n```');
+    await p.getByRole('button', { name: 'Lire la réponse' }).click();
+    await p.getByText('Objectif : 3 saisies par semaine').waitFor();
+    await p.getByRole('button', { name: 'Créer cette app' }).click();
+    await p.getByRole('heading', { name: 'Piano' }).waitFor();
+    await p.getByLabel('Durée (facultatif) en minutes').fill('75');
+    await p.getByRole('button', { name: 'Ressenti : 4' }).click();
+    await p.getByRole('button', { name: 'Noter' }).click();
+    await p.getByText('1 h 15').first().waitFor();
+
+    // Le lien reçu : l'app arrive vide.
+    await p.goto(link);
+    await p.getByRole('heading', { name: 'App reçue' }).waitFor();
+    await p.getByText(/tu reçois sa forme, pas ses saisies/).waitFor();
+    await p.getByRole('button', { name: 'Créer cette app' }).click();
+    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
+    expect(await p.getByText('Dernières saisies').count()).toBe(0);
+    // Supprimer (confirmé) : elle disparaît de la liste.
+    await p.getByRole('button', { name: 'Supprimer l’app' }).click();
+    await p.getByRole('button', { name: /Confirmer : supprimer/ }).click();
+    await p.getByRole('heading', { name: 'Mes apps' }).waitFor();
+    await expect.poll(() => p.getByRole('link', { name: /^Ouvrir / }).count()).toBe(2);
+    await p.waitForTimeout(3500);
+    await ctx.close();
+
+    // Second appareil : les apps et leurs saisies suivent (chiffrées), la supprimée non.
+    const [ctx2, q] = await device();
+    await login(q);
+    await q.goto(`${server.url}/mes-apps`);
+    await q.getByRole('link', { name: 'Ouvrir Piano' }).waitFor({ timeout: 30_000 });
+    expect(await q.getByRole('link', { name: /^Ouvrir / }).count()).toBe(2);
+    await q.getByRole('link', { name: 'Ouvrir Lecture' }).click();
+    await q.getByText('Dune').first().waitFor();
+    await ctx2.close();
   });
 
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {

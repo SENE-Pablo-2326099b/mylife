@@ -2,16 +2,21 @@ import type Anthropic from '@anthropic-ai/sdk';
 import {
   addWeeks,
   computeCharacter,
+  formatMini,
   gameTotals,
+  goalProgress,
   listeningStreak,
   monthWeeks,
   musicPeriod,
   peakHour,
   recap,
+  statValue,
   timeSplit,
   weekStart,
+  weeklySeries,
   yearWeeks,
   type GamesData,
+  type MiniApp,
   type MusicSummary,
   type StatsByApp,
 } from './vendor/lumen';
@@ -55,9 +60,11 @@ export interface CopilotSources {
   music: MusicSummary | null;
   games: GamesData | null;
   sorties: SortieDigest[];
+  /** « Mes apps » : les apps sans code de l'utilisateur et leurs saisies. */
+  miniApps: MiniApp[];
 }
 
-export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, myRaveLoc), la musique (MyMusique), le jeu (MyGames) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
+export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, myRaveLoc), la musique (MyMusique), le jeu (MyGames), ses propres petites apps de suivi (« Mes apps » : lecture, sommeil, habitudes…) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
 
 Ce que tu fais :
 - Tu réponds aux questions de l'utilisateur sur sa vie à partir de SES données, que tu lis avec tes outils. Lis avant de répondre : ne devine jamais un chiffre.
@@ -87,6 +94,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   },
   { name: 'get_games', description: 'MyGames : heures de jeu par jeu sur les N dernières semaines (1 à 12), et depuis toujours.', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_time_split', description: 'Où va le temps : minutes de sport (séances MyPerf), de musique (MyMusique) et de jeu (MyGames) sur les N dernières semaines (1 à 12).', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
+  { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'list_sorties', description: 'Les sorties (festivals, week-ends) de l’utilisateur : dates, lieu, décision (« ça se fait »), sa réponse, planning des sets avec qui y va, budget partagé (son solde), choses à emporter restantes.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
 ];
 
@@ -137,6 +145,25 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
     case 'get_time_split': {
       const { from, to } = weeksBack(src.today, typeof input.weeks === 'number' ? input.weeks : 4);
       return json({ from, to, minutes: timeSplit(src.stats, src.games, from, to), musicHistoryUntil: src.music?.to || null });
+    }
+    case 'get_my_apps': {
+      const apps = src.miniApps.filter((a) => a.spec);
+      if (!apps.length) return { content: 'Aucune app dans « Mes apps » : l’utilisateur peut en créer depuis l’accueil (modèle ou description à une IA).', isError: true };
+      return json(
+        apps.map((a) => {
+          const spec = a.spec!;
+          const field = (id?: string) => spec.fields.find((f) => f.id === id);
+          return {
+            app: spec.name,
+            fields: spec.fields.map((f) => ({ label: f.label, type: f.type, unit: f.unit })),
+            goal: spec.goal ? { ...goalProgress(spec, a.entries, src.today), per: spec.goal.per, agg: spec.goal.agg, field: field(spec.goal.field)?.label } : null,
+            stats: spec.stats.map((s) => ({ stat: s.label, value: formatMini(field(s.field), statValue(a.entries, s, src.today), s.agg) })),
+            weeks: weeklySeries(spec, a.entries, src.today),
+            entries: a.entries.length,
+            last: a.entries.slice(-15).map((e) => ({ day: e.day, ...Object.fromEntries(Object.entries(e.values).map(([k, v]) => [field(k)?.label ?? k, v])) })),
+          };
+        }),
+      );
     }
     case 'list_sorties':
       return json(src.sorties);

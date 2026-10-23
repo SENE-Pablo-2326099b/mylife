@@ -17,6 +17,7 @@ import { SortiePage, SortiesPage } from './pages/Sortie';
 import { MusicPage } from './pages/Music';
 import { GamesPage, TimePage } from './pages/Games';
 import { DataPage } from './pages/Data';
+import { MiniAppNewPage, MiniAppPage, MiniAppsPage } from './pages/MiniApps';
 import { PrivacyPage } from './pages/Privacy';
 import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
 import { useCharacter, useStatsInput } from './ui/stats';
@@ -67,7 +68,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
   useEffect(() => {
     if (!session || welcome || keyPending) return;
     const hash = takeStashedInvite();
-    if (hash) navigate(`/rejoindre${hash}`, { replace: true });
+    if (hash) navigate(hash.startsWith('#app=') ? `/mes-apps/nouvelle${hash}` : `/rejoindre${hash}`, { replace: true });
   }, [session, welcome, keyPending, navigate]);
 
   return (
@@ -97,6 +98,9 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               <Route path="/musique" element={<MusicPage />} />
               <Route path="/jeux" element={<GamesPage />} />
               <Route path="/temps" element={<TimePage />} />
+              <Route path="/mes-apps" element={<MiniAppsPage />} />
+              <Route path="/mes-apps/nouvelle" element={<MiniAppNewPage />} />
+              <Route path="/mes-apps/:id" element={<MiniAppPage />} />
               <Route
                 path="/copilot"
                 element={

@@ -5,7 +5,7 @@ import { getAppearance } from '../ui/appearance';
 import { Icon, type IconName } from '../ui/icons';
 import { Button, Card, Reveal, SectionTitle, SelectField, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { readCharacterPrefs, readGames, readMusic } from '../ui/stats';
+import { readCharacterPrefs, readGames, readMiniApps, readMusic } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -40,6 +40,7 @@ export function DataPage() {
       counters: Object.fromEntries(STATS_APPS.map((a) => [a, readStats(a)])),
       music: readMusic(),
       games: readGames(),
+      apps: Object.values(readMiniApps()).filter((a) => a.spec),
     });
     toast({ message: 'Export téléchargé', tone: 'gold' });
   };
@@ -49,7 +50,7 @@ export function DataPage() {
         <Reveal index={0}>
           <Card level="raised">
             <p className="t-headline">Tout ce que l’accueil sait de toi</p>
-            <p className="t-small mt-1 text-secondary">Apparence, Personnage (compteurs par semaine, semaines de repos, choix de partage), résumé d’écoute, heures de jeu. En clair, dans un fichier JSON.</p>
+            <p className="t-small mt-1 text-secondary">Apparence, Personnage (compteurs par semaine, semaines de repos, choix de partage), résumé d’écoute, heures de jeu, tes apps et leurs saisies. En clair, dans un fichier JSON.</p>
             <Button className="mt-3 w-full" icon="download" onClick={exportMine}>
               Exporter
             </Button>

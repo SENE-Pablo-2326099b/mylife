@@ -102,6 +102,7 @@ notifications web push sans pistage. **Pas de données de santé avant d'avoir r
 - **Terminé quand** : quelqu'un de totalement étranger au projet crée un compte, l'utilise une semaine et revient.
 
 ## Étape 10 : Plateforme d'apps (horizon 2 ans) : effort L+
+*Premier palier fait le 23/10/2026 : « Mes apps », apps personnelles sans code écrites par une IA gratuite, partageables par lien (voir `docs/V3.md`). Paliers suivants : apps à plusieurs sur les espaces du Crew, modification d'une app, rappels par app.*
 D'abord des **apps sans code** décrites par l'utilisateur (l'IA les génère), partageables par lien ; puis, seulement si le besoin est là, des apps avec code dans un cadre isolé.
 Pas de boutique publique au début. Identifiants d'app dynamiques et quotas par app côté serveur.
 

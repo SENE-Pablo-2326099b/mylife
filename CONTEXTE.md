@@ -184,6 +184,9 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `support_messages`, lu avec `DATABASE_URL=… npm run support`, `-- done <id>` une fois traité), rappel du dimanche `server/push.ts` (`/api/push`, table
   `push_subscriptions`) + `api/cron-weekly.ts` (cron Vercel, `CRON_SECRET`), `web/public/push-sw.js`, `web/src/push.ts` ;
   `npm run stats:serveur` (volumes, sans contenu).
+  Mes apps (V3, étape 10, premier palier) : moteur `packages/lumen/src/miniapp.ts` (format `mylife-app`, rien ne
+  s'exécute), `web/src/pages/MiniApps.tsx` (`/mes-apps`), lignes `miniapp/<id>` de l'app `mylife` (stockage
+  `mylife:miniapps`), outil Copilot `get_my_apps`.
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

@@ -8,7 +8,7 @@ import { sortieDigests } from '../sortieDigest';
 import { Icon } from '../ui/icons';
 import { Button, Card, Disclosure, Reveal, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { readGames, readMusic, useStatsInput } from '../ui/stats';
+import { readGames, readMiniApps, readMusic, useStatsInput } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -132,6 +132,7 @@ export function CopilotPage() {
     music: readMusic(),
     games: readGames(),
     sorties: sortieDigests(crews.sorties, crews.uid),
+    miniApps: Object.values(readMiniApps()),
   });
 
   const ask = async (question: string) => {

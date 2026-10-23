@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { advance, COPILOT_MODEL, requestParams, runTool, textOf, userMessage, type CopilotSources, type Msg } from '../web/src/copilot';
 import { summarizeMusic } from '../packages/lumen/src/music';
 import { addManual, emptyGames } from '../packages/lumen/src/games';
+import { MINI_TEMPLATES, addEntry, deleteMiniApp, emptyMiniApp } from '../packages/lumen/src/miniapp';
 
 const TODAY = '2026-10-22';
 const sources = (over: Partial<CopilotSources> = {}): CopilotSources => ({
@@ -13,6 +14,7 @@ const sources = (over: Partial<CopilotSources> = {}): CopilotSources => ({
   music: null,
   games: addManual(emptyGames(), { id: 'x', game: 'FIFA', day: '2026-10-20', minutes: 90 }),
   sorties: [],
+  miniApps: [],
   ...over,
 });
 
@@ -34,6 +36,18 @@ describe('Copilot : outils en lecture seule', () => {
     expect(JSON.parse(runTool('get_games', { weeks: 2 }, sources()).content).games[0]).toMatchObject({ game: 'FIFA', minutesInPeriod: 90 });
     expect(JSON.parse(runTool('get_time_split', { weeks: 1 }, sources()).content).minutes).toMatchObject({ sport: 120, games: 90 });
     expect(runTool('rm_everything', {}, sources()).isError).toBe(true);
+  });
+});
+
+describe('Copilot : Mes apps', () => {
+  it('lit les apps en service (objectif, stats, saisies avec leurs libellés), pas les supprimées', () => {
+    expect(runTool('get_my_apps', {}, sources())).toMatchObject({ isError: true, content: expect.stringMatching(/Aucune app/) });
+    const lecture = addEntry(emptyMiniApp('lect01', MINI_TEMPLATES[0]!), { id: 'a', day: '2026-10-21', values: { pages: 40, livre: 'Dune' } });
+    const gone = deleteMiniApp(emptyMiniApp('eau001', MINI_TEMPLATES[1]!));
+    const r = JSON.parse(runTool('get_my_apps', {}, sources({ miniApps: [lecture, gone] })).content);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ app: 'Lecture', goal: { value: 40, target: 150, done: false, per: 'week', field: 'Pages lues' }, entries: 1, last: [{ day: '2026-10-21', 'Pages lues': 40, Livre: 'Dune' }] });
+    expect(r[0].stats[0]).toEqual({ stat: 'Pages cette semaine', value: '40 pages' });
   });
 });
 

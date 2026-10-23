@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseGames, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
+import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseGames, parseMiniApp, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MiniApp, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -139,7 +139,7 @@ export function setCrewShare(sid: string, stats: readonly StatId[]): void {
 const addDays = (iso: string, n: number) => new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) + n)).toISOString().slice(0, 10);
 
 function subscribe(fn: () => void): () => void {
-  const onStorage = (e: StorageEvent) => (e.key === null || e.key.startsWith('mylife:stats:') || e.key === CHARACTER_KEY || e.key === MUSIC_KEY || e.key === GAMES_KEY) && fn();
+  const onStorage = (e: StorageEvent) => (e.key === null || e.key.startsWith('mylife:stats:') || e.key === CHARACTER_KEY || e.key === MUSIC_KEY || e.key === GAMES_KEY || e.key === MINI_KEY) && fn();
   window.addEventListener('storage', onStorage);
   window.addEventListener(EVENT, fn);
   return () => {
@@ -269,4 +269,58 @@ export function useGames(): GamesData | null {
     }
   }, () => '');
   return useMemo(() => (key ? readGames() : null), [key]);
+}
+
+// ---------------------------------------------------------------- Mes apps : apps sans code et leurs saisies
+
+const MINI_KEY = 'mylife:miniapps';
+
+/** Toutes les apps de l'appareil, supprimées comprises (traces vides, pour que la suppression suive). */
+export function readMiniApps(): Record<string, MiniApp> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MINI_KEY) ?? '{}') as Record<string, unknown>;
+    const out: Record<string, MiniApp> = {};
+    for (const v of Object.values(raw ?? {})) {
+      const app = parseMiniApp(v);
+      if (app) out[app.id] = app;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export function saveMiniApp(app: MiniApp): void {
+  write(MINI_KEY, { ...readMiniApps(), [app.id]: app });
+  emit();
+  onChange?.();
+}
+
+/** Venue d'un autre appareil : la plus récente gagne. */
+export function adoptMiniApp(raw: unknown): boolean {
+  const app = parseMiniApp(raw);
+  if (!app) return false;
+  const all = readMiniApps();
+  if ((all[app.id]?.at ?? 0) >= app.at) return (all[app.id]?.at ?? 0) === app.at;
+  write(MINI_KEY, { ...all, [app.id]: app });
+  emit();
+  return true;
+}
+
+/** Les apps en service, les plus récentes d'abord. */
+export function useMiniApps(): MiniApp[] {
+  const key = useSyncExternalStore(subscribe, () => {
+    try {
+      return localStorage.getItem(MINI_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  }, () => '');
+  return useMemo(
+    () =>
+      Object.values(key ? readMiniApps() : {})
+        .filter((a) => a.spec)
+        .sort((a, b) => b.created - a.created),
+    [key],
+  );
 }

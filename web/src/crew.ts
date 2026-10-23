@@ -165,7 +165,8 @@ export function useCrewPublisher(character: Character, stats: StatsByApp, rest: 
 /** Lien d'invitation ouvert sans être connecté : gardé le temps de créer son compte ou de se connecter. */
 export function stashInvite(hash: string): void {
   try {
-    if (hash.includes('espace=')) sessionStorage.setItem(PENDING_INVITE, hash);
+    // Invitation (Crew, Sortie) ou app partagée (Mes apps).
+    if (hash.includes('espace=') || hash.startsWith('#app=')) sessionStorage.setItem(PENDING_INVITE, hash);
   } catch {
     /* rien */
   }

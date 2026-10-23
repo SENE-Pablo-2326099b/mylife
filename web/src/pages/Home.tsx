@@ -145,6 +145,16 @@ export function HomePage() {
                   <p className="t-caption text-muted">Heures de jeu, ton temps</p>
                 </Card>
               </div>
+              <Card to="/mes-apps" label="Mes apps : crée tes propres apps, sans code">
+                <div className="flex items-center gap-3">
+                  <Icon name="apps" className="text-gold" />
+                  <span className="min-w-0 flex-1">
+                    <span className="t-body-strong block">Mes apps</span>
+                    <span className="t-small block truncate text-secondary">Lecture, sommeil, habitudes : crée les tiennes, sans code</span>
+                  </span>
+                  <Icon name="chevron-forward" className="text-muted" />
+                </div>
+              </Card>
             </div>
           </Reveal>
         )}

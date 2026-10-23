@@ -532,3 +532,4 @@ export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> |
   }
 }
 export * from './pacte';
+export * from './miniapp';
