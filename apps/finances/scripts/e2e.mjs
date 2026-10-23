@@ -43,9 +43,10 @@ try {
   }
   const browser = await chromium.launch({ executablePath });
 
-  for (const width of [390, 320]) {
+  // 1366 : la PWA sur un ordinateur (feuilles en panneau centré, souris).
+  for (const width of [390, 320, 1366]) {
     console.log(`\n${width} px`);
-    const context = await browser.newContext({ viewport: { width, height: width === 320 ? 640 : 844 }, colorScheme: width === 320 ? 'light' : 'dark', locale: 'fr-FR', hasTouch: true, isMobile: true });
+    const context = await browser.newContext({ viewport: { width, height: width === 320 ? 640 : 844 }, colorScheme: width === 320 ? 'light' : 'dark', locale: 'fr-FR', hasTouch: width < 1000, isMobile: width < 1000 });
     context.setDefaultTimeout(10000);
     const page = await context.newPage();
     const errors = [];
@@ -143,6 +144,33 @@ try {
         const state = await page.evaluate(() => ({ lock: document.body.style.overflow, layers: document.querySelectorAll('.fixed.inset-0.z-50').length }));
         expect(state.lock === '' && state.layers === 0, `page restée bloquée : ${JSON.stringify(state)}`);
       }
+    });
+
+    await step('Aujourd’hui : opération ouverte depuis le détail du budget, reclassée, puis l’app reste utilisable', async () => {
+      await open('/');
+      await page.locator('main#contenu button').filter({ hasText: /€/ }).first().click();
+      const detail = page.getByRole('dialog', { name: 'Comment c’est calculé' });
+      await detail.waitFor();
+      await detail.locator('button').filter({ hasText: /€/ }).first().click();
+      const group = page.getByRole('group', { name: 'Choisir une catégorie' });
+      await group.waitFor();
+      await group.getByRole('button').nth(5).click();
+      await page.getByRole('button', { name: 'Enregistrer' }).click();
+      await page.getByText(/Classée en|reclassée/).first().waitFor();
+      // Retour au détail du budget, qui se ferme normalement ; ensuite plus aucune couche ne capte les clics.
+      await detail.waitFor();
+      await page.keyboard.press('Escape');
+      await detail.waitFor({ state: 'detached' });
+      await page.waitForTimeout(400);
+      const blocking = await page.evaluate(() => {
+        const el = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+        return el?.closest('.fixed.inset-0.z-50') ? el.className : null;
+      });
+      expect(blocking === null, `une couche capte encore les clics : ${blocking}`);
+      expect((await page.evaluate(() => document.body.style.overflow)) === '', 'défilement resté bloqué');
+      await page.locator('main#contenu button').filter({ hasText: /€/ }).first().click({ timeout: 3000 });
+      await detail.waitFor();
+      await page.keyboard.press('Escape');
     });
 
     await step('palette de commande : chercher une opération, aller à un écran', async () => {

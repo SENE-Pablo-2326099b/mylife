@@ -1,4 +1,4 @@
-import { AnimatePresence, m, useDragControls, type PanInfo } from 'framer-motion';
+import { AnimatePresence, m, useDragControls, useIsPresent, type PanInfo } from 'framer-motion';
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon, type IconName } from './icons';
@@ -35,10 +35,20 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
   // qu'une fois à l'ouverture, même si l'écran derrière se redessine (sinon le focus est volé en boucle).
   const close = useRef(onClose);
   close.current = onClose;
+  // Dès qu'elle commence à partir, la feuille laisse passer les clics et rend le défilement : une
+  // fermeture qui croise une ouverture (ou une animation qui n'aboutit pas) ne bloque jamais l'app.
+  const present = useIsPresent();
+  const presentRef = useRef(present);
+  presentRef.current = present;
+  const unlock = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    if (!present) unlock.current();
+  }, [present]);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     ref.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
+      if (!presentRef.current) return;
       if (e.key === 'Escape') close.current();
       if (e.key === 'Tab' && ref.current) {
         // Piège à focus : la tabulation reste dans la feuille.
@@ -56,10 +66,10 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
       }
     };
     window.addEventListener('keydown', onKey);
-    const unlock = lockScroll();
+    unlock.current = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      unlock();
+      unlock.current();
       previous?.focus?.({ preventScroll: true });
     };
   }, []);
@@ -69,7 +79,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
   };
 
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50" style={present ? undefined : { pointerEvents: 'none' }}>
       <m.div className="sheet-veil absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.2 } }} onClick={onClose} aria-hidden />
       <div className={`pointer-events-none absolute inset-0 flex justify-center ${wide ? 'items-center p-6' : 'items-end px-2'}`} style={wide ? undefined : { paddingBottom: 'max(calc(var(--safe-bottom) - 4px), 8px)' }}>
         <m.div
@@ -79,6 +89,7 @@ function SheetPanel({ onClose, title, children, footer }: { onClose: () => void;
           aria-labelledby={title ? titleId : undefined}
           aria-label={title ? undefined : 'Feuille'}
           tabIndex={-1}
+          style={present ? undefined : { pointerEvents: 'none' }}
           className={`glass glass-lens pointer-events-auto flex max-h-[88dvh] w-full flex-col overflow-hidden outline-none ${wide ? 'max-w-[520px]' : 'max-w-[640px]'} rounded-[var(--r-sheet)]`}
           initial={wide ? { opacity: 0, scale: 0.94, y: 24 } : { y: '100%' }}
           animate={wide ? { opacity: 1, scale: 1, y: 0 } : { y: 0 }}
