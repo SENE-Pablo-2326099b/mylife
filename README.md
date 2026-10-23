@@ -54,6 +54,12 @@ une semaine de repos se déclare sans casser la série. Le dimanche, **ta semain
 fin d'année, ton **Wrapped** en stories, avec une image à partager (créée sur ton téléphone, sans aucun montant). Seuls des nombres par semaine sont utilisés (aucun montant,
 aucun détail), chiffrés dans ton compte : le même personnage sur tous tes appareils.
 
+### Sorties
+Un festival, un week-end, une soirée : propose, envoie le lien, chacun répond « chaud ». Puis, au même endroit et
+chiffré : le planning set par set (qui va où), le budget partagé (qui doit combien à qui, au centime près), la liste à
+emporter, et le carnet d'ID (un toucher en plein set : l'heure, la scène et le DJ sont notés). Ça marche hors ligne :
+tout part dès que le réseau revient.
+
 ### Ton Crew
 Entre amis, un classement du mois : chacun voit le niveau, le titre, la série et les XP du mois des autres (et le
 niveau des stats que chacun choisit de montrer). Crée un Crew, envoie le lien : la clé du Crew voyage dans le lien,
@@ -133,7 +139,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 86, MyFinances 337, myRaveLoc 83, MyPerf 234) |
+| Tous les tests unitaires | `npm run test:all` (serveur 91, MyFinances 337, myRaveLoc 83, MyPerf 234) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

@@ -563,7 +563,7 @@ export function TextField({
   hint?: ReactNode;
   /** Remplace l'aide, en rouge. */
   error?: ReactNode;
-  type?: 'text' | 'password' | 'search' | 'date' | 'url' | 'email';
+  type?: 'text' | 'password' | 'search' | 'date' | 'time' | 'url' | 'email';
   mono?: boolean;
   autoComplete?: string;
   inputMode?: 'text' | 'decimal' | 'numeric' | 'search' | 'email';

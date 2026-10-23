@@ -111,6 +111,18 @@ export function HomePage() {
               <WrappedCard />
               <CharacterCard />
               <WeekRecapCard />
+              <div className="grid grid-cols-2 gap-3">
+                <Card to="/sorties" label="Sorties : organiser à plusieurs">
+                  <Icon name="flag-fill" className="text-gold" />
+                  <p className="t-body-strong mt-1">Sorties</p>
+                  <p className="t-caption text-muted">Chaud ? Planning, budget, sac</p>
+                </Card>
+                <Card to="/crew" label="Ton Crew : classement entre amis">
+                  <Icon name="people-fill" className="text-gold" />
+                  <p className="t-body-strong mt-1">Crew</p>
+                  <p className="t-caption text-muted">Ton niveau face à tes amis</p>
+                </Card>
+              </div>
             </div>
           </Reveal>
         )}

@@ -87,7 +87,7 @@ export function CrewListPage() {
   const join = () => {
     const parsed = parseSpaceInvite(link);
     if (!parsed) return toast({ message: 'Ce n’est pas un lien d’invitation de Crew.' });
-    navigate(`/crew/rejoindre${link.slice(link.indexOf('#'))}`);
+    navigate(`/rejoindre${link.slice(link.indexOf('#'))}`);
   };
 
   return (
@@ -154,13 +154,14 @@ export function CrewListPage() {
   );
 }
 
-/** /crew/rejoindre#espace=… : « Rejoindre la bande ? » puis le pseudo. */
+/** /rejoindre#espace=… (Crew ou Sortie) : « Rejoindre la bande ? » puis le pseudo. */
 export function CrewJoinPage() {
   const session = useSession();
   const location = useLocation();
   const navigate = useNavigate();
   const invite = useMemo(() => parseSpaceInvite(location.hash), [location.hash]);
-  const [info, setInfo] = useState<{ sid: string; name: string; member: boolean } | null>(null);
+  const [info, setInfo] = useState<{ sid: string; kind: string; name: string; member: boolean } | null>(null);
+  const target = (sid: string, kind: string) => (kind === 'sortie' ? `/sorties/${sid}` : `/crew/${sid}`);
   const [error, setError] = useState<string | null>(invite ? null : 'Ce lien d’invitation est incomplet. Demande-le à nouveau.');
   const [pseudo, setPseudo] = useState(defaultPseudo(session?.login));
   const [busy, setBusy] = useState(false);
@@ -169,7 +170,7 @@ export function CrewJoinPage() {
     const c = client();
     if (!invite || !c) return;
     c.peek(invite).then(
-      (r) => (r.member ? navigate(`/crew/${r.sid}`, { replace: true }) : setInfo(r)),
+      (r) => (r.member ? navigate(target(r.sid, r.kind), { replace: true }) : setInfo(r)),
       (e: unknown) => setError(errorText(e)),
     );
   }, [invite, navigate]);
@@ -183,7 +184,7 @@ export function CrewJoinPage() {
       await c.join(invite, info.sid, pseudo.trim() || defaultPseudo(session?.login), uid);
       await loadCrews();
       toast({ message: `Bienvenue dans « ${info.name} »`, tone: 'gold' });
-      navigate(`/crew/${info.sid}`, { replace: true });
+      navigate(target(info.sid, info.kind), { replace: true });
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -192,7 +193,7 @@ export function CrewJoinPage() {
   };
 
   return (
-    <Screen stack title="Rejoindre un Crew" mood="today" back="/crew">
+    <Screen stack title={info?.kind === 'sortie' ? 'Rejoindre une Sortie' : 'Rejoindre un Crew'} mood="today" back="/">
       <div className="flex flex-col gap-3">
         {error && (
           <Card>
@@ -203,16 +204,22 @@ export function CrewJoinPage() {
         {info && (
           <>
             <Card level="raised" glow>
-              <p className="t-label text-gold">Invitation</p>
+              <p className="t-label text-gold">{info.kind === 'sortie' ? 'Invitation à une sortie' : 'Invitation à un Crew'}</p>
               <p className="t-title">Rejoindre « {info.name} » ?</p>
               <div className="mt-3 flex flex-col gap-3">
-                <TextField label="Ton pseudo dans ce Crew" value={pseudo} onChange={setPseudo} />
+                <TextField label={info.kind === 'sortie' ? 'Ton pseudo pour cette sortie' : 'Ton pseudo dans ce Crew'} value={pseudo} onChange={setPseudo} />
                 <Button icon="people" disabled={busy} onClick={() => void join()}>
                   {busy ? 'Un instant…' : 'Rejoindre'}
                 </Button>
               </div>
             </Card>
-            <Privacy />
+            {info.kind === 'sortie' ? (
+              <Card>
+                <p className="t-small text-secondary">Réponses, planning, budget et liste sont chiffrés : seuls les membres de la sortie les voient, pas même le serveur.</p>
+              </Card>
+            ) : (
+              <Privacy />
+            )}
           </>
         )}
       </div>

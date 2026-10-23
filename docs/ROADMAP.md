@@ -67,7 +67,7 @@ prêts, aperçu à corriger, export. Ajoutée en route ; détails dans `docs/V3.
 - Quotas par espace, quitter un groupe efface ce qu'on y a mis.
 - **Terminé quand** : deux appareils de comptes différents voient leurs scores dans un groupe, le serveur ne voit rien de lisible (test), quitter un groupe retire les données.
 
-## Étape 4 : Sortie : effort L
+## Étape 4 : Sortie : effort L, **fait** (journal : `docs/V3.md`)
 Un événement (festival, week-end) qui orchestre tout : groupe de localisation, budget partagé, planning set par set (qui de la bande va où), liste à emporter,
 « Chaud ? » (un tap pour répondre, la Sortie se crée quand 3 sont chauds), **carnet d'ID** (bouton « ID ? » qui note l'heure, la scène et le DJ du planning),
 carte souvenir après. Réutilise l'espace partagé et myRaveLoc.

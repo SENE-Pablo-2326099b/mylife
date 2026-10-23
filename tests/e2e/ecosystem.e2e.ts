@@ -288,10 +288,10 @@ describe('MyLife, une seule app', () => {
     await page.getByLabel('Ton pseudo dans ce Crew').fill('Alpha');
     await page.getByRole('button', { name: 'Créer le Crew' }).click();
     // Le lien d'invitation est créé tout de suite (copié, ou partagé sur téléphone) et affiché.
-    const linkText = page.getByText(/\/crew\/rejoindre#espace=/);
+    const linkText = page.getByText(/\/rejoindre#espace=/);
     await linkText.waitFor({ timeout: 20_000 });
     const link = (await linkText.textContent())!.trim();
-    expect(link.startsWith(`${server.url}/crew/rejoindre#espace=`)).toBe(true);
+    expect(link.startsWith(`${server.url}/rejoindre#espace=`)).toBe(true);
     await page.getByText('Alpha').first().waitFor();
     await shot(page, '13b-crew-cree');
 
@@ -324,6 +324,91 @@ describe('MyLife, une seule app', () => {
     await friendCtx.close();
   });
 
+  it('Sortie : chaud ?, planning et set en cours, budget partagé, sac commun, carnet d’ID, hors ligne', async () => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const now = new Date();
+    const later = new Date(now.getTime() + 2 * 86_400_000);
+    const from = new Date(now.getTime() - 10 * 60_000);
+    const to = new Date(now.getTime() + 50 * 60_000);
+    await page.goto(`${server.url}/sorties`);
+    await page.getByLabel('Quoi').fill('Festival test');
+    await page.getByLabel('Où (facultatif)').fill('Quelque part');
+    await page.getByLabel('Du').fill(iso(now));
+    await page.getByLabel('Au').fill(iso(later));
+    await page.getByRole('button', { name: 'Proposer et inviter' }).click();
+    const linkText = page.getByText(/\/rejoindre#espace=/);
+    await linkText.waitFor({ timeout: 20_000 });
+    const link = (await linkText.textContent())!.trim();
+
+    // L'ami (déjà inscrit) rejoint et répond « chaud ».
+    const [friendCtx, friend] = await device();
+    await friend.goto(`${server.url}/`);
+    await friend.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await friend.getByLabel('Identifiant').fill(`${LOGIN}-crew`);
+    await friend.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await friend.getByRole('button', { name: 'Se connecter' }).click();
+    await friend.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await friend.goto(link);
+    await friend.getByText('Rejoindre « Festival test » ?').waitFor({ timeout: 20_000 });
+    await friend.getByLabel('Ton pseudo pour cette sortie').fill('Bravo');
+    await friend.getByRole('button', { name: 'Rejoindre' }).click();
+    await friend.getByText('Toi, tu es…').waitFor();
+    await friend.getByRole('radio', { name: 'Chaud' }).click();
+    await friend.waitForTimeout(1500);
+    await page.reload();
+    await page.getByText(/Ça se fait · 2 chauds/).waitFor({ timeout: 20_000 });
+
+    // Planning : le set qui se joue maintenant.
+    await page.getByRole('radio', { name: 'Planning' }).click();
+    await page.getByText('Ajouter un set').click();
+    await page.getByLabel('Début').fill(`${pad(from.getHours())}:${pad(from.getMinutes())}`);
+    await page.getByLabel('Fin').fill(`${pad(to.getHours())}:${pad(to.getMinutes())}`);
+    await page.getByLabel('Scène').fill('Main');
+    await page.getByLabel('Artiste').fill('DJ Test');
+    await page.getByRole('button', { name: 'Ajouter le set' }).click();
+    await page.waitForTimeout(1500);
+    await friend.reload();
+    await friend.getByRole('radio', { name: 'Planning' }).click();
+    await friend.getByText('DJ Test').waitFor({ timeout: 20_000 });
+    await friend.getByRole('button', { name: 'Y aller' }).click();
+    await friend.waitForTimeout(1500);
+
+    // Budget : l'ami paie 30 € pour tous.
+    await friend.getByRole('radio', { name: 'Budget' }).click();
+    await friend.getByText('Ajouter une dépense').click();
+    await friend.getByLabel('Quoi').fill('Essence');
+    await friend.getByLabel('Montant (€)').fill('30');
+    await friend.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await friend.waitForTimeout(1500);
+    await page.reload();
+    await page.getByRole('radio', { name: 'Budget' }).click();
+    await page.getByText(/doit\s+15,00\s?€/).waitFor({ timeout: 20_000 });
+    await shot(page, '13d-sortie-budget');
+
+    // Carnet d'ID : un toucher, le DJ en train de jouer est retrouvé grâce au planning.
+    await page.getByRole('radio', { name: 'ID' }).click();
+    await page.getByRole('button', { name: 'ID ?' }).click();
+    await page.getByText('ID noté : DJ Test · Main').waitFor();
+
+    // Hors ligne : l'ajout attend le réseau, puis part tout seul.
+    await friend.getByRole('radio', { name: 'Sac' }).click();
+    await friendCtx.setOffline(true);
+    await friend.getByLabel('Ajouter à la liste').fill('Tente');
+    await friend.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await friend.getByText(/1 en attente de réseau/).waitFor();
+    await friendCtx.setOffline(false);
+    await friend.evaluate(() => window.dispatchEvent(new Event('online')));
+    await friend.getByText(/en attente de réseau/).waitFor({ state: 'detached', timeout: 20_000 });
+    await page.reload();
+    await page.getByRole('radio', { name: 'Sac' }).click();
+    await page.getByText('Tente').waitFor({ timeout: 20_000 });
+    await page.getByRole('radio', { name: 'Planning' }).click();
+    await page.getByText('Bravo').first().waitFor();
+    await shot(page, '13e-sortie-planning');
+    await friendCtx.close();
+  });
+
   it('320 px : aucun débordement horizontal, nulle part', async () => {
     const [, small] = await device(320, 640);
     await small.goto(`${server.url}/`);
@@ -332,7 +417,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

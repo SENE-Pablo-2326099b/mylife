@@ -13,6 +13,7 @@ import { AppearancePage } from './pages/Appearance';
 import { CharacterPage } from './pages/Character';
 import { RecapPage } from './pages/Recap';
 import { CrewJoinPage, CrewListPage, CrewPage } from './pages/Crew';
+import { SortiePage, SortiesPage } from './pages/Sortie';
 import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
 import { useCharacter, useStatsInput } from './ui/stats';
 import { useEffect } from 'react';
@@ -58,7 +59,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
   useEffect(() => {
     if (!session || welcome || keyPending) return;
     const hash = takeStashedInvite();
-    if (hash) navigate(`/crew/rejoindre${hash}`, { replace: true });
+    if (hash) navigate(`/rejoindre${hash}`, { replace: true });
   }, [session, welcome, keyPending, navigate]);
 
   return (
@@ -78,8 +79,11 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               <Route path="/bilan" element={<RecapPage />} />
               <Route path="/wrapped" element={<WrappedPage />} />
               <Route path="/crew" element={<CrewListPage />} />
+              <Route path="/rejoindre" element={<CrewJoinPage />} />
               <Route path="/crew/rejoindre" element={<CrewJoinPage />} />
               <Route path="/crew/:id" element={<CrewPage />} />
+              <Route path="/sorties" element={<SortiesPage />} />
+              <Route path="/sorties/:id" element={<SortiePage />} />
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>

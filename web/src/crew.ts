@@ -10,7 +10,8 @@ import { crewShare } from './ui/stats';
  * montre : niveau, titre, série, XP (et les stats choisies). Serveur : server/space.ts.
  */
 
-export const CREW_URL = () => `${location.origin}/crew/rejoindre`;
+/** Lien d'invitation commun à tous les espaces (Crew, Sortie…) : la page de jonction lit le type. */
+export const CREW_URL = () => `${location.origin}/rejoindre`;
 const PUBLISHED = (sid: string) => `mylife:character:crew-pub:${sid}`;
 const PENDING_INVITE = 'mylife:crew-invite';
 
@@ -23,17 +24,19 @@ interface CrewState {
   status: 'idle' | 'loading' | 'ready' | 'error';
   uid: string | null;
   crews: Space[];
+  /** Les Sorties (espaces de type « sortie »). */
+  sorties: Space[];
   error: string | null;
 }
 
-let state: CrewState = { status: 'idle', uid: null, crews: [], error: null };
+let state: CrewState = { status: 'idle', uid: null, crews: [], sorties: [], error: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<CrewState>) => {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 };
 
-onSessionChange(() => set({ status: 'idle', uid: null, crews: [], error: null }));
+onSessionChange(() => set({ status: 'idle', uid: null, crews: [], sorties: [], error: null }));
 
 export function useCrews(): CrewState {
   return useSyncExternalStore(
@@ -51,7 +54,7 @@ export async function loadCrews(): Promise<CrewState> {
   if (state.status !== 'ready') set({ status: 'loading', error: null });
   try {
     const r = await c.list();
-    set({ status: 'ready', uid: r.uid, crews: r.spaces.filter((s) => s.kind === 'crew'), error: null });
+    set({ status: 'ready', uid: r.uid, crews: r.spaces.filter((s) => s.kind === 'crew'), sorties: r.spaces.filter((s) => s.kind === 'sortie'), error: null });
   } catch (e) {
     set({ status: state.crews.length ? 'ready' : 'error', error: e instanceof Error ? e.message : String(e) });
   }
