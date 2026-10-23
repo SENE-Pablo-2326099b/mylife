@@ -8,6 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { startLocalServer, type LocalServer } from '../../server/local';
+import { addWeeks, localToday, weekStart } from '../../packages/lumen/src/character';
 
 const PORT = 4330;
 let server: LocalServer;
@@ -16,6 +17,8 @@ let phone: BrowserContext;
 let page: Page;
 const errors: string[] = [];
 const LOGIN = 'test-e2e-mylife';
+/** Libellé de la carte du Personnage sur le premier appareil (le second doit afficher le même). */
+let personnage = '';
 const PASSWORD = 'cheval-Agrafe-2026';
 const shot = async (p: Page, name: string) => void (process.env.SHOTS && (await p.screenshot({ path: `${process.env.SHOTS}/${name}.png` })));
 
@@ -119,6 +122,49 @@ describe('MyLife, une seule app', () => {
     await page.getByText(LOGIN).first().waitFor({ timeout: 40_000 });
     await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
     await shot(page, '07-perf-compte');
+    // MyPerf publie ses compteurs pour le Personnage (objectif de séances compris), une fois relié au compte.
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mylife:stats:perf') ?? 'null')?.goal ?? null), { timeout: 15_000, interval: 500 }).toBe(4);
+  });
+
+  it('le Personnage : niveau, stats et quêtes calculés à partir des compteurs des apps', async () => {
+    // Des compteurs comme ceux que publient MyPerf et MyFinances : 6 semaines à 3 séances, des jours sous le budget.
+    const now = weekStart(localToday());
+    const perf: Record<string, Record<string, number>> = {};
+    const finances: Record<string, Record<string, number>> = {};
+    for (let i = 1; i <= 6; i++) {
+      perf[addWeeks(now, -i)] = { sessions: 3, records: i % 2 };
+      finances[addWeeks(now, -i)] = { under: 6, tracked: 7 };
+    }
+    perf[now] = { sessions: 1 };
+    await page.goto(`${server.url}/`);
+    await page.evaluate(
+      ([p, f]) => {
+        localStorage.setItem('mylife:stats:perf', JSON.stringify({ v: 1, at: Date.now(), weeks: p, goal: 3 }));
+        localStorage.setItem('mylife:stats:finances', JSON.stringify({ v: 1, at: Date.now(), weeks: f }));
+      },
+      [perf, finances],
+    );
+    await page.reload();
+    const card = page.getByRole('link', { name: /Ton personnage : niveau \d+/ });
+    await card.waitFor();
+    await shot(page, '04b-accueil-personnage');
+    await card.click();
+    await page.getByText('Quêtes de la semaine').waitFor();
+    await page.getByText('Fais 3 séances').waitFor();
+    await page.getByText('Reste sous ton budget du jour 5 jours').waitFor();
+    await page.getByText('Série de 6 semaines réussies').waitFor();
+    // Culture n'est pas encore branchée.
+    await page.getByText('Bientôt', { exact: true }).waitFor();
+    await page.waitForTimeout(700);
+    await shot(page, '04c-personnage');
+    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/04d-personnage-complet.png`, fullPage: true });
+    // La semaine de repos se déclare (une toutes les quatre semaines).
+    await page.getByRole('button', { name: 'Déclarer une semaine de repos' }).click();
+    await page.getByRole('button', { name: 'Annuler le repos' }).waitFor();
+    await page.getByRole('button', { name: 'Annuler le repos' }).click();
+    await page.goto(`${server.url}/`);
+    personnage = (await page.getByRole('link', { name: /Ton personnage : niveau \d+/ }).getAttribute('aria-label')) ?? '';
+    expect(personnage).toMatch(/niveau \d+, /);
   });
 
   it('un thème choisi sur l’accueil habille toutes les apps', async () => {
@@ -177,6 +223,10 @@ describe('MyLife, une seule app', () => {
     await other.getByRole('button', { name: 'Se connecter' }).click();
     await other.getByText(`${LOGIN}`).first().waitFor();
     await expect.poll(() => style(other), { timeout: 20_000, interval: 500 }).toBe('brut');
+    // Le Personnage suit aussi : mêmes compteurs (chiffrés dans le compte), même niveau.
+    await expect
+      .poll(() => other.getByRole('link', { name: /Ton personnage : niveau \d+/ }).getAttribute('aria-label').catch(() => null), { timeout: 20_000, interval: 500 })
+      .toBe(personnage);
     await shot(other, '13-second-appareil');
   });
 
@@ -188,7 +238,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -218,6 +268,11 @@ describe('MyLife, une seule app', () => {
     expect(await page.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
     expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
     expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
+    // Le Personnage du premier compte ne suit pas : le nouveau part de zéro.
+    expect(await page.evaluate(() => localStorage.getItem('mylife:stats:perf'))).toBeNull();
+    await page.goto(`${server.url}/`);
+    await page.getByText('Ton personnage t’attend').waitFor();
+    await page.goto(`${server.url}/finances/`);
     await shot(page, '14-autre-compte');
     // MyPerf : relié au nouveau compte, sans rien du précédent.
     await page.goto(`${server.url}/perf/account`);

@@ -10,6 +10,7 @@ import { ToastHost } from './ui/toast';
 import { HomePalette } from './HomePalette';
 import { AccountPage } from './pages/Account';
 import { AppearancePage } from './pages/Appearance';
+import { CharacterPage } from './pages/Character';
 import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
@@ -44,6 +45,7 @@ export function App() {
             <Routes location={location}>
               <Route path="/bienvenue" element={<WelcomePage />} />
               <Route path="/installer" element={<InstallPage />} />
+              <Route path="/personnage" element={<CharacterPage />} />
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>

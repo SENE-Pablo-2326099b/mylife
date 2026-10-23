@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { observable, useObservable } from './lib/observable';
 import { inviteParts } from './lib/groupCrypto';
-import { app } from './state/app';
+import { app, regulars } from './state/app';
 import { Beacon, setBeacon } from './components/Beacon';
 import { RavelocPalette } from './components/Palette';
 import { AuthScreen } from './screens/Auth';
@@ -14,6 +14,8 @@ import { CreateGroup, Groups, Join } from './screens/Groups';
 import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { setGlance } from './ui/glance';
+import { publishStats } from './ui/stats';
+import { localToday, weekStart } from './vendor/lumen';
 import { Navigation, type TabDef } from './ui/Navigation';
 import { KeptTabs, PushedScreen } from './ui/PageTransition';
 import { setPaletteOpen } from './ui/paletteStore';
@@ -82,6 +84,25 @@ function useRavelocGlance() {
   }, [s.session, title, detail, tone, group?.expiresAt]);
 }
 
+/**
+ * Compteurs du Personnage MyLife (stat Social) : groupes actifs et amis croisés cette semaine. Les groupes
+ * expirent et sont effacés du serveur : la ligne de stats garde l'historique, semaine après semaine.
+ */
+function useRavelocStats() {
+  const s = useObservable(app);
+  const groups = s.groups.status === 'ready' ? s.groups.list : null;
+  useEffect(() => {
+    if (!s.session || !groups) return;
+    const week = weekStart(localToday());
+    const active = groups.filter((g) => g.expiresAt > Date.now());
+    const weekStartMs = new Date(`${week}T00:00:00`).getTime();
+    const seen = regulars().filter((r) => r.lastAt >= weekStartMs).length;
+    const friends = Math.max(seen, 0, ...active.map((g) => g.members - 1));
+    if (active.length === 0 && friends === 0) return;
+    publishStats('raveloc', { weeks: { [week]: { groups: active.length, friends } } });
+  }, [s.session, groups]);
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -102,6 +123,7 @@ function Shell() {
   const signedIn = !!session && !s.sessionExpired;
   const { pathname } = location;
   useRavelocGlance();
+  useRavelocStats();
 
   useEffect(() => {
     if (!signedIn || !invite) return;

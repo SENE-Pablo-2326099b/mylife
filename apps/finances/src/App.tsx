@@ -23,6 +23,7 @@ import { ThemeProvider } from './ui/ThemeProvider';
 import { ToastHost } from './ui/toast';
 import { toast } from './ui/toastStore';
 import { useToClassifyCount } from './domain/unclassified';
+import { useRpgStats } from './domain/useRpgStats';
 
 
 /** Les onglets (dock) : gardés montés une fois visités. */
@@ -148,6 +149,8 @@ function Shell() {
   const navigate = useNavigate();
   const onboarded = useLiveQuery(async () => (await db.settings.get('main'))?.onboarded ?? false, []);
   const toClassify = useToClassifyCount();
+  // Compteurs du Personnage MyLife (jours sous le budget, épargne tenue).
+  useRpgStats();
 
   useEffect(() => {
     prefetchPages();

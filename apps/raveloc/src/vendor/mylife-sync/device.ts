@@ -20,7 +20,8 @@ const PERSONAL_KEYS = [
   'myraveloc-errors',
   'pendingAuth',
 ];
-const PERSONAL_PREFIXES = ['mylife:glance:', 'mylife:backup'];
+// Aperçus, dates de sauvegarde, compteurs et préférences du Personnage.
+const PERSONAL_PREFIXES = ['mylife:glance:', 'mylife:backup', 'mylife:stats', 'mylife:character'];
 
 /** À appeler à chaque connexion : efface les traces d'un compte précédent (ou inconnu), puis note le nouveau. */
 export function claimDevice(login: string): void {

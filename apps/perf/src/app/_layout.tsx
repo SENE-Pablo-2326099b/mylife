@@ -33,7 +33,8 @@ import { REST_BAR_HEIGHT, useBreakpoint } from '@/ui/responsive';
 import { IDENTITY_FONTS } from '@/ui/fonts';
 import { applyIdentity, BOOT_BG, identity, space, useShownTheme, useTheme } from '@/ui/theme';
 import { themeInfo } from '@/ui/themes';
-import { cloudBoot } from '@/services/cloud';
+import { cloudBoot, useCloud } from '@/services/cloud';
+import { watchPerfStats } from '@/services/rpgStats';
 import { installSyncTriggers } from '@/services/cloud/sqliteStore';
 
 void SplashScreen.preventAutoHideAsync();
@@ -167,7 +168,10 @@ export default function RootLayout() {
   }, [boot.kind, fontsReady]);
   // Compte MyLife : récupère ce que les autres appareils ont fait, puis synchronise au fil de l'eau.
   useEffect(() => {
-    if (boot.kind === 'ready') cloudBoot();
+    if (boot.kind !== 'ready') return;
+    cloudBoot();
+    // Compteurs du Personnage MyLife (séances, records), tenus à jour au fil des séances.
+    watchPerfStats(() => useCloud.getState().joined);
   }, [boot.kind]);
   // Les polices des autres identités, une fois l'app lancée : aperçus fidèles et bascule immédiate.
   useEffect(() => {

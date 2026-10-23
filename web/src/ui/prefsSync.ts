@@ -1,16 +1,22 @@
 // GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/mylife-sync';
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
-import { parseAppearance } from '../vendor/lumen';
+import { STATS_APPS, parseAppearance, readStats, type StatsApp } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
+import { adoptCharacterPrefs, adoptStats, onStatsChange, readCharacterPrefs } from './stats';
 
 /**
- * Réglages communs de MyLife (l'apparence) synchronisés entre appareils par le compte, chiffrés comme
- * le reste (app `mylife` du serveur). Le choix le plus récent gagne : changer de thème sur le PC le
- * change sur le téléphone. Lancé par chaque app web ; l'app Android fait de même de son côté.
+ * Réglages communs de MyLife synchronisés entre appareils par le compte, chiffrés comme le reste (app
+ * `mylife` du serveur) : l'apparence (`prefs/appearance`), les compteurs du Personnage de chaque app
+ * (`stats/<app>`) et ses préférences (`prefs/character`). Chaque ligne est datée, la plus récente gagne :
+ * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web ; l'app Android fait
+ * de même de son côté.
  */
 const STATE_KEY = 'mylife-sync-mylife';
 const PUSHED_KEY = 'mylife-prefs-pushed';
+const statsPushedKey = (app: StatsApp) => `mylife:stats-pushed:${app}`;
+const CHARACTER_PUSHED_KEY = 'mylife:character-pushed';
+const isStatsApp = (rid: string): rid is StatsApp => (STATS_APPS as readonly string[]).includes(rid);
 
 const readNum = (k: string) => {
   try {
@@ -27,35 +33,60 @@ const write = (k: string, v: string) => {
   }
 };
 
-/** L'apparence comme une ligne `prefs/appearance`, datée de son choix. */
+/** Toutes les lignes communes de cet appareil, avec leur date. */
+function rows(): { tbl: string; rid: string; at: number; pushedKey: string; row: unknown }[] {
+  const out: { tbl: string; rid: string; at: number; pushedKey: string; row: unknown }[] = [];
+  const a = getAppearance();
+  out.push({ tbl: 'prefs', rid: 'appearance', at: a.at, pushedKey: PUSHED_KEY, row: a });
+  for (const app of STATS_APPS) {
+    const st = readStats(app);
+    if (st) out.push({ tbl: 'stats', rid: app, at: st.at, pushedKey: statsPushedKey(app), row: st });
+  }
+  const c = readCharacterPrefs();
+  if (c.at > 0) out.push({ tbl: 'prefs', rid: 'character', at: c.at, pushedKey: CHARACTER_PUSHED_KEY, row: c });
+  return out;
+}
+
+/** Les réglages communs comme des lignes datées ; une ligne jamais choisie (at = 0) n'est jamais envoyée. */
 export const prefsStore: LocalStore = {
   app: 'mylife',
   async pending() {
-    const a = getAppearance();
-    return a.at > readNum(PUSHED_KEY) ? [{ tbl: 'prefs', rid: 'appearance', ver: a.at, updatedAt: a.at, row: a }] : [];
+    return rows()
+      .filter((r) => r.at > readNum(r.pushedKey))
+      .map((r) => ({ tbl: r.tbl, rid: r.rid, ver: r.at, updatedAt: r.at, row: r.row }));
   },
   async ack(done) {
-    for (const d of done) if (d.rid === 'appearance') write(PUSHED_KEY, String(d.ver));
+    const keys = new Map(rows().map((r) => [`${r.tbl}/${r.rid}`, r.pushedKey]));
+    for (const d of done) {
+      const key = keys.get(`${d.tbl}/${d.rid}`);
+      if (key) write(key, String(d.ver));
+    }
   },
-  async apply(rows) {
-    for (const r of rows) {
-      if (r.tbl !== 'prefs' || r.rid !== 'appearance' || r.deleted) continue;
-      const a = parseAppearance(r.row);
-      // Venu d'un autre appareil : gardé avec sa date (pas renvoyé comme un nouveau choix).
-      if (a && a.at > getAppearance().at) {
-        setAppearance(a);
-        write(PUSHED_KEY, String(a.at));
+  async apply(remote) {
+    for (const r of remote) {
+      if (r.deleted) continue;
+      if (r.tbl === 'prefs' && r.rid === 'appearance') {
+        const a = parseAppearance(r.row);
+        // Venu d'un autre appareil : gardé avec sa date (pas renvoyé comme un nouveau choix).
+        if (a && a.at > getAppearance().at) {
+          setAppearance(a);
+          write(PUSHED_KEY, String(a.at));
+        }
+      } else if (r.tbl === 'stats' && isStatsApp(r.rid)) {
+        if (adoptStats(r.rid, r.row)) write(statsPushedKey(r.rid), String(readStats(r.rid)?.at ?? 0));
+      } else if (r.tbl === 'prefs' && r.rid === 'character') {
+        if (adoptCharacterPrefs(r.row)) write(CHARACTER_PUSHED_KEY, String(readCharacterPrefs().at));
       }
     }
   },
   async snapshot() {
-    return [{ tbl: 'prefs', rid: 'appearance', row: getAppearance() }];
+    return rows().map((r) => ({ tbl: r.tbl, rid: r.rid, row: r.row }));
   },
-  async replace(rows) {
-    await this.apply(rows);
+  async replace(remote) {
+    await this.apply(remote);
   },
   async clearPending() {
-    write(PUSHED_KEY, String(getAppearance().at));
+    for (const r of rows()) write(r.pushedKey, String(r.at));
   },
   async getState() {
     try {
@@ -90,7 +121,7 @@ export async function syncPrefs(): Promise<void> {
     if (state.joinedAs !== session.login) {
       // Nouveau compte sur cet appareil : tout relire depuis le début, et proposer le choix local.
       await prefsStore.setState({ ...state, joinedAs: session.login, cursor: 0 });
-      write(PUSHED_KEY, '0');
+      for (const r of rows()) write(r.pushedKey, '0');
     }
     await syncNow(prefsStore, webPlatform.api, session, webPlatform.random);
   } catch {
@@ -116,6 +147,8 @@ export function startPrefsSync(): void {
     timer = setTimeout(() => void syncPrefs(), ms);
   };
   onSessionChange(() => soon(300));
+  // Des compteurs du Personnage ont changé : ils partent un peu après (une séance finie, un import bancaire).
+  onStatsChange(() => soon(2000));
   // Un choix de thème part presque aussitôt : on change souvent d'app juste après.
   subscribeAppearance(() => soon(150));
   document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? soon(500) : void syncPrefs()));

@@ -7,7 +7,7 @@ même design d'un bout à l'autre, et des données chiffrées sur ton téléphon
 
 | | App | Pour quoi faire |
 |---|---|---|
-| ✦ | **Accueil MyLife** (`/`) | Tes apps et ce qu'elles ont à te dire maintenant (« 25 € à dépenser aujourd'hui », « Jambes · 5 exercices »), ton compte, l'apparence, l'installation. |
+| ✦ | **Accueil MyLife** (`/`) | Ton **Personnage** (un RPG de ta vraie vie : niveaux, quêtes de la semaine, série), tes apps et ce qu'elles ont à te dire maintenant (« 25 € à dépenser aujourd'hui », « Jambes · 5 exercices »), ton compte, l'apparence, l'installation. |
 | ◆ | **MyFinances** (`/finances/`) | Le budget au jour près : ce qui reste à dépenser aujourd'hui, le cycle de paie, les opérations (banques en lecture seule), le patrimoine, l'indépendance financière, un assistant IA. |
 | 🏋 | **MyPerf** (`/perf/`) | La musculation : séance du jour, planning en cycles, saisie des séries, 1RM et progression, carte musculaire, coach IA. Aussi en app Android. |
 | ➤ | **myRaveLoc** (`/raveloc/`) | Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, une flèche et une distance, mode phare. |
@@ -45,6 +45,13 @@ mêmes données.
 | Brut | Argile | Circuit |
 |---|---|---|
 | ![Thème Brut](docs/images/sheet-brut.png) | ![Thème Argile](docs/images/sheet-argile.png) | ![Thème Circuit](docs/images/sheet-circuit.png) |
+
+### Ton personnage
+Sur l'accueil, un personnage dont les stats montent toutes seules avec ce que tu fais déjà : **Force** (séances et
+records dans MyPerf), **Discipline** (jours sous ton budget, épargne tenue dans MyFinances), **Social** (groupes et amis
+dans myRaveLoc), **Constance** (semaines réussies d'affilée). Chaque lundi, de nouvelles quêtes calées sur ton rythme ;
+une semaine de repos se déclare sans casser la série. Seuls des nombres par semaine sont utilisés (aucun montant,
+aucun détail), chiffrés dans ton compte : le même personnage sur tous tes appareils.
 
 ### Plusieurs appareils
 Connecte-toi avec le même identifiant : tes données, chiffrées, se synchronisent toutes seules (à
@@ -120,7 +127,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 54, MyFinances 334, myRaveLoc 83, MyPerf 214) |
+| Tous les tests unitaires | `npm run test:all` (serveur 71, MyFinances 337, myRaveLoc 83, MyPerf 216) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
@@ -142,6 +149,7 @@ Garde-fous de l'inscription ouverte : 10 comptes par réseau et par jour (sur un
 par app.
 
 ### Pour aller plus loin
+- `docs/ROADMAP.md` : la feuille de route, étape par étape ; `docs/V3.md` : le journal de la V3 (où on en est, pourquoi, comment).
 - `docs/ARCHITECTURE.md` : documentation technique complète (pattern, flux, séquence, automates, modèle de données, algorithmes, avec diagrammes Mermaid).
 - `CONTEXTE.md` : la référence complète (architecture, décisions, règles, état).
 - `docs/UNIFICATION.md` : les idées de l'unification, notées avant et après réalisation, avec les sources.

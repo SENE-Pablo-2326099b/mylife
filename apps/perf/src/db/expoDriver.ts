@@ -7,6 +7,8 @@ const DB_NAME = 'myperf.db';
 /** Native needs no async preparation; see expoDriver.web.ts for the browser preview. */
 export const NEEDS_PREPARE = false;
 export async function prepareExpoDb(): Promise<void> {}
+/** Sur le téléphone, chaque écriture est déjà sur le disque. */
+export async function flushExpoDb(): Promise<void> {}
 
 export function openExpoDb(name = DB_NAME): Db {
   const sqlite = openDatabaseSync(name);

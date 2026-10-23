@@ -395,6 +395,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Compte MyLife', path: '/compte', keywords: 'compte connexion mot de passe cle secours synchro deconnexion supprimer' },
   { app: 'home', title: 'Apparence', path: '/apparence', keywords: 'theme couleurs sombre clair identite circuit ardoise argile brut' },
   { app: 'home', title: 'Installer MyLife', path: '/installer', keywords: 'installer telephone ecran accueil application pwa' },
+  { app: 'home', title: 'Ton personnage', path: '/personnage', keywords: 'personnage niveau rpg stats quetes xp serie force discipline social constance' },
   { app: 'finances', title: 'Budget du jour', path: '/finances/', keywords: 'argent depenser reste aujourd hui budget finances' },
   { app: 'finances', title: 'Budget du cycle', path: '/finances/budget', keywords: 'cycle paie calendrier depenses' },
   { app: 'finances', title: 'Opérations', path: '/finances/operations', keywords: 'transactions depenses banque achats' },
@@ -490,3 +491,4 @@ export function writeSharedAppearance(a: Partial<SharedAppearance> & { theme: Th
   }
   return next;
 }
+export * from './character';

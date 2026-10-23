@@ -162,6 +162,12 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `mylife:device-owner`. Sur Android, MyPerf efface la clé d'API du trousseau. Avant de se déconnecter, les
   apps envoient leurs dernières modifications.
 - Conflits : la modification la plus récente gagne.
+- **Personnage (V3, étape 1)** : moteur pur `packages/lumen/src/character.ts` (niveaux, quêtes, série, entièrement
+  recalculé depuis des compteurs par semaine). Chaque app publie ses compteurs (`stats/<app>` de l'app de synchro
+  `mylife`, chiffrés, jamais de montant) : MyFinances `domain/rpgStats.ts`, MyPerf `services/rpgStats.ts` (Android :
+  via `services/cloud/prefs.ts`), myRaveLoc `App.tsx` (fusionné : ses groupes expirent). Web : `packages/ui/src/stats.ts`
+  (`publishStats`, `useCharacter`). Écran : `web/src/pages/Character.tsx` (carte de l'accueil, `/personnage`).
+  Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
   thème jamais choisi (at = 0) n'est jamais envoyé.

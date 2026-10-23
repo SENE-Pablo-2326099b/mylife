@@ -12,6 +12,7 @@ import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { useSession } from '../ui/session';
 import { useInstallState } from '../install';
+import { CharacterCard } from './Character';
 
 const APP_ICON: Record<MyLifeApp['id'], IconName> = { finances: 'diamond-fill', perf: 'barbell', raveloc: 'navigate' };
 
@@ -103,7 +104,13 @@ export function HomePage() {
         )}
         <RecoveryReminder />
 
-        <Reveal index={1}>
+        {session && (
+          <Reveal index={1}>
+            <CharacterCard />
+          </Reveal>
+        )}
+
+        <Reveal index={2}>
           <p className="t-label px-0.5 pb-1 pt-2 text-muted">Tes apps</p>
           <div className="flex flex-col gap-3">
             {MYLIFE_APPS.map((a, i) => (
@@ -113,7 +120,7 @@ export function HomePage() {
         </Reveal>
 
         {install !== 'installed' && install !== 'unsupported' && (
-          <Reveal index={2}>
+          <Reveal index={3}>
             <Card to="/installer" className="flex items-center gap-3" label="Installer MyLife sur cet appareil">
               <Icon name="phone" className="text-accent" />
               <span className="min-w-0 flex-1">

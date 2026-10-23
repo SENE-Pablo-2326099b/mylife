@@ -2,6 +2,7 @@ import { AppState, Platform } from 'react-native';
 import { create } from 'zustand';
 
 import { db, subscribeData } from '@/db/db';
+import { flushExpoDb } from '@/db/expoDriver';
 import { seedIfEmpty } from '@/db/seed';
 import { useSettings } from '@/state/settingsStore';
 import { useWorkoutStore } from '@/state/workoutStore';
@@ -78,7 +79,12 @@ async function ensureJoined(): Promise<void> {
     if (r.action === 'downloaded') reloadStores();
     // Les données d'un autre compte viennent d'être effacées : sur le web, la page repart de zéro, sans
     // rien en mémoire (conversation du coach, écrans déjà calculés…).
-    if (before !== null && before !== session.login && Platform.OS === 'web') return window.location.reload();
+    if (before !== null && before !== session.login && Platform.OS === 'web') {
+      // La base du web s'enregistre en différé : on attend qu'elle le soit, sinon la page rechargée se
+      // croirait encore reliée à l'ancien compte (et effacerait, puis rechargerait, en boucle).
+      await flushExpoDb();
+      return window.location.reload();
+    }
     await refreshState();
   } catch (e) {
     set({ error: e instanceof Error ? e.message : String(e) });

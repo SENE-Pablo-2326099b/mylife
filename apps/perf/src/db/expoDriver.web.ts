@@ -117,6 +117,14 @@ async function save(db: Database): Promise<void> {
   }
 }
 
+/** Enregistre tout de suite ce qui attendait (avant un rechargement de la page : sinon, perdu). */
+export async function flushExpoDb(): Promise<void> {
+  if (saveTimer === null || !sqlite) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  await save(sqlite);
+}
+
 function scheduleSave(db: Database) {
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
