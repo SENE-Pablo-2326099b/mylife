@@ -55,7 +55,8 @@ export default defineConfig({
         globIgnores: ['screenshots/**'],
         navigateFallback: '/index.html',
         // Les apps ont leur propre service worker et leurs propres pages : celui-ci ne sert que l'accueil.
-        navigateFallbackAllowlist: [/^\/$/, /^\/(compte|apparence|installer|bienvenue)(\/|$)/],
+        // Toutes les pages de l'accueil s'ouvrent hors ligne (Personnage, bilans, Crew, Sorties, MyMusique…).
+        navigateFallbackAllowlist: [/^\/(?!finances|perf|raveloc|api)/],
         navigateFallbackDenylist: [/^\/(finances|perf|raveloc|api)(\/|$)/],
         runtimeCaching: [],
         cleanupOutdatedCaches: true,

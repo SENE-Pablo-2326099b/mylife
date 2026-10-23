@@ -86,8 +86,15 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
     }
   }
 
+  /**
+   * Les en-têtes de sécurité de la production (Content-Security-Policy…), lus dans les vercel.json : les
+   * parcours de bout en bout voient ce que verra le navigateur en ligne (une API appelée sans être autorisée
+   * par la CSP casse ici aussi).
+   */
+  const securityHeaders = await loadSecurityHeaders();
+
   /** Fichier d'une partie, ou sa page d'entrée (navigation dans une app à une page). */
-  async function file(res: ServerResponse, root: string, path: string, entry: string) {
+  async function file(res: ServerResponse, root: string, path: string, entry: string, part: 'home' | 'finances' | 'perf' | 'raveloc' = 'home') {
     const safe = normalize(decodeURIComponent(path)).replace(/^(\.\.[/\\])+/, '');
     let p = join(root, safe.endsWith('/') ? `${safe}index.html` : safe);
     let data: Buffer;
@@ -101,7 +108,8 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       p = join(root, entry);
       data = await readFile(p);
     }
-    res.writeHead(200, { 'content-type': TYPES[extname(p)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
+    const extra = Object.fromEntries((securityHeaders[part] ?? []).filter((h) => h.re.test(path)).flatMap((h) => h.headers.filter((x) => x.key !== 'Cache-Control').map((x) => [x.key, x.value])));
+    res.writeHead(200, { ...extra, 'content-type': TYPES[extname(p)] ?? 'application/octet-stream', 'cache-control': 'no-cache' });
     res.end(data);
   }
 
@@ -114,7 +122,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
     }
     for (const app of ['finances', 'perf', 'raveloc'] as const) {
       if (path === `/${app}`) return void res.writeHead(301, { location: `/${app}/` }).end();
-      if (path.startsWith(`/${app}/`)) return void file(res, builds[app], path, `${app}/index.html`).catch(fail);
+      if (path.startsWith(`/${app}/`)) return void file(res, builds[app], path, `${app}/index.html`, app).catch(fail);
     }
     void file(res, builds.home, path, 'index.html').catch(fail);
   });
@@ -126,4 +134,21 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
     env,
     close: () => new Promise<void>((r) => server.close(() => void pg.close().then(() => r()))),
   };
+}
+
+type HeaderRule = { re: RegExp; headers: { key: string; value: string }[] };
+
+/** Règles d'en-têtes de chaque partie (vercel.json de l'accueil et des apps). Motifs Vercel simples → expressions régulières. */
+async function loadSecurityHeaders(): Promise<Partial<Record<'home' | 'finances' | 'perf' | 'raveloc', HeaderRule[]>>> {
+  const files = { home: here('../vercel.json'), finances: here('../apps/finances/vercel.json'), perf: here('../apps/perf/vercel.json'), raveloc: here('../apps/raveloc/vercel.json') };
+  const out: Partial<Record<keyof typeof files, HeaderRule[]>> = {};
+  for (const [part, f] of Object.entries(files) as [keyof typeof files, string][]) {
+    try {
+      const conf = JSON.parse(await readFile(f, 'utf8')) as { headers?: { source: string; headers: { key: string; value: string }[] }[] };
+      out[part] = (conf.headers ?? []).map((h) => ({ re: new RegExp(`^${h.source.replace(/:path\*/g, '.*')}$`), headers: h.headers }));
+    } catch {
+      /* pas de vercel.json pour cette partie */
+    }
+  }
+  return out;
 }

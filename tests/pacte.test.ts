@@ -21,7 +21,7 @@ describe('Pacte', () => {
   });
 
   it('évaluation : semaines finies seulement, cagnotte, sans faute ; la semaine en cours ne coûte rien', () => {
-    const values = new Map([
+    const values = new Map<string, Record<string, number>>([
       ['ana', { '2026-10-05': 3, '2026-10-12': 4, '2026-10-19': 1 }],
       ['bob', { '2026-10-05': 2, '2026-10-12': 3 }],
     ]);
