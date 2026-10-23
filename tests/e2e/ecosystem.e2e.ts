@@ -449,6 +449,20 @@ describe('MyLife, une seule app', () => {
     await page.waitForTimeout(800);
     await friend.reload();
     await friend.getByText(/^Force \d+$/).waitFor({ timeout: 20_000 });
+
+    // Pacte : Alpha lance « 3 séances par semaine », validé tout seul par MyPerf ; Bravo s'engage.
+    await page.getByText('Lancer un pacte').click();
+    await page.getByRole('button', { name: 'Lancer le pacte' }).click();
+    await page.getByText('3 séances par semaine').waitFor({ timeout: 20_000 });
+    // La semaine en cours d'Alpha (1 séance d'après ses compteurs) s'affiche déjà.
+    await page.getByText('1/3').waitFor({ timeout: 20_000 });
+    await friend.reload();
+    await friend.getByRole('button', { name: 'Je m’engage' }).click();
+    await friend.getByText('Bravo (toi)').waitFor({ timeout: 20_000 });
+    await friend.getByText('Alpha', { exact: true }).first().waitFor();
+    await friend.getByText('Bravo (toi)').evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await friend.waitForTimeout(400);
+    await shot(friend, '13j-pacte');
     await friendCtx.close();
   });
 

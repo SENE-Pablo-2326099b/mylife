@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { localToday, SHAREABLE_STATS, STATS, type CrewEntry, type StatId } from '../vendor/lumen';
+import { addWeeks, evaluatePacte, localToday, myPacteValues, PACTE_KINDS, SHAREABLE_STATS, STATS, weekStart, type CrewEntry, type PacteKind, type StatId, type StatsByApp } from '../vendor/lumen';
 import { parseSpaceInvite, type Space } from '../vendor/mylife-sync';
-import { CREW_URL, client, loadBoard, loadCrews, monthXp, publishScore, useCrews, type CrewBoard } from '../crew';
+import { CREW_URL, client, loadBoard, loadCrews, monthXp, publishPacteValues, publishScore, useCrews, type CrewBoard } from '../crew';
 import { Icon } from '../ui/icons';
-import { Badge, Button, Card, Disclosure, EmptyState, Reveal, SectionTitle, TextField, ToggleRow } from '../ui/index';
+import { Badge, Button, Card, Disclosure, EmptyState, Reveal, SectionTitle, SelectField, TextField, ToggleRow } from '../ui/index';
+import { formatCents } from '../ui/money';
 import { Screen } from '../ui/Screen';
 import { useSession } from '../ui/session';
 import { crewShare, setCrewShare, useCharacter, useStatsInput } from '../ui/stats';
@@ -269,6 +270,163 @@ function EntryRow({ e }: { e: CrewEntry }) {
   );
 }
 
+const dayLabel = (d: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(`${d}T12:00:00`));
+
+/** Les pactes du Crew : en créer, en rejoindre, suivre les semaines et la cagnotte. */
+function Pactes({ space, uid, board, stats, rest, onChange }: { space: Space; uid: string; board: CrewBoard; stats: StatsByApp; rest: readonly string[]; onChange: () => void }) {
+  const today = localToday();
+  const [kind, setKind] = useState<PacteKind>('sessions');
+  const [target, setTarget] = useState('3');
+  const [stake, setStake] = useState('5');
+  const [weeks, setWeeks] = useState('4');
+  const [startNow, setStartNow] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const pseudo = new Map(board.members.map((m) => [m.uid, m.pseudo]));
+
+  const run = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try {
+      await fn();
+      onChange();
+    } catch (e) {
+      toast({ message: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = () =>
+    run(async () => {
+      const c = client();
+      if (!c) return;
+      const t = Math.round(Number(target));
+      const max = PACTE_KINDS[kind].max;
+      if (!(t >= 1 && t <= max)) throw new Error(`Objectif entre 1 et ${max}.`);
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
+      const start = startNow ? weekStart(today) : addWeeks(weekStart(today), 1);
+      const pacte = { kind, target: t, stakeCents: Math.max(0, Math.round(Number(stake.replace(',', '.')) * 100) || 0), start, weeks: Math.min(26, Math.max(1, Math.round(Number(weeks)) || 4)), title: '' };
+      // Le créateur participe d'office : ses valeurs sont publiées tout de suite.
+      await c.sync(space, Number.MAX_SAFE_INTEGER, [
+        { tbl: 'pacte', rid: id, row: pacte },
+        { tbl: 'pacte_week', rid: `${id}:${uid}`, row: { weeks: {} } },
+      ]);
+      const fresh = await loadBoard(space, uid, today.slice(0, 7));
+      await publishPacteValues(space, uid, fresh, stats, rest);
+      toast({ message: 'Pacte lancé : il se valide tout seul, semaine après semaine', tone: 'gold' });
+    });
+
+  const join = (id: string) =>
+    run(async () => {
+      const c = client();
+      if (!c) return;
+      const p = board.pactes.find((x) => x.pacte.id === id);
+      if (!p) return;
+      await c.sync(space, Number.MAX_SAFE_INTEGER, [{ tbl: 'pacte_week', rid: `${id}:${uid}`, row: { weeks: myPacteValues(p.pacte, stats, today, rest) } }]);
+      toast({ message: 'Tu es dans le pacte' });
+    });
+
+  const leave = (id: string) =>
+    run(async () => {
+      await client()?.sync(space, Number.MAX_SAFE_INTEGER, [{ tbl: 'pacte_week', rid: `${id}:${uid}`, row: null }]);
+    });
+
+  return (
+    <div className="flex flex-col gap-3">
+      {board.pactes.map(({ pacte, values }) => {
+        const participants = [...values.keys()].filter((u) => pseudo.has(u));
+        const r = evaluatePacte(pacte, participants, values, today);
+        const inIt = values.has(uid);
+        const k = PACTE_KINDS[pacte.kind];
+        return (
+          <Card key={pacte.id} level="raised">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="t-headline min-w-0 flex-1">{pacte.title}</p>
+              <Badge tone={r.status === 'en_cours' ? 'success' : 'neutral'}>{r.status === 'avant' ? `Dès le ${dayLabel(pacte.start)}` : r.status === 'en_cours' ? 'En cours' : 'Terminé'}</Badge>
+            </div>
+            <p className="t-small mt-1 text-secondary">
+              {k.label} ({k.app}) · {pacte.weeks} semaine{pacte.weeks > 1 ? 's' : ''} · {formatCents(pacte.stakeCents)} par semaine ratée
+            </p>
+            {participants.length > 0 && r.weeks.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="t-small w-full border-separate" style={{ borderSpacing: '0 6px' }}>
+                  <thead>
+                    <tr className="text-left text-muted">
+                      <th className="font-normal">Qui</th>
+                      {r.weeks.map((w) => (
+                        <th key={w.week} className="text-center font-normal">
+                          {dayLabel(w.week)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participants.map((u) => (
+                      <tr key={u}>
+                        <td className="t-body-strong pr-2">{pseudo.get(u)}{u === uid ? ' (toi)' : ''}</td>
+                        {r.weeks.map((w) => {
+                          const x = w.results[u]!;
+                          return (
+                            <td key={w.week} className="num text-center" aria-label={`${pseudo.get(u)}, semaine du ${dayLabel(w.week)} : ${x.value} sur ${pacte.target}`}>
+                              {w.finished ? (x.ok ? '✓' : '✗') : `${x.value}/${pacte.target}`}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="t-body mt-2">
+              Cagnotte : <strong>{formatCents(r.pot)}</strong>
+              {r.status === 'termine' && r.perfect.length > 0 ? ` · sans faute : ${r.perfect.map((u) => pseudo.get(u)).join(', ')}` : ''}
+            </p>
+            {r.status === 'termine' && r.pot > 0 && <p className="t-caption text-muted">À dépenser ensemble : la prochaine Sortie est toute trouvée.</p>}
+            <div className="mt-3">
+              {inIt ? (
+                r.status !== 'termine' && (
+                  <Button variant="ghost" size="sm" disabled={busy} onClick={() => void leave(pacte.id)}>
+                    Quitter le pacte
+                  </Button>
+                )
+              ) : (
+                r.status !== 'termine' && (
+                  <Button size="sm" icon="flame" disabled={busy} onClick={() => void join(pacte.id)}>
+                    Je m’engage
+                  </Button>
+                )
+              )}
+            </div>
+          </Card>
+        );
+      })}
+      <Disclosure title="Lancer un pacte" summary="Un engagement à plusieurs, validé tout seul">
+        <div className="flex flex-col gap-3">
+          <SelectField
+            label="Sur quoi"
+            value={kind}
+            onChange={(v) => {
+              setKind(v);
+              setTarget(v === 'budget' ? '5' : v === 'quests' ? '2' : '3');
+            }}
+            options={(Object.keys(PACTE_KINDS) as PacteKind[]).map((k) => ({ value: k, label: `${PACTE_KINDS[k].label} (${PACTE_KINDS[k].app})` }))}
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <TextField label="Objectif" value={target} onChange={setTarget} inputMode="numeric" />
+            <TextField label="Mise (€)" value={stake} onChange={setStake} inputMode="decimal" />
+            <TextField label="Semaines" value={weeks} onChange={setWeeks} inputMode="numeric" />
+          </div>
+          <ToggleRow label="Commencer cette semaine" hint="Sinon lundi prochain" checked={startNow} onChange={setStartNow} />
+          <Button icon="flame" disabled={busy} onClick={() => void create()}>
+            Lancer le pacte
+          </Button>
+          <p className="t-caption text-muted">Chaque semaine finie se valide toute seule avec ce que calculent les apps. Une semaine ratée met la mise dans la cagnotte : un compteur, pas de vrai virement.</p>
+        </div>
+      </Disclosure>
+    </div>
+  );
+}
+
 /** /crew/:id : classement du mois, inviter, ce que je partage, pseudo, quitter. */
 export function CrewPage() {
   const { id } = useParams();
@@ -380,6 +538,13 @@ export function CrewPage() {
           </Card>
           <p className="t-caption mt-2 px-1 text-muted">Classé sur les XP gagnés ce mois-ci (le niveau départage). Remis à zéro chaque mois.</p>
         </Reveal>
+
+        {board && crews.uid && (
+          <Reveal index={1}>
+            <SectionTitle>Pactes</SectionTitle>
+            <Pactes space={space} uid={crews.uid} board={board} stats={stats} rest={rest} onChange={() => void refresh(space, crews.uid!)} />
+          </Reveal>
+        )}
 
         <Reveal index={1}>
           <Card>

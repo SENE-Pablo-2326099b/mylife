@@ -90,7 +90,7 @@ carte souvenir après. Réutilise l'espace partagé et myRaveLoc.
 - Une première version en lecture seule est possible dès l'étape 1.
 - **Terminé quand** : des questions croisant au moins deux apps reçoivent une réponse juste sur des données de test.
 
-## Étape 8 : Pacte : effort M
+## Étape 8 : Pacte : effort M, **fait** (journal : `docs/V3.md`)
 Engagement dans un groupe Crew (« 3 séances par semaine chacun »), validé automatiquement par MyPerf (ou MyFinances), cagnotte virtuelle (un compteur, pas de vrai virement)
 qui paie la soirée du groupe. Règles de tricherie : seules les données calculées par l'app valent, pas de saisie libre.
 - **Terminé quand** : un pacte à trois comptes se valide et se clôt tout seul.

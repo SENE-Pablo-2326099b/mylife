@@ -531,3 +531,4 @@ export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> |
     return null;
   }
 }
+export * from './pacte';

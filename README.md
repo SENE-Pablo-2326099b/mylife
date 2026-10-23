@@ -77,7 +77,8 @@ tout part dès que le réseau revient.
 ### Ton Crew
 Entre amis, un classement du mois : chacun voit le niveau, le titre, la série et les XP du mois des autres (et le
 niveau des stats que chacun choisit de montrer). Crée un Crew, envoie le lien : la clé du Crew voyage dans le lien,
-le serveur ne peut rien lire. Quitter efface ton score.
+le serveur ne peut rien lire. Quitter efface ton score. Et des **pactes** : « 3 séances par semaine chacun, 4 semaines,
+5 € par semaine ratée », validés tout seuls par tes apps ; la cagnotte (virtuelle) paie la soirée.
 
 ### Plusieurs appareils
 Connecte-toi avec le même identifiant : tes données, chiffrées, se synchronisent toutes seules (à
@@ -153,7 +154,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 106, MyFinances 337, myRaveLoc 83, MyPerf 235) |
+| Tous les tests unitaires | `npm run test:all` (serveur 109, MyFinances 337, myRaveLoc 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

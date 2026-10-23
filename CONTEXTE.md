@@ -177,6 +177,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `web/src/pages/Games.tsx` (`/jeux`, `/temps`).
   Copilot (V3, étape 7) : `web/src/copilot.ts`, `web/src/pages/Copilot.tsx` (chargé à la demande), fiches de contexte
   `mylife:copilot:<app>` (appareil seulement) posées par MyFinances (`Today.tsx`) et MyPerf (`rpgStats.ts`).
+  Pacte (V3, étape 8) : `packages/lumen/src/pacte.ts`, section Pactes de `web/src/pages/Crew.tsx` (lignes `pacte`,
+  `pacte_week` du Crew).
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
