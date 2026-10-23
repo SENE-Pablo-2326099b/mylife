@@ -1,6 +1,6 @@
 // GÉNÉRÉ depuis MyLife/packages/ui — ne pas modifier ici (MyLife : npm run vendor).
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
+import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseGames, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -140,7 +140,7 @@ export function setCrewShare(sid: string, stats: readonly StatId[]): void {
 const addDays = (iso: string, n: number) => new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) + n)).toISOString().slice(0, 10);
 
 function subscribe(fn: () => void): () => void {
-  const onStorage = (e: StorageEvent) => (e.key === null || e.key.startsWith('mylife:stats:') || e.key === CHARACTER_KEY || e.key === MUSIC_KEY) && fn();
+  const onStorage = (e: StorageEvent) => (e.key === null || e.key.startsWith('mylife:stats:') || e.key === CHARACTER_KEY || e.key === MUSIC_KEY || e.key === GAMES_KEY) && fn();
   window.addEventListener('storage', onStorage);
   window.addEventListener(EVENT, fn);
   return () => {
@@ -233,4 +233,41 @@ export function useMusic(): MusicSummary | null {
     }
   }, () => '');
   return useMemo(() => (key ? readMusic() : null), [key]);
+}
+
+// ---------------------------------------------------------------- MyGames : photos Steam et saisies
+
+const GAMES_KEY = 'mylife:games';
+
+export function readGames(): GamesData | null {
+  try {
+    return parseGames(JSON.parse(localStorage.getItem(GAMES_KEY) ?? 'null'));
+  } catch {
+    return null;
+  }
+}
+
+export function saveGames(data: GamesData): void {
+  write(GAMES_KEY, data);
+  emit();
+  onChange?.();
+}
+
+export function adoptGames(raw: unknown): boolean {
+  const g = parseGames(raw);
+  if (!g || g.at <= (readGames()?.at ?? 0)) return false;
+  write(GAMES_KEY, g);
+  emit();
+  return true;
+}
+
+export function useGames(): GamesData | null {
+  const key = useSyncExternalStore(subscribe, () => {
+    try {
+      return localStorage.getItem(GAMES_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  }, () => '');
+  return useMemo(() => (key ? readGames() : null), [key]);
 }

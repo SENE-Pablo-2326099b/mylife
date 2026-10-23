@@ -19,15 +19,16 @@ const NATIVE_KEY = 'stats_perf';
 
 export function computePerfStats(day = today()): Pick<AppStats, 'weeks' | 'goal'> {
   const from = addDays(day, -7 * 104);
-  const sessions = workoutSummaries(from, day)
-    .filter((w) => w.status === 'completed' && w.setCount > 0)
-    .map((w) => w.date);
+  const done = workoutSummaries(from, day).filter((w) => w.status === 'completed' && w.setCount > 0);
+  const sessions = done.map((w) => w.date);
+  // Durée réelle (séance oubliée ouverte : 4 h au plus).
+  const minutes = done.map((w) => ({ date: w.date, minutes: w.endedAt ? Math.min(240, Math.max(0, (w.endedAt - w.startedAt) / 60_000)) : 0 }));
   const exercises = new Map(listExercises(true).map((e) => [e.id, e]));
   const records = exerciseActivity().flatMap((a) => {
     const main = exercises.get(a.exerciseId)?.progressionType === 'top_set_backoff';
     return recordEvents(setRecordsFor(a.exerciseId), main ? RELIABLE_MAX_REPS : undefined).map((e) => e.date);
   });
-  return { weeks: forceWeeks(sessions, records, from), goal: loadSettings().weeklyGoal };
+  return { weeks: forceWeeks(sessions, records, from, minutes), goal: loadSettings().weeklyGoal };
 }
 
 /** Ligne gardée par l'app Android (lue par la synchro des réglages communs). */

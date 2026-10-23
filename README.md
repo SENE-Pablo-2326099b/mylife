@@ -59,6 +59,10 @@ Tes stats Spotify quand tu veux : demande ton export de données à Spotify, ouv
 et morceaux du mois et de l'année, ton obsession du moment, ton heure d'écoute, tes séries, tes découvertes, et la
 stat Culture de ton personnage. Le fichier est lu sur ton téléphone : seul un résumé est gardé, chiffré.
 
+### MyGames et « Où va ton temps ? »
+Tes heures de jeu : depuis Steam (profil public), ou notées à la main pour la console et le mobile. Et une vue
+honnête de ton temps : sport, musique, jeu, côte à côte. Le jeu ne rapporte pas de points à ton personnage.
+
 ### Sorties
 Un festival, un week-end, une soirée : propose, envoie le lien, chacun répond « chaud ». Puis, au même endroit et
 chiffré : le planning set par set (qui va où), le budget partagé (qui doit combien à qui, au centime près), la liste à
@@ -107,7 +111,7 @@ gardent leurs données).
 ```
 MyLife/
 ├── web/                 Accueil MyLife (React + Vite) — la seule PWA installable (manifeste, portée /)
-├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc), espaces partagés (/api/space)
+├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc), espaces partagés (/api/space), relais Steam (/api/games)
 ├── packages/
 │   ├── lumen/           Thèmes, identités, registre des apps et de leurs écrans, aperçus, apparence commune
 │   ├── sync-client/     Compte et synchro chiffrée (TypeScript pur : web et React Native)
@@ -144,7 +148,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 95, MyFinances 337, myRaveLoc 83, MyPerf 234) |
+| Tous les tests unitaires | `npm run test:all` (serveur 100, MyFinances 337, myRaveLoc 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
@@ -160,6 +164,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | `SESSION_SECRET` | Signe les sessions (aussi sur `myfinances` pour le relais bancaire) |
 | `SIGNUP` | `open` (défaut : inscription libre, protégée) ou `invite` (code exigé) |
 | `INVITE_CODE` | Code d'invitation, seulement en mode `invite` |
+| `STEAM_API_KEY` | Facultatif : clé de l'API Steam pour MyGames (sans elle, saisie à la main) |
 
 Garde-fous de l'inscription ouverte : 10 comptes par réseau et par jour (sur une empreinte de l'adresse),
 10 essais de mot de passe ou de clé de secours par quart d'heure et par identifiant, quotas de stockage

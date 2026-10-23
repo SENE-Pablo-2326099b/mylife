@@ -127,6 +127,11 @@ export function HomePage() {
                   <p className="t-body-strong mt-1">MyMusique</p>
                   <p className="t-caption text-muted">Tes stats d’écoute</p>
                 </Card>
+                <Card to="/jeux" label="MyGames : tes heures de jeu, et où va ton temps">
+                  <Icon name="play" className="text-gold" />
+                  <p className="t-body-strong mt-1">MyGames</p>
+                  <p className="t-caption text-muted">Heures de jeu, ton temps</p>
+                </Card>
               </div>
             </div>
           </Reveal>

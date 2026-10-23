@@ -79,7 +79,7 @@ carte souvenir après. Réutilise l'espace partagé et myRaveLoc.
 - Alimente la stat **Culture** du Personnage. Option plus tard : Last.fm / ListenBrainz en direct.
 - **Terminé quand** : un vrai fichier d'export est importé et donne des stats justes ; rien n'est envoyé au serveur sauf les résultats chiffrés.
 
-## Étape 6 : MyGames et « Où va ton temps ? » : effort M
+## Étape 6 : MyGames et « Où va ton temps ? » : effort M, **fait** (journal : `docs/V3.md`)
 - Steam (clé gratuite, profil public) : temps de jeu total et récent. Autres jeux : saisie ou import, selon ce que tu joues.
 - Vue transversale : camembert d'heures (jeu, musique, salle, festival…).
 - **Terminé quand** : tes heures de jeu s'affichent et la vue « temps » regroupe au moins trois sources.

@@ -173,6 +173,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `packages/sync-client/src/space.ts` ; Crew : `packages/lumen/src/crew.ts`, `web/src/crew.ts`, `web/src/pages/Crew.tsx`.
   Sorties (V3, étape 4) : `packages/lumen/src/sortie.ts`, `web/src/pages/Sortie.tsx`, hors ligne `web/src/spaceSync.ts`.
   MyMusique (V3, étape 5) : `packages/lumen/src/music.ts`, `web/src/pages/Music.tsx`, `web/src/zip.ts`.
+  MyGames (V3, étape 6) : relais `server/games.ts` (`/api/games`, `STEAM_API_KEY`), `packages/lumen/src/games.ts`,
+  `web/src/pages/Games.tsx` (`/jeux`, `/temps`).
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

@@ -398,6 +398,8 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Ta semaine', path: '/bilan', keywords: 'bilan semaine resume recap progres' },
   { app: 'home', title: 'Ton Wrapped', path: '/wrapped', keywords: 'wrapped mois annee resume partager image story' },
   { app: 'home', title: 'Ton Crew', path: '/crew', keywords: 'crew amis classement groupe inviter defi bande' },
+  { app: 'home', title: 'MyGames', path: '/jeux', keywords: 'jeux jeu video steam heures console' },
+  { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
   { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
   { app: 'home', title: 'Sorties', path: '/sorties', keywords: 'sortie festival soiree week end chaud planning sets budget partage depenses liste id' },
   { app: 'finances', title: 'Budget du jour', path: '/finances/', keywords: 'argent depenser reste aujourd hui budget finances' },
@@ -500,3 +502,4 @@ export * from './character';
 export * from './crew';
 export * from './sortie';
 export * from './music';
+export * from './games';

@@ -354,6 +354,24 @@ describe('MyLife, une seule app', () => {
     await page.getByText('Ce que tu écoutes et découvres (MyMusique)', { exact: false }).waitFor();
   });
 
+  it('MyGames et « Où va ton temps ? » : Steam sans clé (message clair), partie notée à la main, temps réparti', async () => {
+    await page.goto(`${server.url}/jeux`);
+    await page.getByLabel('Ton profil Steam').fill('https://steamcommunity.com/id/quelquun/');
+    await page.getByRole('button', { name: 'Mettre à jour depuis Steam' }).click();
+    await page.getByText(/connexion à Steam n’est pas encore activée/).waitFor();
+    await page.getByText('Noter une partie').click();
+    await page.getByLabel('Jeu', { exact: true }).fill('Mario Kart');
+    await page.getByLabel('Durée aujourd’hui (minutes)').fill('90');
+    await page.getByRole('button', { name: 'Noter', exact: true }).click();
+    await page.getByText('Mario Kart').first().waitFor();
+    await page.getByText('1,5 h').first().waitFor();
+    await shot(page, '13g-jeux');
+    await page.goto(`${server.url}/temps`);
+    await page.getByText('Jeu', { exact: true }).waitFor();
+    await page.getByText(/surtout en/).waitFor();
+    await shot(page, '13h-temps');
+  });
+
   it('Crew : créer, inviter (même sans compte chez l’ami), se voir au classement, choisir ce qu’on montre', async () => {
     await page.goto(`${server.url}/crew`);
     await page.getByText('Ce que tes amis voient').waitFor();
@@ -490,7 +508,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

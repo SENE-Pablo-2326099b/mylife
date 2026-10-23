@@ -13,6 +13,7 @@ import { authDispatch } from './auth.js';
 import { ensureSchema, HttpError, type Db, type Env } from './core.js';
 import { dispatch as ravelocDispatch, ensureRavelocSchema, purge } from './raveloc.js';
 import { ensureSpaceSchema, spaceDispatch } from './space.js';
+import { gamesDispatch } from './games.js';
 import { syncDispatch } from './sync.js';
 
 const TYPES: Record<string, string> = {
@@ -75,6 +76,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       if (path === '/api/auth') return send(200, await authDispatch(db, env, body, auth, { ip: req.socket.remoteAddress ?? '' }));
       if (path === '/api/sync') return send(200, await syncDispatch(db, env, body, auth));
       if (path === '/api/space') return send(200, await spaceDispatch(db, env.secret, auth, body));
+      if (path === '/api/games') return send(200, await gamesDispatch(db, { secret: env.secret, steamKey: process.env.STEAM_API_KEY ?? '' }, auth, body));
       await purge(db);
       send(200, await ravelocDispatch(db, env.secret, auth, body));
     } catch (e) {
