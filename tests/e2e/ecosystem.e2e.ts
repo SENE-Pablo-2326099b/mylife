@@ -5,6 +5,7 @@
  * Prérequis : l'accueil (npm run build) et les trois apps construites (voir README).
  * CHROME_PATH pour un autre navigateur que /usr/bin/google-chrome ; SHOTS=dossier pour des captures.
  */
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { startLocalServer, type LocalServer } from '../../server/local';
@@ -124,6 +125,43 @@ describe('MyLife, une seule app', () => {
     await shot(page, '07-perf-compte');
     // MyPerf publie ses compteurs pour le Personnage (objectif de séances compris), une fois relié au compte.
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mylife:stats:perf') ?? 'null')?.goal ?? null), { timeout: 15_000, interval: 500 }).toBe(4);
+  });
+
+  it('MyPerf : importer un programme (texte collé, programme prêt), le retrouver, l’exporter', async () => {
+    await page.goto(`${server.url}/perf/program-import`);
+    await page.getByText('Avec ton IA, gratuite').waitFor({ timeout: 30_000 });
+    // Le programme tel qu'on l'a dans ses notes : titres de séance, une ligne par exercice.
+    await page.getByLabel('Programme à importer').fill('Mon PPL\nLundi – Push\nDC 4x6-8 @75% repos 2min\nPec deck 3x12\nJeudi – Pull\nTractions 3x max\nRowing barre 3x10');
+    await page.getByText('Voir l’aperçu').click();
+    await page.getByText('Programme collé (texte)').waitFor();
+    // « DC » reconnu (Développé couché), « Pec deck » sera créé.
+    await page.getByText('Développé couché', { exact: true }).waitFor();
+    await page.getByText('Nouvel exercice : Pec deck').waitFor();
+    await page.getByText(/4 exercices · 3 reconnus · 1 nouveau/).waitFor();
+    await shot(page, '07b-import-apercu');
+    await page.getByText('Importer 2 séances').click();
+    await page.getByText('C’est prêt').waitFor();
+    await page.getByText('Voir mes séances').click();
+    await page.getByText('Lundi – Push').first().waitFor();
+    await page.getByText('Jeudi – Pull').first().waitFor();
+    await shot(page, '07c-import-planning');
+    // Un programme prêt.
+    await page.goto(`${server.url}/perf/program-import`);
+    await page.getByText('Full body débutant').click();
+    await page.getByText(/10 exercices · 10 reconnus/).waitFor();
+    await page.getByText('Importer 2 séances').click();
+    await page.getByText('C’est prêt').waitFor();
+    // Export : un fichier au format d'échange, avec les séances importées.
+    await page.goto(`${server.url}/perf/program-import`);
+    // Tout en bas de la page : centré d'abord (sinon sous le dock).
+    const exportButton = page.getByRole('button', { name: 'Exporter mon programme' });
+    await exportButton.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    const download = page.waitForEvent('download');
+    await exportButton.click();
+    const file = await download;
+    const json = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; sessions: { name: string }[] };
+    expect(json.format).toBe('myperf-program');
+    expect(json.sessions.map((s) => s.name)).toEqual(expect.arrayContaining(['Lundi – Push', 'Jeudi – Pull', 'Full body A', 'Full body B']));
   });
 
   it('le Personnage : niveau, stats et quêtes calculés à partir des compteurs des apps', async () => {

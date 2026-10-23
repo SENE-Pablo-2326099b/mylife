@@ -41,9 +41,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   barWeight: 20,
   plates: [...DEFAULT_PLATES],
   weeklyGoal: 4,
-  // programme-reel.md: triceps ~9, biceps ~13 sets a week.
-  volumeTargets: { triceps: 9, biceps: 13 },
-  bodyweightGoal: 71.5,
+  // Rien de personnel par défaut : chacun règle ses cibles et son objectif de poids.
+  volumeTargets: {},
+  bodyweightGoal: null,
 };
 
 const KEY = 'app';

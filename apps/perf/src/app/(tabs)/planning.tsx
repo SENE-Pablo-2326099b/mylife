@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 
@@ -66,7 +66,9 @@ import { Tilt } from '@/ui/components/Tilt';
 type Tab = "calendar" | "program";
 
 export default function PlanningScreen() {
-  const [tab, setTab] = useState<Tab>("calendar");
+  // « ?vue=programme » : ouvert directement sur le programme (après un import, par exemple).
+  const { vue } = useLocalSearchParams<{ vue?: string }>();
+  const [tab, setTab] = useState<Tab>(vue === "programme" ? "program" : "calendar");
   return (
     <Screen title="Planning" subtitle="Cycles & semaines" mood="planning" onRefresh={() => syncCloud()}>
       <Segmented
@@ -620,13 +622,22 @@ function ProgramTab() {
           <SectionTitle
             title="Séances types"
             action={
-              <Button
-                label="Nouvelle"
-                icon="add"
-                variant="ghost"
-                size="sm"
-                onPress={newTemplate}
-              />
+              <View style={{ flexDirection: "row" }}>
+                <Button
+                  label="Importer"
+                  icon="download-outline"
+                  variant="ghost"
+                  size="sm"
+                  onPress={() => router.push("/program-import")}
+                />
+                <Button
+                  label="Nouvelle"
+                  icon="add"
+                  variant="ghost"
+                  size="sm"
+                  onPress={newTemplate}
+                />
+              </View>
             }
           />
           <Group>
@@ -639,11 +650,19 @@ function ProgramTab() {
               />
             ))}
             {data.templates.length === 0 && (
-              <Row
-                title="Créer ta première séance type"
-                icon="add-circle-outline"
-                onPress={newTemplate}
-              />
+              <>
+                <Row
+                  title="Importer un programme"
+                  subtitle="Le tien (avec ton IA ou en texte) ou un programme prêt"
+                  icon="download-outline"
+                  onPress={() => router.push("/program-import")}
+                />
+                <Row
+                  title="Créer ta première séance type"
+                  icon="add-circle-outline"
+                  onPress={newTemplate}
+                />
+              </>
             )}
           </Group>
         </View>

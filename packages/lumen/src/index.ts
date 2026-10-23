@@ -408,6 +408,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'perf', title: 'Exercices', path: '/perf/exercises', keywords: 'exercices bibliotheque 1rm record mouvement' },
   { app: 'perf', title: 'Statistiques sportives', path: '/perf/stats', keywords: 'stats progression volume force' },
   { app: 'perf', title: 'Coach', path: '/perf/coach', keywords: 'coach ia conseil entrainement' },
+  { app: 'perf', title: 'Importer un programme', path: '/perf/program-import', keywords: 'importer programme seances ia chatgpt json exporter partager modele' },
   { app: 'raveloc', title: 'Retrouver mes amis', path: '/raveloc/', keywords: 'amis festival position fleche retrouver raveloc' },
   { app: 'raveloc', title: 'Mes groupes', path: '/raveloc/groupes', keywords: 'groupes soiree concert' },
   { app: 'raveloc', title: 'Créer un groupe', path: '/raveloc/groupes/nouveau', keywords: 'nouveau groupe inviter festival' },

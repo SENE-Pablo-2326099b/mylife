@@ -57,6 +57,10 @@ Validation automatique, récompense en XP. Une quête bonus « semaine complète
 - « Wrapped » mensuel et annuel : cartes images à partager (générées sur l'appareil, canvas), sans rien envoyer.
 - **Terminé quand** : le bilan s'affiche à la bonne date, le partage d'image marche sur téléphone.
 
+## Étape 2 bis : Importer son programme dans MyPerf : effort M, **fait**
+Format d'échange, IA gratuite au choix (instructions à copier, réponse à coller), texte collé sans IA, programmes
+prêts, aperçu à corriger, export. Ajoutée en route ; détails dans `docs/V3.md`.
+
 ## Étape 3 : Brique « espace partagé » et Crew : effort L
 - Un groupe chiffré où plusieurs personnes lisent et écrivent (mécanique de myRaveLoc : clé du groupe dans le lien d'invitation, serveur aveugle), rendue **générique** pour que d'autres apps s'en servent.
 - Crew : on partage ses **scores** (jamais les données brutes ni les montants), choix stat par stat et groupe par groupe, discret et facultatif.

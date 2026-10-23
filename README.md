@@ -9,7 +9,7 @@ même design d'un bout à l'autre, et des données chiffrées sur ton téléphon
 |---|---|---|
 | ✦ | **Accueil MyLife** (`/`) | Ton **Personnage** (un RPG de ta vraie vie : niveaux, quêtes de la semaine, série), tes apps et ce qu'elles ont à te dire maintenant (« 25 € à dépenser aujourd'hui », « Jambes · 5 exercices »), ton compte, l'apparence, l'installation. |
 | ◆ | **MyFinances** (`/finances/`) | Le budget au jour près : ce qui reste à dépenser aujourd'hui, le cycle de paie, les opérations (banques en lecture seule), le patrimoine, l'indépendance financière, un assistant IA. |
-| 🏋 | **MyPerf** (`/perf/`) | La musculation : séance du jour, planning en cycles, saisie des séries, 1RM et progression, carte musculaire, coach IA. Aussi en app Android. |
+| 🏋 | **MyPerf** (`/perf/`) | La musculation : séance du jour, planning en cycles, saisie des séries, 1RM et progression, carte musculaire, coach IA, **import de ton programme** (avec l'IA gratuite de ton choix, en texte collé, ou un programme prêt). Aussi en app Android. |
 | ➤ | **myRaveLoc** (`/raveloc/`) | Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, une flèche et une distance, mode phare. |
 
 ---
@@ -128,7 +128,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 76, MyFinances 337, myRaveLoc 83, MyPerf 216) |
+| Tous les tests unitaires | `npm run test:all` (serveur 76, MyFinances 337, myRaveLoc 83, MyPerf 234) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
