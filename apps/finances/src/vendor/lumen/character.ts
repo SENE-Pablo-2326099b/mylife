@@ -226,27 +226,43 @@ function evaluateWeek(stats: StatsByApp, week: string, starts: Record<StatsApp, 
   return { xp, quests, good };
 }
 
-/**
- * Le personnage à partir des compteurs de chaque app. `rest` : semaines de repos déclarées (la série
- * n'y casse pas, elles ne rapportent rien en Constance).
- */
-export function computeCharacter(stats: StatsByApp, today: string, rest: readonly string[] = []): Character {
-  const current = weekStart(today);
-  const starts: Record<StatsApp, string | null> = {
+/** Une semaine de l'histoire du personnage. */
+export interface TimelineWeek {
+  week: string;
+  /** Points gagnés cette semaine, par stat. */
+  xp: Record<StatId, number>;
+  total: number;
+  /** Points cumulés à la fin de la semaine. */
+  cumulative: number;
+  good: boolean;
+  rest: boolean;
+  quests: Quest[];
+  /** Série à la fin de la semaine. */
+  streak: number;
+}
+
+function appStarts(stats: StatsByApp): Record<StatsApp, string | null> {
+  return {
     perf: firstWeek(stats.perf, ['sessions']),
     finances: firstWeek(stats.finances, ['tracked']),
     raveloc: firstWeek(stats.raveloc, ['groups']),
   };
-  const firsts = Object.values(starts).filter((w): w is string => w !== null);
-  const restSet = new Set(rest.map(weekStart));
-  const totals: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
-  const weekly: Record<StatId, number> = { ...totals };
-  const history: Character['history'] = [];
-  let streak = 0;
-  let currentQuests: Quest[] = [];
+}
 
-  const begin = firsts.length ? firsts.sort()[0]! : current;
-  for (let w = begin; w <= current; w = addWeeks(w, 1)) {
+/**
+ * Toute l'histoire du personnage, semaine par semaine, de la première semaine où une app a servi jusqu'à la
+ * semaine en cours. `rest` : semaines de repos déclarées (la série n'y casse pas, elles ne rapportent rien en Constance).
+ */
+export function timeline(stats: StatsByApp, today: string, rest: readonly string[] = []): TimelineWeek[] {
+  const current = weekStart(today);
+  const starts = appStarts(stats);
+  const firsts = Object.values(starts).filter((w): w is string => w !== null).sort();
+  if (!firsts.length) return [];
+  const restSet = new Set(rest.map(weekStart));
+  const out: TimelineWeek[] = [];
+  let streak = 0;
+  let cumulative = 0;
+  for (let w = firsts[0]!; w <= current; w = addWeeks(w, 1)) {
     const isCurrent = w === current;
     const r = evaluateWeek(stats, w, starts, isCurrent);
     const isRest = restSet.has(w);
@@ -257,17 +273,22 @@ export function computeCharacter(stats: StatsByApp, today: string, rest: readonl
       // Semaine manquée : la série repart de zéro. La semaine en cours ne casse rien tant qu'elle n'est pas finie.
       streak = 0;
     }
-    let sum = 0;
-    for (const id of Object.keys(totals) as StatId[]) {
-      totals[id] += r.xp[id];
-      sum += r.xp[id];
-      if (isCurrent) weekly[id] = r.xp[id];
-    }
-    history.push({ week: w, xp: sum, good: r.good, rest: isRest });
-    if (isCurrent) currentQuests = r.quests;
+    const total = Object.values(r.xp).reduce((a, b) => a + b, 0);
+    cumulative += total;
+    out.push({ week: w, xp: r.xp, total, cumulative, good: r.good, rest: isRest, quests: r.quests, streak });
   }
+  return out;
+}
 
-  const xp = Object.values(totals).reduce((a, b) => a + b, 0);
+/** Le personnage à partir des compteurs de chaque app (voir `timeline`). */
+export function computeCharacter(stats: StatsByApp, today: string, rest: readonly string[] = []): Character {
+  const current = weekStart(today);
+  const line = timeline(stats, today, rest);
+  const totals: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
+  for (const w of line) for (const id of Object.keys(totals) as StatId[]) totals[id] += w.xp[id];
+  const now = line[line.length - 1]?.week === current ? line[line.length - 1]! : null;
+  const weekly = now?.xp ?? { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
+  const xp = line[line.length - 1]?.cumulative ?? 0;
   const global = levelFor(xp, GLOBAL_BASE);
   return {
     level: global.level,
@@ -280,13 +301,126 @@ export function computeCharacter(stats: StatsByApp, today: string, rest: readonl
       const l = levelFor(totals[d.id]);
       return { id: d.id, name: d.name, source: d.source, locked: !!d.locked, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
     }),
-    quests: currentQuests,
-    streak,
-    weekXp: Object.values(weekly).reduce((a, b) => a + b, 0),
+    quests: now?.quests ?? [],
+    streak: line[line.length - 1]?.streak ?? 0,
+    weekXp: now?.total ?? 0,
     week: current,
-    history: history.slice(-12),
-    empty: firsts.length === 0,
+    history: line.slice(-12).map((w) => ({ week: w.week, xp: w.total, good: w.good, rest: w.rest })),
+    empty: line.length === 0,
   };
+}
+
+// ---------------------------------------------------------------- bilans (semaine, mois, année)
+
+/** Ce qui s'est passé sur une période (des semaines entières, désignées par leur lundi). Que des nombres. */
+export interface Recap {
+  from: string;
+  to: string;
+  /** Semaines de la période déjà commencées. */
+  weeks: number;
+  apps: Record<StatsApp, boolean>;
+  sessions: number;
+  records: number;
+  /** Semaines où l'objectif de séances a été atteint. */
+  goalWeeks: number;
+  under: number;
+  tracked: number;
+  saved: number;
+  /** Semaines avec au moins un groupe, et le plus d'amis retrouvés en une semaine. */
+  socialWeeks: number;
+  friends: number;
+  questsDone: number;
+  questsTotal: number;
+  goodWeeks: number;
+  /** Plus longue série atteinte pendant la période. */
+  bestStreak: number;
+  xp: number;
+  xpByStat: Record<StatId, number>;
+  levelStart: number;
+  levelEnd: number;
+  bestWeek: { week: string; xp: number } | null;
+}
+
+export function recap(stats: StatsByApp, today: string, from: string, to: string, rest: readonly string[] = []): Recap {
+  const line = timeline(stats, today, rest);
+  const inside = line.filter((w) => w.week >= from && w.week <= to);
+  const before = line.filter((w) => w.week < from);
+  const startXp = before[before.length - 1]?.cumulative ?? 0;
+  const endXp = inside[inside.length - 1]?.cumulative ?? startXp;
+  const sum = (s: AppStats | null | undefined, key: string) => inside.reduce((n, w) => n + count(s, w.week, key), 0);
+  const xpByStat: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
+  for (const w of inside) for (const id of Object.keys(xpByStat) as StatId[]) xpByStat[id] += w.xp[id];
+  const main = inside.flatMap((w) => w.quests.filter((q) => q.id !== 'full'));
+  const best = inside.reduce<TimelineWeek | null>((b, w) => (w.total > (b?.total ?? 0) ? w : b), null);
+  const used = (s: AppStats | null | undefined, keys: readonly string[]) => inside.some((w) => keys.some((k) => count(s, w.week, k) > 0));
+  return {
+    from,
+    to,
+    weeks: inside.length,
+    apps: { perf: used(stats.perf, ['sessions']), finances: used(stats.finances, ['tracked']), raveloc: used(stats.raveloc, ['groups']) },
+    sessions: sum(stats.perf, 'sessions'),
+    records: sum(stats.perf, 'records'),
+    goalWeeks: inside.filter((w) => w.quests.some((q) => q.id === 'force' && q.done)).length,
+    under: sum(stats.finances, 'under'),
+    tracked: sum(stats.finances, 'tracked'),
+    saved: sum(stats.finances, 'saved'),
+    socialWeeks: inside.filter((w) => count(stats.raveloc, w.week, 'groups') > 0).length,
+    friends: inside.reduce((m, w) => Math.max(m, count(stats.raveloc, w.week, 'friends')), 0),
+    questsDone: main.filter((q) => q.done).length,
+    questsTotal: main.length,
+    goodWeeks: inside.filter((w) => w.good).length,
+    bestStreak: inside.reduce((m, w) => Math.max(m, w.streak), 0),
+    xp: endXp - startXp,
+    xpByStat,
+    levelStart: levelFor(startXp, GLOBAL_BASE).level,
+    levelEnd: levelFor(endXp, GLOBAL_BASE).level,
+    bestWeek: best && best.total > 0 ? { week: best.week, xp: best.total } : null,
+  };
+}
+
+/** Les semaines d'un mois (`AAAA-MM`) : celles dont le lundi tombe dans le mois. */
+export function monthWeeks(month: string): { from: string; to: string } {
+  const first = `${month}-01`;
+  let from = weekStart(first);
+  if (from < first) from = addWeeks(from, 1);
+  let to = from;
+  while (addWeeks(to, 1).slice(0, 7) === month) to = addWeeks(to, 1);
+  return { from, to };
+}
+
+/** Les semaines d'une année : celles dont le lundi tombe dans l'année. */
+export function yearWeeks(year: string): { from: string; to: string } {
+  const { from } = monthWeeks(`${year}-01`);
+  const { to } = monthWeeks(`${year}-12`);
+  return { from, to };
+}
+
+/**
+ * La semaine que la carte « Ta semaine » de l'accueil raconte : dimanche, celle qui s'achève ; lundi, celle
+ * qui vient de finir. Les autres jours : rien (le bilan reste ouvert dans sa page).
+ */
+export function recapWeekFor(today: string): string | null {
+  const dow = (new Date(toMs(today)).getUTCDay() + 6) % 7;
+  if (dow === 6) return weekStart(today);
+  if (dow === 0) return addWeeks(weekStart(today), -1);
+  return null;
+}
+
+/**
+ * Le Wrapped mis en avant sur l'accueil : du 1er au 7 du mois, celui du mois qui vient de finir ; à partir
+ * du 15 décembre, l'année en cours ; du 1er au 15 janvier, l'année qui vient de finir.
+ */
+export function wrappedFor(today: string): { kind: 'month' | 'year'; period: string } | null {
+  const y = Number(today.slice(0, 4));
+  const m = Number(today.slice(5, 7));
+  const d = Number(today.slice(8, 10));
+  if (m === 1 && d <= 15) return { kind: 'year', period: String(y - 1) };
+  if (m === 12 && d >= 15) return { kind: 'year', period: String(y) };
+  if (d <= 7) {
+    const pm = m === 1 ? 12 : m - 1;
+    return { kind: 'month', period: `${m === 1 ? y - 1 : y}-${String(pm).padStart(2, '0')}` };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------- stockage (web : même adresse pour toutes les apps)

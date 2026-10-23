@@ -162,6 +162,19 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: 'Déclarer une semaine de repos' }).click();
     await page.getByRole('button', { name: 'Annuler le repos' }).waitFor();
     await page.getByRole('button', { name: 'Annuler le repos' }).click();
+    // Bilan et Wrapped à l'heure réelle (animations comprises).
+    await page.goto(`${server.url}/bilan?semaine=${addWeeks(now, -1)}`);
+    await page.getByText('3 séances').first().waitFor();
+    await page.waitForTimeout(900);
+    await shot(page, '04e-bilan');
+    await page.goto(`${server.url}/wrapped?periode=${addWeeks(now, -1).slice(0, 7)}`);
+    await page.getByRole('dialog', { name: /Wrapped de/ }).waitFor();
+    await page.waitForTimeout(900);
+    await shot(page, '04f-wrapped-intro');
+    await page.mouse.click(300, 420);
+    await page.waitForTimeout(900);
+    await shot(page, '04g-wrapped-force');
+    await page.getByRole('button', { name: 'Fermer le Wrapped' }).click();
     await page.goto(`${server.url}/`);
     personnage = (await page.getByRole('link', { name: /Ton personnage : niveau \d+/ }).getAttribute('aria-label')) ?? '';
     expect(personnage).toMatch(/niveau \d+, /);
@@ -320,6 +333,70 @@ describe('MyLife, une seule app', () => {
     await used.getByText(`Connecté à MyLife : ${login}`).waitFor({ timeout: 30_000 });
     expect(await used.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
     expect(await used.evaluate(() => document.body.innerText)).not.toContain('Orphelin');
+    await ctx.close();
+  });
+
+  it('bilan et Wrapped : carte du dimanche, carte de début de mois, stories, image partagée', async () => {
+    const [ctx, p] = await device();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const plusDays = (day: string, n: number) => iso(new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000));
+    // Un dimanche à venir, et le 3 du mois qui le suit.
+    const sunday = plusDays(weekStart(localToday()), 13);
+    const nextMonth = new Date(Date.parse(`${sunday}T12:00:00Z`));
+    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1, 3);
+    const third = iso(nextMonth);
+    const weeks = (to: string, n: number, counters: Record<string, number>) => Object.fromEntries(Array.from({ length: n }, (_, i) => [addWeeks(weekStart(to), -i), counters]));
+    const inject = (at: string) =>
+      p.evaluate(
+        ([perf, finances, raveloc]) => {
+          localStorage.setItem('mylife:stats:perf', JSON.stringify({ v: 1, at: Date.now(), weeks: perf, goal: 3 }));
+          localStorage.setItem('mylife:stats:finances', JSON.stringify({ v: 1, at: Date.now(), weeks: finances }));
+          localStorage.setItem('mylife:stats:raveloc', JSON.stringify({ v: 1, at: Date.now(), weeks: raveloc }));
+        },
+        [weeks(at, 10, { sessions: 3, records: 1 }), weeks(at, 10, { under: 6, tracked: 7 }), weeks(at, 2, { groups: 1, friends: 3 })],
+      );
+
+    // Horloge figée : les animations ne s'y jouent pas (captures de ces écrans : voir l'étape du Personnage).
+    await p.clock.setFixedTime(new Date(`${sunday}T10:00:00`));
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(`${LOGIN}`).first().waitFor();
+    await inject(sunday);
+    await p.goto(`${server.url}/`);
+    // Dimanche : « Ta semaine, en bref ».
+    await p.getByText('Ta semaine, en bref').waitFor();
+    await shot(p, '16-carte-semaine');
+    await p.getByRole('link', { name: /^Ta semaine du/ }).click();
+    await p.getByText('3 séances · 1 record').waitFor();
+    await p.getByText('6 jours sous ton budget sur 7').waitFor();
+    await p.getByText('Semaine réussie').first().waitFor();
+    // Masquée une fois vue.
+    await p.goto(`${server.url}/`);
+    await p.getByRole('link', { name: /Ton personnage/ }).waitFor();
+    expect(await p.getByText('Ta semaine, en bref').count()).toBe(0);
+
+    // Le 3 du mois suivant : le Wrapped du mois fini.
+    await p.clock.setFixedTime(new Date(`${third}T10:00:00`));
+    await p.goto(`${server.url}/`);
+    await inject(third);
+    await p.reload();
+    const card = p.getByRole('link', { name: /Ton Wrapped de .+ est prêt/ });
+    await card.waitFor();
+    await card.click();
+    await p.getByRole('dialog', { name: /Wrapped de/ }).waitFor();
+    for (let i = 0; i < 8 && !(await p.getByRole('button', { name: 'Partager l’image' }).isVisible()); i++) {
+      await p.mouse.click(300, 420);
+      await p.waitForTimeout(450);
+    }
+    await p.getByRole('button', { name: 'Partager l’image' }).waitFor();
+    const download = p.waitForEvent('download');
+    await p.getByRole('button', { name: 'Partager l’image' }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^mylife-wrapped-\d{4}-\d{2}\.png$/);
+    if (process.env.SHOTS) await file.saveAs(`${process.env.SHOTS}/21-wrapped-image.png`);
     await ctx.close();
   });
 

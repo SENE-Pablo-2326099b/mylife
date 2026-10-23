@@ -13,6 +13,7 @@ import { Tilt } from '../ui/Tilt';
 import { useSession } from '../ui/session';
 import { useInstallState } from '../install';
 import { CharacterCard } from './Character';
+import { WeekRecapCard, WrappedCard } from './Recap';
 
 const APP_ICON: Record<MyLifeApp['id'], IconName> = { finances: 'diamond-fill', perf: 'barbell', raveloc: 'navigate' };
 
@@ -106,7 +107,11 @@ export function HomePage() {
 
         {session && (
           <Reveal index={1}>
-            <CharacterCard />
+            <div className="flex flex-col gap-3">
+              <WrappedCard />
+              <CharacterCard />
+              <WeekRecapCard />
+            </div>
           </Reveal>
         )}
 

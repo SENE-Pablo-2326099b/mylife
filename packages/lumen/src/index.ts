@@ -395,6 +395,8 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Apparence', path: '/apparence', keywords: 'theme couleurs sombre clair identite circuit ardoise argile brut' },
   { app: 'home', title: 'Installer MyLife', path: '/installer', keywords: 'installer telephone ecran accueil application pwa' },
   { app: 'home', title: 'Ton personnage', path: '/personnage', keywords: 'personnage niveau rpg stats quetes xp serie force discipline social constance' },
+  { app: 'home', title: 'Ta semaine', path: '/bilan', keywords: 'bilan semaine resume recap progres' },
+  { app: 'home', title: 'Ton Wrapped', path: '/wrapped', keywords: 'wrapped mois annee resume partager image story' },
   { app: 'finances', title: 'Budget du jour', path: '/finances/', keywords: 'argent depenser reste aujourd hui budget finances' },
   { app: 'finances', title: 'Budget du cycle', path: '/finances/budget', keywords: 'cycle paie calendrier depenses' },
   { app: 'finances', title: 'Opérations', path: '/finances/operations', keywords: 'transactions depenses banque achats' },

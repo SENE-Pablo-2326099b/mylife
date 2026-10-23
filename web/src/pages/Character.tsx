@@ -262,6 +262,23 @@ export function CharacterPage() {
 
         {!c.empty && (
           <Reveal index={4}>
+            <div className="grid grid-cols-2 gap-2">
+              <Card to="/bilan" label="Ta semaine en détail">
+                <Icon name="calendar" className="text-gold" />
+                <p className="t-body-strong mt-1">Ta semaine</p>
+                <p className="t-caption text-muted">et les précédentes</p>
+              </Card>
+              <Card to="/wrapped" label="Ton Wrapped du mois">
+                <Icon name="sparkles" className="text-gold" />
+                <p className="t-body-strong mt-1">Ton Wrapped</p>
+                <p className="t-caption text-muted">le mois en images</p>
+              </Card>
+            </div>
+          </Reveal>
+        )}
+
+        {!c.empty && (
+          <Reveal index={4}>
             <RestWeek c={c} />
           </Reveal>
         )}

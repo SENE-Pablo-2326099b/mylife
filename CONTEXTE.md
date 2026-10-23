@@ -167,6 +167,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `mylife`, chiffrés, jamais de montant) : MyFinances `domain/rpgStats.ts`, MyPerf `services/rpgStats.ts` (Android :
   via `services/cloud/prefs.ts`), myRaveLoc `App.tsx` (fusionné : ses groupes expirent). Web : `packages/ui/src/stats.ts`
   (`publishStats`, `useCharacter`). Écran : `web/src/pages/Character.tsx` (carte de l'accueil, `/personnage`).
+  Bilans (V3, étape 2) : `timeline` et `recap` dans le même moteur ; `web/src/pages/Recap.tsx` (cartes du dimanche et
+  du début de mois, `/bilan`), `Wrapped.tsx` (stories, `/wrapped`), `web/src/wrappedImage.ts` (image partagée).
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

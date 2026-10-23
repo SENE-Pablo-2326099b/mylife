@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addWeeks, computeCharacter, levelFor, mergeStats, parseStats, sameStats, titleFor, trimWeeks, weekStart, XP, xpForLevel, type AppStats } from '../packages/lumen/src/character';
+import { addWeeks, computeCharacter, levelFor, mergeStats, monthWeeks, recap, recapWeekFor, timeline, wrappedFor, yearWeeks, parseStats, sameStats, titleFor, trimWeeks, weekStart, XP, xpForLevel, type AppStats } from '../packages/lumen/src/character';
 
 const stats = (weeks: AppStats['weeks'], goal?: number): AppStats => ({ v: 1, at: 1, weeks, ...(goal ? { goal } : {}) });
 // Jeudi 22 octobre 2026 : semaine du lundi 19.
@@ -123,5 +123,50 @@ describe('lignes de stats', () => {
   });
   it('ne garde que deux ans de semaines non vides', () => {
     expect(Object.keys(trimWeeks({ [W]: { a: 1 }, [prev(200)]: { a: 1 }, [prev(1)]: { a: 0 } }, TODAY))).toEqual([W]);
+  });
+});
+
+describe('bilans', () => {
+  const perf = stats({ [prev(2)]: { sessions: 3, records: 1 }, [prev(1)]: { sessions: 4, records: 2 }, [W]: { sessions: 1 } }, 3);
+  const finances = stats({ [prev(2)]: { under: 6, tracked: 7, saved: 1 }, [prev(1)]: { under: 3, tracked: 7 } });
+  const raveloc = stats({ [prev(1)]: { groups: 1, friends: 4 } });
+
+  it('semaine : compteurs, quêtes, points ; rien pour les apps sans activité', () => {
+    const r = recap({ perf, finances, raveloc }, TODAY, prev(1), prev(1));
+    expect(r).toMatchObject({ weeks: 1, sessions: 4, records: 2, goalWeeks: 1, under: 3, tracked: 7, saved: 0, socialWeeks: 1, friends: 4 });
+    expect(r.questsTotal).toBe(3);
+    expect(r.questsDone).toBe(2);
+    expect(r.xp).toBe(timeline({ perf, finances, raveloc }, TODAY).find((w) => w.week === prev(1))!.total);
+    expect(recap({ perf }, TODAY, prev(1), prev(1)).apps).toEqual({ perf: true, finances: false, raveloc: false });
+  });
+
+  it('période : sommes, meilleure semaine, niveaux gagnés, plus longue série', () => {
+    const r = recap({ perf, finances, raveloc }, TODAY, prev(2), W);
+    expect(r.sessions).toBe(8);
+    expect(r.saved).toBe(1);
+    expect(r.bestWeek?.week).toBeDefined();
+    expect(r.levelEnd).toBeGreaterThanOrEqual(r.levelStart);
+    expect(r.xp).toBe(Object.values(r.xpByStat).reduce((a, b) => a + b, 0));
+    expect(r.bestStreak).toBeGreaterThanOrEqual(1);
+  });
+
+  it('semaines d’un mois et d’une année : lundis tombant dedans', () => {
+    expect(monthWeeks('2026-10')).toEqual({ from: '2026-10-05', to: '2026-10-26' });
+    expect(monthWeeks('2026-06')).toEqual({ from: '2026-06-01', to: '2026-06-29' });
+    expect(yearWeeks('2026')).toEqual({ from: '2026-01-05', to: '2026-12-28' });
+  });
+
+  it('carte « Ta semaine » : dimanche (la semaine qui s’achève) et lundi (celle qui vient de finir)', () => {
+    expect(recapWeekFor('2026-10-25')).toBe('2026-10-19');
+    expect(recapWeekFor('2026-10-26')).toBe('2026-10-19');
+    expect(recapWeekFor('2026-10-22')).toBeNull();
+  });
+
+  it('Wrapped mis en avant : le mois fini (1er–7), l’année (dès le 15 décembre, jusqu’au 15 janvier)', () => {
+    expect(wrappedFor('2026-11-03')).toEqual({ kind: 'month', period: '2026-10' });
+    expect(wrappedFor('2026-11-08')).toBeNull();
+    expect(wrappedFor('2026-12-20')).toEqual({ kind: 'year', period: '2026' });
+    expect(wrappedFor('2027-01-04')).toEqual({ kind: 'year', period: '2026' });
+    expect(wrappedFor('2027-02-02')).toEqual({ kind: 'month', period: '2027-01' });
   });
 });

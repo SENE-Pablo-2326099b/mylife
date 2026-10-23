@@ -52,7 +52,7 @@ Validation automatique, récompense en XP. Une quête bonus « semaine complète
 
 ---
 
-## Étape 2 : Bilan de la semaine et Wrapped : effort S à M
+## Étape 2 : Bilan de la semaine et Wrapped : effort S à M, **fait** (journal : `docs/V3.md`)
 - Carte du dimanche sur l'accueil : budget, séances, sorties, quêtes réussies.
 - « Wrapped » mensuel et annuel : cartes images à partager (générées sur l'appareil, canvas), sans rien envoyer.
 - **Terminé quand** : le bilan s'affiche à la bonne date, le partage d'image marche sur téléphone.

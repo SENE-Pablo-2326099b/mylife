@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type StatsApp } from '../vendor/lumen';
+import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -126,17 +126,46 @@ function subscribe(fn: () => void): () => void {
 /** Empreinte des compteurs stockés (stable tant qu'ils ne changent pas). */
 function fingerprint(): string {
   try {
-    return [...STATS_APPS.map((a) => localStorage.getItem(statsKey(a)) ?? ''), localStorage.getItem(CHARACTER_KEY) ?? '', localToday()].join('\u0001');
+    return [...STATS_APPS.map((a) => localStorage.getItem(statsKey(a)) ?? ''), localStorage.getItem(CHARACTER_KEY) ?? '', localStorage.getItem('mylife:character:seen') ?? '', localToday()].join('\u0001');
   } catch {
     return '';
   }
 }
 
+/** Les compteurs de toutes les apps et les semaines de repos, relus quand ils changent. */
+export function useStatsInput(): { stats: StatsByApp; rest: string[]; today: string } {
+  const key = useSyncExternalStore(subscribe, fingerprint, () => '');
+  return useMemo(
+    () => ({ stats: Object.fromEntries(STATS_APPS.map((a) => [a, readStats(a)])) as StatsByApp, rest: readCharacterPrefs().rest, today: localToday() }),
+    [key], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+}
+
 /** Le personnage, recalculé quand un compteur change (ici ou dans un autre onglet, ou par la synchro). */
 export function useCharacter(): Character {
-  const key = useSyncExternalStore(subscribe, fingerprint, () => '');
-  return useMemo(() => {
-    const stats = Object.fromEntries(STATS_APPS.map((a) => [a, readStats(a)]));
-    return computeCharacter(stats, localToday(), readCharacterPrefs().rest);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { stats, rest, today } = useStatsInput();
+  return useMemo(() => computeCharacter(stats, today, rest), [stats, rest, today]);
+}
+
+// ---------------------------------------------------------------- cartes déjà vues (bilan, Wrapped)
+
+const SEEN_KEY = 'mylife:character:seen';
+
+/** Ce que l'utilisateur a déjà vu (« week:2026-10-19 », « wrapped:2026-10 ») : la carte ne revient pas. Sur l'appareil seulement. */
+export function wasSeen(id: string): boolean {
+  try {
+    return (JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]).includes(id);
+  } catch {
+    return false;
+  }
+}
+
+export function markSeen(id: string): void {
+  try {
+    const all = (JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]') as string[]).filter((x) => x !== id);
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...all, id].slice(-40)));
+  } catch {
+    /* stockage indisponible : la carte reviendra */
+  }
+  emit();
 }
