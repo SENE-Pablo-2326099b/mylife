@@ -35,7 +35,7 @@ export class MyLifeApi {
     private fetchImpl: typeof fetch = (...a) => fetch(...a),
   ) {}
 
-  async call<T>(path: '/api/auth' | '/api/sync' | '/api/raveloc' | '/api/space' | '/api/games', body: Record<string, unknown>, token?: string): Promise<T> {
+  async call<T>(path: '/api/auth' | '/api/sync' | '/api/raveloc' | '/api/space' | '/api/games' | '/api/support' | '/api/push', body: Record<string, unknown>, token?: string): Promise<T> {
     let res: Response;
     try {
       res = await this.fetchImpl(`${this.base}${path}`, {

@@ -22,6 +22,8 @@ const defaultFetch: FetchJson = async (url) => {
 
 async function limited(db: Db, uid: string, now: number): Promise<void> {
   await db.query(`CREATE TABLE IF NOT EXISTS games_rate (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INTEGER NOT NULL)`);
+  // Compteurs d'une fenêtre d'une heure : ceux d'avant-hier ne servent plus.
+  if (Math.random() < 0.02) await db.query('DELETE FROM games_rate WHERE win < $1', [Math.floor((now - 2 * 86_400_000) / RATE.windowMs)]);
   const win = Math.floor(now / RATE.windowMs);
   const { rows } = await db.query<{ n: number }>(
     `INSERT INTO games_rate (k, win, n) VALUES ($1, $2, 1)

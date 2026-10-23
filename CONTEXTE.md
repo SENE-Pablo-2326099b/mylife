@@ -112,7 +112,7 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 - `POST /api/auth` (`server/auth.ts` → `authDispatch`) : sans session `salt`, `available` (identifiant
   libre ?), `signup`, `login`, `recoverStart` / `recoverFinish` ; avec session `password`,
   `renewRecovery` (nouvelle clé de secours), `deleteAccount` (mot de passe redemandé ; efface le compte, ses
-  lignes et quitte ses groupes myRaveLoc).
+  lignes, quitte ses groupes myRaveLoc et ses espaces, efface ses messages au support et ses abonnements aux notifications).
 - `POST /api/sync` (`server/sync.ts`) : `status`, `sync`. Apps synchronisées : `finances`, `perf`, `mylife`
   (réglages communs : l'apparence).
 - `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
@@ -179,6 +179,11 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `mylife:copilot:<app>` (appareil seulement) posées par MyFinances (`Today.tsx`) et MyPerf (`rpgStats.ts`).
   Pacte (V3, étape 8) : `packages/lumen/src/pacte.ts`, section Pactes de `web/src/pages/Crew.tsx` (lignes `pacte`,
   `pacte_week` du Crew).
+  Ouverture au public (V3, étape 9) : `web/src/pages/Privacy.tsx` (`/confidentialite`, lisible sans compte),
+  `web/src/pages/Data.tsx` (`/donnees`, support), support `server/support.ts` (`/api/support`, table
+  `support_messages`, lu avec `DATABASE_URL=… npm run support`, `-- done <id>` une fois traité), rappel du dimanche `server/push.ts` (`/api/push`, table
+  `push_subscriptions`) + `api/cron-weekly.ts` (cron Vercel, `CRON_SECRET`), `web/public/push-sw.js`, `web/src/push.ts` ;
+  `npm run stats:serveur` (volumes, sans contenu).
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
@@ -188,7 +193,9 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 
 - Neon Postgres. Tables `users`, `records`, `auth_rate`, `raveloc_*`, créées au premier appel.
 - Variables (**ne jamais afficher leurs valeurs**) : `DATABASE_URL` ; `SESSION_SECRET` (aussi sur
-  `myfinances` ; sensible, illisible sur Vercel) ; `SIGNUP` ; `INVITE_CODE` (seulement en mode invitation).
+  `myfinances` ; sensible, illisible sur Vercel) ; `SIGNUP` ; `INVITE_CODE` (seulement en mode invitation) ;
+  facultatives : `STEAM_API_KEY`, `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (notifications),
+  `CRON_SECRET` (protège `/api/cron-weekly`).
 - Fichier local : `.env.local` (racine).
 
 ### Suivi des modifications dans chaque app

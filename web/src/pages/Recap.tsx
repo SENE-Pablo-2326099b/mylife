@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { addWeeks, recap, recapWeekFor, timeline, weekStart, wrappedFor, type Quest, type Recap } from '../vendor/lumen';
 import { periodName, periodRecap, weekRange } from '../recapText';
 import { Icon, type IconName } from '../ui/icons';
-import { Badge, Button, Card, IconButton, Reveal, SectionTitle } from '../ui/index';
+import { Badge, Button, Card, IconButton, Reveal, SectionTitle, ToggleRow } from '../ui/index';
+import { toast } from '../ui/toastStore';
+import { pushSupported, setWeekly, weeklyStatus } from '../push';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { markSeen, useStatsInput, wasSeen } from '../ui/stats';
@@ -20,6 +22,44 @@ const plural = (n: number, one: string, many = `${one}s`) => `${fmt(n)} ${n > 1 
 
 function hasActivity(r: Recap) {
   return r.xp > 0 || r.sessions > 0 || r.tracked > 0 || r.socialWeeks > 0;
+}
+
+/**
+ * « Rappel du dimanche » : une notification le dimanche soir pour aller voir son bilan. Le serveur n'envoie
+ * qu'un texte fixe (il ne connaît pas tes chiffres) ; caché si l'appareil ou le serveur ne sait pas faire.
+ */
+function WeeklyReminder() {
+  const [on, setOn] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!pushSupported()) return;
+    let live = true;
+    weeklyStatus()
+      .then((s) => live && setOn(s))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  if (on === null) return null;
+  const change = async (v: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await setWeekly(v);
+      setOn(v);
+      toast({ message: v ? 'Rappel activé : à dimanche !' : 'Rappel désactivé', tone: v ? 'gold' : undefined });
+    } catch (e) {
+      toast({ message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card>
+      <ToggleRow label="Rappel du dimanche" hint="Une notification le dimanche soir pour voir ta semaine. Rien d’autre." checked={on} onChange={(v) => void change(v)} />
+    </Card>
+  );
 }
 
 /** Carte « Ta semaine » de l'accueil : dimanche (la semaine qui s'achève) et lundi (celle qui vient de finir). */
@@ -223,6 +263,10 @@ export function RecapPage() {
               <p className="t-caption text-muted">depuis janvier</p>
             </Card>
           </div>
+        </Reveal>
+
+        <Reveal index={6}>
+          <WeeklyReminder />
         </Reveal>
 
         <p className="t-caption px-1 pt-1 text-center text-muted">Calculé sur ton appareil : des nombres par semaine, aucun montant.</p>

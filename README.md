@@ -93,7 +93,10 @@ précédent (qui les retrouve en se reconnectant : elles sont dans son compte).
 ### Compte
 Accueil → **Compte** : changer de mot de passe, nouvelle clé de secours, se déconnecter (de toutes les
 apps de l'appareil), **supprimer le compte** (tout ce qu'il sauvegarde est effacé du serveur ; les appareils
-gardent leurs données).
+gardent leurs données). Aussi : **Mes données** (export lisible de l'accueil et chemin vers l'export de chaque
+app), **Un problème, une idée ?** (message à l'équipe, non chiffré et c'est dit) et la page **Confidentialité**
+(`/confidentialite`, lisible sans compte). Sur **Ta semaine** : le **rappel du dimanche** (notification
+facultative, même texte pour tous, sans aucune donnée).
 
 ---
 
@@ -107,6 +110,8 @@ gardent leurs données).
 - **Aucune publicité, aucun traceur, aucune analytique.** Les aperçus de l'accueil restent sur l'appareil.
 - Banques : Enable Banking (DSP2), lecture seule, via un relais sans état.
 - Clé d'API Anthropic (assistant, coach, Copilot) : sur l'appareil seulement ; effacée si un autre compte se connecte.
+- Messages au support : lisibles par l'équipe (non chiffrés), 90 jours au plus, effacés avec le compte.
+- Détail complet : page **Confidentialité** de l'app (`/confidentialite`).
 
 ---
 
@@ -117,7 +122,7 @@ gardent leurs données).
 ```
 MyLife/
 ├── web/                 Accueil MyLife (React + Vite) — la seule PWA installable (manifeste, portée /)
-├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc), espaces partagés (/api/space), relais Steam (/api/games)
+├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc), espaces partagés (/api/space), relais Steam (/api/games), support (/api/support), notifications (/api/push, /api/cron-weekly)
 ├── packages/
 │   ├── lumen/           Thèmes, identités, registre des apps et de leurs écrans, aperçus, apparence commune
 │   ├── sync-client/     Compte et synchro chiffrée (TypeScript pur : web et React Native)
@@ -154,12 +159,14 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 109, MyFinances 337, myRaveLoc 83, MyPerf 235) |
+| Tous les tests unitaires | `npm run test:all` (serveur 113, MyFinances 337, myRaveLoc 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |
 | Développer une app | dans `apps/<app>` : `npm run dev` (MyPerf : `npx expo start --web --port 8090`) |
 | Déployer tout | `npm run deploy:all` (les apps d'abord, puis MyLife) |
+| Volumes du serveur (comptes, lignes, taille ; aucun contenu) | `DATABASE_URL=… npm run stats:serveur` |
+| Lire les messages au support, puis les effacer une fois traités | `DATABASE_URL=… npm run support` (puis `-- done <id>`) |
 | APK MyPerf | `cd apps/perf/android && ANDROID_HOME=~/android-sdk ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --max-workers=2` |
 
 ### Variables d'environnement (projet Vercel `mylife`)
@@ -171,6 +178,9 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | `SIGNUP` | `open` (défaut : inscription libre, protégée) ou `invite` (code exigé) |
 | `INVITE_CODE` | Code d'invitation, seulement en mode `invite` |
 | `STEAM_API_KEY` | Facultatif : clé de l'API Steam pour MyGames (sans elle, saisie à la main) |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Facultatif : clés des notifications (`npx web-push generate-vapid-keys`) ; sans elles, le rappel du dimanche est masqué |
+| `VAPID_SUBJECT` | Facultatif : adresse de contact des notifications (`mailto:…` ou l'adresse du site) |
+| `CRON_SECRET` | Protège `/api/cron-weekly` (appelé par le cron de Vercel le dimanche à 17 h UTC) |
 
 Garde-fous de l'inscription ouverte : 10 comptes par réseau et par jour (sur une empreinte de l'adresse),
 10 essais de mot de passe ou de clé de secours par quart d'heure et par identifiant, quotas de stockage

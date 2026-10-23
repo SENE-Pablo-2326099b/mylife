@@ -1,6 +1,8 @@
 import { available, changePassword, deleteAccount, getSalt, HttpError, login, recoverFinish, recoverStart, renewRecovery, signup, verifyToken, type Client, type Db, type Env } from './core.js';
 import { forgetUser } from './raveloc.js';
 import { ensureSpaceSchema, forgetSpaceUser } from './space.js';
+import { ensureSupportSchema } from './support.js';
+import { ensurePushSchema } from './push.js';
 
 /**
  * POST /api/auth : { action, … }. Sans session : `salt`, `available`, `signup`, `login`,
@@ -37,6 +39,11 @@ export async function authDispatch(db: Db, env: Env, body: Record<string, unknow
       // Ses espaces partagés (Crew…) : il les quitte, ses lignes sont effacées.
       await ensureSpaceSchema(db);
       await forgetSpaceUser(db, uid);
+      // Ses messages au support partent aussi.
+      await ensureSupportSchema(db);
+      await db.query('DELETE FROM support_messages WHERE user_id = $1', [uid]);
+      await ensurePushSchema(db);
+      await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [uid]);
       return out;
     }
     default:

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { SupportCard } from './Data';
+import { Icon } from '../ui/icons';
 import { MYLIFE_APPS } from '../vendor/lumen';
 import { AccountForms, AccountOverview, type AccountStatusRow } from '../ui/account';
-import { Reveal } from '../ui/index';
+import { Card, Reveal } from '../ui/index';
 import { relativeTime } from '../ui/relative';
 import { Screen } from '../ui/Screen';
 import { useSession } from '../ui/session';
@@ -50,6 +52,26 @@ export function AccountPage() {
   return (
     <Screen title="Compte" kicker="MyLife" mood="settings">
       <Reveal index={0}>{session ? <AccountOverview session={session} rows={rows(session.login)} /> : <AccountForms initial={params.get('mode') === 'login' ? 'login' : 'create'} />}</Reveal>
+      {session && (
+        <Reveal index={1}>
+          <div className="mt-3 flex flex-col gap-3">
+            <Card to="/donnees" label="Mes données : les voir, les emporter, les effacer">
+              <div className="flex items-center gap-3">
+                <Icon name="shield" className="text-accent" />
+                <span className="min-w-0 flex-1">
+                  <span className="t-body-strong block">Mes données</span>
+                  <span className="t-small block text-secondary">Les voir, les emporter, les effacer</span>
+                </span>
+                <Icon name="chevron-forward" className="text-muted" />
+              </div>
+            </Card>
+            <SupportCard />
+            <a href="/confidentialite" className="t-small px-1 text-accent underline">
+              Confidentialité et mentions légales
+            </a>
+          </div>
+        </Reveal>
+      )}
     </Screen>
   );
 }

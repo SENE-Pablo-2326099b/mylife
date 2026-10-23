@@ -52,6 +52,9 @@ export function WelcomePage() {
               </m.div>
             ))}
           </div>
+          <m.p className="t-small mt-5 text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...springs.soft, delay: 0.35 }}>
+            Et autour : ton Personnage qui monte de niveau avec ta vraie vie, ton bilan du dimanche, tes Crews et tes sorties entre amis, ta musique et tes jeux en chiffres.
+          </m.p>
           <div className="flex-1" />
           <div className="mt-8 flex flex-col gap-2">
             <Button size="lg" onClick={() => setStep('account')}>
@@ -66,6 +69,9 @@ export function WelcomePage() {
             >
               J’ai déjà un compte
             </Button>
+            <a href="/confidentialite" className="t-caption mt-1 text-center text-muted underline">
+              Pas de pub, pas de pistage : ce que MyLife garde
+            </a>
           </div>
         </>
       ) : (
@@ -74,6 +80,11 @@ export function WelcomePage() {
             <Icon name="chevron-back" size={22} />
           </button>
           <AccountForms initial={existing ? 'login' : 'create'} />
+          {!existing && (
+            <p className="t-caption mt-4 text-muted">
+              Après l’inscription, MyLife te donne une clé de secours. Garde-la précieusement : c’est le seul moyen de retrouver tes données si tu oublies ton mot de passe. Personne, pas même nous, ne peut les déchiffrer sans elle.
+            </p>
+          )}
         </>
       )}
     </main>

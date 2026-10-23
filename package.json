@@ -17,12 +17,15 @@
     "build:all": "npm run vendor && npm run build && npm --prefix apps/finances run build && npm --prefix apps/raveloc run build && npm --prefix apps/perf run build:web",
     "test:all": "npm test && npm --prefix apps/finances test && npm --prefix apps/raveloc test && npm --prefix apps/perf test -- --silent",
     "e2e:all": "npm --prefix apps/finances run e2e && npm --prefix apps/raveloc run e2e && npm run e2e",
-    "deploy:all": "npm --prefix apps/finances run deploy && npm --prefix apps/perf run deploy:web && npm --prefix apps/raveloc run deploy && npm run deploy"
+    "deploy:all": "npm --prefix apps/finances run deploy && npm --prefix apps/perf run deploy:web && npm --prefix apps/raveloc run deploy && npm run deploy",
+    "stats:serveur": "node scripts/server-stats.mjs",
+    "support": "node scripts/support.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@vercel/functions": "3.9.11",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -41,6 +44,7 @@
     "@types/pg": "8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.16.0",

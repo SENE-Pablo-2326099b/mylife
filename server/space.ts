@@ -122,6 +122,8 @@ async function rate(db: Db, key: string, rule: { max: number; windowMs: number }
 
 async function limit(db: Db, uid: string, kind: keyof typeof RATE, now: number): Promise<void> {
   if ((await rate(db, `${kind}:${uid}`, RATE[kind], now)) > RATE[kind].max) throw new HttpError(429, 'Trop de requêtes : réessaie dans un moment.');
+  // Les compteurs ne servent qu'à leur fenêtre : effacés au bout de deux jours (de temps en temps).
+  if (Math.random() < 0.02) await db.query('DELETE FROM space_rate WHERE at <= $1', [now - 2 * 86_400_000]);
 }
 
 interface MemberRow {

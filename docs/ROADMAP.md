@@ -96,6 +96,7 @@ qui paie la soirée du groupe. Règles de tricherie : seules les données calcul
 - **Terminé quand** : un pacte à trois comptes se valide et se clôt tout seul.
 
 ## Étape 9 : Ouverture au public : effort L
+*Fait côté app le 23/10/2026 (voir `docs/V3.md`) ; reste la relecture de la page légale et les premiers inconnus.*
 Page de présentation, onboarding pour un inconnu (clé de secours très claire), politique de confidentialité et RGPD, quotas et coûts surveillés (base et hébergement), support, export des données,
 notifications web push sans pistage. **Pas de données de santé avant d'avoir regardé le cadre RGPD.**
 - **Terminé quand** : quelqu'un de totalement étranger au projet crée un compte, l'utilise une semaine et revient.

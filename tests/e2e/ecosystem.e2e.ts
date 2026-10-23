@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -705,6 +705,50 @@ describe('MyLife, une seule app', () => {
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/^mylife-wrapped-\d{4}-\d{2}\.png$/);
     if (process.env.SHOTS) await file.saveAs(`${process.env.SHOTS}/21-wrapped-image.png`);
+    await ctx.close();
+  });
+
+  it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
+    // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
+    const [anon, a] = await device();
+    await a.goto(`${server.url}/`);
+    await a.getByRole('link', { name: /ce que MyLife garde/ }).click();
+    await a.getByRole('heading', { name: 'Tes données restent à toi' }).waitFor();
+    expect(new URL(a.url()).pathname).toBe('/confidentialite');
+    await a.getByText('Mentions légales').waitFor();
+    await shot(a, '30-confidentialite');
+    await a.getByRole('button', { name: 'Retour à l’accueil' }).click();
+    await a.getByRole('button', { name: 'Commencer' }).waitFor();
+    await anon.close();
+
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    // Compte → « Un problème, une idée ? » : envoyé, avec l'avertissement qu'il n'est pas chiffré.
+    await p.goto(`${server.url}/compte`);
+    await p.getByText('Un problème, une idée ?').waitFor();
+    await p.getByText(/n’est pas chiffré/).waitFor();
+    const send = p.getByRole('button', { name: 'Envoyer' });
+    expect(await send.isDisabled()).toBe(true);
+    await p.getByLabel('Ton message').fill('Le bilan devrait montrer les records.');
+    await send.click();
+    await p.getByText('Message envoyé : merci !').waitFor();
+    // Mes données : l'export de l'accueil est un JSON lisible, sans rien d'un autre compte.
+    await p.getByRole('link', { name: /Mes données/ }).click();
+    await p.getByRole('heading', { name: 'Mes données' }).waitFor();
+    await shot(p, '31-mes-donnees');
+    const download = p.waitForEvent('download');
+    await p.getByRole('button', { name: 'Exporter' }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^mylife-\d{4}-\d{2}-\d{2}\.json$/);
+    const data = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; account: string; counters: Record<string, unknown> };
+    expect(data.format).toBe('mylife-export');
+    expect(data.account).toBe(LOGIN);
+    expect(Object.keys(data.counters)).toContain('perf');
     await ctx.close();
   });
 

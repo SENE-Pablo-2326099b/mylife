@@ -16,6 +16,8 @@ import { CrewJoinPage, CrewListPage, CrewPage } from './pages/Crew';
 import { SortiePage, SortiesPage } from './pages/Sortie';
 import { MusicPage } from './pages/Music';
 import { GamesPage, TimePage } from './pages/Games';
+import { DataPage } from './pages/Data';
+import { PrivacyPage } from './pages/Privacy';
 import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
 import { useCharacter, useStatsInput } from './ui/stats';
 import { lazy, Suspense, useEffect } from 'react';
@@ -39,8 +41,9 @@ const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default:
 export function App() {
   const location = useLocation();
   const { pathname } = location;
-  const welcome = pathname === '/bienvenue';
   const session = useSession();
+  // Lisibles sans compte : la bienvenue, et la confidentialité (on doit pouvoir la lire avant de s'inscrire).
+  const welcome = pathname === '/bienvenue' || (!session && pathname === '/confidentialite');
   // Pas de compte, pas d'accueil : bienvenue puis création de compte (ou connexion), partout ailleurs aussi.
   // Une invitation de Crew ouverte sans compte est gardée le temps de le créer.
   if (!session && !welcome) {
@@ -80,6 +83,8 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
             <Routes location={location}>
               <Route path="/bienvenue" element={<WelcomePage />} />
               <Route path="/installer" element={<InstallPage />} />
+              <Route path="/confidentialite" element={<PrivacyPage />} />
+              <Route path="/donnees" element={<DataPage />} />
               <Route path="/personnage" element={<CharacterPage />} />
               <Route path="/bilan" element={<RecapPage />} />
               <Route path="/wrapped" element={<WrappedPage />} />

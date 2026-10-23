@@ -59,6 +59,8 @@ export default defineConfig({
         navigateFallbackAllowlist: [/^\/(?!finances|perf|raveloc|api)/],
         navigateFallbackDenylist: [/^\/(finances|perf|raveloc|api)(\/|$)/],
         runtimeCaching: [],
+        // Rappel du dimanche : réception et clic des notifications (web/public/push-sw.js).
+        importScripts: ['/push-sw.js'],
         cleanupOutdatedCaches: true,
       },
       devOptions: { enabled: false },
