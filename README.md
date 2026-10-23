@@ -54,6 +54,11 @@ une semaine de repos se déclare sans casser la série. Le dimanche, **ta semain
 fin d'année, ton **Wrapped** en stories, avec une image à partager (créée sur ton téléphone, sans aucun montant). Seuls des nombres par semaine sont utilisés (aucun montant,
 aucun détail), chiffrés dans ton compte : le même personnage sur tous tes appareils.
 
+### Copilot
+Une seule IA pour toutes tes apps : « je peux me payer ce billet ? », « résume ma semaine », « quelle semaine alléger
+avant ma sortie ? ». Elle lit tes résumés (budget, séances, bilans, musique, jeux, sorties) et propose ; elle ne modifie
+rien. Avec ta propre clé Anthropic, depuis ton appareil (la même clé que l'assistant de MyFinances et le coach de MyPerf).
+
 ### MyMusique
 Tes stats Spotify quand tu veux : demande ton export de données à Spotify, ouvre le .zip reçu dans MyMusique. Artistes
 et morceaux du mois et de l'année, ton obsession du moment, ton heure d'écoute, tes séries, tes découvertes, et la
@@ -100,7 +105,7 @@ gardent leurs données).
   d'invitation (jamais au serveur). Partage coupé par défaut, limité dans le temps, effacé à l'arrêt.
 - **Aucune publicité, aucun traceur, aucune analytique.** Les aperçus de l'accueil restent sur l'appareil.
 - Banques : Enable Banking (DSP2), lecture seule, via un relais sans état.
-- Clés d'API Anthropic (assistant, coach) : sur l'appareil seulement.
+- Clé d'API Anthropic (assistant, coach, Copilot) : sur l'appareil seulement ; effacée si un autre compte se connecte.
 
 ---
 
@@ -148,7 +153,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 100, MyFinances 337, myRaveLoc 83, MyPerf 235) |
+| Tous les tests unitaires | `npm run test:all` (serveur 106, MyFinances 337, myRaveLoc 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

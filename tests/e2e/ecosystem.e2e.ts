@@ -372,6 +372,43 @@ describe('MyLife, une seule app', () => {
     await shot(page, '13h-temps');
   });
 
+  it('Copilot : clé saisie, question, lecture des apps (Claude simulé), réponse ; fiches de contexte posées par les apps', async () => {
+    // Les apps ont posé leurs fiches de contexte (sur l'appareil seulement).
+    expect(await page.evaluate(() => localStorage.getItem('mylife:copilot:perf'))).toContain('weeklyGoal');
+    const bodies: { messages: { role: string }[]; model: string }[] = [];
+    await page.route('https://api.anthropic.com/**', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      bodies.push(body);
+      const first = bodies.length === 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: `msg_${bodies.length}`,
+          type: 'message',
+          role: 'assistant',
+          model: body.model,
+          stop_reason: first ? 'tool_use' : 'end_turn',
+          stop_sequence: null,
+          usage: { input_tokens: 10, output_tokens: 10 },
+          content: first ? [{ type: 'tool_use', id: 'toolu_1', name: 'get_overview', input: {} }] : [{ type: 'text', text: 'Belle semaine : tu es niveau ' + 'au-dessus de la moyenne.' }],
+        }),
+      });
+    });
+    await page.goto(`${server.url}/copilot`);
+    await page.getByLabel('Clé API').fill('sk-ant-test-e2e');
+    await page.getByRole('button', { name: 'Enregistrer la clé' }).click();
+    await page.getByRole('button', { name: 'Résume ma semaine.' }).click();
+    await page.getByText('Belle semaine : tu es niveau au-dessus de la moyenne.').waitFor({ timeout: 20_000 });
+    await page.getByText('A lu : ton personnage').waitFor();
+    expect(bodies[0]!.model).toBe('claude-opus-5-5');
+    // Le résultat de l'outil (le personnage, lu sur l'appareil) part dans la deuxième requête.
+    expect(JSON.stringify(bodies[1]!.messages)).toContain('character');
+    await shot(page, '13i-copilot');
+    await page.unroute('https://api.anthropic.com/**');
+    await page.evaluate(() => localStorage.removeItem('mylife:anthropic-key'));
+  });
+
   it('Crew : créer, inviter (même sans compte chez l’ami), se voir au classement, choisir ce qu’on montre', async () => {
     await page.goto(`${server.url}/crew`);
     await page.getByText('Ce que tes amis voient').waitFor();
@@ -508,7 +545,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

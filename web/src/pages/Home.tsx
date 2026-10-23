@@ -110,6 +110,18 @@ export function HomePage() {
             <div className="flex flex-col gap-3">
               <WrappedCard />
               <CharacterCard />
+              <Card to="/copilot" label="Copilot : une IA pour toutes tes apps">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] text-white" style={{ background: 'linear-gradient(150deg, var(--accent-g0), var(--gold))' }} aria-hidden>
+                    <Icon name="sparkles" size={20} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="t-body-strong block">Copilot</span>
+                    <span className="t-small block truncate text-secondary">« Je peux me payer ce billet ? » : une IA qui connaît toutes tes apps</span>
+                  </span>
+                  <Icon name="chevron-forward" className="text-muted" />
+                </div>
+              </Card>
               <WeekRecapCard />
               <div className="grid grid-cols-2 gap-3">
                 <Card to="/sorties" label="Sorties : organiser à plusieurs">

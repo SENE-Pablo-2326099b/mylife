@@ -20,6 +20,7 @@
     "deploy:all": "npm --prefix apps/finances run deploy && npm --prefix apps/perf run deploy:web && npm --prefix apps/raveloc run deploy && npm run deploy"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@vercel/functions": "3.9.11",
     "pg": "8.23.1"
   },

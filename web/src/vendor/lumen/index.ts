@@ -399,6 +399,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Ta semaine', path: '/bilan', keywords: 'bilan semaine resume recap progres' },
   { app: 'home', title: 'Ton Wrapped', path: '/wrapped', keywords: 'wrapped mois annee resume partager image story' },
   { app: 'home', title: 'Ton Crew', path: '/crew', keywords: 'crew amis classement groupe inviter defi bande' },
+  { app: 'home', title: 'Copilot', path: '/copilot', keywords: 'copilot ia assistant question claude conseil budget entrainement' },
   { app: 'home', title: 'MyGames', path: '/jeux', keywords: 'jeux jeu video steam heures console' },
   { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
   { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
@@ -504,3 +505,29 @@ export * from './crew';
 export * from './sortie';
 export * from './music';
 export * from './games';
+
+// ---------------------------------------------------------------- Copilot : fiches de contexte
+
+/**
+ * Fiche de contexte d'une app pour Copilot (l'IA de l'accueil) : ce que l'app sait de « maintenant »
+ * (budget du jour, séances prévues…), déposé sur l'appareil, jamais synchronisé ni envoyé ailleurs qu'à
+ * l'API Claude quand l'utilisateur pose une question. Effacé si un autre compte se connecte.
+ */
+export const copilotKey = (app: MyLifeApp['id']) => `mylife:copilot:${app}`;
+
+export function writeCopilotCard(app: MyLifeApp['id'], card: Record<string, unknown>): void {
+  try {
+    globalThis.localStorage?.setItem(copilotKey(app), JSON.stringify({ ...card, at: Date.now() }));
+  } catch {
+    /* stockage indisponible */
+  }
+}
+
+export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(globalThis.localStorage?.getItem(copilotKey(app)) ?? 'null') as unknown;
+    return v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}

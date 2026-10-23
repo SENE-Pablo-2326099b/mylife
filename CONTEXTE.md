@@ -175,6 +175,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   MyMusique (V3, étape 5) : `packages/lumen/src/music.ts`, `web/src/pages/Music.tsx`, `web/src/zip.ts`.
   MyGames (V3, étape 6) : relais `server/games.ts` (`/api/games`, `STEAM_API_KEY`), `packages/lumen/src/games.ts`,
   `web/src/pages/Games.tsx` (`/jeux`, `/temps`).
+  Copilot (V3, étape 7) : `web/src/copilot.ts`, `web/src/pages/Copilot.tsx` (chargé à la demande), fiches de contexte
+  `mylife:copilot:<app>` (appareil seulement) posées par MyFinances (`Today.tsx`) et MyPerf (`rpgStats.ts`).
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

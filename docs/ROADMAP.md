@@ -84,7 +84,7 @@ carte souvenir après. Réutilise l'espace partagé et myRaveLoc.
 - Vue transversale : camembert d'heures (jeu, musique, salle, festival…).
 - **Terminé quand** : tes heures de jeu s'affichent et la vue « temps » regroupe au moins trois sources.
 
-## Étape 7 : Copilot : effort M à L
+## Étape 7 : Copilot : effort M à L, **fait** (journal : `docs/V3.md`)
 - Une IA (ta clé, sur l'appareil) qui lit un **résumé** de tes apps (instantanés + outils de lecture) et répond : budget d'un billet, semaine à alléger avant un festival, compatibilité d'un line-up avec tes goûts.
 - Propose, ne fait jamais sans ta validation ; les écritures sont des propositions.
 - Une première version en lecture seule est possible dès l'étape 1.

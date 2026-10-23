@@ -23,6 +23,7 @@ import { Tilt } from '../ui/Tilt';
 import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
 import { setGlance } from '../ui/glance';
+import { writeCopilotCard } from '../vendor/lumen';
 import { BackupReminder } from '../ui/BackupReminder';
 import { downloadBackup } from '../domain/backupDownload';
 import { useTabActive } from '../ui/tabActive';
@@ -83,6 +84,28 @@ export default function TodayPage() {
     midnight.setHours(24, 0, 0, 0);
     setGlance('finances', { title: glanceTitle, detail: `${status.label} · ${b.usedPercent} % du budget du jour`, tone: glanceTone, until: midnight.getTime() });
   }, [glanceTitle, glanceTone, status.label, b.usedPercent]);
+
+  // Fiche de contexte pour Copilot (accueil MyLife) : sur l'appareil seulement, en euros.
+  useEffect(() => {
+    if (!ready) return;
+    const eur = (c: number) => Math.round(c) / 100;
+    writeCopilotCard('finances', {
+      day: today,
+      remainingToday: eur(b.remainingToday),
+      dailyBudget: eur(b.dailyBudget),
+      nextDailyBudget: eur(b.nextDailyBudget),
+      status: b.status,
+      cycle: { start: b.cycle.start, end: b.cycle.end, daysLeft: b.daysLeft, daysElapsed: b.daysElapsed },
+      envelope: eur(b.envelope.total),
+      spentThisCycle: eur(b.spentBefore + b.spentToday),
+      remainingCycle: eur(b.remainingCycle),
+      projectedEndOfCycle: eur(b.projection.projectedEnd),
+      plannedSavings: eur(b.envelope.savings),
+      overrun: b.overrun ? eur(b.overrun.deficit) : null,
+      realFree: b.realFree === null ? null : eur(b.realFree),
+      upcoming: b.upcoming.slice(0, 6).map((u) => ({ date: u.date, label: u.label, amount: eur(u.amount) })),
+    });
+  }, [ready, b, today]);
 
   // Données pas encore lues : ni faux chiffres ni faux « bienvenue ».
   if (total === undefined || loading) {

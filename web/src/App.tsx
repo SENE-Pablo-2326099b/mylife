@@ -18,7 +18,7 @@ import { MusicPage } from './pages/Music';
 import { GamesPage, TimePage } from './pages/Games';
 import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
 import { useCharacter, useStatsInput } from './ui/stats';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { WrappedPage } from './pages/Wrapped';
 import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
@@ -31,6 +31,9 @@ const TABS: TabDef[] = [
   { to: '/apparence', label: 'Apparence', icon: 'palette', active: 'palette-fill', match: ['/apparence'] },
 ];
 const TAB_PATHS = TABS.map((t) => t.to);
+
+// Copilot embarque le SDK de l'API Claude : chargé seulement quand on l'ouvre (l'accueil reste léger).
+const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 
 /** L'accueil de MyLife : le point d'entrée de l'app installée, avec le compte et l'apparence de toutes les apps. */
 export function App() {
@@ -89,6 +92,14 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               <Route path="/musique" element={<MusicPage />} />
               <Route path="/jeux" element={<GamesPage />} />
               <Route path="/temps" element={<TimePage />} />
+              <Route
+                path="/copilot"
+                element={
+                  <Suspense fallback={<p className="t-small px-4 pt-20 text-muted">Chargement de Copilot…</p>}>
+                    <CopilotPage />
+                  </Suspense>
+                }
+              />
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>

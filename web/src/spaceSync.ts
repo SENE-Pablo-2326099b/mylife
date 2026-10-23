@@ -184,3 +184,8 @@ export function forgetSpace(sid: string): void {
 }
 
 export const newRid = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+
+/** L'état connu d'un espace, sans le synchroniser (lecture du cache de l'appareil). */
+export function spaceSnapshot(sid: string): SpaceData {
+  return get(sid).snapshot;
+}
