@@ -122,6 +122,11 @@ export function HomePage() {
                   <p className="t-body-strong mt-1">Crew</p>
                   <p className="t-caption text-muted">Ton niveau face à tes amis</p>
                 </Card>
+                <Card to="/musique" label="MyMusique : tes stats Spotify">
+                  <Icon name="sparkles" className="text-gold" />
+                  <p className="t-body-strong mt-1">MyMusique</p>
+                  <p className="t-caption text-muted">Tes stats d’écoute</p>
+                </Card>
               </div>
             </div>
           </Reveal>

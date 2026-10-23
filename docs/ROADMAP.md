@@ -73,7 +73,7 @@ Un événement (festival, week-end) qui orchestre tout : groupe de localisation,
 carte souvenir après. Réutilise l'espace partagé et myRaveLoc.
 - **Terminé quand** : une Sortie de bout en bout à deux comptes, du « Chaud ? » à la carte souvenir.
 
-## Étape 5 : MyMusique : effort M
+## Étape 5 : MyMusique : effort M, **fait** (journal : `docs/V3.md`)
 - Import de l'**export de données Spotify** (fichier demandé à Spotify, traité sur l'appareil, seuls les résultats sont gardés). Pas d'API : celle de Spotify est très restreinte pour les nouvelles apps (5 utilisateurs en mode développeur).
 - Top artistes et morceaux, heure d'écoute type, obsession du moment, découvertes, séries ; croisement avec Sortie (ce qu'on écoutait avant un festival).
 - Alimente la stat **Culture** du Personnage. Option plus tard : Last.fm / ListenBrainz en direct.

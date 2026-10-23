@@ -5,13 +5,14 @@
  * tous les appareils, sans registre d'XP à synchroniser ni à tricher.
  */
 
-export type StatsApp = 'perf' | 'finances' | 'raveloc';
+export type StatsApp = 'perf' | 'finances' | 'raveloc' | 'music';
 
 /**
  * Compteurs d'une app, par semaine (clé : le lundi, `AAAA-MM-JJ`).
  * - perf : `sessions` (séances terminées), `records` (records battus) ; `goal` = objectif de séances par semaine.
  * - finances : `under` (jours sous le budget du jour), `tracked` (jours suivis), `saved` (cycles terminés cette semaine avec l'épargne prévue tenue).
  * - raveloc : `groups` (groupes actifs), `friends` (amis distincts dans ces groupes).
+ * - music : `minutes` (minutes d'écoute), `discoveries` (artistes écoutés pour la première fois).
  */
 export interface AppStats {
   v: 1;
@@ -40,7 +41,7 @@ export const STATS: readonly StatDef[] = [
   { id: 'discipline', name: 'Discipline', source: 'Jours sous ton budget et épargne tenue dans MyFinances', app: 'finances' },
   { id: 'social', name: 'Social', source: 'Groupes et amis retrouvés dans myRaveLoc', app: 'raveloc' },
   { id: 'constance', name: 'Constance', source: 'Semaines réussies d’affilée, toutes apps confondues', app: null },
-  { id: 'culture', name: 'Culture', source: 'Bientôt : ta musique (MyMusique)', app: null, locked: true },
+  { id: 'culture', name: 'Culture', source: 'Ce que tu écoutes et découvres (MyMusique)', app: 'music' },
 ];
 
 /** Barème : ce que rapporte chaque chose, plafonné par semaine (une semaine hors norme ne fait pas tout). */
@@ -60,6 +61,11 @@ export const XP = {
   streakStep: 20,
   streakCap: 10,
   fullWeek: 100,
+  /** Culture : 1 point par tranche de 10 minutes d'écoute (10 h comptées au plus par semaine), 20 par artiste découvert. */
+  listenMinutesPerXp: 10,
+  listenCapMinutes: 600,
+  discovery: 20,
+  discoveryCap: 10,
 } as const;
 
 /** Jours sous le budget demandés par la quête Discipline (et jours suivis nécessaires pour qu'elle existe). */
@@ -215,6 +221,9 @@ function evaluateWeek(stats: StatsByApp, week: string, starts: Record<StatsApp, 
     quests.push({ id: 'social', stat: 'social', title: 'Retrouve ta bande dans un groupe', progress: Math.min(groups, 1), target: 1, done, xp: XP.quest.social, bonus: true });
   }
 
+  // Culture (pas de quête : l'historique d'écoute est importé, pas suivi en direct)
+  xp.culture += Math.floor(Math.min(count(stats.music, week, 'minutes'), XP.listenCapMinutes) / XP.listenMinutesPerXp) + XP.discovery * Math.min(count(stats.music, week, 'discoveries'), XP.discoveryCap);
+
   const required = quests.filter((q) => !q.bonus);
   const good = required.length > 0 && required.filter((q) => q.done).length >= Math.min(2, required.length);
   if (quests.length >= 2) {
@@ -245,6 +254,7 @@ function appStarts(stats: StatsByApp): Record<StatsApp, string | null> {
     perf: firstWeek(stats.perf, ['sessions']),
     finances: firstWeek(stats.finances, ['tracked']),
     raveloc: firstWeek(stats.raveloc, ['groups']),
+    music: firstWeek(stats.music, ['minutes']),
   };
 }
 
@@ -298,7 +308,9 @@ export function computeCharacter(stats: StatsByApp, today: string, rest: readonl
     progress: global.progress,
     stats: STATS.map((d) => {
       const l = levelFor(totals[d.id]);
-      return { id: d.id, name: d.name, source: d.source, locked: !!d.locked, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
+      // Culture : verrouillée tant qu'aucun historique d'écoute n'a été importé.
+      const locked = !!d.locked || (d.id === 'culture' && !Object.keys(stats.music?.weeks ?? {}).length);
+      return { id: d.id, name: d.name, source: locked && d.id === 'culture' ? 'Importe ton historique Spotify dans MyMusique' : d.source, locked, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
     }),
     quests: now?.quests ?? [],
     streak: line[line.length - 1]?.streak ?? 0,
@@ -328,6 +340,9 @@ export interface Recap {
   /** Semaines avec au moins un groupe, et le plus d'amis retrouvés en une semaine. */
   socialWeeks: number;
   friends: number;
+  /** Minutes d'écoute et artistes découverts (MyMusique). */
+  listenMinutes: number;
+  discoveries: number;
   questsDone: number;
   questsTotal: number;
   goodWeeks: number;
@@ -356,7 +371,7 @@ export function recap(stats: StatsByApp, today: string, from: string, to: string
     from,
     to,
     weeks: inside.length,
-    apps: { perf: used(stats.perf, ['sessions']), finances: used(stats.finances, ['tracked']), raveloc: used(stats.raveloc, ['groups']) },
+    apps: { perf: used(stats.perf, ['sessions']), finances: used(stats.finances, ['tracked']), raveloc: used(stats.raveloc, ['groups']), music: used(stats.music, ['minutes']) },
     sessions: sum(stats.perf, 'sessions'),
     records: sum(stats.perf, 'records'),
     goalWeeks: inside.filter((w) => w.quests.some((q) => q.id === 'force' && q.done)).length,
@@ -365,6 +380,8 @@ export function recap(stats: StatsByApp, today: string, from: string, to: string
     saved: sum(stats.finances, 'saved'),
     socialWeeks: inside.filter((w) => count(stats.raveloc, w.week, 'groups') > 0).length,
     friends: inside.reduce((m, w) => Math.max(m, count(stats.raveloc, w.week, 'friends')), 0),
+    listenMinutes: sum(stats.music, 'minutes'),
+    discoveries: sum(stats.music, 'discoveries'),
     questsDone: main.filter((q) => q.done).length,
     questsTotal: main.length,
     goodWeeks: inside.filter((w) => w.good).length,
@@ -425,7 +442,7 @@ export function wrappedFor(today: string): { kind: 'month' | 'year'; period: str
 // ---------------------------------------------------------------- stockage (web : même adresse pour toutes les apps)
 
 export const statsKey = (app: StatsApp) => `mylife:stats:${app}`;
-export const STATS_APPS: readonly StatsApp[] = ['perf', 'finances', 'raveloc'];
+export const STATS_APPS: readonly StatsApp[] = ['perf', 'finances', 'raveloc', 'music'];
 
 export function parseStats(raw: unknown): AppStats | null {
   if (!raw || typeof raw !== 'object') return null;

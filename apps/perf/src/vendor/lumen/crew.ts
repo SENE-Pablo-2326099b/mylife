@@ -8,7 +8,7 @@ import type { Character, StatId } from './character';
  */
 
 export const CREW_TABLE = 'score';
-export const SHAREABLE_STATS: readonly StatId[] = ['force', 'discipline', 'social', 'constance'];
+export const SHAREABLE_STATS: readonly StatId[] = ['force', 'discipline', 'social', 'constance', 'culture'];
 
 export interface CrewScore {
   v: 1;

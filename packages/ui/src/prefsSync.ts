@@ -2,12 +2,13 @@ import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/m
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
 import { STATS_APPS, parseAppearance, readStats, type StatsApp } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
-import { adoptCharacterPrefs, adoptStats, onStatsChange, readCharacterPrefs } from './stats';
+import { adoptCharacterPrefs, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readMusic } from './stats';
 
 /**
  * Réglages communs de MyLife synchronisés entre appareils par le compte, chiffrés comme le reste (app
  * `mylife` du serveur) : l'apparence (`prefs/appearance`), les compteurs du Personnage de chaque app
- * (`stats/<app>`) et ses préférences (`prefs/character`). Chaque ligne est datée, la plus récente gagne :
+ * (`stats/<app>`), ses préférences (`prefs/character`) et le résumé d'écoute de MyMusique (`music/summary`).
+ * Chaque ligne est datée, la plus récente gagne :
  * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web ; l'app Android fait
  * de même de son côté.
  */
@@ -15,6 +16,7 @@ const STATE_KEY = 'mylife-sync-mylife';
 const PUSHED_KEY = 'mylife-prefs-pushed';
 const statsPushedKey = (app: StatsApp) => `mylife:stats-pushed:${app}`;
 const CHARACTER_PUSHED_KEY = 'mylife:character-pushed';
+const MUSIC_PUSHED_KEY = 'mylife:music-pushed';
 const isStatsApp = (rid: string): rid is StatsApp => (STATS_APPS as readonly string[]).includes(rid);
 
 const readNum = (k: string) => {
@@ -43,6 +45,8 @@ function rows(): { tbl: string; rid: string; at: number; pushedKey: string; row:
   }
   const c = readCharacterPrefs();
   if (c.at > 0) out.push({ tbl: 'prefs', rid: 'character', at: c.at, pushedKey: CHARACTER_PUSHED_KEY, row: c });
+  const music = readMusic();
+  if (music) out.push({ tbl: 'music', rid: 'summary', at: music.at, pushedKey: MUSIC_PUSHED_KEY, row: music });
   return out;
 }
 
@@ -75,6 +79,8 @@ export const prefsStore: LocalStore = {
         if (adoptStats(r.rid, r.row)) write(statsPushedKey(r.rid), String(readStats(r.rid)?.at ?? 0));
       } else if (r.tbl === 'prefs' && r.rid === 'character') {
         if (adoptCharacterPrefs(r.row)) write(CHARACTER_PUSHED_KEY, String(readCharacterPrefs().at));
+      } else if (r.tbl === 'music' && r.rid === 'summary') {
+        if (adoptMusic(r.row)) write(MUSIC_PUSHED_KEY, String(readMusic()?.at ?? 0));
       }
     }
   },

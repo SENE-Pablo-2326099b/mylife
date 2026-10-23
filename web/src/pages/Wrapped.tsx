@@ -1,12 +1,12 @@
 import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { localToday, titleFor, type Recap } from '../vendor/lumen';
+import { localToday, musicPeriod, titleFor, type Recap } from '../vendor/lumen';
 import { setDockHidden } from '../ui/dockStore';
 import { Icon, type IconName } from '../ui/icons';
 import { Button } from '../ui/index';
 import { haptic, springs } from '../ui/motion';
-import { useStatsInput } from '../ui/stats';
+import { useMusic, useStatsInput } from '../ui/stats';
 import { useTheme } from '../ui/themeRuntime';
 import { toast } from '../ui/toastStore';
 import { useGoBack } from '../ui/useGoBack';
@@ -32,7 +32,7 @@ interface Slide {
   lines: string[];
 }
 
-function slidesFor(r: Recap, name: string): Slide[] {
+function slidesFor(r: Recap, name: string, topArtist: string | null): Slide[] {
   const out: Slide[] = [];
   out.push({ id: 'intro', icon: 'sparkles', kicker: 'Wrapped', big: name.charAt(0).toUpperCase() + name.slice(1), unit: `${r.weeks} ${plural(r.weeks, 'semaine')} de ta vraie vie`, lines: ['Prêt ? Touche pour avancer.'] });
   if (r.apps.perf) {
@@ -64,6 +64,17 @@ function slidesFor(r: Recap, name: string): Slide[] {
       big: fmt(r.socialWeeks),
       unit: `${plural(r.socialWeeks, 'semaine')} avec ta bande`,
       lines: r.friends > 0 ? [`Jusqu’à ${fmt(r.friends)} ${plural(r.friends, 'ami')} réunis`] : [],
+    });
+  }
+  if (r.apps.music && r.listenMinutes > 0) {
+    const h = r.listenMinutes / 60;
+    out.push({
+      id: 'culture',
+      icon: 'sparkles',
+      kicker: 'Culture',
+      big: h >= 2 ? fmt(h) : fmt(r.listenMinutes),
+      unit: h >= 2 ? 'heures de musique' : 'minutes de musique',
+      lines: [topArtist ? `Ton artiste n°1 : ${topArtist}` : '', r.discoveries > 0 ? `${fmt(r.discoveries)} ${plural(r.discoveries, 'artiste découvert', 'artistes découverts')}` : ''].filter(Boolean),
     });
   }
   out.push({
@@ -114,6 +125,7 @@ function Final({ r, name, onReplay }: { r: Recap; name: string; onReplay: () => 
     r.apps.perf && r.records > 0 && { value: fmt(r.records), label: plural(r.records, 'record') },
     r.apps.finances && { value: fmt(r.under), label: 'jours sous le budget' },
     r.apps.raveloc && r.socialWeeks > 0 && { value: fmt(r.socialWeeks), label: 'semaines avec ma bande' },
+    r.apps.music && r.listenMinutes >= 60 && { value: fmt(r.listenMinutes / 60), label: 'heures de musique' },
     { value: fmt(r.goodWeeks), label: plural(r.goodWeeks, 'semaine réussie', 'semaines réussies') },
     { value: `+${fmt(r.xp)}`, label: 'XP' },
   ].filter((b): b is { value: string; label: string } => !!b);
@@ -167,7 +179,9 @@ export function WrappedPage() {
   const period = /^\d{4}(-\d{2})?$/.test(asked) ? asked : localToday().slice(0, 7);
   const name = periodName(period);
   const r = useMemo(() => periodRecap(stats, today, period, rest), [stats, rest, today, period]);
-  const slides = useMemo(() => slidesFor(r, name), [r, name]);
+  const music = useMusic();
+  const topArtist = music ? (musicPeriod(music, period).artists[0]?.[0] ?? null) : null;
+  const slides = useMemo(() => slidesFor(r, name, topArtist), [r, name, topArtist]);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const slide = slides[Math.min(index, slides.length - 1)]!;

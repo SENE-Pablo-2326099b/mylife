@@ -6,6 +6,7 @@
  * CHROME_PATH pour un autre navigateur que /usr/bin/google-chrome ; SHOTS=dossier pour des captures.
  */
 import { readFileSync } from 'node:fs';
+import { deflateRawSync, crc32 } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { startLocalServer, type LocalServer } from '../../server/local';
@@ -30,6 +31,48 @@ async function device(width = 390, height = 844): Promise<[BrowserContext, Page]
   p.on('pageerror', (e) => errors.push(`${p.url()} : ${e.message}`));
   p.on('console', (m) => m.type() === 'error' && !/Failed to load resource|favicon/.test(m.text()) && errors.push(`${p.url()} : ${m.text()}`));
   return [ctx, p];
+}
+
+/** Une petite archive .zip (fichiers compressés), comme l'export de données de Spotify. */
+function makeZip(files: { name: string; content: string }[]): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const f of files) {
+    const raw = Buffer.from(f.content);
+    const data = deflateRawSync(raw);
+    const name = Buffer.from(f.name);
+    const crc = crc32(raw);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(8, 8);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    locals.push(local, name, data);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(8, 10);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(raw.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+    centrals.push(central, name);
+    offset += 30 + name.length + data.length;
+  }
+  const dir = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(dir.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, dir, end]);
 }
 
 const style = (p: Page) => p.evaluate(() => document.documentElement.dataset.style ?? null);
@@ -281,6 +324,36 @@ describe('MyLife, une seule app', () => {
     await shot(other, '13-second-appareil');
   });
 
+  it('MyMusique : l’export Spotify (.zip) lu sur l’appareil, tops et habitudes, Culture déverrouillée, rien de sensible gardé', async () => {
+    const plays = [];
+    const now = Date.now();
+    for (let d = 1; d <= 50; d++) {
+      const ts = new Date(now - d * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+      plays.push({ ts, ms_played: 200_000, master_metadata_track_name: d % 3 ? 'Nuit blanche' : 'Lever du jour', master_metadata_album_artist_name: d % 5 ? 'Artiste Un' : 'Artiste Deux', ip_addr: '198.51.100.7', conn_country: 'FR', platform: 'android' });
+      if (d < 20) plays.push({ ts: new Date(now - d * 86_400_000 + 3_600_000).toISOString().replace(/\.\d+Z$/, 'Z'), ms_played: 180_000, master_metadata_track_name: `Découverte ${d}`, master_metadata_album_artist_name: `Nouveau ${d}`, ip_addr: '198.51.100.7', conn_country: 'FR', platform: 'android' });
+    }
+    const zip = makeZip([
+      { name: 'Spotify Extended Streaming History/Streaming_History_Audio_2026.json', content: JSON.stringify(plays) },
+      { name: 'Spotify Extended Streaming History/ReadMeFirst.pdf', content: 'pas un json' },
+    ]);
+    await page.goto(`${server.url}/musique`);
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Ouvrir mon export Spotify' }).click();
+    await (await chooser).setFiles({ name: 'my_spotify_data.zip', mimeType: 'application/zip', buffer: zip });
+    await page.getByText(/écoutes lues dans 1 fichier/).waitFor({ timeout: 20_000 });
+    await page.getByText('Tes artistes').waitFor();
+    await page.getByText('Artiste Un').first().waitFor();
+    await page.getByText(/Obsession de/).waitFor();
+    await page.waitForTimeout(700);
+    await shot(page, '13f-musique');
+    const stored = await page.evaluate(() => localStorage.getItem('mylife:music') ?? '');
+    expect(stored).toContain('Artiste Un');
+    expect(stored).not.toMatch(/198\.51\.100|android|conn_country/);
+    // La stat Culture est déverrouillée.
+    await page.goto(`${server.url}/personnage`);
+    await page.getByText('Ce que tu écoutes et découvres (MyMusique)', { exact: false }).waitFor();
+  });
+
   it('Crew : créer, inviter (même sans compte chez l’ami), se voir au classement, choisir ce qu’on montre', async () => {
     await page.goto(`${server.url}/crew`);
     await page.getByText('Ce que tes amis voient').waitFor();
@@ -417,7 +490,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

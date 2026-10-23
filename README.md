@@ -49,10 +49,15 @@ mêmes données.
 ### Ton personnage
 Sur l'accueil, un personnage dont les stats montent toutes seules avec ce que tu fais déjà : **Force** (séances et
 records dans MyPerf), **Discipline** (jours sous ton budget, épargne tenue dans MyFinances), **Social** (groupes et amis
-dans myRaveLoc), **Constance** (semaines réussies d'affilée). Chaque lundi, de nouvelles quêtes calées sur ton rythme ;
+dans myRaveLoc, sorties), **Constance** (semaines réussies d'affilée), **Culture** (ta musique, avec MyMusique). Chaque lundi, de nouvelles quêtes calées sur ton rythme ;
 une semaine de repos se déclare sans casser la série. Le dimanche, **ta semaine en bref** ; en début de mois et en
 fin d'année, ton **Wrapped** en stories, avec une image à partager (créée sur ton téléphone, sans aucun montant). Seuls des nombres par semaine sont utilisés (aucun montant,
 aucun détail), chiffrés dans ton compte : le même personnage sur tous tes appareils.
+
+### MyMusique
+Tes stats Spotify quand tu veux : demande ton export de données à Spotify, ouvre le .zip reçu dans MyMusique. Artistes
+et morceaux du mois et de l'année, ton obsession du moment, ton heure d'écoute, tes séries, tes découvertes, et la
+stat Culture de ton personnage. Le fichier est lu sur ton téléphone : seul un résumé est gardé, chiffré.
 
 ### Sorties
 Un festival, un week-end, une soirée : propose, envoie le lien, chacun répond « chaud ». Puis, au même endroit et
@@ -139,7 +144,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 91, MyFinances 337, myRaveLoc 83, MyPerf 234) |
+| Tous les tests unitaires | `npm run test:all` (serveur 95, MyFinances 337, myRaveLoc 83, MyPerf 234) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

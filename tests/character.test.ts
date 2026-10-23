@@ -41,6 +41,14 @@ describe('personnage', () => {
     expect(c.stats.find((s) => s.id === 'culture')?.locked).toBe(true);
   });
 
+  it('Culture : déverrouillée par l’historique d’écoute ; minutes plafonnées, découvertes ; aucune quête', () => {
+    const c = computeCharacter({ music: stats({ [W]: { minutes: 2000, discoveries: 3 }, [prev(1)]: { minutes: 95 } }) }, TODAY);
+    const culture = c.stats.find((s) => s.id === 'culture')!;
+    expect(culture.locked).toBe(false);
+    expect(culture.xp).toBe(XP.listenCapMinutes / XP.listenMinutesPerXp + 3 * XP.discovery + 9);
+    expect(c.quests).toEqual([]);
+  });
+
   it('séances et records font monter la Force ; l’objectif de la quête suit le réglage de MyPerf', () => {
     const c = computeCharacter({ perf: stats({ [W]: { sessions: 4, records: 1 } }, 4) }, TODAY);
     const force = c.stats.find((s) => s.id === 'force')!;
@@ -138,7 +146,7 @@ describe('bilans', () => {
     expect(r.questsTotal).toBe(3);
     expect(r.questsDone).toBe(2);
     expect(r.xp).toBe(timeline({ perf, finances, raveloc }, TODAY).find((w) => w.week === prev(1))!.total);
-    expect(recap({ perf }, TODAY, prev(1), prev(1)).apps).toEqual({ perf: true, finances: false, raveloc: false });
+    expect(recap({ perf }, TODAY, prev(1), prev(1)).apps).toEqual({ perf: true, finances: false, raveloc: false, music: false });
   });
 
   it('période : sommes, meilleure semaine, niveaux gagnés, plus longue série', () => {

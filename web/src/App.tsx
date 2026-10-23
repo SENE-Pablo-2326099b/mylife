@@ -14,6 +14,7 @@ import { CharacterPage } from './pages/Character';
 import { RecapPage } from './pages/Recap';
 import { CrewJoinPage, CrewListPage, CrewPage } from './pages/Crew';
 import { SortiePage, SortiesPage } from './pages/Sortie';
+import { MusicPage } from './pages/Music';
 import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
 import { useCharacter, useStatsInput } from './ui/stats';
 import { useEffect } from 'react';
@@ -84,6 +85,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               <Route path="/crew/:id" element={<CrewPage />} />
               <Route path="/sorties" element={<SortiesPage />} />
               <Route path="/sorties/:id" element={<SortiePage />} />
+              <Route path="/musique" element={<MusicPage />} />
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>
