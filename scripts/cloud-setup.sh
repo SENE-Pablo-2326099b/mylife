@@ -10,8 +10,8 @@ fi
 
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT" || exit 1
-LOG="$ROOT/node_modules/.cloud-setup.log"
-mkdir -p node_modules
+# Hors de node_modules : `npm ci` le vide pendant que le journal s'écrit.
+LOG=/tmp/mylife-cloud-setup.log
 
 # Dépendances d'un dossier, réinstallées seulement si son package-lock a changé.
 install() {

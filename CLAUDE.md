@@ -30,7 +30,7 @@ les paquets partagés (`packages/`) et trois apps (`apps/finances`, `apps/perf`,
 
 ## Dans le cloud (claude.ai/code)
 - Le hook SessionStart (`.claude/settings.json` → `scripts/cloud-setup.sh`) installe les dépendances de l'accueil et
-  des trois apps, et Chrome pour les tests de bout en bout. Journal : `node_modules/.cloud-setup.log`.
+  des trois apps, et Chrome pour les tests de bout en bout. Journal : `/tmp/mylife-cloud-setup.log`.
 - Travailler sur une branche, la pousser ; l'utilisateur relit et fusionne.
 - **Pas de déploiement depuis le cloud** : `npm run deploy:all` se lance sur la machine de l'utilisateur, après fusion.
 - Pas d'accès à la base de production ni aux scripts qui la lisent (`npm run support`, `npm run stats:serveur`).
