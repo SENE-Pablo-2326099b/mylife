@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Backdrop } from './ui/Backdrop';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { Navigation, type TabDef } from './ui/Navigation';
@@ -12,11 +12,15 @@ import { AccountPage } from './pages/Account';
 import { AppearancePage } from './pages/Appearance';
 import { CharacterPage } from './pages/Character';
 import { RecapPage } from './pages/Recap';
+import { CrewJoinPage, CrewListPage, CrewPage } from './pages/Crew';
+import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
+import { useCharacter, useStatsInput } from './ui/stats';
+import { useEffect } from 'react';
 import { WrappedPage } from './pages/Wrapped';
 import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
-import { useSession } from './ui/session';
+import { usePendingRecovery, useSession } from './ui/session';
 
 const TABS: TabDef[] = [
   { to: '/', label: 'Accueil', icon: 'home', active: 'home-fill', match: ['/'] },
@@ -32,7 +36,30 @@ export function App() {
   const welcome = pathname === '/bienvenue';
   const session = useSession();
   // Pas de compte, pas d'accueil : bienvenue puis création de compte (ou connexion), partout ailleurs aussi.
-  if (!session && !welcome) return <Navigate to="/bienvenue" replace />;
+  // Une invitation de Crew ouverte sans compte est gardée le temps de le créer.
+  if (!session && !welcome) {
+    stashInvite(location.hash);
+    return <Navigate to="/bienvenue" replace />;
+  }
+  return <Home session={!!session} welcome={welcome} />;
+}
+
+/** L'app une fois connecté (ou sur la bienvenue). */
+function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
+  const location = useLocation();
+  const { pathname } = location;
+  const navigate = useNavigate();
+  const character = useCharacter();
+  const { stats, rest } = useStatsInput();
+  // Mon score dans mes Crews, tenu à jour (seulement quand il change).
+  useCrewPublisher(character, stats, rest);
+  // Invitation reçue avant la connexion : on y va une fois l'accueil terminé, clé de secours mise de côté.
+  const keyPending = usePendingRecovery() !== null;
+  useEffect(() => {
+    if (!session || welcome || keyPending) return;
+    const hash = takeStashedInvite();
+    if (hash) navigate(`/crew/rejoindre${hash}`, { replace: true });
+  }, [session, welcome, keyPending, navigate]);
 
   return (
     <ThemeProvider>
@@ -50,6 +77,9 @@ export function App() {
               <Route path="/personnage" element={<CharacterPage />} />
               <Route path="/bilan" element={<RecapPage />} />
               <Route path="/wrapped" element={<WrappedPage />} />
+              <Route path="/crew" element={<CrewListPage />} />
+              <Route path="/crew/rejoindre" element={<CrewJoinPage />} />
+              <Route path="/crew/:id" element={<CrewPage />} />
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>

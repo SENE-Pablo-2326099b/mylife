@@ -1,5 +1,6 @@
 import { available, changePassword, deleteAccount, getSalt, HttpError, login, recoverFinish, recoverStart, renewRecovery, signup, verifyToken, type Client, type Db, type Env } from './core.js';
 import { forgetUser } from './raveloc.js';
+import { ensureSpaceSchema, forgetSpaceUser } from './space.js';
 
 /**
  * POST /api/auth : { action, … }. Sans session : `salt`, `available`, `signup`, `login`,
@@ -33,6 +34,9 @@ export async function authDispatch(db: Db, env: Env, body: Record<string, unknow
       const out = await deleteAccount(db, env, uid, body, client);
       // Ses groupes myRaveLoc : il les quitte (positions effacées, admin transmis).
       await forgetUser(db, uid);
+      // Ses espaces partagés (Crew…) : il les quitte, ses lignes sont effacées.
+      await ensureSpaceSchema(db);
+      await forgetSpaceUser(db, uid);
       return out;
     }
     default:

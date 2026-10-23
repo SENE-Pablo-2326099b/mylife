@@ -281,6 +281,49 @@ describe('MyLife, une seule app', () => {
     await shot(other, '13-second-appareil');
   });
 
+  it('Crew : créer, inviter (même sans compte chez l’ami), se voir au classement, choisir ce qu’on montre', async () => {
+    await page.goto(`${server.url}/crew`);
+    await page.getByText('Ce que tes amis voient').waitFor();
+    await page.getByLabel('Nom du Crew').fill('La bande');
+    await page.getByLabel('Ton pseudo dans ce Crew').fill('Alpha');
+    await page.getByRole('button', { name: 'Créer le Crew' }).click();
+    // Le lien d'invitation est créé tout de suite (copié, ou partagé sur téléphone) et affiché.
+    const linkText = page.getByText(/\/crew\/rejoindre#espace=/);
+    await linkText.waitFor({ timeout: 20_000 });
+    const link = (await linkText.textContent())!.trim();
+    expect(link.startsWith(`${server.url}/crew/rejoindre#espace=`)).toBe(true);
+    await page.getByText('Alpha').first().waitFor();
+    await shot(page, '13b-crew-cree');
+
+    // Un ami sans compte ouvre le lien : il crée son compte, puis l'invitation reprend.
+    const [friendCtx, friend] = await device();
+    await friend.goto(link);
+    await friend.getByRole('button', { name: 'Commencer' }).click();
+    await friend.getByLabel('Identifiant').fill(`${LOGIN}-crew`);
+    await friend.getByText('Libre').waitFor();
+    await friend.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await friend.getByRole('button', { name: 'Créer mon compte' }).click();
+    await friend.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
+    await friend.getByText('Rejoindre « La bande » ?').waitFor({ timeout: 20_000 });
+    await friend.getByLabel('Ton pseudo dans ce Crew').fill('Bravo');
+    await friend.getByRole('button', { name: 'Rejoindre' }).click();
+    await friend.getByText('Classement de', { exact: false }).waitFor();
+    await friend.getByText('Alpha').waitFor();
+    await friend.getByText('Bravo').first().waitFor();
+    // Le score d'Alpha (son personnage) est là ; Bravo n'a encore rien publié.
+    await friend.getByText(/Niv\. \d+ · /).first().waitFor();
+    await shot(friend, '13c-crew-ami');
+
+    // Alpha montre aussi son niveau de Force : Bravo le voit.
+    await page.reload();
+    await page.getByText('Bravo').waitFor();
+    await page.getByRole('switch', { name: 'Niveau Force' }).click();
+    await page.waitForTimeout(800);
+    await friend.reload();
+    await friend.getByText(/^Force \d+$/).waitFor({ timeout: 20_000 });
+    await friendCtx.close();
+  });
+
   it('320 px : aucun débordement horizontal, nulle part', async () => {
     const [, small] = await device(320, 640);
     await small.goto(`${server.url}/`);
@@ -289,7 +332,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/compte', '/apparence', '/installer', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

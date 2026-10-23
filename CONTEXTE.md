@@ -169,6 +169,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   (`publishStats`, `useCharacter`). Écran : `web/src/pages/Character.tsx` (carte de l'accueil, `/personnage`).
   Bilans (V3, étape 2) : `timeline` et `recap` dans le même moteur ; `web/src/pages/Recap.tsx` (cartes du dimanche et
   du début de mois, `/bilan`), `Wrapped.tsx` (stories, `/wrapped`), `web/src/wrappedImage.ts` (image partagée).
+  Espaces partagés (V3, étape 3) : `server/space.ts` (`/api/space`, tables `space*`), client
+  `packages/sync-client/src/space.ts` ; Crew : `packages/lumen/src/crew.ts`, `web/src/crew.ts`, `web/src/pages/Crew.tsx`.
   Journal complet : `docs/V3.md`.
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un

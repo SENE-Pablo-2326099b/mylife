@@ -61,6 +61,7 @@ class Device implements LocalStore {
   queue = new Map<string, { ver: number; at: number }>();
   state: SyncState | null = null;
   session: Session | null = null;
+  forget?: () => Promise<void>;
   sessions = { get: async () => this.session, set: async (s: Session | null) => void (this.session = s) };
   write(tbl: string, rid: string, row: unknown | null, at = Date.now()) {
     const k = `${tbl}|${rid}`;

@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type StatsApp, type StatsByApp } from '../vendor/lumen';
+import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -10,10 +10,23 @@ import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, par
 const EVENT = 'mylife:stats';
 const CHARACTER_KEY = 'mylife:character';
 
-/** Préférences du personnage (synchronisées) : les semaines de repos déclarées. */
+/** Préférences du personnage (synchronisées) : semaines de repos, et ce que chaque Crew voit en plus du niveau. */
 export interface CharacterPrefs {
   at: number;
   rest: string[];
+  /** Par Crew (identifiant d'espace) : les stats dont le niveau est partagé. */
+  crews: Record<string, StatId[]>;
+}
+
+const STAT_IDS: readonly StatId[] = ['force', 'discipline', 'social', 'constance', 'culture'];
+
+function readCrews(v: unknown): Record<string, StatId[]> {
+  const out: Record<string, StatId[]> = {};
+  if (!v || typeof v !== 'object') return out;
+  for (const [sid, list] of Object.entries(v as Record<string, unknown>)) {
+    if (/^[0-9a-f]{32}$/.test(sid) && Array.isArray(list)) out[sid] = list.filter((x): x is StatId => (STAT_IDS as readonly string[]).includes(x as string));
+  }
+  return out;
 }
 
 function emit() {
@@ -80,17 +93,17 @@ export function adoptStats(app: StatsApp, raw: unknown): boolean {
 export function readCharacterPrefs(): CharacterPrefs {
   try {
     const p = JSON.parse(localStorage.getItem(CHARACTER_KEY) ?? 'null') as Partial<CharacterPrefs> | null;
-    if (p && typeof p.at === 'number' && Array.isArray(p.rest)) return { at: p.at, rest: p.rest.filter((w): w is string => typeof w === 'string') };
+    if (p && typeof p.at === 'number' && Array.isArray(p.rest)) return { at: p.at, rest: p.rest.filter((w): w is string => typeof w === 'string'), crews: readCrews(p.crews) };
   } catch {
     /* illisible : valeurs par défaut */
   }
-  return { at: 0, rest: [] };
+  return { at: 0, rest: [], crews: {} };
 }
 
 export function adoptCharacterPrefs(raw: unknown): boolean {
   const p = raw as Partial<CharacterPrefs> | null;
   if (!p || typeof p.at !== 'number' || !Array.isArray(p.rest) || p.at <= readCharacterPrefs().at) return false;
-  write(CHARACTER_KEY, { at: p.at, rest: p.rest.filter((w): w is string => typeof w === 'string') });
+  write(CHARACTER_KEY, { at: p.at, rest: p.rest.filter((w): w is string => typeof w === 'string'), crews: readCrews(p.crews) });
   emit();
   return true;
 }
@@ -106,7 +119,19 @@ export function setRestWeek(on: boolean, today = localToday()): void {
   const week = weekStart(today);
   const p = readCharacterPrefs();
   const rest = on ? [...new Set([...p.rest, week])].sort().slice(-60) : p.rest.filter((w) => w !== week);
-  write(CHARACTER_KEY, { at: Date.now(), rest });
+  write(CHARACTER_KEY, { ...p, at: Date.now(), rest });
+  emit();
+  onChange?.();
+}
+
+/** Les stats dont un Crew voit le niveau (en plus du niveau, du titre, de la série et de l'XP du mois). */
+export function crewShare(sid: string): StatId[] {
+  return readCharacterPrefs().crews[sid] ?? [];
+}
+
+export function setCrewShare(sid: string, stats: readonly StatId[]): void {
+  const p = readCharacterPrefs();
+  write(CHARACTER_KEY, { ...p, at: Date.now(), crews: { ...p.crews, [sid]: [...stats] } });
   emit();
   onChange?.();
 }

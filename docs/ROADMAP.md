@@ -61,7 +61,7 @@ Validation automatique, récompense en XP. Une quête bonus « semaine complète
 Format d'échange, IA gratuite au choix (instructions à copier, réponse à coller), texte collé sans IA, programmes
 prêts, aperçu à corriger, export. Ajoutée en route ; détails dans `docs/V3.md`.
 
-## Étape 3 : Brique « espace partagé » et Crew : effort L
+## Étape 3 : Brique « espace partagé » et Crew : effort L, **fait** (journal : `docs/V3.md`)
 - Un groupe chiffré où plusieurs personnes lisent et écrivent (mécanique de myRaveLoc : clé du groupe dans le lien d'invitation, serveur aveugle), rendue **générique** pour que d'autres apps s'en servent.
 - Crew : on partage ses **scores** (jamais les données brutes ni les montants), choix stat par stat et groupe par groupe, discret et facultatif.
 - Quotas par espace, quitter un groupe efface ce qu'on y a mis.

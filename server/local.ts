@@ -12,6 +12,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { authDispatch } from './auth.js';
 import { ensureSchema, HttpError, type Db, type Env } from './core.js';
 import { dispatch as ravelocDispatch, ensureRavelocSchema, purge } from './raveloc.js';
+import { ensureSpaceSchema, spaceDispatch } from './space.js';
 import { syncDispatch } from './sync.js';
 
 const TYPES: Record<string, string> = {
@@ -53,6 +54,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
   const db = pg as unknown as Db;
   await ensureSchema(db);
   await ensureRavelocSchema(db);
+  await ensureSpaceSchema(db);
   const env: Env = { secret: 'local-secret-'.padEnd(40, 'x'), invite: 'local-invite', signup: 'open', ...opts.env };
   const builds = { ...BUILDS, ...opts.builds };
 
@@ -72,6 +74,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       const auth = req.headers.authorization;
       if (path === '/api/auth') return send(200, await authDispatch(db, env, body, auth, { ip: req.socket.remoteAddress ?? '' }));
       if (path === '/api/sync') return send(200, await syncDispatch(db, env, body, auth));
+      if (path === '/api/space') return send(200, await spaceDispatch(db, env.secret, auth, body));
       await purge(db);
       send(200, await ravelocDispatch(db, env.secret, auth, body));
     } catch (e) {

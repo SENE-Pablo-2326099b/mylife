@@ -274,6 +274,16 @@ export function CharacterPage() {
                 <p className="t-caption text-muted">le mois en images</p>
               </Card>
             </div>
+            <Card to="/crew" className="mt-2" label="Ton Crew : ton classement entre amis">
+              <div className="flex items-center gap-3">
+                <Icon name="people-fill" className="text-gold" />
+                <span className="min-w-0 flex-1">
+                  <span className="t-body-strong block">Ton Crew</span>
+                  <span className="t-caption block text-muted">Ton niveau face à tes amis, discret et facultatif</span>
+                </span>
+                <Icon name="chevron-forward" className="text-muted" />
+              </div>
+            </Card>
           </Reveal>
         )}
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildCrewScore, parseCrewScore, rankCrew, sameCrewScore } from '../packages/lumen/src/crew';
 import { addWeeks, computeCharacter, levelFor, mergeStats, monthWeeks, recap, recapWeekFor, timeline, wrappedFor, yearWeeks, parseStats, sameStats, titleFor, trimWeeks, weekStart, XP, xpForLevel, type AppStats } from '../packages/lumen/src/character';
 
 const stats = (weeks: AppStats['weeks'], goal?: number): AppStats => ({ v: 1, at: 1, weeks, ...(goal ? { goal } : {}) });
@@ -168,5 +169,41 @@ describe('bilans', () => {
     expect(wrappedFor('2026-12-20')).toEqual({ kind: 'year', period: '2026' });
     expect(wrappedFor('2027-01-04')).toEqual({ kind: 'year', period: '2026' });
     expect(wrappedFor('2027-02-02')).toEqual({ kind: 'month', period: '2027-01' });
+  });
+});
+
+describe('Crew', () => {
+  const c = computeCharacter({ perf: stats({ [W]: { sessions: 4, records: 1 } }, 4), finances: stats({ [W]: { under: 5, tracked: 5 } }) }, TODAY);
+
+  it('le score ne contient que ce qui est choisi : niveau, titre, série, XP ; stats seulement si partagées', () => {
+    const base = buildCrewScore(c, '2026-10', 900, [], 1);
+    expect(Object.keys(base.stats)).toEqual([]);
+    expect(base).toMatchObject({ v: 1, level: c.level, title: c.title, month: '2026-10', monthXp: 900 });
+    const more = buildCrewScore(c, '2026-10', 900, ['force', 'culture'], 1);
+    expect(Object.keys(more.stats)).toEqual(['force']);
+    expect(JSON.stringify(more)).not.toMatch(/sessions|under|tracked/);
+  });
+
+  it('lecture prudente d’un score reçu', () => {
+    expect(parseCrewScore({ v: 1, level: 5, title: 'Apprenti', streak: 2, month: '2026-10', monthXp: 10, weekXp: 3, stats: { force: 4, hack: 9 }, at: 1 })).toMatchObject({ stats: { force: 4 } });
+    expect(parseCrewScore({ v: 1, level: -1, title: 'x', streak: 0, month: '2026-10', monthXp: 0, weekXp: 0 })).toBeNull();
+    expect(parseCrewScore({ v: 1, level: 2, title: 'x', streak: 0, month: 'octobre', monthXp: 0, weekXp: 0 })).toBeNull();
+  });
+
+  it('classement du mois : XP du mois puis niveau ; un vieux score compte pour 0 ; ex aequo', () => {
+    const s = (level: number, month: string, monthXp: number) => buildCrewScore({ ...c, level }, month, monthXp, [], 1);
+    const scores = new Map([
+      ['a', s(10, '2026-10', 500)],
+      ['b', s(20, '2026-09', 9000)],
+      ['c', s(8, '2026-10', 500)],
+    ]);
+    const ranked = rankCrew([{ uid: 'a', pseudo: 'Ana' }, { uid: 'b', pseudo: 'Bob' }, { uid: 'c', pseudo: 'Cyd' }, { uid: 'd', pseudo: 'Dan' }], scores, 'c', '2026-10');
+    expect(ranked.map((r) => [r.pseudo, r.rank, r.monthXp, r.me])).toEqual([
+      ['Ana', 1, 500, false],
+      ['Cyd', 2, 500, true],
+      ['Bob', 3, 0, false],
+      ['Dan', 4, 0, false],
+    ]);
+    expect(sameCrewScore(s(1, '2026-10', 1), { ...s(1, '2026-10', 1), at: 99 })).toBe(true);
   });
 });
