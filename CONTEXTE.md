@@ -187,7 +187,8 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   Mes apps (V3, étape 10, premier palier) : moteur `packages/lumen/src/miniapp.ts` (format `mylife-app`, rien ne
   s'exécute), `web/src/pages/MiniApps.tsx` (`/mes-apps`), lignes `miniapp/<id>` de l'app `mylife` (stockage
   `mylife:miniapps`), outil Copilot `get_my_apps`.
-  Journal complet : `docs/V3.md`.
+  Journal complet : `docs/V3.md`. Refonte de MyFinances (24/10/2026, en cours) : `docs/REFONTE-FINANCES.md` (points de
+  restauration `apps/finances/src/domain/restorePoints.ts`).
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
   thème jamais choisi (at = 0) n'est jamais envoyé.

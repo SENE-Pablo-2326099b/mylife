@@ -2,6 +2,7 @@ import Dexie, { type DBCore, type DBCoreMutateRequest, type Middleware } from 'd
 import { db, TABLE_NAMES, type BudgetDB, type TableName } from '../../db/db';
 import type { Settings } from '../../db/types';
 import type { LocalStore, PendingChange, RemoteRow, SyncState } from '../../vendor/mylife-sync';
+import { clearRestorePoints, createRestorePoint, restoreDb, type RestoreDB } from '../../domain/restorePoints';
 
 /**
  * MyFinances ↔ synchro MyLife : suivi des modifications de la base locale (Dexie) et application de
@@ -138,7 +139,7 @@ async function putRows(database: BudgetDB, rows: RemoteRow[]) {
   }
 }
 
-export function dexieStore(database: BudgetDB = db): LocalStore {
+export function dexieStore(database: BudgetDB = db, points: RestoreDB = restoreDb): LocalStore {
   return {
     app: 'finances',
     async pending(limit) {
@@ -174,6 +175,8 @@ export function dexieStore(database: BudgetDB = db): LocalStore {
       return out;
     },
     async replace(rows) {
+      // Les données de l'appareil laissent la place à celles du compte : on les garde de côté avant.
+      await createRestorePoint('Avant de reprendre les données du compte', database, points);
       await inRemoteTransaction(database, async () => {
         const password = ((await database.settings.get('main')) as Settings | undefined)?.bridgePassword ?? '';
         for (const name of TABLE_NAMES) {
@@ -196,6 +199,8 @@ export function dexieStore(database: BudgetDB = db): LocalStore {
       });
       q().clear();
       saveQueue();
+      // Ses points de restauration aussi : rien d'un compte ne reste pour le suivant.
+      await clearRestorePoints(points);
     },
     async getState() {
       try {

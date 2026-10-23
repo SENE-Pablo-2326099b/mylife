@@ -5,6 +5,8 @@ import { getSettings, updateSettings } from '../../db/seed';
 import { exportBackup, importBackup, wipeAll } from '../../domain/backup';
 import { downloadBackup } from '../../domain/backupDownload';
 import { clearDemo, loadDemo } from '../../domain/demo';
+import { createRestorePoint } from '../../domain/restorePoints';
+import { RestorePoints } from './RestorePoints';
 import { clearErrors, readErrors } from '../../ui/errorLog';
 import { useCloud } from '../../sync/cloud';
 import { Button, Card, Reveal, SectionTitle, toast } from '../../ui/index';
@@ -39,7 +41,9 @@ export default function DataPage() {
   };
 
   /** Remplacement annulable : la base actuelle est gardée en mémoire le temps du toast. */
-  const replaceWithUndo = async (message: string, change: () => Promise<unknown>) => {
+  const replaceWithUndo = async (message: string, change: () => Promise<unknown>, reason: string) => {
+    // Un point de restauration d'abord : l'annulation du toast ne dure que quelques secondes, lui reste.
+    await createRestorePoint(reason);
     const before = await exportBackup();
     // La sauvegarde n'emporte jamais le mot de passe du relais : on le garde à part pour l'annulation.
     const password = (await getSettings()).bridgePassword;
@@ -63,7 +67,7 @@ export default function DataPage() {
   const doImport = (file: File) =>
     run(async () => {
       const data = JSON.parse(await file.text()) as unknown;
-      await replaceWithUndo('Sauvegarde restaurée', () => importBackup(data));
+      await replaceWithUndo('Sauvegarde restaurée', () => importBackup(data), 'Avant une restauration de sauvegarde');
     });
 
   return (
@@ -105,7 +109,7 @@ export default function DataPage() {
               Charger la démo
             </Button>
             {!!counts?.demo && (
-              <Button variant="secondary" disabled={busy} onClick={() => void run(() => replaceWithUndo('Démo supprimée', clearDemo))}>
+              <Button variant="secondary" disabled={busy} onClick={() => void run(() => replaceWithUndo('Démo supprimée', clearDemo, 'Avant la suppression de la démo'))}>
                 Supprimer la démo
               </Button>
             )}
@@ -116,15 +120,17 @@ export default function DataPage() {
         </Card>
       </Reveal>
 
+      <RestorePoints busy={busy} run={run} />
+
       <ErrorJournal />
 
-      <Reveal index={3}>
+      <Reveal index={4}>
         <SectionTitle>Tout effacer</SectionTitle>
         <Card tone="danger">
           <p className="t-small text-secondary">
-            Efface toutes les données de cet appareil{cloud.joined ? ' et de ton compte MyLife (donc de tous tes appareils synchronisés)' : ''} et revient aux réglages de départ. Tu as quelques secondes pour annuler ; exporte une sauvegarde avant si tu veux la garder.
+            Efface toutes les données de cet appareil{cloud.joined ? ' et de ton compte MyLife (donc de tous tes appareils synchronisés)' : ''} et revient aux réglages de départ. Tu as quelques secondes pour annuler, et une copie reste sur cet appareil dans les points de restauration (supprime-la ensuite si tu veux vraiment tout effacer).
           </p>
-          <Button variant="danger" icon="trash" className="mt-3" disabled={busy} onClick={() => void run(() => replaceWithUndo('Toutes les données ont été effacées', wipeAll))}>
+          <Button variant="danger" icon="trash" className="mt-3" disabled={busy} onClick={() => void run(() => replaceWithUndo('Toutes les données ont été effacées', wipeAll, 'Avant « Tout effacer »'))}>
             Tout effacer
           </Button>
         </Card>
@@ -144,7 +150,7 @@ function ErrorJournal() {
     );
   };
   return (
-    <Reveal index={2}>
+    <Reveal index={3}>
       <SectionTitle>Journal d’erreurs</SectionTitle>
       <Card>
         {errors.length === 0 ? (

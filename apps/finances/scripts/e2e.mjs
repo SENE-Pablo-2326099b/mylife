@@ -21,7 +21,7 @@ async function step(name, fn) {
     passed++;
     console.log(`  ✓ ${name}`);
   } catch (e) {
-    const why = e instanceof Error ? e.message.split('\n')[0] : String(e);
+    const why = e instanceof Error ? e.message.split('\n').slice(0, 3).join(' ') : String(e);
     failures.push(`${name} : ${why}`);
     console.log(`  ✗ ${name} — ${why}`);
   }
@@ -109,7 +109,8 @@ try {
 
     await step('Aujourd’hui : budget du jour et bloc « à faire »', async () => {
       await open('/');
-      await page.getByText('Reste aujourd’hui', { exact: false }).first().waitFor();
+      // Selon l'heure, la démo a déjà une dépense du jour : « Reste » ou « Dépassé aujourd'hui ».
+      await page.getByText(/(Reste|Dépassé) aujourd’hui/).first().waitFor();
       await page.getByText('À faire').first().waitFor();
     });
 
@@ -226,6 +227,20 @@ try {
         await context.setOffline(false);
       });
     }
+
+    await step('point de restauration : la démo supprimée revient', async () => {
+      await open('/reglages/donnees');
+      await page.getByRole('button', { name: 'Supprimer la démo' }).click();
+      await page.getByText('Démo supprimée').first().waitFor();
+      await page.getByText('Avant la suppression de la démo').waitFor();
+      await page.getByRole('button', { name: 'Revenir ici' }).first().click();
+      await page.getByRole('button', { name: 'Confirmer' }).click();
+      await page.getByText(/Données revenues au/).waitFor();
+      await page.getByRole('button', { name: 'Supprimer la démo' }).waitFor();
+      // L'état d'avant le retour était vide : rien de plus à garder ; le point d'origine reste.
+      await page.getByText('Avant la suppression de la démo').waitFor();
+      expect((await page.getByText('Avant de revenir à un point de restauration').count()) === 0, 'point inutile d’une base vide');
+    });
 
     await step('aucune erreur console', async () => expect(errors.length === 0, errors.slice(0, 3).join(' · ')));
     await context.close();
