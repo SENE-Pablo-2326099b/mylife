@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -921,7 +921,7 @@ describe('MyLife, une seule app', () => {
     // Coché en magasin : il entre dans le garde-manger, au frigo, avec une date proposée.
     await p.getByRole('checkbox', { name: 'Lait : à prendre' }).click();
     await p.getByRole('checkbox', { name: 'Lait : pris' }).waitFor();
-    await p.getByRole('radio', { name: /Garde-manger/ }).click();
+    await p.getByRole('radio', { name: /^Stock/ }).click();
     await p.getByRole('heading', { name: 'Frigo' }).waitFor();
     await p.getByRole('button', { name: /^Lait/ }).click();
     await p.getByRole('radio', { name: 'Bientôt fini' }).click();
@@ -984,6 +984,39 @@ describe('MyLife, une seule app', () => {
     expect(await b.getByRole('button', { name: /^Pain/ }).count()).toBe(2);
     await ctxA.close();
     await ctxB.close();
+  });
+
+  it('MyChef recettes : une recette collée, possible avec le garde-manger, mode cuisine, « J’ai cuisiné » retire du stock et fait monter la Vitalité', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.goto(`${server.url}/chef?vue=stock`);
+    await p.getByRole('button', { name: /^Lait/ }).first().waitFor({ timeout: 30_000 });
+    await p.getByRole('radio', { name: 'Recettes' }).click();
+    await p.getByRole('button', { name: 'Ajouter une recette' }).click();
+    await p.getByLabel('Ta recette').fill('Lait chaud\nPour 1 personne\n25 cl de lait\nPréparation :\nFais chauffer le lait 3 min.');
+    await p.getByRole('button', { name: 'Ajouter la recette' }).click();
+    await p.getByRole('button', { name: /^Lait chaud/ }).click();
+    await p.getByText('Tout est là').waitFor();
+    await p.getByRole('button', { name: 'Mode cuisine' }).click();
+    await p.getByText('Fais chauffer le lait 3 min.').waitFor();
+    await p.getByRole('button', { name: 'Minuteur 3 min' }).click();
+    await p.getByText(/^[23]:\d\d$/).waitFor();
+    await shot(p, '40-chef-mode-cuisine');
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    await p.getByRole('button', { name: 'J’ai cuisiné' }).click();
+    await p.getByText(/Bon appétit/).waitFor();
+    // Le lait était « bientôt fini » : il passe à « fini ».
+    await p.getByRole('radio', { name: /^Stock/ }).click();
+    await p.getByRole('heading', { name: 'Finis' }).waitFor();
+    // La stat Vitalité apparaît sur le Personnage (repas fait maison).
+    await p.goto(`${server.url}/personnage`);
+    await p.getByText('Vitalité').first().waitFor({ timeout: 20_000 });
+    await ctx.close();
   });
 
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {

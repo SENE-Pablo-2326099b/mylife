@@ -542,4 +542,5 @@ export * from './actions';
 export * from './agenda';
 export * from './objectifs';
 export * from './chef';
+export * from './recipes';
 // new-app: moteurs (repère du générateur, ne pas retirer)

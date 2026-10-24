@@ -20,7 +20,8 @@ import {
   type ShoppingItem,
 } from '../vendor/lumen';
 import type { Space } from '../vendor/mylife-sync';
-import { pantry, shopping } from '../myChefData';
+import { listItemFor, pantry, shopping } from '../myChefData';
+import { ChefRecipes } from './ChefRecipes';
 import { CREW_URL, client, loadCrews, useCrews } from '../crew';
 import { forgetSpace, useSpaceData, writeSpace } from '../spaceSync';
 import { useSession } from '../ui/session';
@@ -32,7 +33,7 @@ import { Screen } from '../ui/Screen';
  * MyChef (V4, 3.4), palier 1 : la liste de courses et le garde-manger. Les indispensables bientôt finis reviennent seuls
  * sur la liste ; un article coché en magasin entre dans le stock. Moteur : packages/lumen/src/chef.ts.
  */
-type Tab = 'courses' | 'stock';
+type Tab = 'courses' | 'stock' | 'recettes';
 const LEVEL: Record<Level, string> = { ok: 'En stock', low: 'Bientôt fini', out: 'Fini' };
 
 function when(expires: string, today: string): { text: string; tone: 'danger' | 'warning' | 'muted' } {
@@ -401,23 +402,30 @@ function Pantry({ today }: { today: string }) {
 
 export function MyChefPage() {
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get('vue') === 'stock' ? 'stock' : 'courses';
+  const vue = params.get('vue');
+  const tab: Tab = vue === 'stock' || vue === 'recettes' ? vue : 'courses';
   const today = localToday();
-  const toBuy = useShoppingList().items.filter((l) => !l.value.done).length;
+  const list = useShoppingList();
+  const toBuy = list.items.filter((l) => !l.value.done).length;
+  const addToList = (name: string) => {
+    const { id, item } = listItemFor(name);
+    if (!list.items.some((i) => i.id === id && !i.value.done)) list.put(id, item);
+  };
   const soon = expiringSoon(pantry.useList(), today).length;
   return (
-    <Screen stack title="MyChef" kicker="Courses et garde-manger" mood="today" back="/">
+    <Screen stack title="MyChef" kicker="Courses, garde-manger, recettes" mood="today" back="/">
       <div className="flex flex-col gap-3">
         <Segmented
           label="Vue"
           value={tab}
-          onChange={(v) => setParams(v === 'stock' ? { vue: 'stock' } : {}, { replace: true })}
+          onChange={(v) => setParams(v === 'courses' ? {} : { vue: v }, { replace: true })}
           options={[
             { value: 'courses', label: toBuy ? `Courses (${toBuy})` : 'Courses' },
-            { value: 'stock', label: soon ? `Garde-manger (${soon} à finir)` : 'Garde-manger' },
+            { value: 'stock', label: soon ? `Stock (${soon})` : 'Stock' },
+            { value: 'recettes', label: 'Recettes' },
           ]}
         />
-        {tab === 'courses' ? <Shopping today={today} /> : <Pantry today={today} />}
+        {tab === 'courses' ? <Shopping today={today} /> : tab === 'stock' ? <Pantry today={today} /> : <ChefRecipes addToList={addToList} />}
       </div>
     </Screen>
   );
