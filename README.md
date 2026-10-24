@@ -3,14 +3,14 @@
 **Tes finances, ton entraînement et tes sorties dans une seule app.** Un compte, une installation, un
 même design d'un bout à l'autre, et des données chiffrées sur ton téléphone avant de le quitter.
 
-![Les quatre écrans de MyLife dans le thème Nuit : accueil, MyFinances, MyPerf, myRaveLoc](docs/images/sheet-nuit.png)
+![Les quatre écrans de MyLife dans le thème Nuit : accueil, MyFinances, MyPerf, MyRave](docs/images/sheet-nuit.png)
 
 | | App | Pour quoi faire |
 |---|---|---|
 | ✦ | **Accueil MyLife** (`/`) | Ton **Personnage** (un RPG de ta vraie vie : niveaux, quêtes de la semaine, série), tes apps et ce qu'elles ont à te dire maintenant (« 25 € à dépenser aujourd'hui », « Jambes · 5 exercices »), ton compte, l'apparence, l'installation. |
 | ◆ | **MyFinances** (`/finances/`) | Le budget au jour près : ce qui reste à dépenser aujourd'hui, le cycle de paie, les opérations (banques en lecture seule), le patrimoine, l'indépendance financière, un assistant IA. |
 | 🏋 | **MyPerf** (`/perf/`) | La musculation : séance du jour, planning en cycles, saisie des séries, 1RM et progression, carte musculaire, coach IA, **import de ton programme** (avec l'IA gratuite de ton choix, en texte collé, ou un programme prêt). Aussi en app Android. |
-| ➤ | **myRaveLoc** (`/raveloc/`) | Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, une flèche et une distance, mode phare. |
+| ➤ | **MyRave** (`/raveloc/`) | Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, une flèche et une distance, mode phare. |
 
 ---
 
@@ -30,7 +30,7 @@ Le compte est **obligatoire** dans les quatre parties de MyLife : sans lui, l'ap
 - **Android / ordinateur (Chrome, Edge)** : Accueil → **Installe MyLife** → *Installer*.
 - **iPhone (Safari)** : Partager → *Sur l'écran d'accueil*.
 
-Une seule icône pour tout : un **appui long** dessus mène directement à MyFinances, MyPerf ou myRaveLoc.
+Une seule icône pour tout : un **appui long** dessus mène directement à MyFinances, MyPerf ou MyRave.
 Si tu avais installé l'une de ces apps à part, tu peux la désinstaller : MyLife la contient, avec les
 mêmes données.
 
@@ -38,7 +38,7 @@ mêmes données.
 - **Passer d'une app à l'autre** : bouton ⠿ en haut à droite (*Espaces MyLife*), ou l'orbe 🔍 du dock.
 - **Chercher partout** : l'orbe ouvre la palette ; tape « séance », « budget », « groupe »… elle propose
   aussi les écrans des autres apps.
-- **Appui long sur l'orbe** : l'assistant (MyFinances), le coach (MyPerf), le mode phare (myRaveLoc).
+- **Appui long sur l'orbe** : l'assistant (MyFinances), le coach (MyPerf), le mode phare (MyRave).
 - **Apparence** : 12 thèmes, dont 4 identités complètes (Circuit, Ardoise, Argile, Brut). Le thème choisi
   habille toutes les apps, et suit sur tes autres appareils.
 
@@ -49,7 +49,7 @@ mêmes données.
 ### Ton personnage
 Sur l'accueil, un personnage dont les stats montent toutes seules avec ce que tu fais déjà : **Force** (séances et
 records dans MyPerf), **Discipline** (jours sous ton budget, épargne tenue dans MyFinances), **Social** (groupes et amis
-dans myRaveLoc, sorties), **Constance** (semaines réussies d'affilée), **Culture** (ta musique, avec MyMusique). Chaque lundi, de nouvelles quêtes calées sur ton rythme ;
+dans MyRave, sorties), **Constance** (semaines réussies d'affilée), **Culture** (ta musique, avec MyMusique). Chaque lundi, de nouvelles quêtes calées sur ton rythme ;
 une semaine de repos se déclare sans casser la série. Le dimanche, **ta semaine en bref** ; en début de mois et en
 fin d'année, ton **Wrapped** en stories, avec une image à partager (créée sur ton téléphone, sans aucun montant). Seuls des nombres par semaine sont utilisés (aucun montant,
 aucun détail), chiffrés dans ton compte : le même personnage sur tous tes appareils.
@@ -111,7 +111,7 @@ facultative, même texte pour tous, sans aucune donnée).
 - **Chiffrement de bout en bout.** Le mot de passe ne quitte jamais l'appareil (PBKDF2-SHA256, 200 000
   tours, puis HKDF). Chaque donnée est chiffrée en AES-256-GCM avant l'envoi ; le serveur ne range que des
   blocs illisibles, et ne connaît ni le mot de passe ni le contenu.
-- **myRaveLoc** : noms de groupe, pseudos et positions chiffrés avec une clé de groupe transmise dans le lien
+- **MyRave** : noms de groupe, pseudos et positions chiffrés avec une clé de groupe transmise dans le lien
   d'invitation (jamais au serveur). Partage coupé par défaut, limité dans le temps, effacé à l'arrêt.
 - **Aucune publicité, aucun traceur, aucune analytique.** Les aperçus de l'accueil restent sur l'appareil.
 - Banques : Enable Banking (DSP2), lecture seule, via un relais sans état.
@@ -128,7 +128,7 @@ facultative, même texte pour tous, sans aucune donnée).
 ```
 MyLife/
 ├── web/                 Accueil MyLife (React + Vite) — la seule PWA installable (manifeste, portée /)
-├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), myRaveLoc (/api/raveloc), espaces partagés (/api/space), relais Steam (/api/games), support (/api/support), notifications (/api/push, /api/cron-weekly)
+├── api/, server/        API Vercel : comptes (/api/auth), synchro chiffrée (/api/sync), MyRave (/api/raveloc), espaces partagés (/api/space), relais Steam (/api/games), support (/api/support), notifications (/api/push, /api/cron-weekly)
 ├── packages/
 │   ├── lumen/           Thèmes, identités, registre des apps et de leurs écrans, aperçus, apparence commune
 │   ├── sync-client/     Compte et synchro chiffrée (TypeScript pur : web et React Native)
@@ -136,7 +136,7 @@ MyLife/
 ├── apps/
 │   ├── finances/        MyFinances — React 18 + Vite + Tailwind + Dexie
 │   ├── perf/            MyPerf — Expo / React Native (web + Android) + SQLite
-│   └── raveloc/         myRaveLoc — React 18 + Vite
+│   └── raveloc/         MyRave — React 18 + Vite
 ├── tests/               Serveur (Postgres en mémoire) et parcours de bout en bout de tout MyLife
 └── docs/                UNIFICATION.md (choix notés), images
 ```
@@ -165,7 +165,7 @@ npm run local        # tout MyLife sur http://localhost:4300 (vraies API, base e
 | Action | Commande |
 |---|---|
 | Copier les paquets partagés dans les apps | `npm run vendor` |
-| Tous les tests unitaires | `npm run test:all` (serveur 122, MyFinances 337, myRaveLoc 83, MyPerf 235) |
+| Tous les tests unitaires | `npm run test:all` (serveur 122, MyFinances 337, MyRave 83, MyPerf 235) |
 | Parcours de bout en bout de tout MyLife | `npm run e2e` (accueil, compte, les trois apps, thème, second appareil, autre compte sur le même navigateur, 320 px) |
 | Tous les parcours de bout en bout | `npm run e2e:all` |
 | Développer l'accueil | `npm run dev` (+ `npm run local` pour les API) |

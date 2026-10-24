@@ -11,7 +11,7 @@ export function AuthScreen({ expired, invited }: { expired: boolean; invited: bo
       <div className="flex items-center gap-3">
         <BrandMark size={52} />
         <div>
-          <h1 className="t-large">myRaveLoc</h1>
+          <h1 className="t-large">MyRave</h1>
           <p className="t-small text-secondary">Retrouver ses amis dans la foule.</p>
         </div>
       </div>

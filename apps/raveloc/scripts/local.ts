@@ -2,4 +2,4 @@
 import { startLocalServer } from '../server/local';
 
 const s = await startLocalServer({ port: Number(process.env.PORT ?? 4320) });
-console.log(`myRaveLoc local : ${s.url}/raveloc/ (base en mémoire, inscription ouverte)`);
+console.log(`MyRave local : ${s.url}/raveloc/ (base en mémoire, inscription ouverte)`);

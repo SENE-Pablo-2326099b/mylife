@@ -1,6 +1,6 @@
 /**
  * Parcours complet dans Chrome (deux téléphones simulés : Alice et Bob), contre le serveur local
- * (vraie API myRaveLoc + vraie authentification MyLife, base en mémoire).
+ * (vraie API MyRave + vraie authentification MyLife, base en mémoire).
  * Les positions GPS et l'orientation sont SIMULÉES ici, et seulement ici (options du navigateur de test).
  * Prérequis : npm run build. CHROME_PATH pour un autre navigateur que /usr/bin/google-chrome.
  */
@@ -55,7 +55,7 @@ afterAll(async () => {
   await server?.close();
 });
 
-describe('myRaveLoc de bout en bout', () => {
+describe('MyRave de bout en bout', () => {
   let link = '';
 
   it('connexion avec un compte MyLife, puis création d’un groupe', async () => {

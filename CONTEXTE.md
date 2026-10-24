@@ -1,4 +1,4 @@
-# MyLife : contexte complet (accueil + MyFinances + MyPerf + myRaveLoc)
+# MyLife : contexte complet (accueil + MyFinances + MyPerf + MyRave)
 
 > **À lire au début d'une nouvelle conversation.** Ce fichier résume l'écosystème : architecture, dépôt,
 > commandes, décisions, contraintes, état actuel au **22/10/2026**. Une seule copie, à la racine du dépôt
@@ -20,11 +20,11 @@ origine** : https://mylife-liart.vercel.app
 | Chemin | Partie | Dossier du dépôt | Projet Vercel | Techno |
 |---|---|---|---|---|
 | `/` | **Accueil MyLife** : apps + aperçus, compte, apparence, installation, premier lancement ; **manifeste unique** (portée `/`, raccourcis vers les 3 apps) | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
-| `/api/auth`, `/api/sync`, `/api/raveloc` | Comptes, synchro chiffrée, API de myRaveLoc | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
+| `/api/auth`, `/api/sync`, `/api/raveloc` | Comptes, synchro chiffrée, API de MyRave | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
 | `/finances/` | **MyFinances** (budget, banques, patrimoine) | `apps/finances` | `myfinances` (https://myfinances-sepia-sigma.vercel.app) | React 18 + Vite + TS + Tailwind + Dexie |
 | `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
 | `/perf/` | **MyPerf** (musculation) | `apps/perf` | `myperf` (https://myperf-six.vercel.app) | Expo / React Native (React 19) + SQLite ; web + APK Android |
-| `/raveloc/` | **myRaveLoc** (retrouver ses amis en festival) | `apps/raveloc` | `myraveloc` (https://myraveloc.vercel.app) | React 18 + Vite + kit `packages/ui` |
+| `/raveloc/` | **MyRave** (retrouver ses amis en festival) | `apps/raveloc` | `myraveloc` (https://myraveloc.vercel.app) | React 18 + Vite + kit `packages/ui` |
 
 **Fonctionnement :**
 - **Un seul dépôt git** (`~/PersoDev/MyLife`, historiques des quatre anciens dépôts conservés par `git subtree`) ;
@@ -51,7 +51,7 @@ iPhone plus tard (PWA).
 | Action | Commande |
 |---|---|
 | Dépendances (racine + 3 apps) | `npm run setup` |
-| Copier les paquets partagés | `npm run vendor` (ou `npm run vendor -- finances raveloc`) : `packages/sync-client` → `src/vendor/mylife-sync`, `packages/lumen` → `src/vendor/lumen` (toutes les apps), `packages/ui` → `src/ui` (accueil, MyFinances, myRaveLoc). **On modifie toujours dans `packages/`, jamais dans les copies.** |
+| Copier les paquets partagés | `npm run vendor` (ou `npm run vendor -- finances raveloc`) : `packages/sync-client` → `src/vendor/mylife-sync`, `packages/lumen` → `src/vendor/lumen` (toutes les apps), `packages/ui` → `src/ui` (accueil, MyFinances, MyRave). **On modifie toujours dans `packages/`, jamais dans les copies.** |
 | Tout construire | `npm run build:all` |
 | Tests serveur + paquets | `npm test` (vitest, **42 tests**, Postgres en mémoire via PGlite) |
 | Tous les tests unitaires | `npm run test:all` |
@@ -85,7 +85,7 @@ iPhone plus tard (PWA).
 
 Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mémoire (code 137).
 
-### myRaveLoc (`apps/raveloc`)
+### MyRave (`apps/raveloc`)
 
 | Action | Commande |
 |---|---|
@@ -112,7 +112,7 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 - `POST /api/auth` (`server/auth.ts` → `authDispatch`) : sans session `salt`, `available` (identifiant
   libre ?), `signup`, `login`, `recoverStart` / `recoverFinish` ; avec session `password`,
   `renewRecovery` (nouvelle clé de secours), `deleteAccount` (mot de passe redemandé ; efface le compte, ses
-  lignes, quitte ses groupes myRaveLoc et ses espaces, efface ses messages au support et ses abonnements aux notifications).
+  lignes, quitte ses groupes MyRave et ses espaces, efface ses messages au support et ses abonnements aux notifications).
 - `POST /api/sync` (`server/sync.ts`) : `status`, `sync`. Apps synchronisées : `finances`, `perf`, `mylife`
   (réglages communs : l'apparence, les compteurs), `miniapps` (« Mes apps » : une ligne par app, une par saisie).
   Quotas `ROW_QUOTA` : seules les lignes vivantes comptent, et seules les nouvelles s'ajoutent. Une ligne trop grosse
@@ -121,7 +121,7 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   purgées après 90 jours par le cron du dimanche (`purgeTombstones`, table `records_purge`) ; un appareil dont le
   curseur est plus ancien reçoit `resync` : il envoie tout ce qu'il a, puis reprend tout le contenu du compte.
   Les problèmes de synchro qui reviennent s'affichent sur la page Compte (`packages/ui/src/syncIssue.ts`).
-- `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
+- `POST /api/raveloc` : API de MyRave (voir § 6 bis).
 - Le même code sert en local (`server/local.ts`, `npm run local`) et dans les tests.
 
 ### Inscription « comme une app ordinaire »
@@ -171,7 +171,7 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
 - **Personnage (V3, étape 1)** : moteur pur `packages/lumen/src/character.ts` (niveaux, quêtes, série, entièrement
   recalculé depuis des compteurs par semaine). Chaque app publie ses compteurs (`stats/<app>` de l'app de synchro
   `mylife`, chiffrés, jamais de montant) : MyFinances `domain/rpgStats.ts`, MyPerf `services/rpgStats.ts` (Android :
-  via `services/cloud/prefs.ts`), myRaveLoc `App.tsx` (fusionné : ses groupes expirent). Web : `packages/ui/src/stats.ts`
+  via `services/cloud/prefs.ts`), MyRave `App.tsx` (fusionné : ses groupes expirent). Web : `packages/ui/src/stats.ts`
   (`publishStats`, `useCharacter`). Écran : `web/src/pages/Character.tsx` (carte de l'accueil, `/personnage`).
   Bilans (V3, étape 2) : `timeline` et `recap` dans le même moteur ; `web/src/pages/Recap.tsx` (cartes du dimanche et
   du début de mois, `/bilan`), `Wrapped.tsx` (stories, `/wrapped`), `web/src/wrappedImage.ts` (image partagée).
@@ -194,6 +194,9 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   s'exécute), `web/src/pages/MiniApps.tsx` (`/mes-apps`), synchro `packages/ui/src/miniSync.ts` (app `miniapps` :
   `app/<id>` et `entry/<app>.<saisie>`, depuis la V4 ; l'ancien format `miniapp/<id>` de l'app `mylife` est repris
   puis effacé) (stockage `mylife:miniapps`), outil Copilot `get_my_apps`.
+  Contrat d'app (V4) : registre `HOME_APPS` (`packages/lumen/src/homeApps.ts`) dont l'accueil, l'export et la
+  confidentialité découlent ; collections synchronisées `packages/ui/src/collectionSync.ts` (`defineCollection`, stockage
+  `mylife:app:`) ; `tests/contract.test.ts` ; nouvelle app : `npm run new-app <id> "<Nom>"` (`docs/CONTRAT-APP.md`).
   Journal complet : `docs/V3.md`, puis `docs/V4.md` (feuille de route `docs/ROADMAP-V4.md`). Refonte de MyFinances (24/10/2026, en cours) : `docs/REFONTE-FINANCES.md` (points de
   restauration `apps/finances/src/domain/restorePoints.ts`).
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
@@ -258,7 +261,7 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
   - `raveloc` : `['#5DFFC4','#1FA3FF']`, icône `navigate`, `/raveloc/`.
   - **Toute nouvelle app s'ajoute ici.**
 - `MYLIFE_DESTINATIONS` : les écrans de chaque app (titre, chemin, mots-clés) que la palette de commande de n'importe quelle app propose.
-- `MyLifeGlance` / `readGlance` / `writeGlance` : aperçus déposés par chaque app sur l'appareil (`mylife:glance:<app>`, avec échéance `until`) et affichés par l'accueil et les Espaces : MyFinances « X € à dépenser aujourd'hui » (Today), MyPerf la séance du jour (web), myRaveLoc le groupe actif.
+- `MyLifeGlance` / `readGlance` / `writeGlance` : aperçus déposés par chaque app sur l'appareil (`mylife:glance:<app>`, avec échéance `until`) et affichés par l'accueil et les Espaces : MyFinances « X € à dépenser aujourd'hui » (Today), MyPerf la séance du jour (web), MyRave le groupe actif.
 - `SharedAppearance` (`theme`, `followSystem`, `reduceMotion`, `haptics`, `at`) : **un seul réglage d'apparence pour toutes les apps** (`mylife:appearance`), synchronisé entre appareils (§ 3).
 
 ### `sync-client` → `src/vendor/mylife-sync`
@@ -267,7 +270,7 @@ Le **système visuel commun**, dans `packages/lumen/src/index.ts`.
   passe, nouvelle clé, suppression, règles d'identifiant et de mot de passe), `crypto.ts`, `engine.ts`
   (`join`, `autoJoin`, `syncNow`), `web.ts` (session web commune, clé de secours en attente).
 
-### `ui` → `src/ui` (apps web : accueil, MyFinances, myRaveLoc)
+### `ui` → `src/ui` (apps web : accueil, MyFinances, MyRave)
 
 Le **kit d'interface web** de MyLife, extrait de MyFinances : une seule source pour l'apparence.
 - `lumen.css` (verre, identités `[data-style]`, dock, orbe, feuilles, champs, transitions entre apps),
@@ -451,7 +454,7 @@ Le **kit d'interface web** de MyLife, extrait de MyFinances : une seule source p
 
 ---
 
-## 6 bis. myRaveLoc (`apps/raveloc`)
+## 6 bis. MyRave (`apps/raveloc`)
 
 Retrouver ses amis en festival : groupes temporaires, partage de position limité dans le temps, flèche
 vers un ami. Détails dans `apps/raveloc/README.md`.
@@ -504,13 +507,13 @@ vers un ami. Détails dans `apps/raveloc/README.md`.
 ## 9. Historique récent et état actuel (22/10/2026)
 
 **Unification (22/10/2026)**, détaillée et notée dans `docs/UNIFICATION.md` :
-- kit d'interface web commun extrait de MyFinances (`packages/ui`), utilisé par l'accueil, MyFinances et myRaveLoc ;
-- myRaveLoc reconstruit sur le kit (tous les thèmes, dock, en-tête, Espaces, palette, compte) ;
+- kit d'interface web commun extrait de MyFinances (`packages/ui`), utilisé par l'accueil, MyFinances et MyRave ;
+- MyRave reconstruit sur le kit (tous les thèmes, dock, en-tête, Espaces, palette, compte) ;
 - accueil MyLife devenu une app (`web/`) et **seule PWA installable** (manifeste `/`, raccourcis, icône MyLife) ;
 - comptes : inscription ouverte en un écran, garde-fous serveur, nouvelle clé, suppression, reliure automatique ;
 - apparence commune synchronisée entre appareils (web et APK) ; aperçus des apps ; palette transversale ; transitions entre apps ;
 - **dépôt unique** (historiques conservés) et README de présentation ;
-- tests : serveur 49, MyFinances 332 + 25 bout en bout, myRaveLoc 83 + 13, MyPerf 214, écosystème 14 : tout vert.
+- tests : serveur 49, MyFinances 332 + 25 bout en bout, MyRave 83 + 13, MyPerf 214, écosystème 14 : tout vert.
 - menu des apps en feuille du bas, cartes en relief (`Tilt`) partout (y compris MyPerf web), rappel de sauvegarde hebdomadaire (MyFinances, MyPerf web), `docs/ARCHITECTURE.md`.
 
 **Dépôt GitHub (privé)** : https://github.com/SENE-Pablo-2326099b/mylife (branche `master`, `git push`).

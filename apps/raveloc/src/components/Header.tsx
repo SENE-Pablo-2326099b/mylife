@@ -6,7 +6,7 @@ import type { SpaceRow } from '../ui/Spaces';
 import { setBeacon } from './Beacon';
 
 /**
- * En-tête commun de MyLife avec ce qui est propre à myRaveLoc : le mode phare à gauche, et dans les
+ * En-tête commun de MyLife avec ce qui est propre à MyRave : le mode phare à gauche, et dans les
  * Espaces l'état de mon partage de position.
  */
 export function RavelocHeader() {

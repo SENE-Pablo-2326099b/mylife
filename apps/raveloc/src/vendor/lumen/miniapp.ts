@@ -79,6 +79,31 @@ export interface MiniApp {
   entries: MiniEntry[];
   /** Saisies supprimées pas encore parties vers le compte : identifiant → date de la suppression. */
   gone?: Record<string, number>;
+  /** Rappel (heure locale, jours) : écrit par l'appareil, jamais par le serveur (V4, F2). */
+  reminder?: MiniReminder;
+}
+
+/** Un rappel : minute de la journée (heure locale) et jours (bit 0 = lundi … bit 6 = dimanche). */
+export interface MiniReminder {
+  minute: number;
+  days: number;
+}
+export const EVERY_DAY = 0b1111111;
+
+export function parseReminder(raw: unknown): MiniReminder | undefined {
+  const o = raw as Partial<MiniReminder> | null;
+  if (!o || !Number.isInteger(o.minute) || !Number.isInteger(o.days)) return undefined;
+  const minute = o.minute as number;
+  const days = (o.days as number) & EVERY_DAY;
+  return minute >= 0 && minute < 1440 && days ? { minute, days } : undefined;
+}
+
+/** Régler (ou retirer, avec null) le rappel d'une app : la description change, elle part vers le compte. */
+export function setMiniReminder(app: MiniApp, reminder: MiniReminder | null, now = Date.now()): MiniApp {
+  const { reminder: _old, ...rest } = app;
+  void _old;
+  const clean = reminder ? parseReminder(reminder) : undefined;
+  return { ...rest, at: now, ...(clean ? { reminder: clean } : {}) };
 }
 
 export const MAX_MINI_APPS = 20;
@@ -269,7 +294,8 @@ export function parseMiniApp(raw: unknown): MiniApp | null {
   if (o.gone && typeof o.gone === 'object') {
     for (const [id, at] of Object.entries(o.gone as Record<string, unknown>).slice(-3000)) if (ENTRY_ID.test(id) && typeof at === 'number' && Number.isFinite(at)) gone[id] = at;
   }
-  return { v: 1, id: o.id, at: o.at, created: o.created, spec, entries, ...(Object.keys(gone).length ? { gone } : {}) };
+  const reminder = parseReminder(o.reminder);
+  return { v: 1, id: o.id, at: o.at, created: o.created, spec, entries, ...(Object.keys(gone).length ? { gone } : {}), ...(reminder ? { reminder } : {}) };
 }
 
 // ---------------------------------------------------------------- synchro (app `miniapps` du serveur)
@@ -285,9 +311,10 @@ export interface MiniHead {
   at: number;
   created: number;
   spec: MiniSpec;
+  reminder?: MiniReminder;
 }
 
-export const miniHead = (app: MiniApp): MiniHead | null => (app.spec ? { v: 1, id: app.id, at: app.at, created: app.created, spec: app.spec } : null);
+export const miniHead = (app: MiniApp): MiniHead | null => (app.spec ? { v: 1, id: app.id, at: app.at, created: app.created, spec: app.spec, ...(app.reminder ? { reminder: app.reminder } : {}) } : null);
 
 export function parseMiniHead(raw: unknown): MiniHead | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -307,8 +334,11 @@ export function splitMiniEntryRid(rid: string): { app: string; entry: string } |
 /** Une description venue du compte : la plus récente gagne ; une app inconnue arrive sans saisies (elles suivent). */
 export function adoptMiniHead(local: MiniApp | undefined, head: MiniHead): MiniApp | null {
   if (local && local.at >= head.at) return null;
-  if (!local) return { v: 1, id: head.id, at: head.at, created: head.created, spec: head.spec, entries: [] };
-  return { ...local, at: head.at, created: head.created, spec: head.spec, entries: local.spec ? local.entries : [] };
+  const { reminder: _r, ...base } = local ?? ({} as Partial<MiniApp>);
+  void _r;
+  const reminder = head.reminder ? { reminder: head.reminder } : {};
+  if (!local) return { v: 1, id: head.id, at: head.at, created: head.created, spec: head.spec, entries: [], ...reminder };
+  return { ...(base as MiniApp), at: head.at, created: head.created, spec: head.spec, entries: local.spec ? local.entries : [], ...reminder };
 }
 
 /** L'app supprimée sur un autre appareil : il n'en reste qu'une trace. */

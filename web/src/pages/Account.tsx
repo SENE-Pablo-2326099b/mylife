@@ -34,7 +34,7 @@ function rows(login: string): AccountStatusRow[] {
       state: joined ? 'ok' : 'off',
     };
   });
-  out.push({ label: 'myRaveLoc', detail: 'Groupes et positions chiffrés, en direct', state: 'ok' });
+  out.push({ label: 'MyRave', detail: 'Groupes et positions chiffrés, en direct', state: 'ok' });
   const prefs = localSync('mylife');
   out.push({ label: 'Apparence', detail: prefs?.joinedAs === login ? 'La même sur tous tes appareils' : 'Bientôt la même sur tous tes appareils', state: prefs?.joinedAs === login ? 'ok' : 'busy' });
   // Un refus du serveur qui revient à chaque passage se montre ici au lieu de bloquer en silence.

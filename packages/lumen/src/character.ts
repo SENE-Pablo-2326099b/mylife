@@ -39,7 +39,7 @@ export interface StatDef {
 export const STATS: readonly StatDef[] = [
   { id: 'force', name: 'Force', source: 'Séances et records dans MyPerf', app: 'perf' },
   { id: 'discipline', name: 'Discipline', source: 'Jours sous ton budget et épargne tenue dans MyFinances', app: 'finances' },
-  { id: 'social', name: 'Social', source: 'Groupes et amis retrouvés dans myRaveLoc', app: 'raveloc' },
+  { id: 'social', name: 'Social', source: 'Groupes et amis retrouvés dans MyRave', app: 'raveloc' },
   { id: 'constance', name: 'Constance', source: 'Semaines réussies d’affilée, toutes apps confondues', app: null },
   { id: 'culture', name: 'Culture', source: 'Ce que tu écoutes et découvres (MyMusique)', app: 'music' },
 ];
@@ -487,7 +487,7 @@ export function trimWeeks(weeks: AppStats['weeks'], today: string, keep = 104): 
 }
 
 /**
- * Fusion de deux lignes qui accumulent leur historique (myRaveLoc : ses groupes expirent, la ligne est
+ * Fusion de deux lignes qui accumulent leur historique (MyRave : ses groupes expirent, la ligne est
  * leur seule trace) : par semaine et par compteur, le plus grand. Deux appareils ne s'effacent jamais.
  */
 export function mergeStats(a: AppStats | null, b: AppStats | null): AppStats | null {

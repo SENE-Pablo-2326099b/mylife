@@ -124,7 +124,7 @@ describe('lignes de stats', () => {
     expect(sameStats(stats({ [W]: { a: 1, b: 2 }, [prev(1)]: { a: 1 } }), { ...stats({ [prev(1)]: { a: 1 }, [W]: { b: 2, a: 1 } }), at: 99 })).toBe(true);
     expect(sameStats(stats({ [W]: { a: 1 } }), stats({ [W]: { a: 2 } }))).toBe(false);
   });
-  it('fusion (myRaveLoc) : par semaine et par compteur, le plus grand ; deux appareils ne s’effacent jamais', () => {
+  it('fusion (MyRave) : par semaine et par compteur, le plus grand ; deux appareils ne s’effacent jamais', () => {
     const a: AppStats = { v: 1, at: 5, weeks: { [prev(2)]: { groups: 1, friends: 4 }, [W]: { groups: 1 } } };
     const b: AppStats = { v: 1, at: 9, weeks: { [W]: { groups: 2, friends: 3 } } };
     expect(mergeStats(a, b)).toEqual({ v: 1, at: 9, weeks: { [prev(2)]: { groups: 1, friends: 4 }, [W]: { groups: 2, friends: 3 } } });

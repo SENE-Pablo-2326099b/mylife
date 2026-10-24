@@ -3,7 +3,7 @@ import { adoptDevice, claimDevice } from './device';
 
 /**
  * Compte MyLife sur le web : la session (jeton + clé de données) est gardée dans le stockage de
- * l'adresse MyLife, partagé par toutes les apps (accueil, MyFinances, MyPerf, myRaveLoc) : une seule
+ * l'adresse MyLife, partagé par toutes les apps (accueil, MyFinances, MyPerf, MyRave) : une seule
  * connexion pour toutes, et se déconnecter dans l'une déconnecte les autres, onglets ouverts compris.
  */
 const SESSION_KEY = 'mylife-session';

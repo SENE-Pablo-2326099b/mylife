@@ -120,7 +120,7 @@ describe('MyLife, une seule app', () => {
     await shot(page, '03-cle');
     await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
     await page.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    for (const name of ['MyFinances', 'MyPerf', 'myRaveLoc']) await page.getByRole('button', { name: new RegExp(`Ouvrir ${name}`) }).waitFor();
+    for (const name of ['MyFinances', 'MyPerf', 'MyRave']) await page.getByRole('button', { name: new RegExp(`Ouvrir ${name}`) }).waitFor();
     await shot(page, '04-accueil');
   });
 
@@ -146,7 +146,7 @@ describe('MyLife, une seule app', () => {
       .toEqual(['/', '/finances/', '/perf/', '/raveloc/']);
   });
 
-  it('myRaveLoc : déjà connecté (même session), même interface', async () => {
+  it('MyRave : déjà connecté (même session), même interface', async () => {
     await page.goto(`${server.url}/raveloc/`);
     await page.getByText('Aucun groupe pour l’instant').waitFor();
     expect(await page.getByText('Crée ton compte').count()).toBe(0);
@@ -279,14 +279,14 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: /Espaces MyLife/ }).click();
     await page.getByRole('dialog', { name: 'Espaces MyLife' }).getByText(`${LOGIN} · chiffré de bout en bout`).waitFor();
     // L'app ouverte est marquée, l'accueil et les deux autres apps sont à un toucher.
-    await page.getByRole('button', { name: /Rester dans myRaveLoc/ }).waitFor();
+    await page.getByRole('button', { name: /Rester dans MyRave/ }).waitFor();
     await page.getByRole('button', { name: /Ouvrir MyFinances/ }).waitFor();
     await page.getByRole('button', { name: /Ouvrir MyPerf/ }).waitFor();
     await page.waitForTimeout(700);
     await shot(page, '10-espaces-raveloc');
     await page.getByRole('button', { name: /Ouvrir MyLife/ }).click();
     await page.waitForURL(`${server.url}/`);
-    // L'aperçu déposé par myRaveLoc est sur l'accueil.
+    // L'aperçu déposé par MyRave est sur l'accueil.
     await page.getByText('Aucun groupe en cours').waitFor();
     await shot(page, '11-accueil-apercus');
   });
@@ -720,7 +720,7 @@ describe('MyLife, une seule app', () => {
     const [ctx, p] = await device();
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.url });
     await login(p);
-    await p.getByRole('link', { name: /Mes apps : crée tes propres apps/ }).click();
+    await p.getByRole('link', { name: /^Mes apps :/ }).click();
     await p.getByText('Crée tes propres apps').waitFor();
     await p.getByRole('link', { name: 'Créer une app' }).click();
     // Un modèle : aperçu, puis l'app.

@@ -4,7 +4,7 @@ import * as core from '../server/raveloc';
 import { HttpError, signToken, verifyToken, type Db } from '../server/core';
 
 /**
- * myRaveLoc (/api/raveloc) sur un vrai Postgres en mémoire, avec les vraies sessions de MyLife.
+ * MyRave (/api/raveloc) sur un vrai Postgres en mémoire, avec les vraies sessions de MyLife.
  * Les contenus chiffrés sont des blocs base64 quelconques : le serveur ne sait pas les lire
  * (le chiffrement est testé côté app, dans apps/raveloc).
  */

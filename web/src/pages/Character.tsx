@@ -10,7 +10,7 @@ import { toast } from '../ui/toastStore';
 
 /**
  * Le Personnage : un RPG de la vraie vie. Les stats montent toutes seules avec ce que tu fais dans
- * MyPerf (Force), MyFinances (Discipline) et myRaveLoc (Social) ; la Constance récompense les semaines
+ * MyPerf (Force), MyFinances (Discipline) et MyRave (Social) ; la Constance récompense les semaines
  * réussies d'affilée. Calcul : packages/lumen/src/character.ts.
  */
 
@@ -219,7 +219,7 @@ export function CharacterPage() {
             <Card>
               <p className="t-body-strong">Ton personnage démarre ici</p>
               <p className="t-small mt-1 text-secondary">
-                Il monte tout seul : une séance terminée dans MyPerf, une journée sous ton budget dans MyFinances, une sortie avec ta bande dans myRaveLoc. Ouvre une de tes apps pour lui donner ses premiers points.
+                Il monte tout seul : une séance terminée dans MyPerf, une journée sous ton budget dans MyFinances, une sortie avec ta bande dans MyRave. Ouvre une de tes apps pour lui donner ses premiers points.
               </p>
             </Card>
           </Reveal>

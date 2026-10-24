@@ -38,7 +38,7 @@ export function PrivacyPage() {
           <strong className="text-ink">Tes données</strong> (budget, séances, réglages, Personnage, {HOME_APPS.filter((a) => !('spaces' in a.sync)).map((a) => a.privacy).join(', ')}) : chiffrées en AES-256-GCM sur ton appareil. Le serveur voit seulement leur taille, leur date et à quelle app elles appartiennent.
         </p>
         <p>
-          <strong className="text-ink">Groupes, Crews et Sorties</strong> : noms, pseudos, positions, scores, réponses, dépenses sont chiffrés avec une clé de groupe qui voyage dans le lien d’invitation (jamais envoyée au serveur). Le serveur sait seulement qui est membre de quoi. Les positions de myRaveLoc sont effacées à l’arrêt du partage (12 h au plus) ; un groupe expiré est effacé entièrement.
+          <strong className="text-ink">Groupes, Crews et Sorties</strong> : noms, pseudos, positions, scores, réponses, dépenses sont chiffrés avec une clé de groupe qui voyage dans le lien d’invitation (jamais envoyée au serveur). Le serveur sait seulement qui est membre de quoi. Les positions de MyRave sont effacées à l’arrêt du partage (12 h au plus) ; un groupe expiré est effacé entièrement.
         </p>
         <p>
           <strong className="text-ink">Garde-fous contre les abus</strong> : des compteurs de tentatives (connexion, inscription), dont une empreinte de ton adresse réseau (pas l’adresse elle-même), effacés au bout de deux jours.

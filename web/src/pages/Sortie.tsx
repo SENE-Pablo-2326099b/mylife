@@ -322,12 +322,12 @@ export function SortiePage() {
               </Button>
               {link && <p className="t-caption mt-2 select-all break-all text-muted">{link}</p>}
             </Card>
-            <Card to="/raveloc/groupes/nouveau" label="Créer le groupe de localisation dans myRaveLoc">
+            <Card to="/raveloc/groupes/nouveau" label="Créer le groupe de localisation dans MyRave">
               <div className="flex items-center gap-3">
                 <Icon name="navigate" className="text-accent" />
                 <span className="min-w-0 flex-1">
                   <span className="t-body-strong block">Se retrouver sur place</span>
-                  <span className="t-small block text-secondary">Crée le groupe dans myRaveLoc : flèche et distance vers chacun.</span>
+                  <span className="t-small block text-secondary">Crée le groupe dans MyRave : flèche et distance vers chacun.</span>
                 </span>
                 <Icon name="chevron-forward" className="text-muted" />
               </div>

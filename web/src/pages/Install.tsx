@@ -21,7 +21,7 @@ export function InstallPage() {
         <Card level="raised" glow className="flex flex-col items-center gap-3 text-center">
           <img src="/pwa-192x192.png" alt="" width={84} height={84} className="rounded-[22px]" />
           <p className="t-title">Une app, toutes tes apps</p>
-          <p className="t-small text-secondary">MyFinances, MyPerf et myRaveLoc dans une seule icône. Un appui long dessus mène directement à chacune.</p>
+          <p className="t-small text-secondary">MyFinances, MyPerf et MyRave dans une seule icône. Un appui long dessus mène directement à chacune.</p>
         </Card>
       </Reveal>
       <Reveal index={1} className="mt-3">
@@ -64,7 +64,7 @@ export function InstallPage() {
       <Reveal index={2} className="mt-3">
         <Card>
           <p className="t-body-strong">Tu avais installé une app seule ?</p>
-          <p className="t-small mt-1 text-secondary">MyFinances, MyPerf ou myRaveLoc installées à part peuvent être désinstallées : MyLife les contient, avec les mêmes données (elles restent sur l’appareil).</p>
+          <p className="t-small mt-1 text-secondary">MyFinances, MyPerf ou MyRave installées à part peuvent être désinstallées : MyLife les contient, avec les mêmes données (elles restent sur l’appareil).</p>
         </Card>
       </Reveal>
     </Screen>

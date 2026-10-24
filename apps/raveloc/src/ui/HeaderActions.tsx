@@ -6,7 +6,7 @@ import { Spaces, type SpaceRow, type SpaceShortcut } from './Spaces';
 
 /**
  * En-tête des écrans principaux, le même dans toutes les apps MyLife : à gauche le bouton propre à
- * l'app (alertes dans MyFinances, coach dans MyPerf, phare dans myRaveLoc), à droite toujours les
+ * l'app (alertes dans MyFinances, coach dans MyPerf, phare dans MyRave), à droite toujours les
  * Espaces MyLife (apps, compte, synchros — leur état se lit sur la pastille).
  */
 export function HeaderActions({ appAction, rows = [], shortcuts = [], accountPath }: { appAction?: ReactNode; rows?: SpaceRow[]; shortcuts?: SpaceShortcut[]; accountPath: string }) {

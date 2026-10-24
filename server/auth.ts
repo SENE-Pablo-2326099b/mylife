@@ -34,7 +34,7 @@ export async function authDispatch(db: Db, env: Env, body: Record<string, unknow
     case 'deleteAccount': {
       const uid = session();
       const out = await deleteAccount(db, env, uid, body, client);
-      // Ses groupes myRaveLoc : il les quitte (positions effacées, admin transmis).
+      // Ses groupes MyRave : il les quitte (positions effacées, admin transmis).
       await forgetUser(db, uid);
       // Ses espaces partagés (Crew…) : il les quitte, ses lignes sont effacées.
       await ensureSpaceSchema(db);

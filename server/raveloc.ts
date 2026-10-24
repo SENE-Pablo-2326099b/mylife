@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { HttpError, verifyToken, type Db } from './core.js';
 
 /**
- * myRaveLoc côté serveur (POST /api/raveloc) : groupes, invitations, partage de position.
+ * MyRave côté serveur (POST /api/raveloc) : groupes, invitations, partage de position.
  * Hébergé par MyLife, à côté des comptes : même session, mêmes secrets, même base (tables raveloc_*).
  *
  * Le serveur ne lit ni les positions, ni les noms de groupe, ni les pseudos : l'appareil les chiffre

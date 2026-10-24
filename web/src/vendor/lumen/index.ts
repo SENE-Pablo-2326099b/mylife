@@ -1,6 +1,6 @@
 // GÉNÉRÉ depuis MyLife/packages/lumen — ne pas modifier ici (MyLife : npm run vendor).
 /**
- * LUMEN — jetons partagés par toutes les apps MyLife (MyFinances, MyPerf, myRaveLoc).
+ * LUMEN — jetons partagés par toutes les apps MyLife (MyFinances, MyPerf, MyRave).
  *
  * Une seule source pour ce qui doit être identique d'une app à l'autre : la liste des thèmes, leurs
  * graines de couleur, les niveaux de texte (lisibilité) et les couleurs des graphiques. Chaque app en
@@ -372,7 +372,7 @@ export interface MyLifeApp {
 export const MYLIFE_APPS: readonly MyLifeApp[] = [
   { id: 'finances', name: 'MyFinances', tagline: 'Budget, patrimoine, placements', icon: 'diamond', colors: ['#B9A0FF', '#7340FF'], path: '/finances/' },
   { id: 'perf', name: 'MyPerf', tagline: 'Séances, progression, coach', icon: 'barbell', colors: ['#FFB86B', '#F0566B'], path: '/perf/' },
-  { id: 'raveloc', name: 'myRaveLoc', tagline: 'Retrouver ses amis en festival', icon: 'navigate', colors: ['#5DFFC4', '#1FA3FF'], path: '/raveloc/' },
+  { id: 'raveloc', name: 'MyRave', tagline: 'Retrouver ses amis en festival', icon: 'navigate', colors: ['#5DFFC4', '#1FA3FF'], path: '/raveloc/' },
 ];
 
 /** L'accueil de MyLife (point d'entrée de l'app installée), avec les mêmes champs qu'une app. */

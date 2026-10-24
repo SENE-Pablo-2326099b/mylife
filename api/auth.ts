@@ -10,7 +10,7 @@ export default async function handler(req: IncomingMessage & { body?: unknown },
   await handle(req, res, async (body) => {
     const env = getEnv();
     const db = await getDb();
-    // La suppression d'un compte touche aussi les tables de myRaveLoc.
+    // La suppression d'un compte touche aussi les tables de MyRave.
     if (body.action === 'deleteAccount') {
       if (!ravelocReady)
         ravelocReady = ensureRavelocSchema(db).catch((e) => {

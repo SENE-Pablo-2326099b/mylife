@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useObservable } from '../lib/observable';
 import { app, setScreen, type Member } from '../state/app';
-import { location, needLocation, retryLocation } from '../services/location';
+import { location, needLocation } from '../services/location';
 import { compass, compassNeedsGesture, currentHeading, onHeading, requestCompassPermission, holdCompass } from '../services/orientation';
 import { arrowRotationDeg, cardinal, formatDistance } from '../domain/geo';
 import { ageOf, formatAge, freshness, guidance, THRESHOLDS, type Fix, type Guidance } from '../domain/status';
@@ -12,6 +12,7 @@ import { setBeacon } from '../components/Beacon';
 import { Button, Card } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
+import { LocationHelp } from '../components/LocationHelp';
 
 type DialMode = 'compass' | 'course' | 'north';
 
@@ -116,7 +117,7 @@ function Stage({ g, member, me, mode, course, now }: { g: Guidance; member: Memb
     const msg = member.unreadable
       ? 'Sa position est arrivée mais reste illisible : la clé du groupe ne correspond pas. Demande-lui un nouveau lien d’invitation.'
       : g.state === 'not-sharing'
-        ? `${name} ne partage pas sa position. Demande-lui d’activer le partage dans myRaveLoc.`
+        ? `${name} ne partage pas sa position. Demande-lui d’activer le partage dans MyRave.`
         : g.state === 'paused'
           ? `${name} a mis son partage en pause.`
           : `${name} partage, mais sa position n’est pas encore arrivée (GPS en cours, ou autorisation refusée sur son téléphone).`;
@@ -200,12 +201,9 @@ function NoMe({ reason }: { reason: 'locating' | 'denied' | 'unavailable' }) {
       {reason === 'denied' ? (
         <>
           <p className="t-body text-danger">Localisation refusée : impossible de calculer la direction.</p>
-          <p className="t-small max-w-[340px] text-secondary">
-            Autorise la localisation pour ce site (icône de cadenas dans la barre d’adresse, ou Réglages → Safari → Localisation sur iPhone), puis réessaie.
-          </p>
-          <Button variant="secondary" icon="sync" onClick={retryLocation}>
-            Réessayer
-          </Button>
+          <div className="max-w-[340px]">
+            <LocationHelp />
+          </div>
         </>
       ) : reason === 'unavailable' ? (
         <p className="t-body max-w-[340px] text-danger">{loc.error ?? 'Localisation indisponible sur cet appareil.'}</p>
@@ -252,7 +250,7 @@ function CompassHelp({ mode }: { mode: DialMode }) {
   const why =
     cmp.status === 'denied'
       ? compassNeedsGesture()
-        ? 'Accès à la boussole refusé (pour le rétablir sur iPhone : ferme l’onglet et rouvre myRaveLoc).'
+        ? 'Accès à la boussole refusé (pour le rétablir sur iPhone : ferme l’onglet et rouvre MyRave).'
         : 'Accès à la boussole refusé.'
       : 'Pas de boussole disponible sur cet appareil ou ce navigateur.';
   return (

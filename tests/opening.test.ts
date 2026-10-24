@@ -45,7 +45,7 @@ describe('rappel du dimanche', () => {
     await expect(pushDispatch(d, secret, token('u1'), { ...sub(1), keys: { p256dh: 'p'.repeat(20) } }, env)).rejects.toMatchObject({ status: 400 });
     await pushDispatch(d, secret, token('u1'), sub(1), env);
     const status = (uid: string) => pushDispatch(d, secret, token(uid), { action: 'status', endpoint: sub(1).endpoint }, env);
-    expect(await status('u1')).toEqual({ subscribed: true, enabled: true });
+    expect(await status('u1')).toEqual({ subscribed: true, weekly: true, enabled: true });
     // L'abonnement d'un autre ne se lit ni ne s'efface.
     expect(await status('u2')).toMatchObject({ subscribed: false });
     await pushDispatch(d, secret, token('u2'), { action: 'unsubscribe', endpoint: sub(1).endpoint }, env);

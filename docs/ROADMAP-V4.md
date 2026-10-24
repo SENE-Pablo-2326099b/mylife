@@ -174,7 +174,7 @@ historiques**, et qu'elle se pratique **à plusieurs**.
 **Terminé quand** : un programme importé avec % et RPE donne des charges en séance, une décharge est proposée sur un
 historique de test qui stagne, un CSV Strong s'importe, une séance à deux passe de bout en bout.
 
-## 2.4 myRaveLoc
+## 2.4 MyRave
 
 Aujourd'hui, l'app sert à retrouver ses amis. La suite : **qu'elle soit la boussole complète du festival**, plan
 compris, et qu'elle **rassure** (tout le monde est bien rentré).
@@ -265,7 +265,7 @@ de tout ça reste une app sans code dans « Mes apps ».
 
 ## 3.0 Le contrat d'app et les fondations
 
-### Le contrat d'app MyLife (effort M, à faire avant toute nouvelle app)
+### Le contrat d'app MyLife (effort M, à faire avant toute nouvelle app) : **fait** (`docs/CONTRAT-APP.md`, journal `docs/V4.md`)
 Une liste de contrôle, et un générateur (`npm run new-app <id>`) qui crée le squelette déjà branché :
 
 | Prise | Ce que l'app fournit |
@@ -559,7 +559,7 @@ corrélation est expliquée en mots, et rien de santé ne sort de l'appareil en 
 
 ## 3.10 MyCercle : les gens qui comptent (effort M)
 **Quoi** : un carnet des proches. Anniversaires (avec rappel F2), idées de cadeaux (reliées au budget), dernière fois
-que vous vous êtes vus (tirée des Sorties, des groupes myRaveLoc et des séances à deux), et un rappel doux (« ça fait
+que vous vous êtes vus (tirée des Sorties, des groupes MyRave et des séances à deux), et un rappel doux (« ça fait
 3 mois que vous ne vous êtes pas vus », sans prénom dans le texte de la notification).
 
 **Palier franchi** : la stat Social ne compte aujourd'hui que les festivals et les groupes. MyCercle l'étend à toute la
@@ -607,7 +607,7 @@ inchangée). Le journal de la V4 sera `docs/V4.md`.
 |---|---|---|---|
 | **A. Base saine** | 1.1 lignes trop grosses → 1.2 apps de synchro → 1.3 doublons MyPerf → 1.4 refonte MyFinances (2 à 5) → 1.5 fin de l'étape 9 | L | Tout le reste : sans 1.1 et 1.2, aucune nouvelle donnée ne se range sans risque |
 | **B. Multiplicateurs** | Contrat d'app (3.0) → F2 rappels écrits par l'appareil → F1 actions validées → F3 agenda commun ; moteur à stats déclarées (2.1) | L+ | Chaque nouvelle app coûte moins et arrive branchée ; Copilot change de nature |
-| **C. Gains rapides sur l'existant** | Modifier une app et rappels par app (2.9), groupe myRaveLoc depuis la Sortie et repères (2.4), part des Sorties dans le budget (2.2), quêtes au choix, succès et classes (2.1), line-up × goûts (2.5), un seul Copilot partout et point du lundi (2.7), défis et raids (2.8) | L | Ce que les inconnus de la phase A auront réclamé ; la V3 tient enfin toutes ses promesses |
+| **C. Gains rapides sur l'existant** | Modifier une app et rappels par app (2.9), groupe MyRave depuis la Sortie et repères (2.4), part des Sorties dans le budget (2.2), quêtes au choix, succès et classes (2.1), line-up × goûts (2.5), un seul Copilot partout et point du lundi (2.7), défis et raids (2.8) | L | Ce que les inconnus de la phase A auront réclamé ; la V3 tient enfin toutes ses promesses |
 | **D. Premières nouvelles apps** | MyObjectifs (3.1, valide le contrat) → MyChef paliers 1 à 3 (3.4, sur les espaces et F2) → MyAgenda (3.2, sur F3) → MyFoyer (3.3, reprend la liste de MyChef, le budget à deux et F2) → MyChef palier 4 (sur F1) | L+ | MyLife devient quotidien, plusieurs fois par jour, et à plusieurs ; Objectifs donne un sens aux quêtes, MyChef fait revenir chaque jour, Agenda nourrit Copilot |
 | **E. Profondeur** | Prescriptions et progression automatique (2.3), « Et si ? » et échéancier (2.2), MyCulture (3.6), MyPlein air (3.7), MyCercle (3.10), mémoire de Copilot (2.7), apps à plusieurs (2.9) | L+ | Le Personnage passe à 8 stats ; le Wrapped annuel couvre toute la vie |
 | **F. Gros terrains** | F4 coffre chiffré → Coffre (3.5) → MyVoyage (3.8) ; F5 coquille native → examen RGPD → MySanté (3.9) ; apps avec code isolé (3.12) | L+ | Les pans les plus sensibles, ouverts seulement quand la base, le chiffrement et le cadre légal sont prêts |

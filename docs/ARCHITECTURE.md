@@ -56,7 +56,7 @@ MyLife/
 │   │   └── src/{domain,db,sync,pages,components,assistant}
 │   ├── perf/                  MyPerf — Expo / React Native (web + Android) + SQLite
 │   │   └── src/{domain,db,services,state,features,ui,app}
-│   └── raveloc/               myRaveLoc — React 18 + Vite
+│   └── raveloc/               MyRave — React 18 + Vite
 │       └── src/{domain,lib,services,state,screens,components}
 ├── tests/                     Tests serveur et paquets (vitest) + parcours e2e de tout l'écosystème
 └── docs/                      Ce document, UNIFICATION.md (décisions notées)
@@ -77,7 +77,7 @@ Responsabilités détaillées :
 
 Règle de dépendance : **le sens est toujours interface → services/données → domaine** ; le domaine
 n'importe jamais d'I/O, ce qui le rend entièrement testable (332 tests MyFinances, 214 MyPerf, 83
-myRaveLoc, 42 serveur).
+MyRave, 42 serveur).
 
 ---
 
@@ -104,7 +104,7 @@ d'une opération, partage de position) :
 7. **Retour** : l'appareil déchiffre, applique les lignes distantes, acquitte les modifications
    (`ack` par version) et avance son curseur. L'UI se met à jour par les lectures réactives.
 
-Le cas myRaveLoc diffère : **pas de base locale** ; l'état vit en mémoire, la position chiffrée est
+Le cas MyRave diffère : **pas de base locale** ; l'état vit en mémoire, la position chiffrée est
 envoyée par `/api/raveloc` à un rythme adaptatif, et l'accès est revérifié côté serveur à chaque requête.
 
 ### 2.2 Diagramme de flux
@@ -220,7 +220,7 @@ stateDiagram-v2
     ConnecteNonRelie --> Anonyme : déconnexion
 ```
 
-### 4.2 Partage de position (myRaveLoc), côté membre
+### 4.2 Partage de position (MyRave), côté membre
 
 États (`Sharing`) : `off`, `on`, `paused` — plus l'état dérivé de transmission (`bloqué`).
 
@@ -244,7 +244,7 @@ stateDiagram-v2
     paused --> off : arrêter, échéance, départ, fin du groupe
 ```
 
-### 4.3 État d'un ami vu par l'observateur (myRaveLoc)
+### 4.3 État d'un ami vu par l'observateur (MyRave)
 
 États (`FriendState`) : `not-sharing`, `waiting`, `live`, `silent`, `paused`. La **fraîcheur** de la position
 est une seconde dimension : `live` (< 60 s), `recent` (< 3 min), `old` (< 15 min), `stale`.
@@ -257,7 +257,7 @@ est une seconde dimension : `live` (< 60 s), `recent` (< 3 min), `old` (< 15 min
 | silent | Partage `on`, position connue mais plus ancienne que `silentMs` (2 min) | « Plus de nouvelles depuis… » | Flèche vers la dernière position, avertissement |
 | paused | Partage `paused` | « Partage en pause · figée il y a… » | Flèche vers la position figée, avertissement |
 
-### 4.4 Cycle de vie d'un groupe myRaveLoc
+### 4.4 Cycle de vie d'un groupe MyRave
 
 ```mermaid
 stateDiagram-v2
@@ -361,7 +361,7 @@ explicitement (`forgetUser`).
 | `SharedAppearance` | `{ theme, followSystem, reduceMotion, haptics, at }` | Réglage visuel unique pour toutes les apps ; `at` date le choix (arbitrage entre appareils). |
 | `MyLifeGlance` | `{ title, detail?, tone?, until?, at }` | Aperçu déposé par une app (« 25 € à dépenser ») ; expire à `until`. |
 | `Fix` / `FriendFix` | `{ lat, lon, acc, at }` | Position GPS et sa précision (m) ; `at` = instant de la mesure. |
-| `Group`, `Member` (myRaveLoc) | nom, rôle, partage, position déchiffrée, état « illisible » | État en mémoire de l'écran. |
+| `Group`, `Member` (MyRave) | nom, rôle, partage, position déchiffrée, état « illisible » | État en mémoire de l'écran. |
 | MyFinances : `Transaction`, `Account`, `Category`, `Portfolio`, `Settings`… | montants **en centimes entiers** | Domaine budgétaire (jamais de flottants). |
 | MyPerf : `workouts`, `sets`, `exercises`, `templates`, `mesocycles`, `exercise_one_rm`… | SQL (migrations *append-only*) | Domaine d'entraînement. |
 
@@ -424,7 +424,7 @@ Une seule requête SQL atomique par essai, sans verrou applicatif. Clés : `sign
 est refusé** (429) : il n'y a plus de devinette en ligne. Un délai fixe de 400 ms (`slow`) égalise le coût
 d'un échec.
 
-### 6.4 Géodésie et décision de guidage (myRaveLoc)
+### 6.4 Géodésie et décision de guidage (MyRave)
 
 - **Distance** : formule de *haversine* sur une sphère de rayon 6 371 008,8 m ;
   `d = 2R·asin(√(sin²(Δφ/2) + cos φ₁·cos φ₂·sin²(Δλ/2)))` (erreur < 0,5 %, négligeable devant le bruit GPS).
@@ -454,7 +454,7 @@ d'un échec.
   réactif quand on tourne (τ = 0,07 s), sans palier donc sans traîne.
 - La flèche est repeinte **à chaque image** par `requestAnimationFrame` sans passer par React.
 
-### 6.6 Cadence des échanges (myRaveLoc)
+### 6.6 Cadence des échanges (MyRave)
 
 - **Réception** : `pollDelay = min(60 s, base · 2^min(4, échecs))` avec `base` = 4 s en navigation, 10 s
   dans le groupe, 30 s ailleurs ; `null` (rien) si l'app est cachée ou hors ligne. *Backoff* exponentiel

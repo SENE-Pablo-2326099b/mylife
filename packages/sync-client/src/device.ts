@@ -32,6 +32,8 @@ export function claimDevice(login: string): void {
     for (const k of PERSONAL_KEYS) ls.removeItem(k);
     const keys = Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter((k): k is string => k !== null);
     for (const k of keys) if (PERSONAL_PREFIXES.some((p) => k.startsWith(p))) ls.removeItem(k);
+    // Rappels écrits par l'appareil (plan lu par le service worker) : ceux du compte précédent disparaissent.
+    if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase('mylife-reminders');
     ls.setItem(DEVICE_OWNER_KEY, login);
   } catch {
     /* stockage indisponible : rien à effacer */

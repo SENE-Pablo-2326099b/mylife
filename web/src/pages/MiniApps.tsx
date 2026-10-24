@@ -17,15 +17,20 @@ import {
   miniAppPrompt,
   parseSpec,
   removeEntry,
+  setMiniReminder,
   statValue,
+  EVERY_DAY,
   weeklySeries,
+  type MiniApp,
   type MiniField,
   type MiniSpec,
   type MiniValue,
 } from '../vendor/lumen';
 import { ColumnChart } from '../ui/charts';
 import { Icon, type IconName } from '../ui/icons';
-import { Button, Card, Chip, EmptyState, Field, ProgressBar, Reveal, SectionTitle, StatTile, TextField, Toggle } from '../ui/index';
+import { Button, Card, Chip, EmptyState, Field, ProgressBar, Reveal, SectionTitle, StatTile, TextField, Toggle, ToggleRow } from '../ui/index';
+import { ensureSubscription } from '../push';
+import { refreshReminders } from '../reminders';
 import { NotFoundScreen, Screen } from '../ui/Screen';
 import { saveMiniApp, useMiniApps } from '../ui/stats';
 import { toast } from '../ui/toastStore';
@@ -418,6 +423,10 @@ export function MiniAppPage() {
         )}
 
         <Reveal index={5}>
+          <ReminderCard app={app} />
+        </Reveal>
+
+        <Reveal index={5}>
           <div className="flex flex-col gap-2 pt-2">
             <Button variant="secondary" icon="share" onClick={() => void shareSpec(spec)}>
               Partager l’app (sans mes saisies)
@@ -440,3 +449,63 @@ export function MiniAppPage() {
     </Screen>
   );
 }
+
+const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const DAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+const hhmm = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
+
+/**
+ * Rappel de l'app (V4, F2) : écrit par l'appareil à l'heure choisie, jamais le jour où une saisie existe déjà. Le serveur
+ * ne reçoit qu'une heure de réveil, sans savoir de quoi il s'agit.
+ */
+function ReminderCard({ app }: { app: MiniApp }) {
+  const reminder = app.reminder;
+  const [busy, setBusy] = useState(false);
+  const update = async (next: { minute: number; days: number } | null, subscribe: boolean) => {
+    saveMiniApp(setMiniReminder(app, next));
+    if (subscribe) {
+      setBusy(true);
+      try {
+        await ensureSubscription(false);
+      } catch (e) {
+        toast({ message: `${(e as Error).message} Le rappel est gardé : il sonnera dès que les notifications marcheront.` });
+      } finally {
+        setBusy(false);
+      }
+    }
+    await refreshReminders();
+  };
+  return (
+    <Card>
+      <ToggleRow
+        label="Me le rappeler"
+        hint={reminder ? `À ${hhmm(reminder.minute).replace(':', ' h ')}, sauf si c’est déjà noté. Écrit par ton appareil : le serveur ne sait pas de quoi.` : 'Une notification à l’heure choisie, les jours où tu n’as rien noté.'}
+        checked={!!reminder}
+        onChange={(on) => void update(on ? { minute: 21 * 60, days: EVERY_DAY } : null, on)}
+      />
+      {reminder && (
+        <div className="mt-3 flex flex-col gap-3">
+          <TextField label="Heure" type="time" value={hhmm(reminder.minute)} onChange={(v) => {
+            const [h, m] = v.split(':').map(Number);
+            if (Number.isInteger(h) && Number.isInteger(m)) void update({ minute: h! * 60 + m!, days: reminder.days }, false);
+          }} />
+          <div className="flex gap-1.5" role="group" aria-label="Jours du rappel">
+            {DAY_LETTERS.map((letter, i) => {
+              const on = (reminder.days & (1 << i)) !== 0;
+              return (
+                <Chip key={i} small selected={on} label={`${on ? 'Retirer' : 'Ajouter'} le ${DAY_NAMES[i]}`} onClick={() => {
+                  const days = reminder.days ^ (1 << i);
+                  if (days) void update({ minute: reminder.minute, days }, false);
+                }}>
+                  {letter}
+                </Chip>
+              );
+            })}
+          </div>
+          {busy && <p className="t-caption text-muted">Activation des notifications…</p>}
+        </div>
+      )}
+    </Card>
+  );
+}
+

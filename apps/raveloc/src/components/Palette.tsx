@@ -6,7 +6,7 @@ import { foldText, rankItems, usePaletteQuery, type PaletteItem } from '../ui/pa
 import { setPaletteOpen } from '../ui/paletteStore';
 import { setBeacon } from './Beacon';
 
-/** Les entrées de myRaveLoc dans la palette commune : écrans, actions, amis et groupes. */
+/** Les entrées de MyRave dans la palette commune : écrans, actions, amis et groupes. */
 export function RavelocPalette() {
   const navigate = useNavigate();
   const s = useObservable(app);

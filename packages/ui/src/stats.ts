@@ -49,7 +49,7 @@ export function onStatsChange(fn: () => void): void {
 
 /**
  * Dépose les compteurs de cette app ; ne réécrit rien (ni n'envoie) s'ils n'ont pas changé. Pour une app
- * qui accumule (myRaveLoc), les compteurs s'ajoutent à l'historique déjà connu au lieu de le remplacer.
+ * qui accumule (MyRave), les compteurs s'ajoutent à l'historique déjà connu au lieu de le remplacer.
  */
 export function publishStats(app: StatsApp, next: Pick<AppStats, 'weeks' | 'goal'>): void {
   const mine = readStats(app);
@@ -63,7 +63,7 @@ export function publishStats(app: StatsApp, next: Pick<AppStats, 'weeks' | 'goal
 
 /**
  * Compteurs venus d'un autre appareil. Renvoie vrai quand cet appareil a maintenant exactement ceux du
- * compte (rien à renvoyer). App recalculée : les plus récents gagnent. App qui accumule (myRaveLoc) :
+ * compte (rien à renvoyer). App recalculée : les plus récents gagnent. App qui accumule (MyRave) :
  * fusion ; si cet appareil apporte des semaines que le compte n'a pas, la fusion est redatée pour repartir.
  */
 export function adoptStats(app: StatsApp, raw: unknown): boolean {

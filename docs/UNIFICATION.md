@@ -1,5 +1,7 @@
 # Unification de MyLife : idées notées, réalisation notée, itérations
 
+> myRaveLoc s’appelle **MyRave** depuis le 24/10/2026 (seul le nom affiché change : chemin `/raveloc/`, API et projets restent).
+
 Demande (22/10/2026) : une seule PWA installable, une identité visuelle unifiée à 100 %, une création de
 compte aussi simple qu'une app standard, tout réuni sur GitHub avec un README. Méthode : noter chaque
 idée sur 10, l'appliquer, noter la réalisation sur 10, recommencer jusqu'à 10/10 partout.

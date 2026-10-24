@@ -146,7 +146,7 @@ function Invites({ gid }: { gid: string }) {
   const shareLink = async (l: string) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'myRaveLoc', text: 'Rejoins mon groupe sur myRaveLoc pour qu’on se retrouve :', url: l });
+        await navigator.share({ title: 'MyRave', text: 'Rejoins mon groupe sur MyRave pour qu’on se retrouve :', url: l });
         return;
       } catch {
         /* partage annulé : on propose la copie */

@@ -1,5 +1,7 @@
 # Feuille de route MyLife
 
+> myRaveLoc s’appelle **MyRave** depuis le 24/10/2026 (seul le nom affiché change : chemin `/raveloc/`, API et projets restent).
+
 **Objectif final** : un environnement d'apps utiles et amusantes, centralisé et sécurisé (chiffré de bout en bout),
 dont n'importe qui se sert au quotidien, seul ou avec son entourage ; et, à terme, où chacun peut ajouter la sienne.
 

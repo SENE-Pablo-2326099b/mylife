@@ -1,5 +1,5 @@
 /**
- * Appels à l'API myRaveLoc (`/api/raveloc`, même origine que MyLife : la session suit).
+ * Appels à l'API MyRave (`/api/raveloc`, même origine que MyLife : la session suit).
  * Hors ligne → ApiError(0) ; session refusée → ApiError(401).
  */
 import { ApiError } from '../vendor/mylife-sync';

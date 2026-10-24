@@ -27,6 +27,7 @@ import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
 import { usePendingRecovery, useSession } from './ui/session';
+import { refreshReminders } from './reminders';
 
 const TABS: TabDef[] = [
   { to: '/', label: 'Accueil', icon: 'home', active: 'home-fill', match: ['/'] },
@@ -65,6 +66,23 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
   const { stats, rest } = useStatsInput();
   // Mon score dans mes Crews, tenu à jour (seulement quand il change).
   useCrewPublisher(character, stats, rest);
+  // Rappels écrits par l'appareil : le plan local et les heures de réveil suivent « Mes apps » (reminders.ts).
+  useEffect(() => {
+    if (!session) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refreshReminders(), 800);
+    };
+    soon();
+    window.addEventListener('mylife:stats', soon);
+    window.addEventListener('storage', soon);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener('mylife:stats', soon);
+      window.removeEventListener('storage', soon);
+    };
+  }, [session]);
   // Invitation reçue avant la connexion : on y va une fois l'accueil terminé, clé de secours mise de côté.
   const keyPending = usePendingRecovery() !== null;
   useEffect(() => {

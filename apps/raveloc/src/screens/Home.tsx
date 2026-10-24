@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useObservable } from '../lib/observable';
 import { app, loadGroups, pollNow, resume, setScreen, share, SHARE_DURATIONS, type Group } from '../state/app';
-import { location, needLocation, retryLocation } from '../services/location';
+import { location, needLocation } from '../services/location';
 import { formatAge } from '../domain/status';
 import { describe, sortFriends, TONE } from '../lib/describe';
 import { remaining, when } from '../lib/format';
@@ -14,6 +14,7 @@ import { Icon } from '../ui/icons';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { useTabActive } from '../ui/tabActive';
+import { LocationHelp } from '../components/LocationHelp';
 
 /** Écran principal : le groupe actif, mes amis, et une seule grande action — en retrouver un. */
 export function Home() {
@@ -38,7 +39,7 @@ export function Home() {
   useEffect(() => (autoLocate ? needLocation('home', 'share') : undefined), [autoLocate]);
 
   const title = group ? (group.name ?? 'Groupe (nom illisible)') : 'Retrouver';
-  const kicker = group ? `Groupe · fin ${remaining(group.expiresAt, now)}` : 'myRaveLoc';
+  const kicker = group ? `Groupe · fin ${remaining(group.expiresAt, now)}` : 'MyRave';
 
   if (s.groups.status === 'loading' || s.groups.status === 'idle')
     return (
@@ -138,16 +139,11 @@ export function Home() {
                 </Button>
               )}
               {someoneLocated && loc.status === 'denied' && (
-                <Banner
-                  tone="warning"
-                  icon="warning"
-                  action={
-                    <Button size="sm" variant="secondary" onClick={retryLocation}>
-                      Réessayer
-                    </Button>
-                  }
-                >
-                  Localisation refusée : distances et direction impossibles. Autorise-la dans les réglages du site.
+                <Banner tone="warning" icon="warning">
+                  <span className="block">Localisation refusée : distances et direction impossibles.</span>
+                  <span className="mt-2 block">
+                    <LocationHelp compact />
+                  </span>
                 </Banner>
               )}
               {friends.map(({ m, line }) => (
@@ -242,6 +238,11 @@ function ShareCard({ group, now }: { group: Group; now: number }) {
         <span className="text-secondary">Visible par {audience}.</span>
       </p>
       {!paused && <p className="t-caption mt-1 text-muted">Garde l’app ouverte : un navigateur n’envoie rien quand l’écran est éteint ou l’app en arrière-plan.</p>}
+      {!paused && loc.status === 'denied' && (
+        <div className="mt-2">
+          <LocationHelp compact />
+        </div>
+      )}
       <ErrorLine error={action.error} />
       <div className="mt-3 grid grid-cols-2 gap-2">
         {paused ? (
@@ -299,7 +300,7 @@ function ShareSheet({ open, group, audience, onClose }: { open: boolean; group: 
           ))}
         </div>
         <p className="t-small text-muted">Jusqu’à {when(until)}. Pause ou arrêt à tout moment ; à l’arrêt, ta position est effacée du serveur.</p>
-        <p className="t-small text-muted">Ton téléphone va demander l’accès à ta position. Elle n’est envoyée que pendant que myRaveLoc est ouvert.</p>
+        <p className="t-small text-muted">Ton téléphone va demander l’accès à ta position. Elle n’est envoyée que pendant que MyRave est ouvert.</p>
         <ErrorLine error={action.error} />
       </div>
     </Sheet>

@@ -1,4 +1,4 @@
-// POST /api/raveloc : { action: 'groups' | 'create' | 'poll' | 'share' | 'invite' | 'join' | …, … } (session requise) — app myRaveLoc
+// POST /api/raveloc : { action: 'groups' | 'create' | 'poll' | 'share' | 'invite' | 'join' | …, … } (session requise) — app MyRave
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dispatch, ensureRavelocSchema, purge } from '../server/raveloc.js';
 import { bearer, getDb, getEnv, handle } from '../server/http.js';

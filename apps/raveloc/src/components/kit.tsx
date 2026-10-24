@@ -10,14 +10,14 @@ import { SkeletonCard } from '../ui/extras';
 import { useTabActive } from '../ui/tabActive';
 
 /**
- * Briques propres à myRaveLoc, faites des briques communes de MyLife (src/ui) : avatars des amis,
+ * Briques propres à MyRave, faites des briques communes de MyLife (src/ui) : avatars des amis,
  * bandeaux d'état du réseau, actions protégées, horloge d'affichage.
  */
 
-/** Couleurs d'identité de myRaveLoc (registre MyLife), les mêmes dans tous les thèmes. */
+/** Couleurs d'identité de MyRave (registre MyLife), les mêmes dans tous les thèmes. */
 export const BRAND = MYLIFE_APPS.find((a) => a.id === 'raveloc')!.colors;
 
-/** Balise de l'app : un point lumineux et ses ondes, aux couleurs de myRaveLoc. */
+/** Balise de l'app : un point lumineux et ses ondes, aux couleurs de MyRave. */
 export function BrandMark({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" aria-hidden className="shrink-0">

@@ -1,4 +1,4 @@
-# myRaveLoc
+# MyRave
 
 Retrouver ses amis en festival, en rave ou en concert : une flèche, une distance, et la vérité sur la
 qualité des données. App web mobile-first (PWA) de l'écosystème **MyLife**, servie sous
@@ -134,7 +134,7 @@ falsifier de façon indétectable, mais il peut renvoyer une ancienne position c
 
 - Aucun navigateur mobile n'envoie la position d'une page en arrière-plan, écran verrouillé ou onglet
   fermé (iOS suspend la page ; Android la gèle rapidement ; une PWA installée ne change rien). Le
-  partage n'est donc effectif **que lorsque myRaveLoc est ouvert à l'écran** ; l'app le dit, et les amis
+  partage n'est donc effectif **que lorsque MyRave est ouvert à l'écran** ; l'app le dit, et les amis
   voient « plus de nouvelles depuis X min » au lieu d'une fausse position en direct.
 - Un suivi continu écran éteint exigerait une app native (Android : service de premier plan ; iOS :
   « Always » + mise à jour en arrière-plan). Évolution possible, non faite.
@@ -162,8 +162,8 @@ identité existante n'a été modifiée, et le moteur de thèmes n'est pas dupli
 Aucune variable d'environnement pour le projet `myraveloc` (app statique). L'API utilise celles du
 projet `mylife` (`DATABASE_URL`, `SESSION_SECRET`) ; ses tables `raveloc_*` sont créées au premier appel.
 
-1. myRaveLoc : `npx tsc -b --noEmit && npx eslint . && npm test && npm run e2e` ; MyLife : `npx tsc --noEmit && npm test`
-2. myRaveLoc : `npm run deploy`
+1. MyRave : `npx tsc -b --noEmit && npx eslint . && npm test && npm run e2e` ; MyLife : `npx tsc --noEmit && npm test`
+2. MyRave : `npm run deploy`
 3. MyLife : réécritures `/raveloc`, `/raveloc/`, `/raveloc/:path+` vers le projet `myraveloc` ; `raveloc`
    exclu des en-têtes de l'accueil ; `npm run deploy` (publie aussi l'API).
 4. Vérifier en production : `/raveloc/` (200), `/raveloc/manifest.webmanifest`, `POST /api/raveloc` sans

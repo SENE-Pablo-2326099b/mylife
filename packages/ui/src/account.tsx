@@ -142,7 +142,7 @@ export function AccountForms({ initial = 'create', onDone, skip }: { initial?: M
             {mode === 'create'
               ? 'Un seul compte pour toutes tes apps MyLife, sur tous tes appareils. Tes données sont chiffrées sur ton téléphone avant d’être sauvegardées.'
               : mode === 'login'
-                ? 'Le même compte pour MyFinances, MyPerf et myRaveLoc.'
+                ? 'Le même compte pour MyFinances, MyPerf et MyRave.'
                 : 'Encore connecté sur un autre appareil ? Change simplement ton mot de passe depuis son écran Compte, sans clé. Sinon, ta clé de secours te redonne accès à ton compte, avec un nouveau mot de passe.'}
           </p>
         </div>
@@ -339,7 +339,7 @@ export function AccountOverview({
   session: Session;
   rows?: AccountStatusRow[];
   children?: ReactNode;
-  /** Ce que l'app doit faire tant que la session existe encore (myRaveLoc : couper les partages). */
+  /** Ce que l'app doit faire tant que la session existe encore (MyRave : couper les partages). */
   beforeSignOut?: () => Promise<void>;
 }) {
   const [panel, setPanel] = useState<'none' | 'password' | 'recovery' | 'delete'>('none');

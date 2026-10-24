@@ -82,7 +82,7 @@ export function Groups() {
               onSubmit={(e) => {
                 e.preventDefault();
                 const inv = inviteParts(paste);
-                if (!inv || !parseInvite(paste)) return setPasteError('Ce n’est pas un lien d’invitation myRaveLoc complet.');
+                if (!inv || !parseInvite(paste)) return setPasteError('Ce n’est pas un lien d’invitation MyRave complet.');
                 setPasteError(null);
                 setPaste('');
                 navigate('/rejoindre', { state: inv });

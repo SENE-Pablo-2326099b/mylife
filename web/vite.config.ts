@@ -6,7 +6,7 @@ const root = new URL('.', import.meta.url).pathname;
 
 /**
  * L'accueil MyLife (`/`) et la seule PWA installable de l'écosystème : son manifeste (portée `/`)
- * couvre MyFinances, MyPerf et myRaveLoc, qui le relient au lieu d'avoir le leur. Une app installée,
+ * couvre MyFinances, MyPerf et MyRave, qui le relient au lieu d'avoir le leur. Une app installée,
  * des raccourcis vers chaque app (appui long sur l'icône).
  */
 export default defineConfig({
@@ -42,12 +42,12 @@ export default defineConfig({
           { src: '/screenshots/1-accueil.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'Accueil : tes apps et ce qu’elles ont à te dire' },
           { src: '/screenshots/2-finances.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyFinances : le budget du jour' },
           { src: '/screenshots/3-perf.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyPerf : la séance du jour' },
-          { src: '/screenshots/4-raveloc.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'myRaveLoc : retrouver ses amis' },
+          { src: '/screenshots/4-raveloc.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyRave : retrouver ses amis' },
         ],
         shortcuts: [
           { name: 'MyFinances', short_name: 'Finances', description: 'Budget du jour, opérations, patrimoine', url: '/finances/', icons: [{ src: '/shortcut-finances.png', sizes: '96x96', type: 'image/png' }] },
           { name: 'MyPerf', short_name: 'Perf', description: 'Séance du jour, planning, progression', url: '/perf/', icons: [{ src: '/shortcut-perf.png', sizes: '96x96', type: 'image/png' }] },
-          { name: 'myRaveLoc', short_name: 'RaveLoc', description: 'Retrouver tes amis en festival', url: '/raveloc/', icons: [{ src: '/shortcut-raveloc.png', sizes: '96x96', type: 'image/png' }] },
+          { name: 'MyRave', short_name: 'RaveLoc', description: 'Retrouver tes amis en festival', url: '/raveloc/', icons: [{ src: '/shortcut-raveloc.png', sizes: '96x96', type: 'image/png' }] },
         ],
       },
       workbox: {

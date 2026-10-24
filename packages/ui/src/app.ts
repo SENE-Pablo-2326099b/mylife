@@ -1,7 +1,7 @@
 import { MYLIFE_APPS, type MyLifeApp } from '../vendor/lumen';
 
 /**
- * L'app qui utilise le kit (MyFinances, myRaveLoc, l'accueil MyLife) : son nom dans les titres, la barre
+ * L'app qui utilise le kit (MyFinances, MyRave, l'accueil MyLife) : son nom dans les titres, la barre
  * latérale et le journal d'erreurs. Posée une fois au démarrage (`configureApp`), avant le premier rendu.
  */
 export type KitAppId = MyLifeApp['id'] | 'home';

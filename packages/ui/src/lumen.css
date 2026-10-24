@@ -1126,7 +1126,7 @@ input[type='number']::-webkit-outer-spin-button {
 /* ================================================================== Passage d'une app à l'autre */
 /*
  * Toutes les apps MyLife sont sur la même adresse : aller de l'accueil à MyFinances, ou de MyPerf à
- * myRaveLoc, se fait en fondu (Chrome 126+, Safari 18.2+ ; ailleurs, navigation normale). Le fond
+ * MyRave, se fait en fondu (Chrome 126+, Safari 18.2+ ; ailleurs, navigation normale). Le fond
  * reste en place, la nouvelle app monte légèrement.
  */
 @view-transition {
