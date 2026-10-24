@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeStats, parseGames, parseMiniApp, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MiniApp, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
+import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeLegacyMiniApp, mergeStats, parseGames, parseMiniApp, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MiniApp, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -290,21 +290,105 @@ export function readMiniApps(): Record<string, MiniApp> {
   }
 }
 
+/**
+ * Lignes à envoyer (synchro `miniapps`, voir miniSync.ts) : `app/<id>` ou `entry/<app>.<saisie>` → date de la
+ * modification. Tenu ici, au seul endroit où l'on écrit : rien ne peut changer sans partir vers le compte.
+ */
+const MINI_DIRTY_KEY = 'mylife:miniapps-dirty';
+/** Anciennes lignes (une par app, toutes ses saisies, dans l'app `mylife`) à effacer du compte : id → date. */
+const MINI_LEGACY_KEY = 'mylife:miniapps-legacy';
+const MINI_MIGRATED_KEY = 'mylife:miniapps-v2';
+
+function readMap(key: string): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw ?? {})) if (typeof v === 'number') out[k] = v;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+export const readMiniDirty = (): Record<string, number> => readMap(MINI_DIRTY_KEY);
+export const writeMiniDirty = (d: Record<string, number>): void => write(MINI_DIRTY_KEY, d);
+export const readMiniLegacy = (): Record<string, number> => readMap(MINI_LEGACY_KEY);
+export const writeMiniLegacy = (d: Record<string, number>): void => write(MINI_LEGACY_KEY, d);
+
+/** Ce qui a changé entre deux versions d'une app, noté dans `dirty`. */
+export function markMiniDirty(prev: MiniApp | undefined, next: MiniApp, dirty: Record<string, number>): void {
+  if (!prev || prev.at !== next.at || !prev.spec !== !next.spec) dirty[`app/${next.id}`] = next.at;
+  const before = new Map((prev?.spec ? prev.entries : []).map((e) => [e.id, e.at ?? 0]));
+  for (const e of next.entries) if (before.get(e.id) !== (e.at ?? 0)) dirty[`entry/${next.id}.${e.id}`] = e.at ?? next.at;
+  for (const [id, at] of Object.entries(next.gone ?? {})) if (prev?.gone?.[id] !== at) dirty[`entry/${next.id}.${id}`] = at;
+  if (!next.spec && prev?.spec) for (const e of prev.entries) dirty[`entry/${next.id}.${e.id}`] = next.at;
+}
+
+/** Écrit les apps sans rien marquer à envoyer (ce qui vient du compte, ou une remise en ordre). */
+export function writeMiniApps(all: Record<string, MiniApp>, notify = true): void {
+  write(MINI_KEY, all);
+  if (notify) emit();
+}
+
 export function saveMiniApp(app: MiniApp): void {
-  write(MINI_KEY, { ...readMiniApps(), [app.id]: app });
+  const all = readMiniApps();
+  const dirty = readMiniDirty();
+  markMiniDirty(all[app.id], app, dirty);
+  write(MINI_KEY, { ...all, [app.id]: app });
+  writeMiniDirty(dirty);
   emit();
   onChange?.();
 }
 
-/** Venue d'un autre appareil : la plus récente gagne. */
-export function adoptMiniApp(raw: unknown): boolean {
-  const app = parseMiniApp(raw);
-  if (!app) return false;
+/**
+ * Une app de l'ancien format, reçue par la synchro des réglages communs (un appareil pas encore à jour) : ses
+ * saisies rejoignent celles d'ici et partent vers la nouvelle synchro ; l'ancienne ligne sera effacée.
+ */
+export function adoptLegacyMiniApp(raw: unknown): boolean {
+  const old = parseMiniApp(raw);
+  if (!old) return false;
   const all = readMiniApps();
-  if ((all[app.id]?.at ?? 0) >= app.at) return (all[app.id]?.at ?? 0) === app.at;
-  write(MINI_KEY, { ...all, [app.id]: app });
-  emit();
+  const merged = mergeLegacyMiniApp(all[old.id], old);
+  const dirty = readMiniDirty();
+  markMiniDirty(all[old.id], merged, dirty);
+  writeMiniDirty(dirty);
+  writeMiniLegacy({ ...readMiniLegacy(), [old.id]: Date.now() });
+  if (JSON.stringify(all[old.id]) !== JSON.stringify(merged)) writeMiniApps({ ...all, [old.id]: merged });
+  onChange?.();
   return true;
+}
+
+/**
+ * Passage au nouveau format, une fois par appareil : chaque saisie reçoit une date (celle de son app), tout part
+ * vers la synchro `miniapps`, et les anciennes lignes de l'app `mylife` sont à effacer.
+ */
+export function migrateMiniApps(): void {
+  try {
+    if (localStorage.getItem(MINI_MIGRATED_KEY)) return;
+  } catch {
+    return;
+  }
+  const all = readMiniApps();
+  const dirty = readMiniDirty();
+  const legacy = readMiniLegacy();
+  const now = Date.now();
+  for (const app of Object.values(all)) {
+    const dated = { ...app, entries: app.entries.map((e) => (e.at ? e : { ...e, at: app.at })) };
+    all[app.id] = dated;
+    markMiniDirty(undefined, dated, dirty);
+    legacy[app.id] = now;
+  }
+  writeMiniApps(all, false);
+  writeMiniDirty(dirty);
+  writeMiniLegacy(legacy);
+  write(MINI_MIGRATED_KEY, 1);
+}
+
+/** Un autre compte vient d'être relié à cet appareil : tout ce qu'il contient est à envoyer. */
+export function markAllMiniDirty(): void {
+  const dirty = readMiniDirty();
+  for (const app of Object.values(readMiniApps())) markMiniDirty(undefined, app, dirty);
+  writeMiniDirty(dirty);
 }
 
 /** Les apps en service, les plus récentes d'abord. */

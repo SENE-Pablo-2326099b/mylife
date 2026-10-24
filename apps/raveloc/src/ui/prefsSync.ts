@@ -3,14 +3,16 @@ import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/m
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
 import { STATS_APPS, parseAppearance, readStats, type StatsApp } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
-import { adoptCharacterPrefs, adoptGames, adoptMiniApp, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readGames, readMiniApps, readMusic } from './stats';
+import { syncMiniApps, quiet } from './miniSync';
+import { adoptCharacterPrefs, adoptGames, adoptLegacyMiniApp, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readGames, readMiniLegacy, readMusic, writeMiniLegacy } from './stats';
+import { clearSyncIssue, noteSyncIssue } from './syncIssue';
 
 /**
  * Réglages communs de MyLife synchronisés entre appareils par le compte, chiffrés comme le reste (app
  * `mylife` du serveur) : l'apparence (`prefs/appearance`), les compteurs du Personnage de chaque app
  * (`stats/<app>`), ses préférences (`prefs/character`) et le résumé d'écoute de MyMusique (`music/summary`) et
- * les heures de jeu de MyGames (`games/data`) et chaque app sans code de « Mes apps » (`miniapp/<id>`, une
- * app supprimée reste une trace vide pour que la suppression suive).
+ * les heures de jeu de MyGames (`games/data`). « Mes apps » a sa propre synchro (miniSync.ts) ; les lignes
+ * `miniapp/<id>` de l'ancien format (une app et toutes ses saisies) sont seulement reprises puis effacées.
  * Chaque ligne est datée, la plus récente gagne :
  * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web ; l'app Android fait
  * de même de son côté.
@@ -21,7 +23,6 @@ const statsPushedKey = (app: StatsApp) => `mylife:stats-pushed:${app}`;
 const CHARACTER_PUSHED_KEY = 'mylife:character-pushed';
 const MUSIC_PUSHED_KEY = 'mylife:music-pushed';
 const GAMES_PUSHED_KEY = 'mylife:games-pushed';
-const miniPushedKey = (id: string) => `mylife:miniapps-pushed:${id}`;
 const isStatsApp = (rid: string): rid is StatsApp => (STATS_APPS as readonly string[]).includes(rid);
 
 const readNum = (k: string) => {
@@ -54,7 +55,6 @@ function rows(): { tbl: string; rid: string; at: number; pushedKey: string; row:
   if (music) out.push({ tbl: 'music', rid: 'summary', at: music.at, pushedKey: MUSIC_PUSHED_KEY, row: music });
   const games = readGames();
   if (games && games.at > 0) out.push({ tbl: 'games', rid: 'data', at: games.at, pushedKey: GAMES_PUSHED_KEY, row: games });
-  for (const app of Object.values(readMiniApps())) out.push({ tbl: 'miniapp', rid: app.id, at: app.at, pushedKey: miniPushedKey(app.id), row: app });
   return out;
 }
 
@@ -62,16 +62,29 @@ function rows(): { tbl: string; rid: string; at: number; pushedKey: string; row:
 export const prefsStore: LocalStore = {
   app: 'mylife',
   async pending() {
-    return rows()
+    const out = rows()
       .filter((r) => r.at > readNum(r.pushedKey))
-      .map((r) => ({ tbl: r.tbl, rid: r.rid, ver: r.at, updatedAt: r.at, row: r.row }));
+      .map((r) => ({ tbl: r.tbl, rid: r.rid, ver: r.at, updatedAt: r.at, row: r.row as unknown }));
+    // Anciennes lignes de « Mes apps », reprises par la nouvelle synchro : effacées du compte.
+    for (const [rid, at] of Object.entries(readMiniLegacy()).slice(0, 100)) out.push({ tbl: 'miniapp', rid, ver: at, updatedAt: at, row: null });
+    return out;
   },
   async ack(done) {
     const keys = new Map(rows().map((r) => [`${r.tbl}/${r.rid}`, r.pushedKey]));
+    const legacy = readMiniLegacy();
+    let cleaned = false;
     for (const d of done) {
+      if (d.tbl === 'miniapp') {
+        if (legacy[d.rid] === d.ver) {
+          delete legacy[d.rid];
+          cleaned = true;
+        }
+        continue;
+      }
       const key = keys.get(`${d.tbl}/${d.rid}`);
       if (key) write(key, String(d.ver));
     }
+    if (cleaned) writeMiniLegacy(legacy);
   },
   async apply(remote) {
     for (const r of remote) {
@@ -92,7 +105,8 @@ export const prefsStore: LocalStore = {
       } else if (r.tbl === 'games' && r.rid === 'data') {
         if (adoptGames(r.row)) write(GAMES_PUSHED_KEY, String(readGames()?.at ?? 0));
       } else if (r.tbl === 'miniapp') {
-        if (adoptMiniApp(r.row)) write(miniPushedKey(r.rid), String(readMiniApps()[r.rid]?.at ?? 0));
+        // Un appareil pas encore à jour : ses saisies rejoignent la nouvelle synchro.
+        adoptLegacyMiniApp(r.row);
       }
     }
   },
@@ -115,6 +129,9 @@ export const prefsStore: LocalStore = {
   async setState(s) {
     write(STATE_KEY, JSON.stringify(s));
   },
+  async tooBig(list) {
+    noteSyncIssue('mylife', `${list.length} réglage${list.length > 1 ? 's' : ''} trop gros pour le compte (${list.map((r) => r.tbl).join(', ')})`);
+  },
 };
 
 let running = false;
@@ -134,6 +151,7 @@ export async function syncPrefs(): Promise<void> {
   }
   running = true;
   try {
+    clearSyncIssue('mylife');
     const state = await loadState(prefsStore, webPlatform.random);
     if (state.joinedAs !== session.login) {
       // Nouveau compte sur cet appareil : tout relire depuis le début, et proposer le choix local.
@@ -141,8 +159,9 @@ export async function syncPrefs(): Promise<void> {
       for (const r of rows()) write(r.pushedKey, '0');
     }
     await syncNow(prefsStore, webPlatform.api, session, webPlatform.random);
-  } catch {
-    /* hors ligne, session expirée : on réessaiera au prochain passage */
+  } catch (e) {
+    // Hors ligne, session expirée : on réessaiera au prochain passage. Un refus du serveur se montre (page Compte).
+    if (!quiet(e)) noteSyncIssue('mylife', (e as Error).message);
   } finally {
     running = false;
     if (again) {
@@ -150,6 +169,12 @@ export async function syncPrefs(): Promise<void> {
       void syncPrefs();
     }
   }
+}
+
+/** Réglages communs puis « Mes apps ». */
+async function syncAll(): Promise<void> {
+  await syncPrefs();
+  await syncMiniApps();
 }
 
 let started = false;
@@ -161,14 +186,14 @@ export function startPrefsSync(): void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const soon = (ms = 1500) => {
     if (timer) clearTimeout(timer);
-    timer = setTimeout(() => void syncPrefs(), ms);
+    timer = setTimeout(() => void syncAll(), ms);
   };
   onSessionChange(() => soon(300));
   // Des compteurs du Personnage ont changé : ils partent un peu après (une séance finie, un import bancaire).
   onStatsChange(() => soon(2000));
   // Un choix de thème part presque aussitôt : on change souvent d'app juste après.
   subscribeAppearance(() => soon(150));
-  document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? soon(500) : void syncPrefs()));
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'visible' ? soon(500) : void syncAll()));
   window.addEventListener('online', () => soon(500));
   soon(400);
 }

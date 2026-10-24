@@ -36,8 +36,11 @@ export class HttpError extends Error {
   }
 }
 
-/** `mylife` : réglages communs à toutes les apps (apparence), synchronisés entre appareils. */
-export const APPS = ['finances', 'perf', 'mylife'] as const;
+/**
+ * `mylife` : réglages communs à toutes les apps (apparence, compteurs du Personnage) ; `miniapps` : « Mes apps »,
+ * une ligne par app et une par saisie.
+ */
+export const APPS = ['finances', 'perf', 'mylife', 'miniapps'] as const;
 export type App = (typeof APPS)[number];
 export const KDF_ITERATIONS = 200_000;
 const SESSION_DAYS = 365;
@@ -45,7 +48,7 @@ const MAX_CHANGES = 500;
 const MAX_PAYLOAD = 200_000;
 const PULL_LIMIT = 1000;
 /** Lignes gardées au plus par compte et par app (garde-fou de stockage, très au-delà d'un usage réel). */
-export const ROW_QUOTA: Record<App, number> = { finances: 100_000, perf: 100_000, mylife: 200 };
+export const ROW_QUOTA: Record<App, number> = { finances: 100_000, perf: 100_000, mylife: 200, miniapps: 40_000 };
 
 /** Garde-fous contre les abus (fenêtres simples, par clé). */
 export const RATES = {
@@ -349,10 +352,16 @@ function appOf(body: Record<string, unknown>): App {
   return app as App;
 }
 
-function parseChanges(raw: unknown): Change[] {
-  if (raw === undefined) return [];
+/**
+ * Lit les modifications envoyées. Une ligne mal formée refuse tout l'envoi (appareil défaillant) ; une ligne
+ * seulement trop grosse est écartée seule et signalée (`tooBig`) : elle ne bloque plus les autres.
+ */
+function parseChanges(raw: unknown): { changes: Change[]; tooBig: { tbl: string; rid: string }[] } {
+  if (raw === undefined) return { changes: [], tooBig: [] };
   if (!Array.isArray(raw) || raw.length > MAX_CHANGES) throw new HttpError(400, `Paramètre invalide : changes (au plus ${MAX_CHANGES})`);
-  return raw.map((c) => {
+  const changes: Change[] = [];
+  const tooBig: { tbl: string; rid: string }[] = [];
+  for (const c of raw) {
     const x = (c ?? {}) as Record<string, unknown>;
     const ok =
       typeof x.tbl === 'string' &&
@@ -363,10 +372,37 @@ function parseChanges(raw: unknown): Change[] {
       typeof x.updatedAt === 'number' &&
       Number.isFinite(x.updatedAt) &&
       typeof x.deleted === 'boolean' &&
-      (x.deleted ? x.payload == null : typeof x.payload === 'string' && x.payload.length <= MAX_PAYLOAD);
+      (x.deleted ? x.payload == null : typeof x.payload === 'string');
     if (!ok) throw new HttpError(400, 'Paramètre invalide : modification');
-    return { tbl: x.tbl as string, rid: x.rid as string, updatedAt: Math.round(x.updatedAt as number), deleted: x.deleted as boolean, payload: (x.payload as string | null) ?? null };
+    if (!x.deleted && (x.payload as string).length > MAX_PAYLOAD) {
+      tooBig.push({ tbl: x.tbl as string, rid: x.rid as string });
+      continue;
+    }
+    changes.push({ tbl: x.tbl as string, rid: x.rid as string, updatedAt: Math.round(x.updatedAt as number), deleted: x.deleted as boolean, payload: (x.payload as string | null) ?? null });
+  }
+  return { changes, tooBig };
+}
+
+/**
+ * Quota : seules comptent les lignes vivantes (pas les traces de suppression), et seules les lignes vraiment
+ * nouvelles s'y ajoutent (modifier une ligne existante passe toujours).
+ */
+async function checkQuota(db: Db, uid: string, app: App, changes: Change[]): Promise<void> {
+  const written = changes.filter((c) => !c.deleted);
+  if (!written.length) return;
+  const { rows: n } = await db.query<{ n: string | number }>('SELECT COUNT(*) AS n FROM records WHERE user_id = $1 AND app = $2 AND deleted = false', [uid, app]);
+  const live = Number(n[0]?.n ?? 0);
+  if (live + written.length <= ROW_QUOTA[app]) return;
+  const params: unknown[] = [uid, app];
+  const pairs = written.map((c) => {
+    params.push(c.tbl, c.rid);
+    return `($${params.length - 1},$${params.length})`;
   });
+  const { rows: e } = await db.query<{ n: string | number }>(
+    `SELECT COUNT(*) AS n FROM records WHERE user_id = $1 AND app = $2 AND deleted = false AND (tbl, rid) IN (${pairs.join(',')})`,
+    params,
+  );
+  if (live + written.length - Number(e[0]?.n ?? 0) > ROW_QUOTA[app]) throw new HttpError(413, 'Espace du compte plein pour cette app : supprime des données anciennes ou écris-nous.');
 }
 
 /** Ce que contient le compte pour une app (avant de rejoindre : récupérer ou envoyer ?). */
@@ -388,18 +424,15 @@ export async function sync(
   db: Db,
   uid: string,
   body: Record<string, unknown>,
-): Promise<{ changes: (Change & { seq: number })[]; cursor: number; more: boolean; accepted: number }> {
+): Promise<{ changes: (Change & { seq: number })[]; cursor: number; more: boolean; accepted: number; tooBig: { tbl: string; rid: string }[] }> {
   const app = appOf(body);
   const device = typeof body.device === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(body.device) ? body.device : null;
   if (!device) throw new HttpError(400, 'Paramètre invalide : device');
   const cursor = typeof body.cursor === 'number' && body.cursor >= 0 ? Math.floor(body.cursor) : 0;
-  const changes = parseChanges(body.changes);
+  const { changes, tooBig } = parseChanges(body.changes);
 
   if (body.reset === true) await db.query('DELETE FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
-  if (changes.some((c) => !c.deleted)) {
-    const { rows: n } = await db.query<{ n: string | number }>('SELECT COUNT(*) AS n FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
-    if (Number(n[0]?.n ?? 0) + changes.length > ROW_QUOTA[app]) throw new HttpError(413, 'Espace du compte plein pour cette app : supprime des données anciennes ou écris-nous.');
-  }
+  await checkQuota(db, uid, app, changes);
 
   let accepted = 0;
   let overruled: RecordRow[] = [];
@@ -455,5 +488,6 @@ export async function sync(
     cursor: next,
     more,
     accepted,
+    tooBig,
   };
 }

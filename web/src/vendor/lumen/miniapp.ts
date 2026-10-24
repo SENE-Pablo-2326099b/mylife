@@ -65,6 +65,8 @@ export interface MiniEntry {
   id: string;
   day: string;
   values: Record<string, MiniValue>;
+  /** Dernière modification : chaque saisie se synchronise seule, la plus récente gagne. */
+  at?: number;
 }
 
 /** Une app de l'utilisateur et ses saisies ; `spec: null` = supprimée (gardée vide pour que la suppression suive). */
@@ -75,6 +77,8 @@ export interface MiniApp {
   created: number;
   spec: MiniSpec | null;
   entries: MiniEntry[];
+  /** Saisies supprimées pas encore parties vers le compte : identifiant → date de la suppression. */
+  gone?: Record<string, number>;
 }
 
 export const MAX_MINI_APPS = 20;
@@ -82,6 +86,7 @@ export const MAX_MINI_ENTRIES = 1500;
 
 const NUMERIC: readonly MiniFieldType[] = ['number', 'duration', 'rating'];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const ENTRY_ID = /^[A-Za-z0-9_-]{1,32}$/;
 const FIELD_ID = /^[a-z][a-z0-9_]{0,23}$/;
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.trim().replace(/\s+/g, ' ').slice(0, max) : '');
@@ -223,17 +228,26 @@ export function emptyMiniApp(id: string, spec: MiniSpec, now = Date.now()): Mini
   return { v: 1, id, at: now, created: now, spec, entries: [] };
 }
 
-/** Ajoute une saisie (les plus anciennes partent au-delà de 1 500). */
+const byDay = (a: MiniEntry, b: MiniEntry) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0);
+
+/**
+ * Ajoute ou remplace une saisie (les plus anciennes partent au-delà de 1 500, et leur suppression suit sur les
+ * autres appareils). La date de l'app (`at`) ne bouge pas : elle date la description, pas les saisies.
+ */
 export function addEntry(app: MiniApp, entry: MiniEntry, now = Date.now()): MiniApp {
   if (!DATE.test(entry.day)) return app;
-  const entries = [...app.entries.filter((e) => e.id !== entry.id), entry].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0)).slice(-MAX_MINI_ENTRIES);
-  return { ...app, at: now, entries };
+  const sorted = [...app.entries.filter((e) => e.id !== entry.id), { ...entry, at: now }].sort(byDay);
+  const cut = sorted.length - MAX_MINI_ENTRIES;
+  if (cut <= 0) return { ...app, entries: sorted };
+  const gone = { ...app.gone };
+  for (const e of sorted.slice(0, cut)) gone[e.id] = now;
+  return { ...app, entries: sorted.slice(cut), gone };
 }
 
-export const removeEntry = (app: MiniApp, id: string, now = Date.now()): MiniApp => ({ ...app, at: now, entries: app.entries.filter((e) => e.id !== id) });
+export const removeEntry = (app: MiniApp, id: string, now = Date.now()): MiniApp => ({ ...app, entries: app.entries.filter((e) => e.id !== id), gone: { ...app.gone, [id]: now } });
 
 /** Supprimer une app : il en reste une trace vide et datée, pour que la suppression gagne sur les autres appareils. */
-export const deleteMiniApp = (app: MiniApp, now = Date.now()): MiniApp => ({ ...app, at: now, spec: null, entries: [] });
+export const deleteMiniApp = (app: MiniApp, now = Date.now()): MiniApp => ({ v: 1, id: app.id, at: now, created: app.created, spec: null, entries: [] });
 
 export function parseMiniApp(raw: unknown): MiniApp | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -246,12 +260,89 @@ export function parseMiniApp(raw: unknown): MiniApp | null {
   const entries: MiniEntry[] = [];
   for (const e of o.entries.slice(-MAX_MINI_ENTRIES)) {
     const x = (e ?? {}) as Record<string, unknown>;
-    if (typeof x.id !== 'string' || typeof x.day !== 'string' || !DATE.test(x.day) || !x.values || typeof x.values !== 'object') continue;
+    if (typeof x.id !== 'string' || !ENTRY_ID.test(x.id) || typeof x.day !== 'string' || !DATE.test(x.day) || !x.values || typeof x.values !== 'object') continue;
     // Une saisie devenue incomplète (champ rendu obligatoire) reste visible : on garde ce qui est valable.
     const { values } = cleanValues(spec, x.values as Record<string, unknown>, true);
-    if (Object.keys(values).length) entries.push({ id: x.id.slice(0, 32), day: x.day, values });
+    if (Object.keys(values).length) entries.push({ id: x.id, day: x.day, values, ...(typeof x.at === 'number' && Number.isFinite(x.at) ? { at: x.at } : {}) });
   }
-  return { v: 1, id: o.id, at: o.at, created: o.created, spec, entries };
+  const gone: Record<string, number> = {};
+  if (o.gone && typeof o.gone === 'object') {
+    for (const [id, at] of Object.entries(o.gone as Record<string, unknown>).slice(-3000)) if (ENTRY_ID.test(id) && typeof at === 'number' && Number.isFinite(at)) gone[id] = at;
+  }
+  return { v: 1, id: o.id, at: o.at, created: o.created, spec, entries, ...(Object.keys(gone).length ? { gone } : {}) };
+}
+
+// ---------------------------------------------------------------- synchro (app `miniapps` du serveur)
+//
+// Une ligne par app (sa description, `app/<id>`) et une ligne par saisie (`entry/<app>.<saisie>`) : une ligne
+// reste petite quel que soit le nombre de saisies, et deux saisies notées hors ligne sur deux appareils
+// s'additionnent au lieu de s'écraser.
+
+/** Ce que porte la ligne d'une app : sa description, sans les saisies. */
+export interface MiniHead {
+  v: 1;
+  id: string;
+  at: number;
+  created: number;
+  spec: MiniSpec;
+}
+
+export const miniHead = (app: MiniApp): MiniHead | null => (app.spec ? { v: 1, id: app.id, at: app.at, created: app.created, spec: app.spec } : null);
+
+export function parseMiniHead(raw: unknown): MiniHead | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const app = parseMiniApp({ ...(raw as Record<string, unknown>), entries: [], gone: undefined });
+  return app ? miniHead(app) : null;
+}
+
+/** Identifiant de la ligne d'une saisie, et l'inverse. */
+export const miniEntryRid = (app: string, entry: string) => `${app}.${entry}`;
+export function splitMiniEntryRid(rid: string): { app: string; entry: string } | null {
+  const i = rid.indexOf('.');
+  const app = rid.slice(0, i);
+  const entry = rid.slice(i + 1);
+  return i > 0 && /^[a-z0-9]{6,32}$/.test(app) && ENTRY_ID.test(entry) ? { app, entry } : null;
+}
+
+/** Une description venue du compte : la plus récente gagne ; une app inconnue arrive sans saisies (elles suivent). */
+export function adoptMiniHead(local: MiniApp | undefined, head: MiniHead): MiniApp | null {
+  if (local && local.at >= head.at) return null;
+  if (!local) return { v: 1, id: head.id, at: head.at, created: head.created, spec: head.spec, entries: [] };
+  return { ...local, at: head.at, created: head.created, spec: head.spec, entries: local.spec ? local.entries : [] };
+}
+
+/** L'app supprimée sur un autre appareil : il n'en reste qu'une trace. */
+export const tombMiniApp = (local: MiniApp, at: number): MiniApp | null => (local.spec ? deleteMiniApp(local, Math.max(at, local.at)) : null);
+
+/** Une saisie venue du compte (`{ app, entry }`). Une version plus récente ici, ou une suppression plus récente ici, l'emporte. */
+export function adoptMiniEntry(app: MiniApp, raw: unknown): MiniApp | null {
+  if (!app.spec || !raw || typeof raw !== 'object') return null;
+  const x = raw as Record<string, unknown>;
+  if (typeof x.id !== 'string' || !ENTRY_ID.test(x.id) || typeof x.day !== 'string' || !DATE.test(x.day) || !x.values || typeof x.values !== 'object') return null;
+  const at = typeof x.at === 'number' && Number.isFinite(x.at) ? x.at : 0;
+  const mine = app.entries.find((e) => e.id === x.id);
+  if ((mine && (mine.at ?? 0) > at) || (app.gone?.[x.id] ?? 0) > at) return null;
+  const { values } = cleanValues(app.spec, x.values as Record<string, unknown>, true);
+  if (!Object.keys(values).length) return null;
+  const entry: MiniEntry = { id: x.id, day: x.day, values, at };
+  if (mine && JSON.stringify(mine) === JSON.stringify(entry)) return null;
+  return { ...app, entries: [...app.entries.filter((e) => e.id !== entry.id), entry].sort(byDay).slice(-MAX_MINI_ENTRIES) };
+}
+
+/** Une saisie supprimée sur un autre appareil. */
+export const dropMiniEntry = (app: MiniApp, id: string): MiniApp | null => (app.entries.some((e) => e.id === id) ? { ...app, entries: app.entries.filter((e) => e.id !== id) } : null);
+
+/**
+ * Une app de l'ancien format (une seule ligne avec toutes ses saisies, app `mylife`) : la description la plus
+ * récente gagne, et ses saisies s'ajoutent à celles d'ici (jamais une saisie supprimée ici ne revient).
+ */
+export function mergeLegacyMiniApp(local: MiniApp | undefined, old: MiniApp): MiniApp {
+  let app: MiniApp = local ?? { v: 1, id: old.id, at: old.at, created: old.created, spec: old.spec, entries: [] };
+  if (local && old.at > local.at) app = { ...local, at: old.at, created: old.created, spec: old.spec, entries: old.spec ? local.entries : [] };
+  if (!app.spec) return app;
+  const known = new Set(app.entries.map((e) => e.id));
+  const added = old.entries.filter((e) => !known.has(e.id) && !app.gone?.[e.id]).map((e) => ({ ...e, at: e.at ?? old.at }));
+  return added.length ? { ...app, entries: [...app.entries, ...added].sort(byDay).slice(-MAX_MINI_ENTRIES) } : app;
 }
 
 // ---------------------------------------------------------------- calculs

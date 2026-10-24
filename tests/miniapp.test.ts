@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_MINI_ENTRIES,
   MINI_TEMPLATES,
   addEntry,
+  adoptMiniEntry,
+  adoptMiniHead,
+  mergeLegacyMiniApp,
+  miniHead,
+  splitMiniEntryRid,
   aggregate,
   cleanValues,
   decodeSpec,
@@ -130,5 +136,32 @@ describe('Mes apps : saisies et calculs', () => {
     expect(parseMiniApp({ ...raw, id: '../x' })).toBeNull();
     const gone = deleteMiniApp(parseMiniApp(raw)!, 9);
     expect(parseMiniApp(JSON.parse(JSON.stringify(gone)))).toEqual({ v: 1, id: 'abc123', at: 9, created: 1, spec: null, entries: [] });
+  });
+
+  it('synchro saisie par saisie : dates, suppressions retenues, la plus récente gagne, ancien format repris', () => {
+    const lecture = MINI_TEMPLATES[0]!;
+    let app = addEntry(emptyMiniApp('lect01', lecture, 1), { id: 'a', day: '2026-10-20', values: { pages: 10 } }, 50);
+    // La saisie est datée ; la date de l'app (sa description) ne bouge pas.
+    expect([app.at, app.entries[0]!.at]).toEqual([1, 50]);
+    app = removeEntry(app, 'a', 60);
+    expect([app.entries, app.gone]).toEqual([[], { a: 60 }]);
+    // Une version plus ancienne que la suppression ne revient pas ; une plus récente, si.
+    expect(adoptMiniEntry(app, { id: 'a', day: '2026-10-20', values: { pages: 10 }, at: 55 })).toBeNull();
+    expect(adoptMiniEntry(app, { id: 'a', day: '2026-10-20', values: { pages: 11 }, at: 70 })?.entries).toEqual([{ id: 'a', day: '2026-10-20', values: { pages: 11 }, at: 70 }]);
+    // Au-delà de 1 500 saisies, les plus anciennes partent et leur suppression est retenue.
+    let full = emptyMiniApp('lect02', lecture, 1);
+    for (let i = 0; i <= MAX_MINI_ENTRIES; i++) full = addEntry(full, { id: `e${i}`, day: `2026-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}`, values: { pages: 1 } }, 100 + i);
+    expect(full.entries).toHaveLength(MAX_MINI_ENTRIES);
+    expect(Object.keys(full.gone ?? {})).toHaveLength(1);
+    // Description : la plus récente gagne, sans toucher aux saisies.
+    const head = miniHead({ ...app, at: 9, spec: { ...lecture, name: 'Livres' } })!;
+    expect(adoptMiniHead(app, head)).toMatchObject({ at: 9, spec: { name: 'Livres' }, gone: { a: 60 } });
+    expect(adoptMiniHead({ ...app, at: 10 }, head)).toBeNull();
+    // Ancien format : les saisies s'ajoutent, datées de leur app, sauf celle supprimée ici.
+    const old = { v: 1 as const, id: 'lect01', at: 40, created: 1, spec: lecture, entries: [{ id: 'a', day: '2026-10-20', values: { pages: 10 } }, { id: 'b', day: '2026-10-21', values: { pages: 3 } }] };
+    expect(mergeLegacyMiniApp(app, old).entries).toEqual([{ id: 'b', day: '2026-10-21', values: { pages: 3 }, at: 40 }]);
+    expect(splitMiniEntryRid('lect01.abc')).toEqual({ app: 'lect01', entry: 'abc' });
+    expect(splitMiniEntryRid('../x.abc')).toBeNull();
+    expect(splitMiniEntryRid('lect01')).toBeNull();
   });
 });

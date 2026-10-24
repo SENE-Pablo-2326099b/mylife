@@ -114,7 +114,10 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `renewRecovery` (nouvelle clé de secours), `deleteAccount` (mot de passe redemandé ; efface le compte, ses
   lignes, quitte ses groupes myRaveLoc et ses espaces, efface ses messages au support et ses abonnements aux notifications).
 - `POST /api/sync` (`server/sync.ts`) : `status`, `sync`. Apps synchronisées : `finances`, `perf`, `mylife`
-  (réglages communs : l'apparence).
+  (réglages communs : l'apparence, les compteurs), `miniapps` (« Mes apps » : une ligne par app, une par saisie).
+  Quotas `ROW_QUOTA` : seules les lignes vivantes comptent, et seules les nouvelles s'ajoutent. Une ligne trop grosse
+  (plus de 200 000 caractères chiffrés) est écartée seule et renvoyée dans `tooBig` : elle ne bloque plus le lot.
+  Les problèmes de synchro qui reviennent s'affichent sur la page Compte (`packages/ui/src/syncIssue.ts`).
 - `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
 - Le même code sert en local (`server/local.ts`, `npm run local`) et dans les tests.
 
@@ -185,9 +188,10 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `push_subscriptions`) + `api/cron-weekly.ts` (cron Vercel, `CRON_SECRET`), `web/public/push-sw.js`, `web/src/push.ts` ;
   `npm run stats:serveur` (volumes, sans contenu).
   Mes apps (V3, étape 10, premier palier) : moteur `packages/lumen/src/miniapp.ts` (format `mylife-app`, rien ne
-  s'exécute), `web/src/pages/MiniApps.tsx` (`/mes-apps`), lignes `miniapp/<id>` de l'app `mylife` (stockage
-  `mylife:miniapps`), outil Copilot `get_my_apps`.
-  Journal complet : `docs/V3.md`. Refonte de MyFinances (24/10/2026, en cours) : `docs/REFONTE-FINANCES.md` (points de
+  s'exécute), `web/src/pages/MiniApps.tsx` (`/mes-apps`), synchro `packages/ui/src/miniSync.ts` (app `miniapps` :
+  `app/<id>` et `entry/<app>.<saisie>`, depuis la V4 ; l'ancien format `miniapp/<id>` de l'app `mylife` est repris
+  puis effacé) (stockage `mylife:miniapps`), outil Copilot `get_my_apps`.
+  Journal complet : `docs/V3.md`, puis `docs/V4.md` (feuille de route `docs/ROADMAP-V4.md`). Refonte de MyFinances (24/10/2026, en cours) : `docs/REFONTE-FINANCES.md` (points de
   restauration `apps/finances/src/domain/restorePoints.ts`).
 - **Apparence synchronisée** entre appareils (app `mylife`, `packages/ui/src/prefsSync.ts` et
   `apps/perf/src/services/cloud/prefs.ts`) : une ligne datée du choix (`at`), la plus récente gagne, un
@@ -213,10 +217,11 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   `DELETE FROM users WHERE login LIKE 'test-e2e-%'` (client `pg`, `DATABASE_URL` de `.env.local`). Les
   parcours de bout en bout tournent sur une base en mémoire : rien à nettoyer.
 
-### Risque connu
+### Historique importé de MyPerf
 
-- Augmenter `PERSONAL_IMPORT_VERSION` dans MyPerf reconstruit l'historique importé avec des identifiants
-  aléatoires sur chaque appareil : doublons possibles entre appareils synchronisés.
+- Augmenter `PERSONAL_IMPORT_VERSION` reconstruit l'historique importé avec des identifiants fixes (`historyIds` :
+  date, exercice, position) : deux appareils synchronisés écrivent les mêmes lignes, sans doublons (V4, étape 1.3).
+  Avant la version 5, les identifiants étaient aléatoires ; la reconstruction en version 5 efface ces doublons.
 
 ---
 

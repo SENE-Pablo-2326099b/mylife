@@ -9,7 +9,7 @@ import { DEFAULT_DELOAD, generateScheme, mesocycleEndOffsetDays, weekIndexFor } 
 import { expandPattern } from '@/domain/planning';
 import type { Mesocycle, ProgressionType, SetType, WorkoutExercise, WorkoutSet } from '@/domain/types';
 import { clearAllData } from '@/db/backup';
-import { db, newId } from '@/db/db';
+import { db } from '@/db/db';
 import { insertRaw, selectRaw } from '@/db/raw';
 import { addBodyEntry, latestBodyweight } from '@/db/repos/body';
 import { listMesocycles, saveMesocycle } from '@/db/repos/cycles';
@@ -308,11 +308,22 @@ export function tagSets(progression: ProgressionType, weights: readonly number[]
   return weights.map((_, i) => (i === top ? 'top_set' : 'backoff'));
 }
 
+/**
+ * Identifiers of the imported history are derived from the date, the exercise and the set position, never
+ * random: two synced devices that rebuild the history (version bump) write the same rows instead of
+ * duplicating every session.
+ */
+export const historyIds = {
+  workout: (date: string) => `hist-${date}`,
+  exercise: (date: string, exerciseId: string) => `hist-${date}-${exerciseId}`,
+  set: (date: string, exerciseId: string, position: number) => `hist-${date}-${exerciseId}-${position}`,
+};
+
 function importSession(date: string, sets: readonly HistorySetRow[], bloc1: Mesocycle): number {
   const template = PERSONAL_TEMPLATES.find((t) => t.weekday === weekday(date)) ?? null;
   const startedAt = startTimestamp(date);
   const weekIndex = weekIndexFor(bloc1, date);
-  const workoutId = newId();
+  const workoutId = historyIds.workout(date);
   insertWorkout({
     id: workoutId,
     name: template?.name ?? DAYS[weekday(date)] ?? 'Séance',
@@ -344,7 +355,7 @@ function importSession(date: string, sets: readonly HistorySetRow[], bloc1: Meso
     const slot = slotFor(template, exerciseId);
     const progression = slot?.progression ?? ex.progression;
     const we: WorkoutExercise = {
-      id: newId(),
+      id: historyIds.exercise(date, exerciseId),
       workoutId,
       exerciseId,
       position: position++,
@@ -366,7 +377,7 @@ function importSession(date: string, sets: readonly HistorySetRow[], bloc1: Meso
     const tags = tagSets(progression, plain.map((s) => s.weight));
     group.forEach((s, i) => {
       const set: WorkoutSet = {
-        id: newId(),
+        id: historyIds.set(date, exerciseId, i),
         workoutExerciseId: we.id,
         position: i,
         setType: s.setType ?? tags[plain.indexOf(s)] ?? 'working',
@@ -508,8 +519,12 @@ function mergesOf(build: HistoryBuild): ImportReport['merges'] {
 
 // ---------------------------------------------------------------- entry points
 
-/** Version of the import logic; databases imported by an older one get their history refreshed. */
-export const PERSONAL_IMPORT_VERSION = 4;
+/**
+ * Version of the import logic; databases imported by an older one get their history refreshed. Safe to bump
+ * on synced devices since v5: the rebuilt history has fixed identifiers (`historyIds`), and the rebuild also
+ * removes the duplicates older random identifiers could leave behind.
+ */
+export const PERSONAL_IMPORT_VERSION = 5;
 const IMPORT_VERSION_KEY = 'personal_import_version';
 
 /** Imports program + history into the current database (expects no user data yet). */

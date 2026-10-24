@@ -357,6 +357,36 @@ describe('personal import', () => {
     expect(item(ohpSlot.we.id)?.replaces).toBeNull();
   });
 
+  it('rebuilds the history with the same identifiers on every device: no duplicates after a version bump', () => {
+    const ids = () => ({
+      workouts: db().all<{ id: string }>("SELECT id FROM workouts WHERE date <= '2026-10-04' ORDER BY id").map((r) => r.id),
+      sets: db().all<{ id: string }>("SELECT s.id FROM sets s JOIN workout_exercises we ON we.id = s.workout_exercise_id JOIN workouts w ON w.id = we.workout_id WHERE w.date <= '2026-10-04' ORDER BY s.id").map((r) => r.id),
+    });
+    const first = ids();
+    expect(first.workouts).toHaveLength(17);
+    expect(first.workouts.every((id) => id.startsWith('hist-'))).toBe(true);
+    // Another device imports on its own: same rows, same identifiers.
+    createTestDb();
+    importPersonalData();
+    expect(ids()).toEqual(first);
+    // An older import whose history came twice (other identifiers from two devices) is cleaned by the rebuild.
+    db().run('PRAGMA foreign_keys = OFF');
+    const tables = [['workouts', ['id']], ['workout_exercises', ['id', 'workout_id']], ['sets', ['id', 'workout_exercise_id']]] as const;
+    for (const prefix of ['a-', 'b-']) {
+      for (const [table, refs] of tables) {
+        const cols = db().all<{ name: string }>(`PRAGMA table_info(${table})`).map((c) => c.name);
+        const select = cols.map((c) => ((refs as readonly string[]).includes(c) ? `'${prefix}' || ${c}` : c)).join(', ');
+        db().run(`INSERT INTO ${table} (${cols.join(', ')}) SELECT ${select} FROM ${table} WHERE id LIKE 'hist-%'`);
+      }
+    }
+    for (const [table] of [...tables].reverse()) db().run(`DELETE FROM ${table} WHERE id LIKE 'hist-%'`);
+    db().run('PRAGMA foreign_keys = ON');
+    expect(count("SELECT COUNT(*) AS n FROM workouts WHERE date <= '2026-10-04'")).toBe(34);
+    setKv('personal_import_version', '4');
+    expect(upgradePersonalData()).toBe(true);
+    expect(ids()).toEqual(first);
+  });
+
   it('can be replayed and only seeds a fresh database', () => {
     expect(seedPersonalIfFresh()).toBeNull();
     const again = replaceWithPersonalData();

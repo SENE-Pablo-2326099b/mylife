@@ -27,7 +27,7 @@ import { ColumnChart } from '../ui/charts';
 import { Icon, type IconName } from '../ui/icons';
 import { Button, Card, Chip, EmptyState, Field, ProgressBar, Reveal, SectionTitle, StatTile, TextField, Toggle } from '../ui/index';
 import { NotFoundScreen, Screen } from '../ui/Screen';
-import { readMiniApps, saveMiniApp, useMiniApps } from '../ui/stats';
+import { saveMiniApp, useMiniApps } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -175,8 +175,8 @@ export function MiniAppNewPage() {
   const create = () => {
     if (!spec) return;
     if (live >= MAX_MINI_APPS) return toast({ message: `${MAX_MINI_APPS} apps au plus : supprimes-en une d’abord.` });
-    // Une app supprimée laisse une trace : la nouvelle reprend sa place (le compte ne garde pas de traces sans fin).
-    const id = Object.values(readMiniApps()).find((a) => !a.spec)?.id ?? newId();
+    // Toujours un identifiant neuf : une saisie tardive d'une app supprimée ne doit pas rejoindre la nouvelle.
+    const id = newId();
     saveMiniApp(emptyMiniApp(id, spec));
     toast({ message: `« ${spec.name} » est prête`, tone: 'gold' });
     navigate(`/mes-apps/${id}`, { replace: true });

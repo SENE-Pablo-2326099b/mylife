@@ -12,8 +12,8 @@
 import { decryptRow, encryptRow, fromB64, type RandomBytes } from './crypto';
 import { ApiError, type MyLifeApi, type Session } from './account';
 
-/** `mylife` : réglages communs à toutes les apps (apparence). */
-export type AppId = 'finances' | 'perf' | 'mylife';
+/** `mylife` : réglages communs à toutes les apps (apparence) ; `miniapps` : « Mes apps » et leurs saisies. */
+export type AppId = 'finances' | 'perf' | 'mylife' | 'miniapps';
 
 export interface PendingChange {
   tbl: string;
@@ -30,6 +30,8 @@ export interface RemoteRow {
   rid: string;
   deleted: boolean;
   row: unknown | null;
+  /** Date de la modification gardée par le serveur (utile pour une suppression, qui n'a pas de contenu). */
+  updatedAt?: number;
 }
 
 export interface SyncState {
@@ -58,6 +60,13 @@ export interface LocalStore {
    * l'appareil (mot de passe du relais…). Appelé quand un autre compte que celui de ces données se connecte.
    */
   forget?(): Promise<void>;
+  /** Modifications envoyées par passage (400 par défaut). */
+  batch?: number;
+  /**
+   * Lignes que le serveur a écartées parce que trop grosses. Elles sont acquittées (pas renvoyées tant
+   * qu'elles ne changent pas) et ne bloquent plus les autres ; l'app peut le signaler.
+   */
+  tooBig?(rows: { tbl: string; rid: string }[]): Promise<void>;
 }
 
 interface SyncResponse {
@@ -65,6 +74,8 @@ interface SyncResponse {
   cursor: number;
   more: boolean;
   accepted: number;
+  /** Absent avec un serveur plus ancien. */
+  tooBig?: { tbl: string; rid: string }[];
 }
 
 const BATCH = 400;
@@ -79,7 +90,7 @@ export async function loadState(store: LocalStore, random: RandomBytes): Promise
 }
 
 function decrypt(dek: Uint8Array, app: AppId, changes: SyncResponse['changes']): RemoteRow[] {
-  return changes.map((c) => ({ tbl: c.tbl, rid: c.rid, deleted: c.deleted, row: c.deleted || !c.payload ? null : decryptRow(dek, app, c.tbl, c.rid, c.payload) }));
+  return changes.map((c) => ({ tbl: c.tbl, rid: c.rid, deleted: c.deleted, updatedAt: c.updatedAt, row: c.deleted || !c.payload ? null : decryptRow(dek, app, c.tbl, c.rid, c.payload) }));
 }
 
 /** Ce que contient le compte pour cette app. */
@@ -165,8 +176,9 @@ export async function syncNow(store: LocalStore, api: MyLifeApi, session: Sessio
   const dek = fromB64(session.dek);
   let pushed = 0;
   let pulled = 0;
+  const batch = store.batch ?? BATCH;
   for (let guard = 0; guard < 200; guard++) {
-    const pending = await store.pending(BATCH);
+    const pending = await store.pending(batch);
     const changes = pending.map((p) => ({
       tbl: p.tbl,
       rid: p.rid,
@@ -176,12 +188,13 @@ export async function syncNow(store: LocalStore, api: MyLifeApi, session: Sessio
     }));
     const res = await api.call<SyncResponse>('/api/sync', { action: 'sync', app: store.app, device: state.device, cursor: state.cursor, changes }, session.token);
     if (pending.length) await store.ack(pending);
+    if (res.tooBig?.length) await store.tooBig?.(res.tooBig);
     if (res.changes.length) await store.apply(decrypt(dek, store.app, res.changes));
     pushed += pending.length;
     pulled += res.changes.length;
     state = { ...state, cursor: res.cursor, lastSyncAt: Date.now() };
     await store.setState(state);
-    if (!res.more && pending.length < BATCH) break;
+    if (!res.more && pending.length < batch) break;
   }
   return { pushed, pulled };
 }

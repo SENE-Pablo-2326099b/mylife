@@ -4,8 +4,8 @@ Dépôt unique de l'écosystème MyLife : l'accueil (`web/`, la seule PWA instal
 les paquets partagés (`packages/`) et trois apps (`apps/finances`, `apps/perf`, `apps/raveloc`).
 
 **Au début d'une tâche, lire `CONTEXTE.md`** (architecture, commandes, décisions, état). Puis selon le sujet :
-`docs/V3.md` (journal de la V3 : pourquoi, comment, fichiers, tests), `docs/ROADMAP.md`, `README.md`,
-`apps/perf/CLAUDE.md` pour MyPerf.
+`docs/ROADMAP-V4.md` (feuille de route en cours) et `docs/V4.md` (son journal), `docs/V3.md` (journal de la V3 :
+pourquoi, comment, fichiers, tests), `docs/ROADMAP.md`, `README.md`, `apps/perf/CLAUDE.md` pour MyPerf.
 
 ## Règles qui ne se négocient pas
 - **Rien de personnel** : aucune donnée de l'utilisateur ne doit apparaître pour un autre compte ni dans ce qui est
@@ -24,7 +24,7 @@ les paquets partagés (`packages/`) et trois apps (`apps/finances`, `apps/perf`,
 - Avant de conclure : `npm run build:all`, `npm run lint`, `npm run test:all`, et pour ce qui touche aux écrans
   `npm run e2e:all` (Chrome attendu à `/usr/bin/google-chrome`, ou `CHROME_PATH`). Les tests du serveur et de bout en
   bout tournent sur une base Postgres en mémoire (PGlite) : aucune base réelle ni secret nécessaire.
-- Noter chaque évolution importante dans `docs/V3.md` (et `CONTEXTE.md` si l'architecture change).
+- Noter chaque évolution importante dans `docs/V4.md` (et `CONTEXTE.md` si l'architecture change).
 - Messages de commit en français, descriptifs, terminés par
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 

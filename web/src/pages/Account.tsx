@@ -6,6 +6,7 @@ import { MYLIFE_APPS } from '../vendor/lumen';
 import { AccountForms, AccountOverview, type AccountStatusRow } from '../ui/account';
 import { Card, Reveal } from '../ui/index';
 import { relativeTime } from '../ui/relative';
+import { readSyncIssue } from '../ui/syncIssue';
 import { Screen } from '../ui/Screen';
 import { useSession } from '../ui/session';
 
@@ -36,6 +37,11 @@ function rows(login: string): AccountStatusRow[] {
   out.push({ label: 'myRaveLoc', detail: 'Groupes et positions chiffrés, en direct', state: 'ok' });
   const prefs = localSync('mylife');
   out.push({ label: 'Apparence', detail: prefs?.joinedAs === login ? 'La même sur tous tes appareils' : 'Bientôt la même sur tous tes appareils', state: prefs?.joinedAs === login ? 'ok' : 'busy' });
+  // Un refus du serveur qui revient à chaque passage se montre ici au lieu de bloquer en silence.
+  for (const [app, label] of [['mylife', 'Réglages communs'], ['miniapps', 'Mes apps']] as const) {
+    const issue = readSyncIssue(app);
+    if (issue) out.push({ label: `${label} : synchro en échec`, detail: `${issue.message} (${relativeTime(issue.at)})`, state: 'error' });
+  }
   return out;
 }
 

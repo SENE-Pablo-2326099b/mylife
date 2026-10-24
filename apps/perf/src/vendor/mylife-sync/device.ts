@@ -20,8 +20,9 @@ const PERSONAL_KEYS = [
   'myraveloc-errors',
   'pendingAuth',
 ];
-// Aperçus, dates de sauvegarde, compteurs et préférences du Personnage, données des espaces partagés.
-const PERSONAL_PREFIXES = ['mylife:glance:', 'mylife:backup', 'mylife:stats', 'mylife:character', 'mylife:space:', 'mylife:music', 'mylife:games', 'mylife:copilot', 'mylife:miniapps'];
+// Aperçus, dates de sauvegarde, compteurs et préférences du Personnage, données des espaces partagés, Mes apps,
+// problèmes de synchro notés.
+const PERSONAL_PREFIXES = ['mylife:glance:', 'mylife:backup', 'mylife:stats', 'mylife:character', 'mylife:space:', 'mylife:music', 'mylife:games', 'mylife:copilot', 'mylife:miniapps', 'mylife:sync-issue'];
 
 /** À appeler à chaque connexion : efface les traces d'un compte précédent (ou inconnu), puis note le nouveau. */
 export function claimDevice(login: string): void {
