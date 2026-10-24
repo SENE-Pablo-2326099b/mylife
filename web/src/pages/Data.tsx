@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { STATS_APPS, readStats } from '../vendor/lumen';
+import { HOME_APPS, STATS_APPS, readStats } from '../vendor/lumen';
+import { APP_EXPORTS } from '../appData';
 import { currentSession, webPlatform } from '../vendor/mylife-sync/web';
 import { getAppearance } from '../ui/appearance';
 import { Icon, type IconName } from '../ui/icons';
 import { Button, Card, Reveal, SectionTitle, SelectField, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { readCharacterPrefs, readGames, readMiniApps, readMusic } from '../ui/stats';
+import { readCharacterPrefs } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -38,9 +39,8 @@ export function DataPage() {
       appearance: getAppearance(),
       character: readCharacterPrefs(),
       counters: Object.fromEntries(STATS_APPS.map((a) => [a, readStats(a)])),
-      music: readMusic(),
-      games: readGames(),
-      apps: Object.values(readMiniApps()).filter((a) => a.spec),
+      // Chaque app de l'accueil, selon le registre (les espaces partagés appartiennent à leur groupe).
+      ...Object.fromEntries(HOME_APPS.filter((a) => a.exportable && APP_EXPORTS[a.id]).map((a) => [a.id, APP_EXPORTS[a.id]!()])),
     });
     toast({ message: 'Export téléchargé', tone: 'gold' });
   };

@@ -401,6 +401,8 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Ton Crew', path: '/crew', keywords: 'crew amis classement groupe inviter defi bande' },
   { app: 'home', title: 'Copilot', path: '/copilot', keywords: 'copilot ia assistant question claude conseil budget entrainement' },
   { app: 'home', title: 'MyGames', path: '/jeux', keywords: 'jeux jeu video steam heures console' },
+  { app: 'home', title: 'Mes apps', path: '/mes-apps', keywords: 'mes apps creer app sans code suivi habitude lecture sommeil eau humeur tracker' },
+  // new-app: destinations (repère du générateur, ne pas retirer)
   { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
   { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
   { app: 'home', title: 'Sorties', path: '/sorties', keywords: 'sortie festival soiree week end chaud planning sets budget partage depenses liste id' },
@@ -533,3 +535,5 @@ export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> |
 }
 export * from './pacte';
 export * from './miniapp';
+export * from './homeApps';
+// new-app: moteurs (repère du générateur, ne pas retirer)

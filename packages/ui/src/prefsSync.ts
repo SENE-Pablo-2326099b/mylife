@@ -2,6 +2,7 @@ import { loadState, syncNow, type LocalStore, type SyncState } from '../vendor/m
 import { currentSession, onSessionChange, webPlatform } from '../vendor/mylife-sync/web';
 import { STATS_APPS, parseAppearance, readStats, type StatsApp } from '../vendor/lumen';
 import { getAppearance, setAppearance, subscribeAppearance } from './appearance';
+import { syncCollections } from './collectionSync';
 import { syncMiniApps, quiet } from './miniSync';
 import { adoptCharacterPrefs, adoptGames, adoptLegacyMiniApp, adoptMusic, adoptStats, onStatsChange, readCharacterPrefs, readGames, readMiniLegacy, readMusic, writeMiniLegacy } from './stats';
 import { clearSyncIssue, noteSyncIssue } from './syncIssue';
@@ -170,10 +171,11 @@ export async function syncPrefs(): Promise<void> {
   }
 }
 
-/** Réglages communs puis « Mes apps ». */
+/** Réglages communs, « Mes apps », puis les collections des apps de l'accueil ouvertes sur cette page. */
 async function syncAll(): Promise<void> {
   await syncPrefs();
   await syncMiniApps();
+  await syncCollections();
 }
 
 let started = false;

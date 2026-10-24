@@ -12,8 +12,11 @@
 import { decryptRow, encryptRow, fromB64, type RandomBytes } from './crypto';
 import { ApiError, type MyLifeApi, type Session } from './account';
 
-/** `mylife` : réglages communs à toutes les apps (apparence) ; `miniapps` : « Mes apps » et leurs saisies. */
-export type AppId = 'finances' | 'perf' | 'mylife' | 'miniapps';
+/**
+ * `mylife` : réglages communs à toutes les apps (apparence) ; `miniapps` : « Mes apps » et leurs saisies ; et les apps
+ * de l'accueil qui ont leur propre synchro (registre `SYNC_APPS` du serveur, qui fait foi).
+ */
+export type AppId = 'finances' | 'perf' | 'mylife' | 'miniapps' | (string & {});
 
 export interface PendingChange {
   tbl: string;

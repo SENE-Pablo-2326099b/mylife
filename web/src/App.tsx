@@ -37,6 +37,8 @@ const TAB_PATHS = TABS.map((t) => t.to);
 
 // Copilot embarque le SDK de l'API Claude : chargé seulement quand on l'ouvre (l'accueil reste léger).
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
+// Les apps de l'accueil ajoutées en V4 sont chargées à la demande (contrat d'app).
+// new-app: pages (repère du générateur, ne pas retirer)
 
 /** L'accueil de MyLife : le point d'entrée de l'app installée, avec le compte et l'apparence de toutes les apps. */
 export function App() {
@@ -109,6 +111,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
                   </Suspense>
                 }
               />
+              {/* new-app: routes (repère du générateur, ne pas retirer) */}
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>

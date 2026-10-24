@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { HOME_APPS } from '../vendor/lumen';
 import { Icon } from '../ui/icons';
 import { Button, Card } from '../ui/index';
 import { useSession } from '../ui/session';
@@ -34,7 +35,7 @@ export function PrivacyPage() {
           <strong className="text-ink">Ton compte</strong> : ton identifiant (en clair, pour te reconnaître), la date de création, des empreintes de ton mot de passe et de ta clé de secours (jamais le mot de passe lui-même) et ta clé de données « emballée » (illisible sans ton mot de passe ou ta clé de secours).
         </p>
         <p>
-          <strong className="text-ink">Tes données</strong> (budget, séances, réglages, Personnage, musique, jeux) : chiffrées en AES-256-GCM sur ton appareil. Le serveur voit seulement leur taille, leur date et à quelle app elles appartiennent.
+          <strong className="text-ink">Tes données</strong> (budget, séances, réglages, Personnage, {HOME_APPS.filter((a) => !('spaces' in a.sync)).map((a) => a.privacy).join(', ')}) : chiffrées en AES-256-GCM sur ton appareil. Le serveur voit seulement leur taille, leur date et à quelle app elles appartiennent.
         </p>
         <p>
           <strong className="text-ink">Groupes, Crews et Sorties</strong> : noms, pseudos, positions, scores, réponses, dépenses sont chiffrés avec une clé de groupe qui voyage dans le lien d’invitation (jamais envoyée au serveur). Le serveur sait seulement qui est membre de quoi. Les positions de myRaveLoc sont effacées à l’arrêt du partage (12 h au plus) ; un groupe expiré est effacé entièrement.

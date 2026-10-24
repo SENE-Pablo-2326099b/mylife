@@ -19,7 +19,8 @@
     "e2e:all": "npm --prefix apps/finances run e2e && npm --prefix apps/raveloc run e2e && npm run e2e",
     "deploy:all": "npm --prefix apps/finances run deploy && npm --prefix apps/perf run deploy:web && npm --prefix apps/raveloc run deploy && npm run deploy",
     "stats:serveur": "node scripts/server-stats.mjs",
-    "support": "node scripts/support.mjs"
+    "support": "node scripts/support.mjs",
+    "new-app": "node scripts/new-app.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",

@@ -1,6 +1,6 @@
 import { m } from 'framer-motion';
 import { useState } from 'react';
-import { MYLIFE_APPS, type MyLifeApp } from '../vendor/lumen';
+import { HOME_APPS, MYLIFE_APPS, type MyLifeApp } from '../vendor/lumen';
 import { RecoveryReminder } from '../ui/account';
 import { openMyLifeApp } from '../ui/app';
 import { useGlance } from '../ui/glance';
@@ -123,38 +123,28 @@ export function HomePage() {
                 </div>
               </Card>
               <WeekRecapCard />
+              {/* Les apps de l'accueil, dans l'ordre du registre (contrat d'app : packages/lumen/src/homeApps.ts). */}
               <div className="grid grid-cols-2 gap-3">
-                <Card to="/sorties" label="Sorties : organiser à plusieurs">
-                  <Icon name="flag-fill" className="text-gold" />
-                  <p className="t-body-strong mt-1">Sorties</p>
-                  <p className="t-caption text-muted">Chaud ? Planning, budget, sac</p>
-                </Card>
-                <Card to="/crew" label="Ton Crew : classement entre amis">
-                  <Icon name="people-fill" className="text-gold" />
-                  <p className="t-body-strong mt-1">Crew</p>
-                  <p className="t-caption text-muted">Ton niveau face à tes amis</p>
-                </Card>
-                <Card to="/musique" label="MyMusique : tes stats Spotify">
-                  <Icon name="sparkles" className="text-gold" />
-                  <p className="t-body-strong mt-1">MyMusique</p>
-                  <p className="t-caption text-muted">Tes stats d’écoute</p>
-                </Card>
-                <Card to="/jeux" label="MyGames : tes heures de jeu, et où va ton temps">
-                  <Icon name="play" className="text-gold" />
-                  <p className="t-body-strong mt-1">MyGames</p>
-                  <p className="t-caption text-muted">Heures de jeu, ton temps</p>
-                </Card>
+                {HOME_APPS.filter((a) => !a.wide).map((a) => (
+                  <Card key={a.id} to={a.path} label={`${a.name} : ${a.tagline}`}>
+                    <Icon name={a.icon as IconName} className="text-gold" />
+                    <p className="t-body-strong mt-1">{a.name}</p>
+                    <p className="t-caption text-muted">{a.tagline}</p>
+                  </Card>
+                ))}
               </div>
-              <Card to="/mes-apps" label="Mes apps : crée tes propres apps, sans code">
-                <div className="flex items-center gap-3">
-                  <Icon name="apps" className="text-gold" />
-                  <span className="min-w-0 flex-1">
-                    <span className="t-body-strong block">Mes apps</span>
-                    <span className="t-small block truncate text-secondary">Lecture, sommeil, habitudes : crée les tiennes, sans code</span>
-                  </span>
-                  <Icon name="chevron-forward" className="text-muted" />
-                </div>
-              </Card>
+              {HOME_APPS.filter((a) => a.wide).map((a) => (
+                <Card key={a.id} to={a.path} label={`${a.name} : ${a.tagline}`}>
+                  <div className="flex items-center gap-3">
+                    <Icon name={a.icon as IconName} className="text-gold" />
+                    <span className="min-w-0 flex-1">
+                      <span className="t-body-strong block">{a.name}</span>
+                      <span className="t-small block truncate text-secondary">{a.tagline}</span>
+                    </span>
+                    <Icon name="chevron-forward" className="text-muted" />
+                  </div>
+                </Card>
+              ))}
             </div>
           </Reveal>
         )}
