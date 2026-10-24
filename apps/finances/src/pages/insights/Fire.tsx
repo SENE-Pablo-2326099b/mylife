@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { updateSettings } from '../../db/seed';
 import type { FireSettings } from '../../db/types';
 import { compoundSchedule, computeFire, cutsMonthly, effectiveRate, milestoneReached, monthlyNeeded, monthsToReach, passiveMonthly, reducibleSpending } from '../../domain/fire';
-import { plannedMonthlySavings } from '../../domain/plans';
 import { useRecurring } from '../../domain/useInsights';
 import { useWealth } from '../../domain/useWealth';
 import { useCategoryMap, useSettings } from '../../hooks';
@@ -14,6 +13,7 @@ import { Button, Card, Chip, Disclosure, Divider, MoneyField, ProgressBar, Revea
 import { Screen } from '../../ui/Screen';
 import { Tilt } from '../../ui/Tilt';
 import { useBreakpoint } from '../../ui/responsive';
+import { plannedSavings } from '../../domain/defaults';
 
 /**
  * Simulateur d'intérêts composés, branché sur tes données : capital de départ, épargne mensuelle,
@@ -63,7 +63,7 @@ export default function FirePage() {
   // Tes données : capital pris en compte, rythme d'épargne actuel, dépenses, impôt sur les retraits.
   const savingsAccounts = useMemo(() => w.accounts.filter((a) => a.kind === 'savings' && !a.hidden), [w.accounts]);
   const excluded = new Set(f.excludedIds);
-  const myMonthly = settings.savings.mode === 'manual' ? settings.savings.manual : plannedMonthlySavings(w.plans, w.goals);
+  const myMonthly = plannedSavings(settings);
   const me = useMemo(
     () => computeFire({ summaries: w.summaries, savingsAccounts, txs, cats, settings, today, monthly: myMonthly }),
     [w.summaries, savingsAccounts, txs, cats, settings, today, myMonthly],

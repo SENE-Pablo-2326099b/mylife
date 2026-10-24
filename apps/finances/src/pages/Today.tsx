@@ -62,7 +62,9 @@ export default function TodayPage() {
   const status = STATUS[b.status];
   // Le champ de lumière prend la couleur du budget du jour tant que cet écran est ouvert.
   const active = useTabActive();
-  const ambientTone = total && active ? (b.overrun ? 'danger' : status.tone) : null;
+  // Enveloppe dépassée mais argent réellement libre : pas un déficit, pas de rouge.
+  const realDeficit = b.overrun !== null && b.overrun.covered === null;
+  const ambientTone = total && active ? (realDeficit ? 'danger' : status.tone) : null;
   useEffect(() => {
     setAmbient(ambientTone);
     return () => setAmbient(null);
@@ -73,11 +75,13 @@ export default function TodayPage() {
   const glanceTitle = !ready
     ? null
     : b.overrun
-      ? `${b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Enveloppe dépassée'} : ${formatCents(b.overrun.deficit)}`
+      ? b.overrun.covered !== null
+        ? `Enveloppe dépassée · ${formatCents(b.overrun.covered)} encore libres`
+        : `${b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Enveloppe dépassée'} : ${formatCents(b.overrun.deficit)}`
       : b.remainingToday >= 0
         ? `${formatCents(b.remainingToday)} à dépenser aujourd’hui`
         : `${formatCents(-b.remainingToday)} de trop aujourd’hui`;
-  const glanceTone = !ready ? undefined : b.overrun || b.remainingToday < 0 ? 'danger' : status.tone;
+  const glanceTone = !ready ? undefined : realDeficit || (!b.overrun && b.remainingToday < 0) ? 'danger' : status.tone;
   useEffect(() => {
     if (!glanceTitle) return;
     const midnight = new Date();
@@ -100,8 +104,11 @@ export default function TodayPage() {
       spentThisCycle: eur(b.spentBefore + b.spentToday),
       remainingCycle: eur(b.remainingCycle),
       projectedEndOfCycle: eur(b.projection.projectedEnd),
-      plannedSavings: eur(b.envelope.savings),
+      plannedSavings: eur(b.envelope.savingsDetail.planned),
+      savedThisCycle: eur(b.envelope.savingsDetail.done),
+      savingsLeftThisCycle: eur(b.envelope.savingsDetail.left),
       overrun: b.overrun ? eur(b.overrun.deficit) : null,
+      overrunCoveredByFreeMoney: b.overrun?.covered != null,
       realFree: b.realFree === null ? null : eur(b.realFree),
       upcoming: b.upcoming.slice(0, 6).map((u) => ({ date: u.date, label: u.label, amount: eur(u.amount) })),
     });
@@ -142,9 +149,11 @@ export default function TodayPage() {
     );
   }
 
-  // Enveloppe dépassée : on montre le déficit, jamais un budget du jour négatif.
+  // Enveloppe dépassée : on montre le dépassement, jamais un budget du jour négatif. Si l'argent réellement libre le
+  // couvre, ce n'est pas un déficit : l'enveloppe reste le repère, sans rouge.
   const over = b.overrun;
-  const heroLabel = over ? (b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Déficit du cycle') : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
+  const covered = over?.covered ?? null;
+  const heroLabel = over ? (covered !== null ? 'Au-delà de l’enveloppe' : b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Déficit du cycle') : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
   const heroValue = over ? over.deficit : Math.abs(b.remainingToday);
   const p = b.projection;
 
@@ -160,7 +169,7 @@ export default function TodayPage() {
         <Card level="raised" glow={b.status === 'good'} tone={b.status === 'bad' ? 'danger' : 'neutral'} className="p-5" onClick={() => setExplain(true)} label="Comment le budget du jour est calculé">
           <Ring value={b.usedPercent / 100} tone={status.tone} size={232} label={`${status.label} : ${b.usedPercent} % du budget du jour utilisé`}>
             <span className="t-label text-muted">{heroLabel}</span>
-            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${over || b.remainingToday < 0 ? 'text-danger' : ''}`}>
+            <span className={`num mt-1 font-display text-[40px] font-bold leading-[46px] tracking-[-1.2px] ${realDeficit || (!over && b.remainingToday < 0) ? 'text-danger' : ''}`}>
               <Rolling mount text={formatCents(heroValue)} />
             </span>
             <span className="mt-2">
@@ -169,7 +178,12 @@ export default function TodayPage() {
               </Badge>
             </span>
           </Ring>
-          {over ? (
+          {over && covered !== null ? (
+            <p className="t-body mt-4 text-center text-secondary">
+              Il te reste <strong className="text-ink">{formatCents(covered)} réellement libres</strong> d’ici le {formatShort(b.cycle.end)}, charges et épargne mises de côté.
+              {b.spentToday > 0 && <> Aujourd’hui : {formatCents(b.spentToday)}.</>}
+            </p>
+          ) : over ? (
             <p className="t-body mt-4 text-center text-secondary">
               Pour ne pas l’aggraver : <strong className="text-ink">{formatCents(over.maxPerDay)} par jour</strong> d’ici le {formatShort(b.cycle.end)}.
               {b.spentToday > 0 && <> Aujourd’hui : {formatCents(b.spentToday)}.</>}
@@ -197,7 +211,7 @@ export default function TodayPage() {
 
       <div className={wide ? 'flex flex-col gap-3' : ''}>
       <Reveal index={1} className={wide ? 'grid grid-cols-1 gap-3 min-[1180px]:grid-cols-3' : 'mt-3 grid grid-cols-3 gap-2'}>
-        <StatTile label="Reste du cycle" value={formatCents(b.remainingCycle, { short: true })} tone={b.remainingCycle < 0 ? 'danger' : undefined} to="/budget" />
+        <StatTile label="Reste du cycle" value={formatCents(b.remainingCycle, { short: true })} tone={b.remainingCycle < 0 ? (realDeficit ? 'danger' : 'warning') : undefined} to="/budget" />
         <StatTile label="Jours restants" value={b.daysLeft} />
         <StatTile label="Demain" value={formatCents(b.nextDailyBudget, { short: true })} hint="par jour" />
       </Reveal>

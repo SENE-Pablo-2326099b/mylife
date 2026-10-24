@@ -190,7 +190,7 @@ describe('budget du jour', () => {
   it('enveloppe dépassée : jamais de budget négatif, le déficit et 0 € par jour', () => {
     const b = run([salary('2026-10-01'), spend('a', '2026-10-05', ENVELOPE + 4100)], '2026-10-21');
     expect(b.dailyBudget).toBe(0);
-    expect(b.overrun).toEqual({ deficit: 4100, maxPerDay: 0 });
+    expect(b.overrun).toEqual({ deficit: 4100, maxPerDay: 0, covered: null });
     expect(b.status).toBe('bad');
     expect(b.nextDailyBudget).toBe(0);
     const worse = run([salary('2026-10-01'), spend('a', '2026-10-05', ENVELOPE + 4100), spend('b', '2026-10-21', 900)], '2026-10-21');
@@ -274,5 +274,61 @@ describe('plafond réel : jamais plus que l’argent réellement libre', () => {
     const b = run(txs, '2026-10-21', { balance: 5000 });
     expect(b.dailyBudget).toBe(0);
     expect(b.overrun?.deficit).toBe(1000 + 10000 - 5000);
+  });
+});
+
+describe('un seul modèle d’argent (refonte, étape 2) : le cas réel du 22 octobre', () => {
+  // Paie de 1 700 € le 25, loyer de 255 € sans jour de prélèvement (pas encore débité), 500 € d'épargne prévue
+  // dont 370 € versés (le BTC est sauté ce mois), 1 005,26 € dépensés, 437,69 € sur le compte, 3 jours avant la paie.
+  const real: Settings = {
+    ...DEFAULT_SETTINGS,
+    payday: 25,
+    incomes: [{ id: 'paie', label: 'Paie', amount: 170000, day: 25 }],
+    fixedCharges: [{ id: 'loyer', label: 'Loyer', amount: 25500, day: null }],
+    savings: { mode: 'manual', manual: 50000 },
+    envelopeOverride: null,
+  };
+  const txs = [
+    tx({ id: 'paie', date: '2026-09-25', amount: 170000, label: 'VIR SALAIRE', categoryId: CAT.revenus }),
+    tx({ id: 'courses', date: '2026-10-10', amount: -100526, categoryId: CAT.courses }),
+    tx({ id: 'tr', date: '2026-09-27', amount: -37000, label: 'VIR TRADE REPUBLIC', categoryId: CAT.epargne }),
+  ];
+  const at = (extra: Partial<BudgetInput> = {}) => computeBudget({ txs, cats, settings: real, today: '2026-10-22', balance: 43769, upcoming: [], cashAccounts: new Set(['a']), ...extra });
+
+  it('le loyer sans jour est réservé ; l’enveloppe dépassée n’est pas un déficit quand il reste de l’argent libre', () => {
+    const b = at();
+    expect(b.envelope.savingsDetail).toEqual({ planned: 50000, done: 37000, closed: false, counted: 50000, left: 13000, kept: false });
+    expect(b.upcoming).toEqual([{ date: '2026-10-24', label: 'Loyer', amount: 25500, undated: true }]);
+    expect([b.reservedCharges, b.reservedSavings, b.realFree]).toEqual([25500, 13000, 43769 - 25500 - 13000]);
+    expect(b.fromEnvelope).toBe(94500 - 100526);
+    expect(b.overrun).toEqual({ deficit: 6026, maxPerDay: 0, covered: 5269 });
+    expect(b.status).toBe('warn');
+  });
+
+  it('« c’est tout pour ce cycle » : seul le versé compte, plus rien n’est réservé pour l’épargne', () => {
+    const b = at({ savingsClosed: { '2026-09-25': true } });
+    expect(b.envelope.savingsDetail).toMatchObject({ counted: 37000, left: 0, closed: true });
+    expect(b.envelope.total).toBe(170000 - 25500 - 37000);
+    expect(b.realFree).toBe(43769 - 25500);
+    expect(b.overrun).toBeNull();
+    expect(b.dailyBudget).toBe(Math.floor((107500 - 100526) / 3));
+  });
+
+  it('l’argent déjà sur le compte au début du cycle explique un argent libre plus haut que l’enveloppe', () => {
+    expect(at().cash).toEqual({ balance: 43769, atStart: 43769 - (170000 - 100526 - 37000) });
+    expect(at({ cashAccounts: null }).cash).toEqual({ balance: 43769, atStart: null });
+  });
+
+  it('une charge que la prévision compte déjà n’est pas réservée deux fois ; une charge débitée ne l’est plus', () => {
+    const forecast = [{ date: '2026-10-23', label: 'PRLV LOYER AGENCE', amount: 25500 }];
+    expect(at({ upcoming: forecast }).reservedCharges).toBe(25500);
+    const paid = [...txs, tx({ id: 'loyer', date: '2026-10-05', amount: -25500, label: 'PRLV LOYER', categoryId: CAT.logement })];
+    expect(computeBudget({ txs: paid, cats, settings: real, today: '2026-10-22', balance: 43769, upcoming: [] }).reservedCharges).toBe(0);
+  });
+
+  it('épargne versée au-delà du prévu : l’enveloppe retire ce qui est vraiment sorti ; le prévu tenu est noté', () => {
+    const more = [...txs, tx({ id: 'btc', date: '2026-10-02', amount: -20000, label: 'BITSTACK', categoryId: CAT.epargne })];
+    const sv = computeBudget({ txs: more, cats, settings: real, today: '2026-10-22' }).envelope.savingsDetail;
+    expect(sv).toMatchObject({ done: 57000, counted: 57000, left: 0, kept: true });
   });
 });

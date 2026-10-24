@@ -1,8 +1,7 @@
 import type { Settings, Transaction } from '../db/types';
 import { addDays, type ISODate } from '../lib/dates';
 import { weekStart, type AppStats } from '../vendor/lumen';
-import { cycleEnvelope, daySeries, payDates, resolveCycle, type Allocations, type CatMap } from './budgetEngine';
-import { CAT, plannedSavings } from './defaults';
+import { cycleEnvelope, cycleSavings, daySeries, payDates, resolveCycle, type Allocations, type CatMap, type SavingsClosed } from './budgetEngine';
 
 /**
  * Compteurs de MyFinances pour le Personnage (stat Discipline), par semaine : jours sous le budget du
@@ -17,17 +16,17 @@ export function disciplineWeeks(input: {
   settings: Settings;
   allocations: Allocations;
   dataStart: ISODate | null;
+  savingsClosed?: SavingsClosed;
   today: ISODate;
   weeks?: number;
 }): AppStats['weeks'] {
-  const { txs, cats, settings, allocations, dataStart, today } = input;
+  const { txs, cats, settings, allocations, dataStart, savingsClosed, today } = input;
   const out: AppStats['weeks'] = {};
   if (!dataStart) return out;
   const horizon = addDays(weekStart(today), -7 * ((input.weeks ?? 104) - 1));
   const from = dataStart > horizon ? dataStart : horizon;
   const yesterday = addDays(today, -1);
   const pays = payDates(txs, cats, settings);
-  const planned = plannedSavings(settings);
   const bump = (week: string, key: string) => {
     const w = (out[week] ??= {});
     w[key] = (w[key] ?? 0) + 1;
@@ -35,7 +34,7 @@ export function disciplineWeeks(input: {
 
   let cycle = resolveCycle(today, settings.payday, pays);
   for (let guard = 0; guard < 40 && cycle.end >= from; guard++) {
-    const envelope = cycleEnvelope({ txs, cats, settings, allocations, dataStart }, cycle).total;
+    const envelope = cycleEnvelope({ txs, cats, settings, allocations, dataStart, savingsClosed }, cycle).total;
     if (envelope > 0 && yesterday >= cycle.start) {
       for (const p of daySeries(txs, cats, cycle, envelope, yesterday < cycle.end ? yesterday : cycle.end)) {
         if (p.date < from) continue;
@@ -45,10 +44,7 @@ export function disciplineWeeks(input: {
       }
     }
     // Cycle terminé : l'épargne prévue a-t-elle été mise de côté ?
-    if (planned > 0 && cycle.end < today && cycle.end >= from) {
-      const saved = txs.filter((t) => t.date >= cycle.start && t.date <= cycle.end && t.amount < 0 && t.categoryId === CAT.epargne).reduce((s, t) => s - t.amount, 0);
-      if (saved >= planned) bump(weekStart(cycle.end), 'saved');
-    }
+    if (cycle.end < today && cycle.end >= from && cycleSavings({ txs, settings, savingsClosed }, cycle).kept) bump(weekStart(cycle.end), 'saved');
     cycle = resolveCycle(addDays(cycle.start, -1), settings.payday, pays);
   }
   return out;

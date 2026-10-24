@@ -5,7 +5,6 @@ import { toolInput, visibleText, type Msg, type ProposedChange } from '../assist
 import { decide, resetConversation, retry, send, setApiKey, setAssistantContext, setMode, useAssistant } from '../assistant/store';
 import { WRITE_TOOL_NAMES, type AssistantContext } from '../assistant/tools';
 import { computeFire } from '../domain/fire';
-import { plannedMonthlySavings } from '../domain/plans';
 import { useAlerts } from '../domain/useAlerts';
 import { useBudget } from '../domain/useBudget';
 import { useRecurring } from '../domain/useInsights';
@@ -14,6 +13,7 @@ import { useCategoryMap, useSettings } from '../hooks';
 import { todayISO } from '../lib/dates';
 import { Button, Card, Chip, Glass, Icon, IconButton, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
+import { plannedSavings } from '../domain/defaults';
 
 /**
  * Assistant finance : une conversation avec Claude (clé API de l'utilisateur) qui lit les données de
@@ -202,7 +202,7 @@ function useAssistantContext(): AssistantContext | null {
   const { list: recurring, txs, loaded } = useRecurring();
   const alerts = useAlerts();
   const fire = useMemo(() => {
-    const monthly = settings.savings.mode === 'manual' ? settings.savings.manual : plannedMonthlySavings(wealth.plans, wealth.goals);
+    const monthly = plannedSavings(settings);
     return computeFire({ summaries: wealth.summaries, savingsAccounts: wealth.accounts.filter((a) => a.kind === 'savings' && !a.hidden), txs, cats, settings, today, monthly });
   }, [wealth, txs, cats, settings, today]);
   if (loading || !wealth.loaded || !loaded) return null;

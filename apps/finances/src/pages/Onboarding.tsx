@@ -2,7 +2,7 @@ import { AnimatePresence, m } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { updateSettings } from '../db/seed';
-import { computeEnvelope, totalFixed, totalIncome } from '../domain/defaults';
+import { computeEnvelope, plannedSavings, totalFixed, totalIncome } from '../domain/defaults';
 import { loadDemo } from '../domain/demo';
 import { syncHolderRules } from '../domain/learn';
 import { useSettings } from '../hooks';
@@ -153,7 +153,7 @@ export default function OnboardingPage() {
                   <p className="t-label text-muted">Ton enveloppe vie courante</p>
                   <p className={`num mt-1 font-display text-[30px] font-bold tracking-[-0.8px] ${envelope <= 0 ? 'text-danger' : ''}`}>{formatCents(envelope)}</p>
                   <p className="t-small text-secondary">
-                    {formatCents(totalIncome(s))} de revenus − {formatCents(totalFixed(s))} de charges − {formatCents(s.savings.mode === 'manual' ? s.savings.manual : s.plannedSavingsAuto)} d’épargne, à dépenser sur le cycle.
+                    {formatCents(totalIncome(s))} de revenus − {formatCents(totalFixed(s))} de charges − {formatCents(plannedSavings(s))} d’épargne, à dépenser sur le cycle.
                   </p>
                 </Card>
               </>

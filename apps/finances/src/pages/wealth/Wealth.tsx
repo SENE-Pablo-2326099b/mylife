@@ -13,7 +13,6 @@ import { useWealth } from '../../domain/useWealth';
 import { useCategoryMap, useSettings } from '../../hooks';
 import { addDays, formatLong, formatShort, todayISO } from '../../lib/dates';
 import { formatCents } from '../../ui/money';
-import { plannedMonthlySavings } from '../../domain/plans';
 import { AllocationBar, LineChart, Ring } from '../../ui/charts';
 import { OrbFlash } from '../../ui/extras';
 import { Badge, Button, Card, EmptyState, Group, Icon, IconBubble, Money, ProgressBar, Reveal, Row, SectionTitle, Segmented, Sheet, StatTile, Tap, toast, useTheme } from '../../ui/index';
@@ -24,6 +23,7 @@ import { seriesColors } from '../../ui/themes';
 import { HeaderActions } from '../../components/HeaderActions';
 import { AssetForm, GoalForm, GoalMoveForm, PortfolioForm } from './forms';
 import { refreshEverything } from '../../sync/refresh';
+import { plannedSavings } from '../../domain/defaults';
 
 const NO_TX: Transaction[] = [];
 const RANGES = [
@@ -145,10 +145,10 @@ export default function WealthPage() {
 
   // Même calcul que l'écran Indépendance financière (exclusions, impôts, frais) : même date affichée.
   const fire = useMemo(() => {
-    const monthly = settings.savings.mode === 'manual' ? settings.savings.manual : plannedMonthlySavings(w.plans, w.goals);
+    const monthly = plannedSavings(settings);
     const r = computeFire({ summaries: w.summaries, savingsAccounts: w.accounts.filter((a) => a.kind === 'savings' && !a.hidden), txs, cats, settings, today, monthly });
     return { target: r.target, current: r.current, months: r.months };
-  }, [txs, cats, settings, today, w.summaries, w.accounts, w.plans, w.goals]);
+  }, [txs, cats, settings, today, w.summaries, w.accounts]);
 
   const empty = w.loaded && w.accounts.length === 0 && w.portfolios.length === 0 && w.assets.length === 0 && w.goals.length === 0;
   const totalInvest = w.summaries.reduce((s, p) => s + p.value, 0);

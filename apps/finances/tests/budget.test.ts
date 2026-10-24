@@ -76,7 +76,7 @@ describe('budget du jour', () => {
   it('enveloppe épuisée → rouge, budget du jour à 0 et déficit affiché', () => {
     const b = computeDailyBudget([tx({ id: '1', amount: -95000, date: '2026-10-01', categoryId: CAT.courses })], cats, settings, '2026-10-17');
     expect(b.dailyBudget).toBe(0);
-    expect(b.overrun).toEqual({ deficit: 95000 - 89800, maxPerDay: 0 });
+    expect(b.overrun).toEqual({ deficit: 95000 - 89800, maxPerDay: 0, covered: null });
     expect(b.status).toBe('bad');
   });
 

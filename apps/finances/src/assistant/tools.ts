@@ -11,7 +11,7 @@ import type { Category, CategoryKind, Goal, Settings, Transaction } from '../db/
 import type { Alert } from '../domain/alerts';
 import { isSpending, type BudgetState } from '../domain/budget';
 import { classifyTransactions, setManualCategory } from '../domain/classifyDb';
-import { computeEnvelope, totalFixed, totalIncome } from '../domain/defaults';
+import { computeEnvelope, plannedSavings, totalFixed, totalIncome } from '../domain/defaults';
 import type { FireState } from '../domain/fire';
 import { newRule } from '../domain/learn';
 import type { Recurring } from '../domain/recurring';
@@ -310,7 +310,7 @@ export async function runReadTool(name: string, input: Input, ctx: AssistantCont
         fixed_charges: s.fixedCharges.map((l) => ({ label: l.label, monthly: eur(l.amount), day: l.day })),
         monthly_income_total: eur(totalIncome(s)),
         monthly_fixed_total: eur(totalFixed(s)),
-        planned_monthly_savings: eur(s.savings.mode === 'manual' ? s.savings.manual : s.plannedSavingsAuto),
+        planned_monthly_savings: eur(plannedSavings(s)),
         savings_mode: s.savings.mode === 'manual' ? 'montant saisi' : 'calculé (plans + objectifs)',
         envelope_per_cycle: eur(computeEnvelope(s)),
         accounts: w.accounts.filter((a) => !a.hidden).map((a) => ({ id: a.id, name: accountNames.get(a.id), kind: a.kind ?? 'current', balance: eur(a.balance), last_sync: a.lastSyncAt ? new Date(a.lastSyncAt).toISOString() : null })),
@@ -374,6 +374,11 @@ export async function runReadTool(name: string, input: Input, ctx: AssistantCont
         next_daily_budget: eur(b.nextDailyBudget),
         remaining_cycle: eur(b.remainingCycle),
         limited_by: b.limitedBy,
+        savings_this_cycle: { planned: eur(b.envelope.savingsDetail.planned), already_saved: eur(b.envelope.savingsDetail.done), still_reserved: eur(b.reservedSavings), declared_complete: b.envelope.savingsDetail.closed },
+        real_free_until_payday: b.realFree === null ? null : eur(b.realFree),
+        envelope_overrun: b.overrun ? { amount: eur(b.overrun.deficit), covered_by_free_money: b.overrun.covered !== null } : null,
+        cash_at_cycle_start: b.cash?.atStart == null ? null : eur(b.cash.atStart),
+        reserved_until_payday: b.upcoming.map((u) => ({ label: u.label, amount: eur(u.amount), date: u.undated ? null : u.date, savings: u.savings === true })),
         projection: { pace_per_day: eur(b.projection.pace), projected_end: eur(b.projection.projectedEnd), gap_vs_ideal: eur(b.projection.gap) },
         unallocated_exceptional_income: eur(b.unallocated),
         fixed_charges: b.charges.map((c) => ({ label: c.line.label, amount: eur(c.line.amount), paid: c.paidBy !== null, paid_on: c.paidBy?.date ?? null })),
@@ -605,7 +610,7 @@ export async function prepareChange(name: string, input: Input, ctx: AssistantCo
       const envelope = input.envelope_override === null ? null : cents(input, 'envelope_override', 0, 1e8);
       const lines = [
         ...(payday !== undefined ? [`Jour de paie : ${s.payday} → ${payday}`] : []),
-        ...(savings !== undefined ? [`Épargne prévue : ${fmt(s.savings.mode === 'manual' ? s.savings.manual : s.plannedSavingsAuto)} → ${fmt(savings)}/mois`] : []),
+        ...(savings !== undefined ? [`Épargne prévue : ${fmt(plannedSavings(s))} → ${fmt(savings)}/mois`] : []),
         ...(envelope !== undefined ? [`Enveloppe vie courante : ${s.envelopeOverride === null ? 'calculée' : fmt(s.envelopeOverride)} → ${envelope === null ? 'calculée' : fmt(envelope)}`] : []),
       ];
       if (lines.length === 0) throw new ToolInputError('Aucun changement demandé');

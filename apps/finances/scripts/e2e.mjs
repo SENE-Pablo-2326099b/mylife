@@ -147,6 +147,19 @@ try {
       }
     });
 
+    await step('détail du budget : l’épargne du cycle (prévue, versée) et l’argent réellement libre, sans débordement', async () => {
+      await open('/');
+      await page.locator('main#contenu button').filter({ hasText: /€/ }).first().click();
+      const detail = page.getByRole('dialog', { name: 'Comment c’est calculé' });
+      await detail.getByText('Épargne du cycle').waitFor();
+      await detail.getByText(/prévus|versés/).first().waitFor();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow <= 1, `débordement horizontal de ${overflow} px`);
+      if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/detail-budget-${width}.png`, fullPage: false });
+      await page.keyboard.press('Escape');
+      await detail.waitFor({ state: 'detached' });
+    });
+
     await step('Aujourd’hui : opération ouverte depuis le détail du budget, reclassée, puis l’app reste utilisable', async () => {
       await open('/');
       await page.locator('main#contenu button').filter({ hasText: /€/ }).first().click();
