@@ -76,6 +76,8 @@ interface SyncResponse {
   accepted: number;
   /** Absent avec un serveur plus ancien. */
   tooBig?: { tbl: string; rid: string }[];
+  /** Curseur d'avant une purge des traces de suppression : repartir de tout le compte. */
+  resync?: boolean;
 }
 
 const BATCH = 400;
@@ -189,6 +191,22 @@ export async function syncNow(store: LocalStore, api: MyLifeApi, session: Sessio
     const res = await api.call<SyncResponse>('/api/sync', { action: 'sync', app: store.app, device: state.device, cursor: state.cursor, changes }, session.token);
     if (pending.length) await store.ack(pending);
     if (res.tooBig?.length) await store.tooBig?.(res.tooBig);
+    if (res.resync) {
+      // Absent plus longtemps que les traces de suppression ne sont gardées : toutes ses modifications partent
+      // d'abord, puis il reprend tout le contenu du compte (ce qui a été supprimé ailleurs disparaît).
+      for (let more = 0; more < 200; more++) {
+        const rest = await store.pending(batch);
+        if (!rest.length) break;
+        const changes = rest.map((p) => ({ tbl: p.tbl, rid: p.rid, updatedAt: p.updatedAt, deleted: p.row === null, payload: p.row === null ? null : encryptRow(dek, store.app, p.tbl, p.rid, p.row, random) }));
+        const r = await api.call<SyncResponse>('/api/sync', { action: 'sync', app: store.app, device: state.device, cursor: state.cursor, changes }, session.token);
+        await store.ack(rest);
+        if (r.tooBig?.length) await store.tooBig?.(r.tooBig);
+        pushed += rest.length;
+      }
+      const cursor = await downloadAll(store, api, session, state);
+      await store.setState({ ...state, cursor, lastSyncAt: Date.now() });
+      return { pushed: pushed + pending.length, pulled: -1 };
+    }
     if (res.changes.length) await store.apply(decrypt(dek, store.app, res.changes));
     pushed += pending.length;
     pulled += res.changes.length;

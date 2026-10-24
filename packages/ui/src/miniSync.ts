@@ -143,6 +143,18 @@ export const miniStore: LocalStore = {
     return out;
   },
   async replace(remote) {
+    // Tout le contenu du compte : ce qui n'y est plus (supprimé ailleurs) disparaît d'ici, sauf ce qui n'est pas
+    // encore parti d'ici.
+    const dirty = readMiniDirty();
+    const heads = new Set(remote.filter((r) => r.tbl === 'app' && !r.deleted).map((r) => r.rid));
+    const entries = new Set(remote.filter((r) => r.tbl === 'entry' && !r.deleted).map((r) => r.rid));
+    const all = readMiniApps();
+    for (const app of Object.values(all)) {
+      if (!app.spec) continue;
+      if (!heads.has(app.id) && !dirty[`app/${app.id}`]) all[app.id] = tombMiniApp(app, app.at) ?? app;
+      else all[app.id] = { ...app, entries: app.entries.filter((e) => entries.has(miniEntryRid(app.id, e.id)) || dirty[`entry/${miniEntryRid(app.id, e.id)}`]) };
+    }
+    writeMiniApps(all, false);
     await this.apply(remote);
   },
   async clearPending() {

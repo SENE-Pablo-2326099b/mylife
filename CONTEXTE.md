@@ -117,6 +117,9 @@ Pour l'APK, utiliser **2 workers** : avec 4, WSL tue la compilation faute de mé
   (réglages communs : l'apparence, les compteurs), `miniapps` (« Mes apps » : une ligne par app, une par saisie).
   Quotas `ROW_QUOTA` : seules les lignes vivantes comptent, et seules les nouvelles s'ajoutent. Une ligne trop grosse
   (plus de 200 000 caractères chiffrés) est écartée seule et renvoyée dans `tooBig` : elle ne bloque plus le lot.
+  Registre des apps et de leurs quotas : `SYNC_APPS` (`server/core.ts`) + `AppId` (sync-client). Traces de suppression
+  purgées après 90 jours par le cron du dimanche (`purgeTombstones`, table `records_purge`) ; un appareil dont le
+  curseur est plus ancien reçoit `resync` : il envoie tout ce qu'il a, puis reprend tout le contenu du compte.
   Les problèmes de synchro qui reviennent s'affichent sur la page Compte (`packages/ui/src/syncIssue.ts`).
 - `POST /api/raveloc` : API de myRaveLoc (voir § 6 bis).
 - Le même code sert en local (`server/local.ts`, `npm run local`) et dans les tests.

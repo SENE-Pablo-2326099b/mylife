@@ -37,18 +37,22 @@ export class HttpError extends Error {
 }
 
 /**
+ * Registre des apps de synchro et de leur quota (lignes vivantes gardées au plus par compte, très au-delà d'un
+ * usage réel). Déclarer une app : une ligne ici, et son nom dans `AppId` (packages/sync-client/src/engine.ts).
  * `mylife` : réglages communs à toutes les apps (apparence, compteurs du Personnage) ; `miniapps` : « Mes apps »,
  * une ligne par app et une par saisie.
  */
-export const APPS = ['finances', 'perf', 'mylife', 'miniapps'] as const;
-export type App = (typeof APPS)[number];
+export const SYNC_APPS = { finances: 100_000, perf: 100_000, mylife: 200, miniapps: 40_000 } as const;
+export type App = keyof typeof SYNC_APPS;
+export const APPS = Object.keys(SYNC_APPS) as App[];
+export const ROW_QUOTA: Record<App, number> = SYNC_APPS;
+/** Traces de suppression gardées ce temps-là, puis purgées (un appareil absent plus longtemps repart du compte). */
+export const TOMBSTONE_DAYS = 90;
 export const KDF_ITERATIONS = 200_000;
 const SESSION_DAYS = 365;
 const MAX_CHANGES = 500;
 const MAX_PAYLOAD = 200_000;
 const PULL_LIMIT = 1000;
-/** Lignes gardées au plus par compte et par app (garde-fou de stockage, très au-delà d'un usage réel). */
-export const ROW_QUOTA: Record<App, number> = { finances: 100_000, perf: 100_000, mylife: 200, miniapps: 40_000 };
 
 /** Garde-fous contre les abus (fenêtres simples, par clé). */
 export const RATES = {
@@ -88,6 +92,8 @@ export async function ensureSchema(db: Db): Promise<void> {
     PRIMARY KEY (user_id, app, tbl, rid)
   )`);
   await db.query(`CREATE INDEX IF NOT EXISTS records_by_seq ON records (user_id, app, seq)`);
+  // Dernière trace purgée par compte et par app : un curseur plus ancien a pu manquer des suppressions.
+  await db.query(`CREATE TABLE IF NOT EXISTS records_purge (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, app TEXT NOT NULL, seq BIGINT NOT NULL, PRIMARY KEY (user_id, app))`);
   await db.query(`CREATE TABLE IF NOT EXISTS auth_rate (k TEXT PRIMARY KEY, win BIGINT NOT NULL, n INTEGER NOT NULL, at BIGINT NOT NULL)`);
 }
 
@@ -424,7 +430,7 @@ export async function sync(
   db: Db,
   uid: string,
   body: Record<string, unknown>,
-): Promise<{ changes: (Change & { seq: number })[]; cursor: number; more: boolean; accepted: number; tooBig: { tbl: string; rid: string }[] }> {
+): Promise<{ changes: (Change & { seq: number })[]; cursor: number; more: boolean; accepted: number; tooBig: { tbl: string; rid: string }[]; resync?: true }> {
   const app = appOf(body);
   const device = typeof body.device === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(body.device) ? body.device : null;
   if (!device) throw new HttpError(400, 'Paramètre invalide : device');
@@ -466,6 +472,13 @@ export async function sync(
     }
   }
 
+  // Curseur d'avant une purge : des suppressions ont pu disparaître du serveur avant que l'appareil les voie.
+  // Ses modifications sont reçues ci-dessus ; il doit ensuite repartir de tout le compte.
+  if (cursor > 0) {
+    const { rows: p } = await db.query<{ seq: string | number }>('SELECT seq FROM records_purge WHERE user_id = $1 AND app = $2', [uid, app]);
+    if (p[0] && cursor < Number(p[0].seq)) return { changes: [], cursor, more: false, accepted, tooBig, resync: true };
+  }
+
   // Les lignes écrites en dernier par cet appareil sont déjà chez lui : pas d'écho.
   const { rows } = await db.query<RecordRow>(
     'SELECT tbl, rid, seq, updated_at, deleted, payload FROM records WHERE user_id = $1 AND app = $2 AND seq > $3 AND device <> $4 ORDER BY seq LIMIT $5',
@@ -491,3 +504,20 @@ export async function sync(
     tooBig,
   };
 }
+
+/**
+ * Purge des traces de suppression plus vieilles que `TOMBSTONE_DAYS` (cron du dimanche). On note pour chaque compte
+ * et app la dernière purgée : un appareil dont le curseur est plus ancien repart de tout le compte (`resync`).
+ */
+export async function purgeTombstones(db: Db, now = Date.now()): Promise<{ purged: number }> {
+  const before = now - TOMBSTONE_DAYS * 86_400_000;
+  await db.query(
+    `INSERT INTO records_purge (user_id, app, seq)
+     SELECT user_id, app, MAX(seq) FROM records WHERE deleted = true AND updated_at < $1 GROUP BY user_id, app
+     ON CONFLICT (user_id, app) DO UPDATE SET seq = GREATEST(records_purge.seq, EXCLUDED.seq)`,
+    [before],
+  );
+  const res = await db.query('DELETE FROM records WHERE deleted = true AND updated_at < $1 RETURNING 1', [before]);
+  return { purged: res.rows.length };
+}
+

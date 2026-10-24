@@ -46,7 +46,7 @@ Seulement ce qui ralentirait ou casserait la suite. Le reste des petites imperfe
 | # | Chantier | Effort | Pourquoi maintenant |
 |---|---|---|---|
 | 1.1 | **Lignes de « Mes apps » trop grosses** (bug trouvé) : **fait** | M | Ça bloque toute la synchro commune, en silence |
-| 1.2 | **Apps de synchro déclarables et quota de `mylife`** | M | Sans ça, aucune nouvelle app ne peut ranger ses données proprement |
+| 1.2 | **Apps de synchro déclarables et quota de `mylife`** : **fait** | M | Sans ça, aucune nouvelle app ne peut ranger ses données proprement |
 | 1.3 | **Doublons d'import MyPerf** (risque connu, `CONTEXTE.md` § 3) : **fait** | S à M | Une montée de version fabriquerait des séances en double sur chaque appareil |
 | 1.4 | **Refonte MyFinances, étapes 2 à 5** | M + M + S + S | Discipline, Pacte et Copilot lisent des chiffres faux tant que l'épargne a trois définitions |
 | 1.5 | **Fin de l'étape 9** : page légale, VAPID, premiers inconnus | S + S + temps | On ne choisit pas les nouvelles apps sans avoir écouté de vrais utilisateurs |
@@ -68,7 +68,7 @@ Seulement ce qui ralentirait ou casserait la suite. Le reste des petites imperfe
 - **Terminé quand** : un test remplit une app à 1 500 saisies de 8 textes longs, et la synchro passe. Une ligne trop
   grosse forcée n'empêche plus les autres de passer. L'ancien format se relit et se migre tout seul.
 
-### 1.2 Apps de synchro déclarables et quota de `mylife`
+### 1.2 Apps de synchro déclarables et quota de `mylife` : **fait** (journal : `docs/V4.md`)
 - **Constat** : la liste des apps de synchro est figée (`APPS = ['finances', 'perf', 'mylife']`), et tout ce qui est
   né en V3 range ses données dans `mylife`, qui a un quota de 200 lignes. Le calcul du quota compte en plus chaque mise
   à jour comme une ligne nouvelle (`COUNT + changes.length`), et les lignes supprimées aussi. Près du plafond, une simple

@@ -164,6 +164,27 @@ describe('Mes apps : une ligne par saisie (app `miniapps`)', () => {
     expect(app('vieux01').entries.map((e) => e.id)).toEqual(['old1', 'old2']);
   }, 60_000);
 
+  it('absent plus de 90 jours : ses saisies partent, puis il repart du compte et voit les suppressions purgées', async () => {
+    on('a');
+    let lect = emptyMiniApp('lecture2', MINI_TEMPLATES[0]!, 1000);
+    lect = addEntry(lect, { id: 'vieille', day: '2026-01-10', values: { pages: 4 } }, 2000);
+    saveMiniApp(addEntry(lect, { id: 'gardee', day: '2026-01-11', values: { pages: 9 } }, 2001));
+    await sync('a');
+    await sync('b');
+    // A supprime une saisie ; B, hors ligne depuis longtemps, en note une nouvelle.
+    on('a');
+    saveMiniApp(removeEntry(app('lecture2'), 'vieille', 3000));
+    await sync('a');
+    on('b');
+    saveMiniApp(addEntry(app('lecture2'), { id: 'horsligne', day: '2026-05-01', values: { pages: 2 } }, Date.now()));
+    // Le cron purge les traces de plus de 90 jours (la suppression datée 3000 en fait partie).
+    expect((await core.purgeTombstones(srv.db as unknown as core.Db)).purged).toBeGreaterThan(0);
+    await sync('b');
+    expect(app('lecture2').entries.map((e) => e.id)).toEqual(['gardee', 'horsligne']);
+    await sync('a');
+    expect(app('lecture2').entries.map((e) => e.id)).toEqual(['gardee', 'horsligne']);
+  }, 60_000);
+
   it('une saisie arrivée avant la description de son app attend, puis la rejoint', async () => {
     on('e');
     await miniStore.apply([{ tbl: 'entry', rid: 'tardive1.x1', deleted: false, row: { app: 'tardive1', entry: { id: 'x1', day: '2026-10-01', values: { pages: 3 }, at: 10 } } }]);
@@ -202,6 +223,22 @@ describe('serveur : une ligne trop grosse ne bloque plus les autres, quota juste
     await syncNow(store, srv.api, session, random);
     expect(seen).toEqual(['r1']);
     expect(queue).toEqual([]);
+  });
+
+  it('purge des traces : seules les vieilles partent ; un curseur d’avant la purge doit repartir du compte', async () => {
+    const db = srv.db as unknown as core.Db;
+    const old = Date.now() - 100 * 86_400_000;
+    await core.sync(db, uid(), { app: 'mylife', device: 'device-1', cursor: 0, changes: [row('vivante'), { ...row('vieille', '', true), updatedAt: old }, row('recente', '', true)] });
+    const before = (await core.sync(db, uid(), { app: 'mylife', device: 'device-2', cursor: 0 })).cursor;
+    expect(await core.purgeTombstones(db)).toEqual({ purged: 1 });
+    const { rows } = await srv.db.query<{ rid: string }>("SELECT rid FROM records WHERE app = 'mylife' ORDER BY rid");
+    expect(rows.map((r) => r.rid)).toEqual(['recente', 'vivante']);
+    // Un appareil qui s'était arrêté avant la trace purgée : ses modifications passent, puis il doit tout reprendre.
+    const stale = await core.sync(db, uid(), { app: 'mylife', device: 'device-3', cursor: 1, changes: [row('depuis')] });
+    expect(stale).toMatchObject({ resync: true, accepted: 1, changes: [] });
+    // Un appareil à jour, ou neuf (curseur 0), continue normalement.
+    expect((await core.sync(db, uid(), { app: 'mylife', device: 'device-2', cursor: before })).resync).toBeUndefined();
+    expect((await core.sync(db, uid(), { app: 'mylife', device: 'device-4', cursor: 0 })).resync).toBeUndefined();
   });
 
   it('le quota ne compte que les lignes vivantes et vraiment nouvelles', async () => {
