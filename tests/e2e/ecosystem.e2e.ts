@@ -942,6 +942,50 @@ describe('MyLife, une seule app', () => {
     await ctx2.close();
   });
 
+  it('MyChef à deux : la liste partagée avec le foyer, ce que l’un coche entre dans le garde-manger de l’autre', async () => {
+    const signIn = async (p: Page, login: string) => {
+      await p.goto(`${server.url}/`);
+      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+      await p.getByLabel('Identifiant').fill(login);
+      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+      await p.getByRole('button', { name: 'Se connecter' }).click();
+      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    };
+    const [ctxA, a] = await device();
+    await ctxA.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await signIn(a, LOGIN);
+    await a.goto(`${server.url}/chef`);
+    await a.getByText('Lessive').waitFor({ timeout: 30_000 });
+    await a.getByRole('button', { name: 'Partager avec mon foyer' }).click();
+    await a.getByText('Liste du foyer').waitFor({ timeout: 20_000 });
+    const link = (await a.getByText(/\/rejoindre#espace=/).textContent())!.trim();
+    // Ta liste est devenue celle du foyer.
+    await a.getByText('Lessive').waitFor();
+    const [ctxB, b] = await device();
+    await signIn(b, `${LOGIN}-crew`);
+    await b.goto(link);
+    await b.getByText('Invitation à la liste de courses du foyer').waitFor({ timeout: 20_000 });
+    await b.getByRole('button', { name: 'Rejoindre' }).click();
+    await b.getByRole('heading', { name: 'MyChef' }).waitFor();
+    await b.getByText('Lessive').waitFor({ timeout: 20_000 });
+    await b.getByLabel('Ajouter à la liste').fill('Pain');
+    await b.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await shot(b, '39-chef-foyer');
+    // A voit le pain (synchro de l'espace) et le coche au magasin.
+    await expect.poll(async () => { await a.reload(); return a.getByText('Pain', { exact: true }).count(); }, { timeout: 30_000, interval: 2000 }).toBeGreaterThan(0);
+    await a.getByRole('checkbox', { name: 'Pain : à prendre' }).click();
+    await a.getByRole('checkbox', { name: 'Pain : pris' }).waitFor();
+    // Chez B, la coche arrive et le pain entre dans son garde-manger.
+    await expect.poll(async () => { await b.reload(); return b.getByRole('checkbox', { name: 'Pain : pris' }).count(); }, { timeout: 30_000, interval: 2000 }).toBe(1);
+    await b.goto(`${server.url}/chef?vue=stock`);
+    await b.getByRole('heading', { name: 'Placard' }).waitFor();
+    // Il se garde 2 jours : il est au placard et dans « À finir vite ».
+    await b.getByRole('heading', { name: 'À finir vite' }).waitFor();
+    expect(await b.getByRole('button', { name: /^Pain/ }).count()).toBe(2);
+    await ctxA.close();
+    await ctxB.close();
+  });
+
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
     // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
     const [anon, a] = await device();

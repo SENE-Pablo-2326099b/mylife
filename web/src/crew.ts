@@ -26,17 +26,19 @@ interface CrewState {
   crews: Space[];
   /** Les Sorties (espaces de type « sortie »). */
   sorties: Space[];
+  /** Les listes communes (espaces de type « liste » : la liste de courses du foyer, MyChef). */
+  lists: Space[];
   error: string | null;
 }
 
-let state: CrewState = { status: 'idle', uid: null, crews: [], sorties: [], error: null };
+let state: CrewState = { status: 'idle', uid: null, crews: [], sorties: [], lists: [], error: null };
 const listeners = new Set<() => void>();
 const set = (patch: Partial<CrewState>) => {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 };
 
-onSessionChange(() => set({ status: 'idle', uid: null, crews: [], sorties: [], error: null }));
+onSessionChange(() => set({ status: 'idle', uid: null, crews: [], sorties: [], lists: [], error: null }));
 
 export function useCrews(): CrewState {
   return useSyncExternalStore(
@@ -54,7 +56,7 @@ export async function loadCrews(): Promise<CrewState> {
   if (state.status !== 'ready') set({ status: 'loading', error: null });
   try {
     const r = await c.list();
-    set({ status: 'ready', uid: r.uid, crews: r.spaces.filter((s) => s.kind === 'crew'), sorties: r.spaces.filter((s) => s.kind === 'sortie'), error: null });
+    set({ status: 'ready', uid: r.uid, crews: r.spaces.filter((s) => s.kind === 'crew'), sorties: r.spaces.filter((s) => s.kind === 'sortie'), lists: r.spaces.filter((s) => s.kind === 'liste'), error: null });
   } catch (e) {
     set({ status: state.crews.length ? 'ready' : 'error', error: e instanceof Error ? e.message : String(e) });
   }

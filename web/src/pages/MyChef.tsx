@@ -10,14 +10,20 @@ import {
   isRunningLow,
   localToday,
   newPantryItem,
+  parseShoppingItem,
   staplesToBuy,
   stockAfterPurchase,
   suggestFoods,
   type Level,
   type PantryItem,
   type Place,
+  type ShoppingItem,
 } from '../vendor/lumen';
+import type { Space } from '../vendor/mylife-sync';
 import { pantry, shopping } from '../myChefData';
+import { CREW_URL, client, loadCrews, useCrews } from '../crew';
+import { forgetSpace, useSpaceData, writeSpace } from '../spaceSync';
+import { useSession } from '../ui/session';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, Chip, EmptyState, Group, Reveal, Row, SectionTitle, Segmented, SelectField, Sheet, TextField, ToggleRow, toast } from '../ui/index';
 import { Screen } from '../ui/Screen';
@@ -36,6 +42,140 @@ function when(expires: string, today: string): { text: string; tone: 'danger' | 
   if (d === 1) return { text: 'demain', tone: 'warning' };
   if (d <= 3) return { text: `dans ${d} jours`, tone: 'warning' };
   return { text: `jusqu’au ${new Date(`${expires}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`, tone: 'muted' };
+}
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const STOCKED_KEY = 'mylife:app:chef:stocked';
+function readStocked(): Record<string, number> {
+  try {
+    return (JSON.parse(localStorage.getItem(STOCKED_KEY) ?? '{}') as Record<string, number>) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+interface ListItem {
+  id: string;
+  value: ShoppingItem;
+}
+
+/**
+ * La liste de courses : la tienne (synchronisée entre tes appareils), ou celle de ton foyer (espace chiffré de type
+ * « liste », lignes ouvertes : chaque membre ajoute, coche, retire ; hors ligne d'abord).
+ */
+function useShoppingList(): { items: ListItem[]; put: (id: string, v: ShoppingItem) => void; remove: (id: string) => void; shared: Space | null; members: number; uid: string | null } {
+  const crews = useCrews();
+  useEffect(() => {
+    if (crews.status === 'idle') void loadCrews();
+  }, [crews.status]);
+  const space = crews.lists[0];
+  const data = useSpaceData(space);
+  const personal = shopping.useList();
+  if (space && crews.uid) {
+    const uid = crews.uid;
+    const items = data.records.filter((r) => r.tbl === 'item').flatMap((r) => {
+      const v = parseShoppingItem(r.row);
+      return v ? [{ id: r.rid, value: v }] : [];
+    });
+    return { items, put: (id, v) => writeSpace(space, uid, 'item', id, v, true), remove: (id) => writeSpace(space, uid, 'item', id, null, true), shared: space, members: data.members.length, uid };
+  }
+  return { items: personal, put: (id, v) => shopping.put(id, v), remove: (id) => shopping.remove(id), shared: null, members: 0, uid: crews.uid };
+}
+
+async function shareLink(link: string): Promise<void> {
+  if (navigator.share) {
+    try {
+      return await navigator.share({ title: 'Courses du foyer', text: 'Rejoins notre liste de courses sur MyLife', url: link });
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(link);
+    toast({ message: 'Lien copié : envoie-le à ton foyer', tone: 'gold' });
+  } catch {
+    toast({ message: 'Copie impossible : sélectionne le lien affiché' });
+  }
+}
+
+/** Partager la liste avec son foyer (ou la quitter). */
+function FoyerCard({ list }: { list: ReturnType<typeof useShoppingList> }) {
+  const session = useSession();
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  const invite = async (space: Space) => {
+    const c = client();
+    if (!c) return;
+    const r = await c.invite(space, CREW_URL());
+    setLink(r.link);
+    await shareLink(r.link);
+  };
+  const share = async () => {
+    const c = client();
+    if (!c || !list.uid || !session) return;
+    setBusy(true);
+    try {
+      const pseudo = session.login.charAt(0).toUpperCase() + session.login.slice(1);
+      const space = await c.create('liste', 'Courses du foyer', pseudo, list.uid);
+      // Ta liste devient celle du foyer.
+      for (const i of shopping.list()) writeSpace(space, list.uid, 'item', i.id, i.value, true);
+      for (const i of shopping.list()) shopping.remove(i.id);
+      await loadCrews();
+      await invite(space);
+    } catch (e) {
+      toast({ message: errorText(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const leave = async () => {
+    const c = client();
+    const space = list.shared;
+    if (!c || !space) return;
+    if (!leaving) return setLeaving(true);
+    setBusy(true);
+    try {
+      await c.leave(space);
+      forgetSpace(space.id);
+      await loadCrews();
+      toast({ message: 'Tu as quitté la liste du foyer' });
+    } catch (e) {
+      toast({ message: errorText(e) });
+    } finally {
+      setBusy(false);
+      setLeaving(false);
+    }
+  };
+  if (!list.shared)
+    return (
+      <Card>
+        <p className="t-body-strong">Faire les courses à plusieurs</p>
+        <p className="t-small mt-1 text-secondary">Partage ta liste avec ton foyer : chacun ajoute et coche, même sans réseau au magasin, et ce que l’un coche entre dans le garde-manger de chacun. Chiffrée : le serveur ne la lit pas.</p>
+        <Button className="mt-3 w-full" variant="secondary" icon="people" disabled={busy || !list.uid} onClick={() => void share()}>
+          {busy ? 'Un instant…' : 'Partager avec mon foyer'}
+        </Button>
+      </Card>
+    );
+  const others = Math.max(0, list.members - 1);
+  return (
+    <Card>
+      <div className="flex items-center gap-2">
+        <Icon name="people-fill" className="text-gold" />
+        <p className="t-body-strong min-w-0 flex-1">Liste du foyer</p>
+        <span className="t-caption text-muted">{others ? `avec ${others} personne${others > 1 ? 's' : ''}` : 'personne d’autre pour l’instant'}</span>
+      </div>
+      {link && <p className="t-caption mt-2 break-all text-muted">{link}</p>}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button size="sm" variant="secondary" icon="share" disabled={busy} onClick={() => void invite(list.shared!).catch((e) => toast({ message: errorText(e) }))}>
+          Inviter
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void leave()}>
+          {leaving ? 'Confirmer' : 'Quitter'}
+        </Button>
+      </div>
+    </Card>
+  );
 }
 
 /** Champ d'ajout avec les suggestions du catalogue. */
@@ -67,30 +207,52 @@ function AddFood({ label, onAdd }: { label: string; onAdd: (name: string) => voi
 }
 
 function Shopping({ today }: { today: string }) {
-  const list = shopping.useList();
+  const src = useShoppingList();
+  const list = src.items;
   const stock = pantry.useList();
   const groups = byAisle(list);
   const done = list.filter((l) => l.value.done);
+  const get = (id: string) => list.find((l) => l.id === id)?.value ?? null;
   // Les indispensables bientôt finis passent tout seuls sur la liste.
   useEffect(() => {
-    for (const p of staplesToBuy(stock, list)) shopping.put(foodId(p.value.name), { v: 1, name: p.value.name, aisle: p.value.aisle, auto: true });
-  }, [stock, list]);
+    for (const p of staplesToBuy(stock, list)) src.put(foodId(p.value.name), { v: 1, name: p.value.name, aisle: p.value.aisle, auto: true });
+  }, [stock, list]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Coché = acheté : l'article entre dans le garde-manger, une seule fois par coche, que ce soit toi ou un membre du foyer.
+  useEffect(() => {
+    const stocked = readStocked();
+    let changed = false;
+    for (const l of list) {
+      if (!l.value.done || !l.value.doneAt || stocked[l.id] === l.value.doneAt) continue;
+      pantry.put(l.id, stockAfterPurchase(pantry.get(l.id), l.value, today));
+      stocked[l.id] = l.value.doneAt;
+      changed = true;
+    }
+    if (changed) {
+      try {
+        localStorage.setItem(STOCKED_KEY, JSON.stringify(Object.fromEntries(Object.entries(stocked).slice(-500))));
+      } catch {
+        /* stockage plein */
+      }
+    }
+  }, [list, today]);
   const add = (name: string) => {
     const id = foodId(name);
-    const existing = shopping.get(id);
+    const existing = get(id);
     if (existing && !existing.done) return toast({ message: `${existing.name} est déjà sur la liste` });
     const food = findFood(name);
-    shopping.put(id, { v: 1, name: food?.name ?? name, aisle: food?.aisle ?? 'autre' });
+    src.put(id, { v: 1, name: food?.name ?? name, aisle: food?.aisle ?? 'autre' });
   };
   const toggle = (id: string) => {
-    const item = shopping.get(id);
+    const item = get(id);
     if (!item) return;
-    shopping.put(id, { ...item, done: !item.done });
-    // Coché = acheté : il entre dans le garde-manger.
-    if (!item.done) pantry.put(id, stockAfterPurchase(pantry.get(id), item, today));
+    const { done: _d, doneAt: _a, ...rest } = item;
+    void _d;
+    void _a;
+    src.put(id, item.done ? rest : { ...rest, done: true, doneAt: Date.now() });
   };
   return (
     <div className="flex flex-col gap-3">
+      <FoyerCard list={src} />
       <AddFood label="Ajouter à la liste" onAdd={add} />
       {list.length === 0 ? (
         <Card>
@@ -123,7 +285,7 @@ function Shopping({ today }: { today: string }) {
           variant="ghost"
           icon="trash"
           onClick={() => {
-            for (const d of done) shopping.remove(d.id);
+            for (const d of done) src.remove(d.id);
             toast({ message: `${done.length} article${done.length > 1 ? 's' : ''} retiré${done.length > 1 ? 's' : ''} de la liste (déjà dans le garde-manger)` });
           }}
         >
@@ -241,7 +403,7 @@ export function MyChefPage() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get('vue') === 'stock' ? 'stock' : 'courses';
   const today = localToday();
-  const toBuy = shopping.useList().filter((l) => !l.value.done).length;
+  const toBuy = useShoppingList().items.filter((l) => !l.value.done).length;
   const soon = expiringSoon(pantry.useList(), today).length;
   return (
     <Screen stack title="MyChef" kicker="Courses et garde-manger" mood="today" back="/">

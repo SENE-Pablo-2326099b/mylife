@@ -143,6 +143,8 @@ export interface ShoppingItem {
   auto?: boolean;
   /** Coché en magasin. */
   done?: boolean;
+  /** Quand il a été coché (liste partagée : chaque membre le met une fois dans son garde-manger). */
+  doneAt?: number;
 }
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -184,6 +186,7 @@ export function parseShoppingItem(raw: unknown): ShoppingItem | null {
     ...(qty !== undefined && text(o.unit, 12) ? { unit: text(o.unit, 12) } : {}),
     ...(o.auto === true ? { auto: true } : {}),
     ...(o.done === true ? { done: true } : {}),
+    ...(o.done === true && typeof o.doneAt === 'number' ? { doneAt: o.doneAt } : {}),
   };
 }
 
