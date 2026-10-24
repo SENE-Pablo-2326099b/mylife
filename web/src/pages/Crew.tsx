@@ -163,7 +163,7 @@ export function CrewJoinPage() {
   const invite = useMemo(() => parseSpaceInvite(location.hash), [location.hash]);
   const [info, setInfo] = useState<{ sid: string; kind: string; name: string; member: boolean } | null>(null);
   const target = (sid: string, kind: string) => (kind === 'sortie' ? `/sorties/${sid}` : kind === 'liste' ? '/chef' : `/crew/${sid}`);
-  const what = info?.kind === 'sortie' ? 'une Sortie' : info?.kind === 'liste' ? 'la liste de courses' : 'un Crew';
+  const what = info?.kind === 'sortie' ? 'une Sortie' : info?.kind === 'liste' ? 'un foyer' : 'un Crew';
   const [error, setError] = useState<string | null>(invite ? null : 'Ce lien d’invitation est incomplet. Demande-le à nouveau.');
   const [pseudo, setPseudo] = useState(defaultPseudo(session?.login));
   const [busy, setBusy] = useState(false);
@@ -206,10 +206,10 @@ export function CrewJoinPage() {
         {info && (
           <>
             <Card level="raised" glow>
-              <p className="t-label text-gold">{info.kind === 'sortie' ? 'Invitation à une sortie' : info.kind === 'liste' ? 'Invitation à la liste de courses du foyer' : 'Invitation à un Crew'}</p>
+              <p className="t-label text-gold">{info.kind === 'sortie' ? 'Invitation à une sortie' : info.kind === 'liste' ? 'Invitation à rejoindre un foyer' : 'Invitation à un Crew'}</p>
               <p className="t-title">Rejoindre « {info.name} » ?</p>
               <div className="mt-3 flex flex-col gap-3">
-                <TextField label={info.kind === 'sortie' ? 'Ton pseudo pour cette sortie' : info.kind === 'liste' ? 'Ton pseudo pour cette liste' : 'Ton pseudo dans ce Crew'} value={pseudo} onChange={setPseudo} />
+                <TextField label={info.kind === 'sortie' ? 'Ton pseudo pour cette sortie' : info.kind === 'liste' ? 'Ton pseudo dans ce foyer' : 'Ton pseudo dans ce Crew'} value={pseudo} onChange={setPseudo} />
                 <Button icon="people" disabled={busy} onClick={() => void join()}>
                   {busy ? 'Un instant…' : 'Rejoindre'}
                 </Button>
@@ -221,7 +221,7 @@ export function CrewJoinPage() {
               </Card>
             ) : info.kind === 'liste' ? (
               <Card>
-                <p className="t-small text-secondary">La liste de courses est chiffrée : seuls les membres du foyer la voient, pas même le serveur. Ce que l’un coche entre dans le garde-manger de chacun.</p>
+                <p className="t-small text-secondary">Liste de courses, dépenses communes, corvées et factures sont chiffrées : seuls les membres du foyer les voient, pas même le serveur.</p>
               </Card>
             ) : (
               <Privacy />

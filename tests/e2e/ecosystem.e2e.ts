@@ -964,7 +964,7 @@ describe('MyLife, une seule app', () => {
     const [ctxB, b] = await device();
     await signIn(b, `${LOGIN}-crew`);
     await b.goto(link);
-    await b.getByText('Invitation à la liste de courses du foyer').waitFor({ timeout: 20_000 });
+    await b.getByText('Invitation à rejoindre un foyer').waitFor({ timeout: 20_000 });
     await b.getByRole('button', { name: 'Rejoindre' }).click();
     await b.getByRole('heading', { name: 'MyChef' }).waitFor();
     await b.getByText('Lessive').waitFor({ timeout: 20_000 });
@@ -1112,6 +1112,46 @@ describe('MyLife, une seule app', () => {
     await p.getByText('« Cinéma » et « Dîner famille » se chevauchent').waitFor();
     await shot(p, '42-agenda');
     await ctx.close();
+  });
+
+  it('MyFoyer à deux : une corvée chacun son tour, une dépense commune et qui doit quoi, la stat Foyer', async () => {
+    const signIn = async (p: Page, login: string) => {
+      await p.goto(`${server.url}/`);
+      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+      await p.getByLabel('Identifiant').fill(login);
+      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+      await p.getByRole('button', { name: 'Se connecter' }).click();
+      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    };
+    // Le foyer créé pour la liste de courses (test MyChef à deux) est celui de MyFoyer.
+    const [ctxA, a] = await device();
+    await signIn(a, LOGIN);
+    await a.goto(`${server.url}/foyer`);
+    await a.getByText('Avec 1 personne').waitFor({ timeout: 30_000 });
+    await a.getByRole('button', { name: 'Ajouter' }).nth(1).click();
+    await a.getByLabel('Quelle corvée').fill('Poubelles');
+    await a.getByRole('button', { name: 'Ajouter', exact: true }).last().click();
+    // Le tour commence par celui qui l'ajoute.
+    await a.getByText('ton tour', { exact: false }).waitFor();
+    await a.getByRole('button', { name: 'Ajouter' }).first().click();
+    await a.getByLabel('Quelle dépense').fill('Courses');
+    await a.getByLabel('Montant (€)').fill('30');
+    await a.getByRole('button', { name: 'Ajouter', exact: true }).last().click();
+    await a.getByText('payé par toi, partagé par tous').waitFor();
+    await shot(a, '43-foyer');
+    // Chez B : la dépense est partagée (B doit la moitié), la corvée est au tour de A.
+    const [ctxB, b] = await device();
+    await signIn(b, `${LOGIN}-crew`);
+    await b.goto(`${server.url}/foyer`);
+    await b.getByText(/Tu dois 15,00/).waitFor({ timeout: 30_000 });
+    await b.getByText(/Poubelles pour/).waitFor();
+    // A fait sa corvée : elle compte pour sa stat Foyer.
+    await a.getByRole('button', { name: 'Fait' }).click();
+    await a.getByText('Faite').waitFor();
+    await a.goto(`${server.url}/personnage`);
+    await a.getByText('Foyer').first().waitFor({ timeout: 20_000 });
+    await ctxA.close();
+    await ctxB.close();
   });
 
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {

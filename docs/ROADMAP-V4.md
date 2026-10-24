@@ -331,7 +331,7 @@ rien, comme le relais Steam. Les événements sont chiffrés dans le compte.
 **Terminé quand** : un agenda ICS importé, des événements de trois apps, un conflit détecté et une séance déplacée par
 action validée.
 
-## 3.3 MyFoyer : MyLife à la maison (effort L)
+## 3.3 MyFoyer : MyLife à la maison (effort L) : **fait** (journal : `docs/V4.md`)
 **Quoi** : la vie commune d'un foyer (couple, coloc, famille), sur un espace chiffré :
 - **dépenses communes** permanentes avec un solde « qui doit quoi », sur le moteur de budget de la Sortie
   (`packages/lumen/src/sortie.ts`) et le budget à deux (2.2) ;

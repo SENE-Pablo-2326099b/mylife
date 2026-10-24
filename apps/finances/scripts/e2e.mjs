@@ -109,8 +109,9 @@ try {
 
     await step('Aujourd’hui : budget du jour et bloc « à faire »', async () => {
       await open('/');
-      // Selon l'heure, la démo a déjà une dépense du jour : « Reste » ou « Dépassé aujourd'hui ».
-      await page.getByText(/(Reste|Dépassé) aujourd’hui/).first().waitFor();
+      // Selon le jour et l'heure, la démo a déjà une dépense du jour (« Reste » ou « Dépassé aujourd'hui »), ou son
+      // enveloppe est dépassée (libellés de OVERRUN_LABEL).
+      await page.getByText(/(Reste|Dépassé) aujourd’hui|Au-delà de l’enveloppe|Manque d’ici la paie|Enveloppe dépassée/).first().waitFor();
       await page.getByText('À faire').first().waitFor();
     });
 

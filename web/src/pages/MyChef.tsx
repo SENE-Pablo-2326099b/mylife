@@ -26,8 +26,9 @@ import { TicketImport } from './ChefTicket';
 import { formatCents } from '../ui/money';
 import { ChefRecipes } from './ChefRecipes';
 import { ChefWeek } from './ChefWeek';
-import { CREW_URL, client, loadCrews, useCrews } from '../crew';
-import { forgetSpace, useSpaceData, writeSpace } from '../spaceSync';
+import { loadCrews, useCrews } from '../crew';
+import { useSpaceData, writeSpace } from '../spaceSync';
+import { createFoyer, inviteFoyer, leaveFoyer } from '../foyerSpace';
 import { useSession } from '../ui/session';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, Chip, EmptyState, Group, Reveal, Row, SectionTitle, Segmented, SelectField, Sheet, TextField, ToggleRow, toast } from '../ui/index';
@@ -87,46 +88,21 @@ function useShoppingList(): { items: ListItem[]; put: (id: string, v: ShoppingIt
   return { items: personal, put: (id, v) => shopping.put(id, v), remove: (id) => shopping.remove(id), shared: null, members: 0, uid: crews.uid };
 }
 
-async function shareLink(link: string): Promise<void> {
-  if (navigator.share) {
-    try {
-      return await navigator.share({ title: 'Courses du foyer', text: 'Rejoins notre liste de courses sur MyLife', url: link });
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return;
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(link);
-    toast({ message: 'Lien copié : envoie-le à ton foyer', tone: 'gold' });
-  } catch {
-    toast({ message: 'Copie impossible : sélectionne le lien affiché' });
-  }
-}
-
 /** Partager la liste avec son foyer (ou la quitter). */
 function FoyerCard({ list }: { list: ReturnType<typeof useShoppingList> }) {
   const session = useSession();
   const [busy, setBusy] = useState(false);
   const [link, setLink] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
-  const invite = async (space: Space) => {
-    const c = client();
-    if (!c) return;
-    const r = await c.invite(space, CREW_URL());
-    setLink(r.link);
-    await shareLink(r.link);
-  };
+  const invite = async (space: Space) => setLink(await inviteFoyer(space));
   const share = async () => {
-    const c = client();
-    if (!c || !list.uid || !session) return;
+    if (!list.uid || !session) return;
     setBusy(true);
     try {
-      const pseudo = session.login.charAt(0).toUpperCase() + session.login.slice(1);
-      const space = await c.create('liste', 'Courses du foyer', pseudo, list.uid);
+      const space = await createFoyer(list.uid, session.login);
       // Ta liste devient celle du foyer.
       for (const i of shopping.list()) writeSpace(space, list.uid, 'item', i.id, i.value, true);
       for (const i of shopping.list()) shopping.remove(i.id);
-      await loadCrews();
       await invite(space);
     } catch (e) {
       toast({ message: errorText(e) });
@@ -135,16 +111,13 @@ function FoyerCard({ list }: { list: ReturnType<typeof useShoppingList> }) {
     }
   };
   const leave = async () => {
-    const c = client();
     const space = list.shared;
-    if (!c || !space) return;
+    if (!space) return;
     if (!leaving) return setLeaving(true);
     setBusy(true);
     try {
-      await c.leave(space);
-      forgetSpace(space.id);
-      await loadCrews();
-      toast({ message: 'Tu as quitté la liste du foyer' });
+      await leaveFoyer(space);
+      toast({ message: 'Tu as quitté le foyer' });
     } catch (e) {
       toast({ message: errorText(e) });
     } finally {

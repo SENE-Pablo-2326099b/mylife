@@ -405,6 +405,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'MyObjectifs', path: '/objectifs', keywords: 'objectifs objectif but annee cible progression rythme' },
   { app: 'home', title: 'MyChef', path: '/chef', keywords: 'chef courses liste garde manger frigo placard cuisine repas recette peremption' },
   { app: 'home', title: 'MyAgenda', path: '/calendrier', keywords: 'agenda calendrier semaine rendez vous evenement google ics conflit' },
+  { app: 'home', title: 'MyFoyer', path: '/foyer', keywords: 'foyer coloc couple famille depenses communes corvees factures loyer menage' },
   // new-app: destinations (repère du générateur, ne pas retirer)
   { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
   { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
@@ -547,4 +548,5 @@ export * from './recipes';
 export * from './mealplan';
 export * from './ticket';
 export * from './calendrier';
+export * from './foyer';
 // new-app: moteurs (repère du générateur, ne pas retirer)

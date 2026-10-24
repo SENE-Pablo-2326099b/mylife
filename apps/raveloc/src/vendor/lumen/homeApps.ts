@@ -40,6 +40,7 @@ export const HOME_APPS: readonly HomeAppInfo[] = [
   { id: 'objectifs', name: 'MyObjectifs', path: '/objectifs', icon: 'flag', tagline: 'Tes objectifs, mesurés par tes apps', storage: ['mylife:app:objectifs:'], sync: { app: 'objectifs' }, exportable: true, privacy: 'tes objectifs (titre, cible, date limite)' },
   { id: 'chef', name: 'MyChef', path: '/chef', icon: 'leaf', tagline: 'Courses, garde-manger, repas de la semaine', storage: ['mylife:app:chef:'], sync: { app: 'chef' }, exportable: true, privacy: 'ton garde-manger et ta liste de courses' },
   { id: 'calendrier', name: 'MyAgenda', path: '/calendrier', icon: 'calendar', tagline: 'Ton agenda, rempli par tes apps', storage: ['mylife:app:calendrier:'], sync: { app: 'calendrier' }, exportable: true, privacy: 'tes agendas importés (lien ICS et événements)' },
+  { id: 'foyer', name: 'MyFoyer', path: '/foyer', icon: 'home', tagline: 'Dépenses communes, corvées, factures', storage: ['mylife:space:'], sync: { spaces: true }, exportable: false, privacy: 'les dépenses communes, corvées et factures de ton foyer', stat: 'foyer' },
   // new-app: entrées (repère du générateur, ne pas retirer)
 ];
 
