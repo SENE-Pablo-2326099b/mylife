@@ -4,6 +4,7 @@ import {
   PLACES,
   byAisle,
   daysUntil,
+  estimateList,
   expiringSoon,
   findFood,
   foodId,
@@ -20,7 +21,9 @@ import {
   type ShoppingItem,
 } from '../vendor/lumen';
 import type { Space } from '../vendor/mylife-sync';
-import { listItemFor, pantry, shopping } from '../myChefData';
+import { listItemFor, pantry, prices, shopping } from '../myChefData';
+import { TicketImport } from './ChefTicket';
+import { formatCents } from '../ui/money';
 import { ChefRecipes } from './ChefRecipes';
 import { ChefWeek } from './ChefWeek';
 import { CREW_URL, client, loadCrews, useCrews } from '../crew';
@@ -256,6 +259,7 @@ function Shopping({ today }: { today: string }) {
     <div className="flex flex-col gap-3">
       <FoyerCard list={src} />
       <AddFood label="Ajouter à la liste" onAdd={add} />
+      <ListCost list={list} />
       {list.length === 0 ? (
         <Card>
           <EmptyState icon="leaf" title="Liste vide" body="Ajoute ce qu’il te faut. Marque tes indispensables dans le garde-manger : ils reviendront tout seuls quand ils seront bientôt finis." />
@@ -333,7 +337,22 @@ function PantryEditor({ id, item, onClose }: { id: string; item: PantryItem; onC
   );
 }
 
-function Pantry({ today }: { today: string }) {
+/** Coût estimé de la liste, avec les prix retenus des tickets. */
+function ListCost({ list }: { list: ListItem[] }) {
+  const known = prices.useList();
+  if (!known.length || !list.some((l) => !l.value.done)) return null;
+  const e = estimateList(list, new Map(known.map((p) => [p.id, p.value])));
+  if (!e.priced) return null;
+  return (
+    <p className="t-small px-1 text-secondary">
+      Environ <strong className="text-ink">{formatCents(e.total)}</strong> pour {e.priced} article{e.priced > 1 ? 's' : ''}
+      {e.unknown > 0 && <> ({e.unknown} sans prix connu)</>}, d’après tes derniers tickets.
+    </p>
+  );
+}
+
+function Pantry({ today, onBought }: { today: string; onBought: (ids: string[]) => void }) {
+  const [ticketOpen, setTicketOpen] = useState(false);
   const items = pantry.useList();
   const [open, setOpen] = useState<string | null>(null);
   const soon = expiringSoon(items, today);
@@ -367,6 +386,10 @@ function Pantry({ today }: { today: string }) {
   return (
     <div className="flex flex-col gap-3">
       <AddFood label="Ajouter au garde-manger" onAdd={add} />
+      <Button variant="secondary" icon="upload" onClick={() => setTicketOpen(true)}>
+        Importer un ticket de caisse
+      </Button>
+      <TicketImport open={ticketOpen} onClose={() => setTicketOpen(false)} bought={onBought} />
       {soon.length > 0 && (
         <Reveal>
           <SectionTitle action={<Badge tone="warning">{soon.length}</Badge>}>À finir vite</SectionTitle>
@@ -427,7 +450,7 @@ export function MyChefPage() {
             { value: 'semaine', label: 'Semaine' },
           ]}
         />
-        {tab === 'courses' ? <Shopping today={today} /> : tab === 'stock' ? <Pantry today={today} /> : tab === 'recettes' ? <ChefRecipes addToList={addToList} /> : <ChefWeek addToList={addToList} />}
+        {tab === 'courses' ? <Shopping today={today} /> : tab === 'stock' ? <Pantry today={today} onBought={(ids) => list.items.filter((i) => ids.includes(i.id) && !i.value.done).forEach((i) => list.remove(i.id))} /> : tab === 'recettes' ? <ChefRecipes addToList={addToList} /> : <ChefWeek addToList={addToList} />}
       </div>
     </Screen>
   );

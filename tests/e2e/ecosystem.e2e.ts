@@ -1042,6 +1042,54 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
+  it('MyChef ticket et Copilot : un ticket collé range les articles et retient les prix ; Copilot (simulé) propose un ajout à la liste, validé', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.goto(`${server.url}/chef?vue=stock`);
+    await p.getByRole('button', { name: 'Importer un ticket de caisse' }).click();
+    await p.getByLabel('Texte du ticket').fill('MON MAGASIN\nLESSIVE LIQUIDE 2L   6,49\nPATES PENNE 500G   1,15\nTOTAL   7,64\nCB   7,64');
+    await p.getByRole('button', { name: 'Lire le ticket' }).click();
+    await p.getByRole('button', { name: 'Ranger 2 articles' }).click();
+    await p.getByText(/2 articles rangés/).waitFor();
+    // Les prix retenus estiment la liste (la lessive y était : elle en sort, achetée).
+    await p.getByRole('radio', { name: /^Courses/ }).click();
+    await p.getByLabel('Ajouter à la liste').fill('Pâtes');
+    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await p.getByText(/d’après tes derniers tickets/).waitFor({ timeout: 20_000 });
+    // Copilot propose d'ajouter des œufs à la liste ; validé, MyChef l'exécute aussitôt.
+    let n = 0;
+    await p.route('https://api.anthropic.com/**', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      n += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: `msg_c${n}`, type: 'message', role: 'assistant', model: body.model, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 },
+          stop_reason: n === 1 ? 'tool_use' : 'end_turn',
+          content: n === 1 ? [{ type: 'tool_use', id: 'toolu_chef', name: 'propose_action', input: { kind: 'chef.addToList', summary: 'Ajouter 6 œufs à la liste', params: { name: 'Œufs', qty: 6 } } }] : [{ type: 'text', text: 'Je te propose d’ajouter des œufs.' }],
+        }),
+      });
+    });
+    await p.goto(`${server.url}/copilot`);
+    await p.getByLabel('Clé API').fill('sk-ant-test-e2e');
+    await p.getByRole('button', { name: 'Enregistrer la clé' }).click();
+    await p.getByLabel('Ta question').fill('Ajoute des œufs');
+    await p.getByRole('button', { name: 'Demander' }).click();
+    await p.getByText('Ajouter 6 œufs à la liste').waitFor({ timeout: 20_000 });
+    await p.getByRole('button', { name: 'Valider' }).click();
+    await p.getByText('Fait par MyChef.').waitFor();
+    await p.unroute('https://api.anthropic.com/**');
+    await p.goto(`${server.url}/chef`);
+    await p.getByText('6 pièce').or(p.getByText(/^6\s*$/)).or(p.getByRole('button', { name: /^Œufs/ })).first().waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
     // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
     const [anon, a] = await device();

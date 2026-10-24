@@ -3,6 +3,8 @@ import { enqueueAction, parseActionSpec, pendingActions, readActions, runPending
 import { addEntry, emptyMiniApp, MINI_TEMPLATES } from '../packages/lumen/src/miniapp';
 import { advance, userMessage, type CopilotSources } from '../web/src/copilot';
 import { runHomeActions } from '../web/src/actionsHome';
+import { runChefActions } from '../web/src/actionsChef';
+import { plan, shopping } from '../web/src/myChefData';
 import { readMiniApps, saveMiniApp } from '../web/src/ui/stats';
 
 /** Actions validées (V4, F1) : Copilot propose, l'utilisateur valide, l'app exécute ; tout est annulable. */
@@ -95,3 +97,29 @@ describe('l’accueil exécute « Mes apps », et l’annulation défait', () =>
     expect(readActions().find((a) => a.id === 'h2')).toMatchObject({ status: 'failed', error: expect.stringMatching(/nombre/) });
   });
 });
+
+describe('MyChef exécute ses actions (liste, repas), et l’annulation défait', () => {
+  it('ajouter à la liste puis retirer ; prévoir un repas puis revenir à l’état d’avant', async () => {
+    expect(parseActionSpec({ kind: 'chef.planMeal', summary: 'x', params: { day: '2026-10-26', slot: 'goûter', recipeId: 'fournie-1' } }).error).toMatch(/slot/);
+    enqueueAction({ kind: 'chef.addToList', summary: 'Ajouter des œufs', params: { name: 'oeufs', qty: 6 } }, 'c1');
+    await runChefActions();
+    expect(shopping.get('oeuf')).toMatchObject({ name: 'Œufs', qty: 6, aisle: 'frais' });
+    const add = readActions().find((a) => a.id === 'c1')!;
+    expect(add.undo).toMatchObject({ kind: 'chef.removeFromList', params: { itemId: 'oeuf' } });
+    // Déjà sur la liste : l'action échoue, avec la raison.
+    enqueueAction({ kind: 'chef.addToList', summary: 'x', params: { name: 'Œufs' } }, 'c2');
+    await runChefActions();
+    expect(readActions().find((a) => a.id === 'c2')).toMatchObject({ status: 'failed', error: expect.stringMatching(/déjà sur la liste/) });
+    enqueueAction(add.undo!, 'c1:annule');
+    await runChefActions();
+    expect(shopping.get('oeuf')).toBeNull();
+
+    enqueueAction({ kind: 'chef.planMeal', summary: 'Omelette lundi soir', params: { day: '2026-10-26', slot: 'soir', recipeId: 'fournie-1' } }, 'c3');
+    await runChefActions();
+    expect(plan.get('2026-10-26-soir')).toMatchObject({ title: 'Omelette', recipeId: 'fournie-1' });
+    enqueueAction(readActions().find((a) => a.id === 'c3')!.undo!, 'c3:annule');
+    await runChefActions();
+    expect(plan.get('2026-10-26-soir')).toBeNull();
+  });
+});
+

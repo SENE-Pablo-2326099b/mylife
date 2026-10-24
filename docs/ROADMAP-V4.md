@@ -352,7 +352,7 @@ les corvées faites, jamais les montants. Pas de classement entre colocataires.
 **Terminé quand** : un foyer à trois comptes de bout en bout : liste cochée hors ligne puis synchronisée, une dépense
 commune répartie et rapprochée de la banque, une corvée tournante avec rappel.
 
-## 3.4 MyChef : courses, garde-manger, recettes et repas de la semaine (effort L+, en 4 paliers)
+## 3.4 MyChef : courses, garde-manger, recettes et repas de la semaine (effort L+, en 4 paliers) : **fait** (journal : `docs/V4.md`)
 **Quoi** : l'app de la cuisine du quotidien. Elle sait ce que tu as chez toi, te dit ce que tu peux cuisiner avec,
 prévoit tes repas de la semaine et en déduit ce qu'il faut acheter. Elle est bâtie sur une boucle qui tourne toute seule
 une fois lancée :

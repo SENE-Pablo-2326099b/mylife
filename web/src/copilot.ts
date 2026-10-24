@@ -71,6 +71,8 @@ export interface CopilotSources {
   miniApps: MiniApp[];
   /** MyObjectifs : ses objectifs (facultatif : absent, l'outil le dit). */
   objectives?: Objective[];
+  /** MyChef : un résumé de la cuisine (garde-manger, péremptions, liste, semaine, recettes classées). */
+  kitchen?: Record<string, unknown> | null;
 }
 
 export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, MyRave), la musique (MyMusique), le jeu (MyGames), ses propres petites apps de suivi (« Mes apps » : lecture, sommeil, habitudes…) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
@@ -78,7 +80,7 @@ export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qu
 Ce que tu fais :
 - Tu réponds aux questions de l'utilisateur sur sa vie à partir de SES données, que tu lis avec tes outils. Lis avant de répondre : ne devine jamais un chiffre.
 - Tu croises les apps : un achat face au budget et à l'épargne, une semaine d'entraînement face à une sortie prévue, le temps passé à jouer face au sport.
-- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf), noter une saisie dans une de ses apps (Mes apps). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training, apps et champs de get_my_apps), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
+- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf), noter une saisie dans une de ses apps (Mes apps), ajouter un aliment à la liste de courses ou prévoir un repas (MyChef). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training, apps et champs de get_my_apps), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
 
 Règles :
 - Réponds en français, tutoie, sois concret et bref : quelques phrases ou une courte liste. Les montants en euros, les dates en clair.
@@ -105,15 +107,16 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   { name: 'get_time_split', description: 'Où va le temps : minutes de sport (séances MyPerf), de musique (MyMusique) et de jeu (MyGames) sur les N dernières semaines (1 à 12).', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_objectives', description: 'MyObjectifs : les objectifs de l’utilisateur (titre, ce qui compte, cible, date limite), où il en est, ce que le rythme régulier attendait aujourd’hui, en avance ou en retard, atteint ou non.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'get_kitchen', description: 'MyChef : le garde-manger (aliments, niveau, lieu, date limite), ce qui périme bientôt, la liste de courses, les repas prévus de la semaine, et les recettes classées (identifiant, faisable ou ce qui manque, si elles sauvent ce qui périme).', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_agenda', description: 'Agenda commun de toutes les apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
   {
     name: 'propose_action',
     description:
-      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ) ; miniapp.addEntry (params : appId de get_my_apps, day AAAA-MM-JJ, values { identifiant de champ: valeur }). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
+      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ) ; miniapp.addEntry (params : appId de get_my_apps, day AAAA-MM-JJ, values { identifiant de champ: valeur }) ; chef.addToList (params : name, qty et unit facultatifs) ; chef.planMeal (params : day AAAA-MM-JJ, slot midi ou soir, recipeId de get_kitchen → recipes). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
     input_schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['finances.skipRecurring', 'perf.movePlanned', 'miniapp.addEntry'] },
+        kind: { type: 'string', enum: ['finances.skipRecurring', 'perf.movePlanned', 'miniapp.addEntry', 'chef.addToList', 'chef.planMeal'] },
         params: { type: 'object' },
         summary: { type: 'string' },
       },
@@ -204,6 +207,8 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
         }),
       );
     }
+    case 'get_kitchen':
+      return src.kitchen ? json(src.kitchen) : { content: 'MyChef est vide sur cet appareil : l’utilisateur peut y noter son garde-manger et ses courses (accueil → MyChef).', isError: true };
     case 'get_agenda': {
       const days = Math.max(1, Math.min(35, typeof input.days === 'number' ? Math.round(input.days) : 7));
       const to = new Date(`${src.today}T12:00:00`);

@@ -6,9 +6,9 @@
  * Rien ne s'exécute sans validation : une proposition de Copilot n'entre jamais seule dans la boîte.
  */
 
-export type ActionApp = 'finances' | 'perf' | 'home';
+export type ActionApp = 'finances' | 'perf' | 'home' | 'chef';
 
-export type ActionKind = 'finances.skipRecurring' | 'perf.movePlanned' | 'miniapp.addEntry' | 'miniapp.removeEntry';
+export type ActionKind = 'finances.skipRecurring' | 'perf.movePlanned' | 'miniapp.addEntry' | 'miniapp.removeEntry' | 'chef.addToList' | 'chef.removeFromList' | 'chef.planMeal' | 'chef.clearMeal';
 
 export interface ActionSpec {
   kind: ActionKind;
@@ -34,9 +34,13 @@ export const ACTION_APP: Record<ActionKind, ActionApp> = {
   'perf.movePlanned': 'perf',
   'miniapp.addEntry': 'home',
   'miniapp.removeEntry': 'home',
+  'chef.addToList': 'chef',
+  'chef.removeFromList': 'chef',
+  'chef.planMeal': 'chef',
+  'chef.clearMeal': 'chef',
 };
 
-export const ACTION_APP_NAME: Record<ActionApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Mes apps' };
+export const ACTION_APP_NAME: Record<ActionApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Mes apps', chef: 'MyChef' };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[A-Za-z0-9_:.+-]{1,200}$/;
@@ -78,6 +82,28 @@ export function parseActionSpec(raw: unknown): ParsedAction {
       const entryId = str(p.entryId, 32);
       if (!/^[a-z0-9]{6,32}$/.test(appId) || !/^[A-Za-z0-9_-]{1,32}$/.test(entryId)) return { error: 'miniapp.removeEntry : appId et entryId.' };
       return { action: { kind, summary, params: { appId, entryId } } };
+    }
+    case 'chef.addToList': {
+      const name = str(p.name, 60);
+      const qty = typeof p.qty === 'number' && p.qty > 0 && p.qty < 100_000 ? Math.round(p.qty * 100) / 100 : undefined;
+      if (!name) return { error: 'chef.addToList : name (l’aliment), qty et unit facultatifs.' };
+      return { action: { kind, summary, params: { name, ...(qty !== undefined ? { qty } : {}), ...(qty !== undefined && str(p.unit, 12) ? { unit: str(p.unit, 12) } : {}) } } };
+    }
+    case 'chef.removeFromList': {
+      const itemId = str(p.itemId, 64);
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(itemId)) return { error: 'chef.removeFromList : itemId.' };
+      return { action: { kind, summary, params: { itemId } } };
+    }
+    case 'chef.planMeal': {
+      const day = str(p.day, 10);
+      const recipeId = str(p.recipeId, 64);
+      if (!DATE.test(day) || (p.slot !== 'midi' && p.slot !== 'soir') || !/^[A-Za-z0-9_-]{1,64}$/.test(recipeId)) return { error: 'chef.planMeal : day (AAAA-MM-JJ), slot (midi ou soir), recipeId (de get_kitchen → recipes).' };
+      return { action: { kind, summary, params: { day, slot: p.slot, recipeId } } };
+    }
+    case 'chef.clearMeal': {
+      const day = str(p.day, 10);
+      if (!DATE.test(day) || (p.slot !== 'midi' && p.slot !== 'soir')) return { error: 'chef.clearMeal : day et slot.' };
+      return { action: { kind, summary, params: { day, slot: p.slot } } };
     }
     default:
       return { error: `Action inconnue : ${String(o.kind)}. Possibles : ${Object.keys(ACTION_APP).join(', ')}.` };

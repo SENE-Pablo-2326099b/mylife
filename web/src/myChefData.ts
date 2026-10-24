@@ -1,4 +1,4 @@
-import { STARTER_RECIPES, findFood, foodId, parsePantryItem, parsePlannedMeal, parseRecipe, parseShoppingItem, type Recipe } from './vendor/lumen';
+import { STARTER_RECIPES, findFood, foodId, parsePantryItem, parsePlannedMeal, parsePrice, parseRecipe, parseShoppingItem, type Recipe } from './vendor/lumen';
 import { defineCollection } from './ui/collectionSync';
 
 /**
@@ -38,3 +38,6 @@ export const plan = defineCollection({ app: 'chef', name: 'plan', parse: parsePl
 export function withStarters(mine: readonly { id: string; value: Recipe }[]): { id: string; value: Recipe; mine: boolean }[] {
   return [...mine.map((m) => ({ id: m.id, value: m.value, mine: true })), ...STARTER_RECIPES.map((r, k) => ({ id: `fournie-${k}`, value: r, mine: false }))];
 }
+
+/** Les prix retenus des tickets (prix d'une unité, par aliment) : le coût estimé de la liste. */
+export const prices = defineCollection({ app: 'chef', name: 'prices', parse: parsePrice, max: 1500 });
