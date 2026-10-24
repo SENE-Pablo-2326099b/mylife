@@ -8,7 +8,7 @@ navigation rangée. Une étape à la fois, avec un arrêt pour tester après cha
 | 1. Filet de sécurité (points de restauration) | **fait** (24/10/2026) |
 | 2. Un seul modèle d'argent (cycle, argent libre, épargne) | **fait** (24/10/2026) |
 | 3. Une seule liste de récurrents (revenus, charges, abonnements, investissements) | **fait** (24/10/2026) |
-| 4. Navigation et réglages remis en ordre | à faire |
+| 4. Navigation et réglages remis en ordre | **fait** (24/10/2026) |
 | 5. Vocabulaire et affichage cohérents | à faire |
 
 ## Ce qui ne va pas (constat de départ)
@@ -192,4 +192,41 @@ règles de rapprochement (10 % + 1 € et 5 jours pour la prévision, 20 % et mo
 - Un même commerçant qui prélève deux montants différents chaque mois est vu comme un seul récurrent (comme avant).
 - Pour un détecté seul (pas dans les réglages), « sauter ce mois » le retire de la prévision et des réservations, mais
   pas de l'enveloppe (qui ne compte que les charges des réglages).
+
+---
+
+## Étape 4 : navigation et réglages remis en ordre
+
+### Pourquoi
+Prévision et Récurrents étaient cachés en bas du Budget (« Aller plus loin ») ; Réglages mélangeait de vrais réglages avec
+des écrans (Banques, Assistant, import Trade Republic) ; le compte apparaissait à deux endroits ; certains écrans
+allumaient le mauvais onglet.
+
+### Comment (décisions, choix du 24/10 : les 5 onglets restent)
+- **Budget** : deux tuiles en haut du cycle en cours, **Prévision** (le solde attendu sur tes comptes à la paie, en rouge
+  si un jour passe sous zéro) et **Récurrents** (ce qui reste à passer d'ici la paie, et combien). Le bloc « Aller plus
+  loin » disparaît.
+- **Banques** : une puce « Banques » dans Opérations (d'où viennent les opérations), en plus des Espaces et de la palette.
+- **Réglages = seulement des réglages** : Budget (revenus, charges et épargne ; catégories ; règles ; seuils d'alerte) et
+  App (apparence ; sauvegarde et données). Retirés : Compte MyLife et « Ouvrir MyPerf » (dans les Espaces, communs à
+  toutes les apps), Banques (Opérations, Espaces), Assistant (appui long sur l'orbe, Espaces, palette), import Trade
+  Republic (déjà dans Patrimoine). Une phrase dit où les trouver.
+- **Onglets** : Alertes et Assistant allument Aujourd'hui ; Banques allume Opérations ; Réglages n'allume que ses écrans.
+
+### Fichiers
+| Fichier | Rôle |
+|---|---|
+| `src/pages/Cycle.tsx` | Tuiles Prévision et Récurrents ; « Aller plus loin » retiré |
+| `src/pages/Transactions.tsx` | Puce Banques |
+| `src/pages/Settings.tsx` | Réglages rangés en deux familles, sans doublons |
+| `src/App.tsx` | Onglet allumé par chaque écran |
+
+### Tests
+- De bout en bout (3 tailles) : tuiles du Budget, Banques depuis Opérations, Réglages sans compte ni banques, « Seuils
+  d'alerte ».
+- Totaux MyFinances : 351 unitaires, 55 étapes de bout en bout : tout vert.
+
+### Comment tester
+Budget : les deux tuiles sous la carte du cycle. Opérations : la puce Banques. Réglages : plus que des réglages ; ton
+compte est dans les Espaces (en haut à droite).
 

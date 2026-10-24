@@ -213,6 +213,20 @@ try {
       await page.getByRole('dialog', { name: 'Rechercher et agir' }).waitFor({ state: 'detached' });
     });
 
+    await step('navigation : Prévision et Récurrents en haut du Budget, Banques depuis Opérations, Réglages sans doublons', async () => {
+      await open('/budget');
+      await page.locator('main#contenu a[href$="/previsions"]').first().waitFor();
+      await page.locator('main#contenu a[href$="/recurrents"]').first().waitFor();
+      if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/budget-${width}.png` });
+      await open('/operations');
+      await page.getByRole('button', { name: 'Banques' }).click();
+      await page.waitForURL((u) => u.pathname.endsWith('/synchro'));
+      await open('/reglages');
+      expect((await page.locator('main#contenu').getByText('Compte MyLife', { exact: true }).count()) === 0, 'le compte est dans les Espaces, pas dans les Réglages');
+      expect((await page.locator('main#contenu a[href$="/synchro"]').count()) === 0, 'les banques ne sont plus dans les Réglages');
+      await page.getByText('Seuils d’alerte').waitFor();
+    });
+
     await step('lanceur MyLife : apps et état des synchros', async () => {
       await open('/');
       await page.getByRole('button', { name: /Espaces MyLife/ }).first().click();

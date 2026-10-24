@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TxEditor } from '../components/TxEditor';
 import { TxRow } from '../components/TxRow';
 import { db } from '../db/db';
@@ -26,6 +26,7 @@ const NO_TX: Transaction[] = [];
 
 export default function TransactionsPage() {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const settings = useSettings();
   const categories = useCategories();
   const accounts = useAccounts();
@@ -111,6 +112,9 @@ export default function TransactionsPage() {
               {unclassified} à classer
             </Chip>
           )}
+          <Chip icon="bank" onClick={() => navigate('/synchro')}>
+            Banques
+          </Chip>
         </div>
         <p className="t-small px-0.5 text-secondary">
           {filtered.length} opération{filtered.length > 1 ? 's' : ''} · solde <Money cents={total} sign tone="auto" className="text-[13px]" />

@@ -8,6 +8,7 @@ import { categoryBreakdown, summarize } from '../domain/cycleStats';
 import { totalFixed } from '../domain/defaults';
 import { cycleEnvelope, payDates, resolveCycle } from '../domain/budgetEngine';
 import { useBudgetContext } from '../domain/useBudget';
+import { useForecast, useRecurringList } from '../domain/useInsights';
 import { personBalances } from '../domain/people';
 import { useAccounts, useCategoryMap, useSettings } from '../hooks';
 import { addDays, cycleLength, formatCycle, formatShort, todayISO, type Cycle, type ISODate } from '../lib/dates';
@@ -17,7 +18,7 @@ import { seriesColors } from '../ui/themes';
 import { TxRow } from '../components/TxRow';
 import { biggestExpenses, cycleHeatmap, cycleHistory, topMerchants, weekdayProfile } from '../domain/cycleInsights';
 import { useRecentTransactions } from '../domain/recentTransactions';
-import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, Tap, useTheme } from '../ui/index';
+import { Card, Disclosure, EmptyState, Group, IconButton, Metric, Money, ProgressBar, Reveal, Row, SectionTitle, StatTile, Tap, useTheme } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Pending } from '../ui/extras';
 import { HeaderActions } from '../components/HeaderActions';
@@ -56,6 +57,10 @@ export default function CyclePage() {
   const isCurrent = offset === 0;
   const until = isCurrent ? today : cycle.end;
   const context = useBudgetContext();
+  // Prévision et récurrents du cycle en cours, visibles en haut du Budget.
+  const { forecast } = useForecast(current.end, current);
+  const { items: recurringItems } = useRecurringList(current);
+  const comingUp = recurringItems.filter((i) => !i.paid && !i.skipped && i.nextDate !== null && i.nextDate >= today && i.nextDate <= current.end);
 
   const inWindow = prev.start >= addDays(today, -455);
   const olderRaw = useLiveQuery(() => (inWindow ? NO_TX : db.transactions.where('date').between(prev.start, cycle.end, true, true).toArray()), [inWindow, prev.start, cycle.end]);
@@ -177,6 +182,13 @@ export default function CyclePage() {
           </div>
         </Card>
       </Reveal>
+
+      {isCurrent && (
+        <Reveal index={1} className="mt-3 grid grid-cols-2 gap-2">
+          <StatTile label="Prévision" value={forecast ? euros(forecast.end) : '—'} hint={forecast ? `sur tes comptes le ${formatShort(current.end)}` : 'connecte une banque'} tone={forecast && forecast.lowest.balance < 0 ? 'danger' : undefined} to="/previsions" />
+          <StatTile label="Récurrents" value={String(comingUp.length)} hint={comingUp.length ? `à venir d’ici la paie, ${euros(comingUp.reduce((s, i) => s + (i.kind === 'income' ? 0 : i.amount), 0))}` : 'rien d’ici la paie'} to="/recurrents" />
+        </Reveal>
+      )}
 
       <Reveal index={1}>
         <SectionTitle action={<span className="t-caption text-muted">touche un jour</span>}>Jour par jour</SectionTitle>
@@ -374,12 +386,6 @@ export default function CyclePage() {
             </Group>
           </Disclosure>
         )}
-        <Disclosure title="Aller plus loin">
-          <Group>
-            <Row icon="trend-up" title="Prévision de trésorerie" subtitle="Ton solde jour par jour jusqu’à la paie" to="/previsions" />
-            <Row icon="repeat" title="Abonnements et récurrents" subtitle="Détectés automatiquement" to="/recurrents" />
-          </Group>
-        </Disclosure>
       </Reveal>
     </Screen>
   );

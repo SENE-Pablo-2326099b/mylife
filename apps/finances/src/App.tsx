@@ -167,11 +167,11 @@ function Shell() {
   }, []);
 
   const tabs: TabDef[] = [
-    { to: '/', label: 'Aujourd’hui', icon: 'flash', active: 'flash-fill', match: ['/'] },
+    { to: '/', label: 'Aujourd’hui', icon: 'flash', active: 'flash-fill', match: ['/', '/alertes', '/assistant'] },
     { to: '/budget', label: 'Budget', icon: 'pie', active: 'pie-fill', match: ['/budget', '/previsions', '/recurrents'] },
-    { to: '/operations', label: 'Opérations', icon: 'list', active: 'list-fill', match: ['/operations', '/a-classer'], badge: toClassify },
+    { to: '/operations', label: 'Opérations', icon: 'list', active: 'list-fill', match: ['/operations', '/a-classer', '/synchro'], badge: toClassify },
     { to: '/patrimoine', label: 'Patrimoine', icon: 'diamond', active: 'diamond-fill', match: ['/patrimoine', '/independance'] },
-    { to: '/reglages', label: 'Réglages', icon: 'options', active: 'options-fill', match: ['/reglages', '/synchro', '/alertes'], inDock: false },
+    { to: '/reglages', label: 'Réglages', icon: 'options', active: 'options-fill', match: ['/reglages'], inDock: false },
   ];
 
   if (onboarded === undefined) return null;
