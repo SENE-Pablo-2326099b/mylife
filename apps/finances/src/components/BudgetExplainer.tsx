@@ -95,34 +95,36 @@ export function BudgetExplainer({
         <Line sign="=" label="Reste de l’enveloppe" cents={b.fromEnvelope} strong={b.limitedBy === 'envelope'} calm={covered !== null} />
         {b.realFree !== null && (
           <>
-            <Line label="Réellement libre sur tes comptes" cents={b.realFree + b.spentToday} strong={b.limitedBy === 'cash'} />
+            <Line label="Argent libre sur tes comptes" cents={b.realFree + b.spentToday} strong={b.limitedBy === 'cash'} />
             <p className="t-caption pb-1 text-muted">
               {b.limitedBy === 'cash'
-                ? 'Ton argent réel est plus bas que l’enveloppe : c’est lui qui fixe le budget du jour.'
-                : 'Ton argent réel couvre l’enveloppe : c’est l’enveloppe qui fixe le budget du jour.'}
+                ? 'Ton argent libre est plus bas que l’enveloppe : c’est lui qui fixe le budget du jour.'
+                : 'Ton argent libre couvre l’enveloppe : c’est l’enveloppe qui fixe le budget du jour.'}
             </p>
           </>
         )}
         <Line sign="÷" label={`${b.daysLeft} jour${b.daysLeft > 1 ? 's' : ''} jusqu’à la paie, aujourd’hui compris`} cents={b.dailyBudget} />
         <p className="t-small mt-2 text-muted">
           {available < 0 && covered !== null
-            ? `L’enveloppe du cycle est dépassée, mais il te reste ${formatCents(covered)} réellement libres, charges et épargne mises de côté : ce n’est pas un déficit. L’enveloppe reste ton repère, donc le budget du jour est à 0 € jusqu’à la paie.`
+            ? `L’enveloppe du cycle est dépassée, mais il te reste ${formatCents(covered)} d’argent libre, charges et épargne mises de côté : il ne manque rien. L’enveloppe reste ton repère, donc le budget du jour est à 0 € jusqu’à la paie.`
+            : available < 0 && b.limitedBy === 'cash'
+            ? 'Ton argent libre ne couvre plus ce qui reste à payer d’ici la paie : le budget du jour est à 0 € et chaque dépense creuse le manque.'
             : available < 0
-            ? 'Les dépenses du cycle ont déjà dépassé l’enveloppe : le budget du jour est à 0 € et chaque dépense creuse le déficit.'
+            ? 'Les dépenses du cycle ont déjà dépassé l’enveloppe : le budget du jour est à 0 € jusqu’à la paie.'
             : 'Ce budget ne bouge pas de la journée : tes achats du jour s’y comparent. Une journée économe fait monter celui des jours suivants, un excès le fait baisser.'}
         </p>
       </Card>
 
       {b.realFree !== null && (
         <Card className="mt-3">
-          <p className="t-body-strong">Réellement libre d’ici la paie</p>
+          <p className="t-body-strong">Argent libre d’ici la paie</p>
           <Line label="Solde de tes comptes du quotidien" cents={b.realFree + b.reservedCharges + b.reservedSavings} />
           {b.upcoming.length > 0
             ? b.upcoming.map((u, i) => <Line key={`${u.date}-${u.label}-${i}`} sign="−" label={`${u.label} · ${u.undated ? 'd’ici la paie' : formatShort(u.date)}`} cents={u.amount} />)
             : pending.map((c) => <Line key={c.line.id} sign="−" label={c.line.label} cents={c.line.amount} />)}
           {b.reservedSavings - upcomingSavings > 0 && <Line sign="−" label="Épargne prévue pas encore versée" cents={b.reservedSavings - upcomingSavings} />}
           <Divider />
-          <Line sign="=" label="Réellement libre" cents={b.realFree} strong />
+          <Line sign="=" label="Argent libre" cents={b.realFree} strong />
           {b.cash?.atStart != null && b.cash.atStart > 0 && (
             <p className="t-caption text-muted">
               Au début du cycle, le {formatShort(b.cycle.start)}, tes comptes du quotidien contenaient déjà {formatCents(b.cash.atStart)} : c’est pourquoi l’argent libre peut dépasser l’enveloppe, qui ne compte que les revenus du cycle.

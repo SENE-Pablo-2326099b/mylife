@@ -447,3 +447,19 @@ export function daySeries(txs: readonly Transaction[], cats: CatMap, cycle: Cycl
   }
   return points;
 }
+
+/**
+ * Nature d'un dépassement, une seule règle pour tous les écrans (mots et couleurs) :
+ * - `covered` : enveloppe dépassée, mais l'argent libre la couvre → « Au-delà de l'enveloppe », orange ;
+ * - `shortage` : l'argent réel manque d'ici la paie → « Manque d'ici la paie », rouge ;
+ * - `over` : enveloppe dépassée, solde des comptes inconnu → « Enveloppe dépassée », rouge.
+ */
+export type OverrunKind = 'covered' | 'shortage' | 'over';
+export function overrunKind(b: Pick<BudgetState, 'overrun' | 'limitedBy' | 'realFree'>): OverrunKind | null {
+  if (!b.overrun) return null;
+  if (b.overrun.covered !== null) return 'covered';
+  return b.limitedBy === 'cash' || b.realFree !== null ? 'shortage' : 'over';
+}
+
+export const OVERRUN_LABEL: Record<OverrunKind, string> = { covered: 'Au-delà de l’enveloppe', shortage: 'Manque d’ici la paie', over: 'Enveloppe dépassée' };
+

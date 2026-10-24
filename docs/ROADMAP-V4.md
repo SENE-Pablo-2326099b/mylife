@@ -48,7 +48,7 @@ Seulement ce qui ralentirait ou casserait la suite. Le reste des petites imperfe
 | 1.1 | **Lignes de « Mes apps » trop grosses** (bug trouvé) : **fait** | M | Ça bloque toute la synchro commune, en silence |
 | 1.2 | **Apps de synchro déclarables et quota de `mylife`** : **fait** | M | Sans ça, aucune nouvelle app ne peut ranger ses données proprement |
 | 1.3 | **Doublons d'import MyPerf** (risque connu, `CONTEXTE.md` § 3) : **fait** | S à M | Une montée de version fabriquerait des séances en double sur chaque appareil |
-| 1.4 | **Refonte MyFinances, étapes 2 à 5** | M + M + S + S | Discipline, Pacte et Copilot lisent des chiffres faux tant que l'épargne a trois définitions |
+| 1.4 | **Refonte MyFinances, étapes 2 à 5** : **fait** | M + M + S + S | Discipline, Pacte et Copilot lisent des chiffres faux tant que l'épargne a trois définitions |
 | 1.5 | **Fin de l'étape 9** : page légale, VAPID, premiers inconnus | S + S + temps | On ne choisit pas les nouvelles apps sans avoir écouté de vrais utilisateurs |
 
 ### 1.1 Lignes de « Mes apps » trop grosses (bug trouvé en lisant le code) : **fait** (journal : `docs/V4.md`)
@@ -88,7 +88,7 @@ Seulement ce qui ralentirait ou casserait la suite. Le reste des petites imperfe
 - **Terminé quand** : `PERSONAL_IMPORT_VERSION` peut être augmenté sans risque, et c'est prouvé par un test à deux
   appareils simulés.
 
-### 1.4 Refonte MyFinances, étapes 2 à 5
+### 1.4 Refonte MyFinances, étapes 2 à 5 : **fait** (journal : `docs/REFONTE-FINANCES.md`)
 Telles que décrites dans `docs/REFONTE-FINANCES.md` : **un seul modèle d'argent** (M), **une seule liste de
 récurrents** (M), **navigation et réglages remis en ordre** (S), **vocabulaire cohérent** (S). C'est une condition de
 la V4 : la fiche Copilot, la quête Discipline, le Pacte « jours sous le budget » et les futures actions validées (F1)

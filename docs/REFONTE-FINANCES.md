@@ -9,7 +9,7 @@ navigation rangée. Une étape à la fois, avec un arrêt pour tester après cha
 | 2. Un seul modèle d'argent (cycle, argent libre, épargne) | **fait** (24/10/2026) |
 | 3. Une seule liste de récurrents (revenus, charges, abonnements, investissements) | **fait** (24/10/2026) |
 | 4. Navigation et réglages remis en ordre | **fait** (24/10/2026) |
-| 5. Vocabulaire et affichage cohérents | à faire |
+| 5. Vocabulaire et affichage cohérents | **fait** (24/10/2026) |
 
 ## Ce qui ne va pas (constat de départ)
 1. **Trois définitions de l'épargne** : montant fixe des réglages, plans et objectifs, virements détectés. Budget,
@@ -229,4 +229,48 @@ allumaient le mauvais onglet.
 ### Comment tester
 Budget : les deux tuiles sous la carte du cycle. Opérations : la puce Banques. Réglages : plus que des réglages ; ton
 compte est dans les Espaces (en haut à droite).
+
+---
+
+## Étape 5 : vocabulaire et affichage cohérents
+
+### Pourquoi
+Le même argent portait plusieurs noms (« réellement libre », « argent réel », « déficit », « enveloppe dépassée »), et le
+rouge servait aussi bien à un vrai manque qu'à une simple projection au-dessus de l'enveloppe.
+
+### Comment (décisions)
+- **Les mots** :
+  - **Enveloppe** : ce qui est à dépenser sur le cycle (revenus − charges − épargne du cycle).
+  - **Budget du jour** : la part de l'enveloppe pour aujourd'hui, fixe dans la journée.
+  - **Argent libre** : le solde des comptes du quotidien moins ce qui reste à payer et à épargner d'ici la paie (plus
+    « réellement libre » ni « argent réel »).
+  - **Épargne du cycle** : prévue, versée, encore mise de côté.
+  - Un dépassement a **trois noms, selon une seule règle** (`overrunKind`) : « Au-delà de l'enveloppe » quand l'argent
+    libre le couvre ; « Manque d'ici la paie » quand l'argent manque vraiment ; « Enveloppe dépassée » quand le solde des
+    comptes est inconnu. Le mot « déficit » disparaît de l'écran.
+- **Les couleurs** : rouge seulement pour un vrai manque (ou un dépassement sans solde connu) ; orange pour un
+  dépassement couvert, une projection au-dessus de l'enveloppe, un cycle passé dépassé ; vert sinon. Même règle sur
+  Aujourd'hui (anneau, carte, tuile, lumière d'ambiance, aperçu de l'accueil) et sur Budget (carte du cycle, fin projetée).
+- **Budget** : un dépassement du cycle en cours couvert par l'argent libre le dit (« … mais il te reste X d'argent libre
+  d'ici la paie »).
+
+### Fichiers
+| Fichier | Rôle |
+|---|---|
+| `src/domain/budgetEngine.ts` | `overrunKind`, `OVERRUN_LABEL` : la règle unique |
+| `src/pages/Today.tsx` | Mots et couleurs selon la règle ; projection en orange |
+| `src/components/BudgetExplainer.tsx` | « Argent libre » partout ; explication selon le cas |
+| `src/pages/Cycle.tsx` | Même règle de couleur, dépassement couvert expliqué |
+
+### Tests
+- `tests/budgetEngine.test.ts` (+1) : couvert, manque, solde inconnu, rien.
+- Totaux MyFinances : 352 unitaires, 55 étapes de bout en bout : tout vert.
+
+### Comment tester
+Un cycle où tu dépasses l'enveloppe avec de l'argent de côté : orange et « Au-delà de l'enveloppe » sur Aujourd'hui comme
+sur Budget, jamais « déficit ».
+
+---
+
+**La refonte est terminée** (étapes 1 à 5). Suite : `docs/ROADMAP-V4.md` (phase B, puis C).
 

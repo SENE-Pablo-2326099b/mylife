@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Settings, Transaction } from '../src/db/types';
-import { computeBudget, daySeries, payDates, resolveCycle, splitIncomes, type BudgetInput } from '../src/domain/budgetEngine';
+import { computeBudget, daySeries, overrunKind, payDates, resolveCycle, splitIncomes, type BudgetInput } from '../src/domain/budgetEngine';
 import { CAT, DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from '../src/domain/defaults';
 import { tx } from './helpers';
 
@@ -324,6 +324,13 @@ describe('un seul modèle d’argent (refonte, étape 2) : le cas réel du 22 oc
     expect(at({ upcoming: forecast }).reservedCharges).toBe(25500);
     const paid = [...txs, tx({ id: 'loyer', date: '2026-10-05', amount: -25500, label: 'PRLV LOYER', categoryId: CAT.logement })];
     expect(computeBudget({ txs: paid, cats, settings: real, today: '2026-10-22', balance: 43769, upcoming: [] }).reservedCharges).toBe(0);
+  });
+
+  it('une seule règle de mots et de couleurs : couvert (orange), manque (rouge), solde inconnu (rouge), rien', () => {
+    expect(overrunKind(at())).toBe('covered');
+    expect(overrunKind(at({ balance: 30000 }))).toBe('shortage');
+    expect(overrunKind(at({ balance: null }))).toBe('over');
+    expect(overrunKind(at({ savingsClosed: { '2026-09-25': true } }))).toBeNull();
   });
 
   it('épargne versée au-delà du prévu : l’enveloppe retire ce qui est vraiment sorti ; le prévu tenu est noté', () => {

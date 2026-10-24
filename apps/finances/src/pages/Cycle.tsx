@@ -6,8 +6,8 @@ import type { Transaction } from '../db/types';
 import { dailySeries } from '../domain/budget';
 import { categoryBreakdown, summarize } from '../domain/cycleStats';
 import { totalFixed } from '../domain/defaults';
-import { cycleEnvelope, payDates, resolveCycle } from '../domain/budgetEngine';
-import { useBudgetContext } from '../domain/useBudget';
+import { cycleEnvelope, overrunKind, payDates, resolveCycle } from '../domain/budgetEngine';
+import { useBudget, useBudgetContext } from '../domain/useBudget';
 import { useForecast, useRecurringList } from '../domain/useInsights';
 import { personBalances } from '../domain/people';
 import { useAccounts, useCategoryMap, useSettings } from '../hooks';
@@ -57,6 +57,8 @@ export default function CyclePage() {
   const isCurrent = offset === 0;
   const until = isCurrent ? today : cycle.end;
   const context = useBudgetContext();
+  // Le budget du jour (même modèle) : pour dire si un dépassement du cycle en cours est couvert par l'argent libre.
+  const { state: live } = useBudget(today);
   // Prévision et récurrents du cycle en cours, visibles en haut du Budget.
   const { forecast } = useForecast(current.end, current);
   const { items: recurringItems } = useRecurringList(current);
@@ -133,6 +135,10 @@ export default function CyclePage() {
   const periodParam = isCurrent ? '' : offset === -1 ? '&periode=previous' : '&periode=all';
   const over = summary.variable > envelope;
   const ahead = summary.variable > expectedNow;
+  // Une seule règle de couleur : rouge seulement si l'argent manque (cycle en cours) ; un dépassement couvert, un cycle
+  // passé ou une projection au-dessus de l'enveloppe restent orange.
+  const kind = isCurrent ? overrunKind(live) : null;
+  const overTone: 'danger' | 'warning' = isCurrent && over && kind !== 'covered' ? 'danger' : 'warning';
   const maxSpent = Math.max(1, ...lines.map((l) => Math.max(l.spent, l.category?.target ?? 0)));
 
   // Paies et opérations pas encore lues : le cycle serait d'abord faux (jour de paie théorique) puis
@@ -159,18 +165,20 @@ export default function CyclePage() {
       }
     >
       <Reveal index={0}>
-        <Card level="raised" glow={!over && !ahead} tone={over ? 'danger' : 'neutral'}>
+        <Card level="raised" glow={!over && !ahead} tone={over && overTone === 'danger' ? 'danger' : 'neutral'}>
           <p className="t-label text-muted">Vie courante</p>
           <p className="mt-1 flex flex-wrap items-baseline gap-x-2">
-            <Money cents={summary.variable} className={`text-[30px] tracking-[-0.8px] ${over ? 'text-danger' : ''}`} />
+            <Money cents={summary.variable} className={`text-[30px] tracking-[-0.8px] ${over ? (overTone === 'danger' ? 'text-danger' : 'text-warning') : ''}`} />
             <span className="t-body text-secondary">sur {formatCents(envelope)}</span>
           </p>
           <div className="mt-3">
-            <ProgressBar value={summary.variable} max={Math.max(envelope, summary.variable)} marker={isCurrent ? expectedNow : null} tone={over ? 'danger' : ahead ? 'warning' : 'success'} label={`${formatCents(summary.variable)} dépensés sur ${formatCents(envelope)}`} />
+            <ProgressBar value={summary.variable} max={Math.max(envelope, summary.variable)} marker={isCurrent ? expectedNow : null} tone={over ? overTone : ahead ? 'warning' : 'success'} label={`${formatCents(summary.variable)} dépensés sur ${formatCents(envelope)}`} />
           </div>
           <p className="t-small mt-2 text-secondary">
             {over
-              ? `Enveloppe dépassée de ${formatCents(summary.variable - envelope)}.`
+              ? kind === 'covered' && live.overrun?.covered != null
+                ? `Enveloppe dépassée de ${formatCents(summary.variable - envelope)}, mais il te reste ${formatCents(live.overrun.covered)} d’argent libre d’ici la paie.`
+                : `Enveloppe dépassée de ${formatCents(summary.variable - envelope)}.`
               : isCurrent
                 ? `${ahead ? 'Au-dessus' : 'En dessous'} de la trajectoire : ${formatCents(expectedNow)} prévus au jour ${summary.daysElapsed}.`
                 : `Reste ${formatCents(envelope - summary.variable)} non dépensés.`}
@@ -178,7 +186,7 @@ export default function CyclePage() {
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line pt-3">
             <Metric label="Par jour" value={euros(perDay)} hint="en moyenne" />
             {isCurrent ? <Metric label="Reste / jour" value={euros(leftPerDay)} hint={`${daysLeft} j restants`} /> : <Metric label="Jours" value={String(summary.length)} hint="dans le cycle" />}
-            <Metric label={isCurrent ? 'Fin projetée' : 'Écart'} value={euros(isCurrent ? projected : summary.variable - envelope)} tone={(isCurrent ? projected : summary.variable) > envelope ? 'danger' : 'success'} hint={isCurrent ? 'à ce rythme' : summary.variable > envelope ? 'au-dessus' : 'en dessous'} />
+            <Metric label={isCurrent ? 'Fin projetée' : 'Écart'} value={euros(isCurrent ? projected : summary.variable - envelope)} tone={(isCurrent ? projected : summary.variable) > envelope ? 'warning' : 'success'} hint={isCurrent ? 'à ce rythme' : summary.variable > envelope ? 'au-dessus' : 'en dessous'} />
           </div>
         </Card>
       </Reveal>

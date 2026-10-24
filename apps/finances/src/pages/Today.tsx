@@ -9,6 +9,7 @@ import { db, getMeta } from '../db/db';
 import type { Transaction } from '../db/types';
 import { isVariable, type Status } from '../domain/budget';
 import { useBudget } from '../domain/useBudget';
+import { OVERRUN_LABEL, overrunKind } from '../domain/budgetEngine';
 import { useAlerts } from '../domain/useAlerts';
 import { useAccounts, useCategories, useCategoryMap } from '../hooks';
 import { formatCycle, formatDay, formatShort, todayISO } from '../lib/dates';
@@ -62,8 +63,9 @@ export default function TodayPage() {
   const status = STATUS[b.status];
   // Le champ de lumière prend la couleur du budget du jour tant que cet écran est ouvert.
   const active = useTabActive();
-  // Enveloppe dépassée mais argent réellement libre : pas un déficit, pas de rouge.
-  const realDeficit = b.overrun !== null && b.overrun.covered === null;
+  // Enveloppe dépassée mais couverte par l'argent libre : orange, jamais rouge (une seule règle : overrunKind).
+  const kind = overrunKind(b);
+  const realDeficit = kind === 'shortage' || kind === 'over';
   const ambientTone = total && active ? (realDeficit ? 'danger' : status.tone) : null;
   useEffect(() => {
     setAmbient(ambientTone);
@@ -74,10 +76,10 @@ export default function TodayPage() {
   const ready = total !== undefined && !loading && total > 0;
   const glanceTitle = !ready
     ? null
-    : b.overrun
-      ? b.overrun.covered !== null
-        ? `Enveloppe dépassée · ${formatCents(b.overrun.covered)} encore libres`
-        : `${b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Enveloppe dépassée'} : ${formatCents(b.overrun.deficit)}`
+    : b.overrun && kind
+      ? kind === 'covered'
+        ? `Au-delà de l’enveloppe · ${formatCents(b.overrun.covered ?? 0)} d’argent libre`
+        : `${OVERRUN_LABEL[kind]} : ${formatCents(b.overrun.deficit)}`
       : b.remainingToday >= 0
         ? `${formatCents(b.remainingToday)} à dépenser aujourd’hui`
         : `${formatCents(-b.remainingToday)} de trop aujourd’hui`;
@@ -153,7 +155,7 @@ export default function TodayPage() {
   // couvre, ce n'est pas un déficit : l'enveloppe reste le repère, sans rouge.
   const over = b.overrun;
   const covered = over?.covered ?? null;
-  const heroLabel = over ? (covered !== null ? 'Au-delà de l’enveloppe' : b.limitedBy === 'cash' ? 'Manque d’ici la paie' : 'Déficit du cycle') : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
+  const heroLabel = kind ? OVERRUN_LABEL[kind] : b.remainingToday >= 0 ? 'Reste aujourd’hui' : 'Dépassé aujourd’hui';
   const heroValue = over ? over.deficit : Math.abs(b.remainingToday);
   const p = b.projection;
 
@@ -174,13 +176,13 @@ export default function TodayPage() {
             </span>
             <span className="mt-2">
               <Badge tone={status.tone} icon={status.icon}>
-                {over ? 'Enveloppe dépassée' : status.label}
+                {kind ? OVERRUN_LABEL[kind] : status.label}
               </Badge>
             </span>
           </Ring>
           {over && covered !== null ? (
             <p className="t-body mt-4 text-center text-secondary">
-              Il te reste <strong className="text-ink">{formatCents(covered)} réellement libres</strong> d’ici le {formatShort(b.cycle.end)}, charges et épargne mises de côté.
+              Il te reste <strong className="text-ink">{formatCents(covered)} d’argent libre</strong> d’ici le {formatShort(b.cycle.end)}, charges et épargne mises de côté.
               {b.spentToday > 0 && <> Aujourd’hui : {formatCents(b.spentToday)}.</>}
             </p>
           ) : over ? (
@@ -200,7 +202,7 @@ export default function TodayPage() {
               </div>
             </div>
           )}
-          {b.limitedBy === 'cash' && !over && <p className="t-caption mt-3 text-center text-warning">Plafonné par l’argent réellement libre sur tes comptes</p>}
+          {b.limitedBy === 'cash' && !over && <p className="t-caption mt-3 text-center text-warning">Plafonné par l’argent libre sur tes comptes</p>}
           <p className="t-caption mt-3 flex items-center justify-center gap-1 text-muted">
             <Icon name="info" size={14} />
             {over ? 'Pourquoi ? Touche pour voir le détail' : 'Comment c’est calculé'}
@@ -226,10 +228,10 @@ export default function TodayPage() {
       {b.daysElapsed > 0 && (
         <Reveal index={2} className={wide ? '' : 'mt-3'}>
           <Card className="flex items-center gap-3">
-            <Icon name={p.projectedEnd >= 0 ? 'trend-up' : 'trend-down'} className={p.projectedEnd >= 0 ? 'text-success' : 'text-danger'} />
+            <Icon name={p.projectedEnd >= 0 ? 'trend-up' : 'trend-down'} className={p.projectedEnd >= 0 ? 'text-success' : 'text-warning'} />
             <span className="min-w-0 flex-1">
               <span className="t-body block">
-                À ce rythme, fin de cycle à <strong className={`font-semibold ${p.projectedEnd >= 0 ? 'text-success' : 'text-danger'}`}>{formatCents(p.projectedEnd, { sign: true })}</strong>
+                À ce rythme, fin de cycle à <strong className={`font-semibold ${p.projectedEnd >= 0 ? 'text-success' : 'text-warning'}`}>{formatCents(p.projectedEnd, { sign: true })}</strong>
               </span>
               <span className="t-small block text-secondary">
                 {formatCents(p.pace)} par jour en moyenne · {p.gap >= 0 ? `${formatCents(p.gap)} d’avance` : `${formatCents(-p.gap)} de retard`} sur la trajectoire
