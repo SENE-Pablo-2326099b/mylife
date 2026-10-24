@@ -41,6 +41,7 @@ const TAB_PATHS = TABS.map((t) => t.to);
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 // Les apps de l'accueil ajoutées en V4 sont chargées à la demande (contrat d'app).
 // new-app: pages (repère du générateur, ne pas retirer)
+const MyObjectifsPage = lazy(() => import('./pages/MyObjectifs').then((m) => ({ default: m.MyObjectifsPage })));
 
 /** L'accueil de MyLife : le point d'entrée de l'app installée, avec le compte et l'apparence de toutes les apps. */
 export function App() {
@@ -132,6 +133,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
                   </Suspense>
                 }
               />
+              <Route path="/objectifs" element={<Suspense fallback={null}><MyObjectifsPage /></Suspense>} />
               {/* new-app: routes (repère du générateur, ne pas retirer) */}
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>

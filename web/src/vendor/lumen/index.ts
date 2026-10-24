@@ -402,6 +402,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Copilot', path: '/copilot', keywords: 'copilot ia assistant question claude conseil budget entrainement' },
   { app: 'home', title: 'MyGames', path: '/jeux', keywords: 'jeux jeu video steam heures console' },
   { app: 'home', title: 'Mes apps', path: '/mes-apps', keywords: 'mes apps creer app sans code suivi habitude lecture sommeil eau humeur tracker' },
+  { app: 'home', title: 'MyObjectifs', path: '/objectifs', keywords: 'objectifs objectif but annee cible progression rythme' },
   // new-app: destinations (repère du générateur, ne pas retirer)
   { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
   { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
@@ -538,4 +539,5 @@ export * from './miniapp';
 export * from './homeApps';
 export * from './actions';
 export * from './agenda';
+export * from './objectifs';
 // new-app: moteurs (repère du générateur, ne pas retirer)

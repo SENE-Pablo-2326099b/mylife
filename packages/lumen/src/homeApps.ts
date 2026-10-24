@@ -36,6 +36,7 @@ export const HOME_APPS: readonly HomeAppInfo[] = [
   { id: 'musique', name: 'MyMusique', path: '/musique', icon: 'sparkles', tagline: 'Tes stats d’écoute', storage: ['mylife:music'], sync: { mylife: ['music'] }, exportable: true, privacy: 'le résumé de ton écoute (jamais l’export Spotify entier)', stat: 'culture' },
   { id: 'jeux', name: 'MyGames', path: '/jeux', icon: 'play', tagline: 'Heures de jeu, ton temps', storage: ['mylife:games'], sync: { mylife: ['games'] }, exportable: true, privacy: 'tes heures de jeu' },
   { id: 'mes-apps', name: 'Mes apps', path: '/mes-apps', icon: 'apps', tagline: 'Lecture, sommeil, habitudes : crée les tiennes, sans code', wide: true, storage: ['mylife:miniapps'], sync: { app: 'miniapps' }, exportable: true, privacy: 'tes apps sans code et leurs saisies' },
+  { id: 'objectifs', name: 'MyObjectifs', path: '/objectifs', icon: 'flag', tagline: 'Tes objectifs, mesurés par tes apps', storage: ['mylife:app:objectifs:'], sync: { app: 'objectifs' }, exportable: true, privacy: 'tes objectifs (titre, cible, date limite)' },
   // new-app: entrées (repère du générateur, ne pas retirer)
 ];
 

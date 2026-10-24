@@ -299,7 +299,7 @@ moins et arrive complète.
 | F4 | **Coffre de fichiers chiffrés** : fichiers chiffrés sur l'appareil avant l'envoi, stockés en blocs opaques (Vercel Blob ou équivalent), clé dans la ligne chiffrée ; quotas par compte | L | Coffre (3.5), Voyage (3.8), photos de progression, souvenirs de Sortie, billets, champs photo de Mes apps | Le serveur stocke des octets illisibles ; quotas et coûts surveillés (`stats:serveur`) |
 | F5 | **Coquille native** : une APK MyLife (l'accueil web dans une coque native qui reprend la PWA), avec accès à Health Connect et aux widgets ; l'APK MyPerf la rejoint à terme | L | Santé (3.9), widget « Ta journée », notifications plus fiables sur Android | Une seule app installable, aucune donnée hors de l'appareil sans chiffrement |
 
-## 3.1 MyObjectifs : la direction (effort M)
+## 3.1 MyObjectifs : la direction (effort M) : **fait** (journal : `docs/V4.md`)
 **Quoi** : tes objectifs de l'année ou du trimestre, **reliés aux apps** qui en mesurent l'avancée, sans saisie :
 « 5 000 € de côté » (MyFinances), « 100 kg au développé couché » (MyPerf), « 20 livres » (Culture), « un semi-marathon »
 (Plein air), « une sortie par mois avec la bande » (Sortie). Chaque objectif se découpe en jalons et en arcs de

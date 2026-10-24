@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -864,6 +864,38 @@ describe('MyLife, une seule app', () => {
     await shot(p, '35-ta-journee');
     expect(await p.evaluate(() => Object.keys(localStorage))).toContain('mylife:agenda:home');
     await ctx.close();
+  });
+
+  it('MyObjectifs : un objectif branché sur « Mes apps », mesuré tout seul, retrouvé sur un second appareil', async () => {
+    const signIn = async (p: Page) => {
+      await p.goto(`${server.url}/`);
+      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+      await p.getByLabel('Identifiant').fill(LOGIN);
+      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+      await p.getByRole('button', { name: 'Se connecter' }).click();
+      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    };
+    const [ctx, p] = await device();
+    await signIn(p);
+    await p.goto(`${server.url}/mes-apps`);
+    await p.getByRole('link', { name: 'Ouvrir Lecture' }).waitFor({ timeout: 30_000 });
+    await p.goto(`${server.url}/`);
+    await p.getByRole('link', { name: /^MyObjectifs :/ }).click();
+    await p.getByRole('heading', { name: 'MyObjectifs' }).waitFor();
+    await p.getByRole('button', { name: 'Nouvel objectif' }).click();
+    await p.getByLabel('Ce qui compte').selectOption({ label: 'Lecture : nombre de saisies' });
+    await p.getByLabel('Cible (saisies)').fill('10');
+    await p.getByRole('button', { name: 'Créer l’objectif' }).click();
+    await p.getByText(/\/ 10 saisies · jusqu’au/).waitFor();
+    await shot(p, '36-objectifs');
+    await p.waitForTimeout(3500);
+    await ctx.close();
+    // Second appareil : l'objectif suit (chiffré), avec la même mesure.
+    const [ctx2, q] = await device();
+    await signIn(q);
+    await q.goto(`${server.url}/objectifs`);
+    await q.getByText(/\/ 10 saisies · jusqu’au/).waitFor({ timeout: 30_000 });
+    await ctx2.close();
   });
 
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {

@@ -1,3 +1,4 @@
+import { objectives } from './myObjectifsData';
 import { readGames, readMiniApps, readMusic } from './ui/stats';
 
 /**
@@ -8,5 +9,6 @@ export const APP_EXPORTS: Record<string, () => unknown> = {
   musique: () => readMusic(),
   jeux: () => readGames(),
   'mes-apps': () => Object.values(readMiniApps()).filter((a) => a.spec),
+  objectifs: () => objectives.list(),
   // new-app: exports (repère du générateur, ne pas retirer)
 };

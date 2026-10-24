@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '../vendor/lumen';
 import { runHomeActions } from '../actionsHome';
+import { objectives } from '../myObjectifsData';
 import { openMyLifeApp } from '../ui/app';
 import { readAiKey, writeAiKey } from '../vendor/mylife-sync/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '../copilot';
@@ -136,6 +137,7 @@ const READ_LABEL: Record<string, string> = {
   list_sorties: 'tes sorties',
   get_my_apps: 'tes apps',
   get_agenda: 'ton agenda',
+  get_objectives: 'tes objectifs',
   propose_action: 'une action à valider',
 };
 
@@ -260,6 +262,7 @@ export function CopilotPage() {
     games: readGames(),
     sorties: sortieDigests(crews.sorties, crews.uid),
     miniApps: Object.values(readMiniApps()),
+    objectives: objectives.list().map((i) => i.value),
   });
 
   const ask = async (question: string) => {

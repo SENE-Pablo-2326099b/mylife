@@ -10,6 +10,8 @@ import {
   musicPeriod,
   parseActionSpec,
   readAgenda,
+  objectiveLine,
+  objectiveProgress,
   peakHour,
   recap,
   statValue,
@@ -18,6 +20,7 @@ import {
   weeklySeries,
   yearWeeks,
   type ActionSpec,
+  type Objective,
   type GamesData,
   type MiniApp,
   type MusicSummary,
@@ -66,6 +69,8 @@ export interface CopilotSources {
   sorties: SortieDigest[];
   /** « Mes apps » : les apps sans code de l'utilisateur et leurs saisies. */
   miniApps: MiniApp[];
+  /** MyObjectifs : ses objectifs (facultatif : absent, l'outil le dit). */
+  objectives?: Objective[];
 }
 
 export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, MyRave), la musique (MyMusique), le jeu (MyGames), ses propres petites apps de suivi (« Mes apps » : lecture, sommeil, habitudes…) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
@@ -99,6 +104,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   { name: 'get_games', description: 'MyGames : heures de jeu par jeu sur les N dernières semaines (1 à 12), et depuis toujours.', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_time_split', description: 'Où va le temps : minutes de sport (séances MyPerf), de musique (MyMusique) et de jeu (MyGames) sur les N dernières semaines (1 à 12).', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'get_objectives', description: 'MyObjectifs : les objectifs de l’utilisateur (titre, ce qui compte, cible, date limite), où il en est, ce que le rythme régulier attendait aujourd’hui, en avance ou en retard, atteint ou non.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_agenda', description: 'Agenda commun de toutes les apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
   {
     name: 'propose_action',
@@ -188,6 +194,16 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
     }
     case 'list_sorties':
       return json(src.sorties);
+    case 'get_objectives': {
+      const list = src.objectives ?? [];
+      if (!list.length) return { content: 'Aucun objectif dans MyObjectifs : l’utilisateur peut en créer depuis l’accueil (séances, jours sous le budget, épargne tenue, Mes apps…).', isError: true };
+      return json(
+        list.map((o) => {
+          const p = objectiveProgress(o, { stats: src.stats, miniApps: src.miniApps, today: src.today, rest: src.rest });
+          return { title: o.title, from: o.start, deadline: o.deadline, value: p.value, target: p.target, unit: p.unit[0], expectedToday: p.expected, status: p.status, daysLeft: p.daysLeft, summary: objectiveLine(p) };
+        }),
+      );
+    }
     case 'get_agenda': {
       const days = Math.max(1, Math.min(35, typeof input.days === 'number' ? Math.round(input.days) : 7));
       const to = new Date(`${src.today}T12:00:00`);
