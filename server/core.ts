@@ -42,7 +42,7 @@ export class HttpError extends Error {
  * `mylife` : réglages communs à toutes les apps (apparence, compteurs du Personnage) ; `miniapps` : « Mes apps »,
  * une ligne par app et une par saisie.
  */
-export const SYNC_APPS = { finances: 100_000, perf: 100_000, mylife: 200, miniapps: 40_000, objectifs: 5_000 } as const;
+export const SYNC_APPS = { finances: 100_000, perf: 100_000, mylife: 200, miniapps: 40_000, objectifs: 5_000, chef: 5_000 } as const;
 export type App = keyof typeof SYNC_APPS;
 export const APPS = Object.keys(SYNC_APPS) as App[];
 export const ROW_QUOTA: Record<App, number> = SYNC_APPS;

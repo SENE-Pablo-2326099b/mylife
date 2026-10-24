@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -895,6 +895,50 @@ describe('MyLife, une seule app', () => {
     await signIn(q);
     await q.goto(`${server.url}/objectifs`);
     await q.getByText(/\/ 10 saisies · jusqu’au/).waitFor({ timeout: 30_000 });
+    await ctx2.close();
+  });
+
+  it('MyChef : courses par rayon, coché = en stock, indispensable bientôt fini qui revient seul ; second appareil', async () => {
+    const signIn = async (p: Page) => {
+      await p.goto(`${server.url}/`);
+      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+      await p.getByLabel('Identifiant').fill(LOGIN);
+      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+      await p.getByRole('button', { name: 'Se connecter' }).click();
+      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    };
+    const [ctx, p] = await device();
+    await signIn(p);
+    await p.getByRole('link', { name: /^MyChef :/ }).click();
+    await p.getByRole('heading', { name: 'MyChef' }).waitFor();
+    await p.getByLabel('Ajouter à la liste').fill('lai');
+    await p.getByRole('button', { name: 'Lait', exact: true }).click();
+    await p.getByLabel('Ajouter à la liste').fill('Lessive');
+    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await p.getByRole('heading', { name: 'Frais (crèmerie, œufs)' }).waitFor();
+    await p.getByRole('heading', { name: 'Maison' }).waitFor();
+    await shot(p, '37-chef-courses');
+    // Coché en magasin : il entre dans le garde-manger, au frigo, avec une date proposée.
+    await p.getByRole('checkbox', { name: 'Lait : à prendre' }).click();
+    await p.getByRole('checkbox', { name: 'Lait : pris' }).waitFor();
+    await p.getByRole('radio', { name: /Garde-manger/ }).click();
+    await p.getByRole('heading', { name: 'Frigo' }).waitFor();
+    await p.getByRole('button', { name: /^Lait/ }).click();
+    await p.getByRole('radio', { name: 'Bientôt fini' }).click();
+    await p.getByRole('switch', { name: /Indispensable/ }).click();
+    await p.keyboard.press('Escape');
+    await shot(p, '38-chef-garde-manger');
+    // Indispensable bientôt fini : il revient tout seul sur la liste.
+    await p.getByRole('button', { name: 'Retirer les 1 article pris' }).waitFor({ state: 'detached' }).catch(() => undefined);
+    await p.getByRole('radio', { name: /Courses/ }).click();
+    await p.getByText('Indispensable à racheter').waitFor();
+    await p.waitForTimeout(3500);
+    await ctx.close();
+    const [ctx2, q] = await device();
+    await signIn(q);
+    await q.goto(`${server.url}/chef`);
+    await q.getByText('Indispensable à racheter').waitFor({ timeout: 30_000 });
+    await q.getByText('Lessive').waitFor();
     await ctx2.close();
   });
 
