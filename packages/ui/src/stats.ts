@@ -1,5 +1,5 @@
 import { useMemo, useSyncExternalStore } from 'react';
-import { MERGED_STATS, STATS_APPS, computeCharacter, localToday, mergeLegacyMiniApp, mergeStats, parseGames, parseMiniApp, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MiniApp, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
+import { MERGED_STATS, STAT_IDS, STATS_APPS, computeCharacter, localToday, mergeLegacyMiniApp, miniAppStatWeeks, trimWeeks, mergeStats, parseGames, parseMiniApp, parseMusicSummary, parseStats, readStats, sameStats, statsKey, weekStart, type AppStats, type Character, type GamesData, type MiniApp, type MusicSummary, type StatId, type StatsApp, type StatsByApp } from '../vendor/lumen';
 
 /**
  * Compteurs du Personnage sur le web. Chaque app dépose les siens (`publishStats`) dans le stockage
@@ -18,7 +18,6 @@ export interface CharacterPrefs {
   crews: Record<string, StatId[]>;
 }
 
-const STAT_IDS: readonly StatId[] = ['force', 'discipline', 'social', 'constance', 'culture'];
 
 function readCrews(v: unknown): Record<string, StatId[]> {
   const out: Record<string, StatId[]> = {};
@@ -327,7 +326,16 @@ export function markMiniDirty(prev: MiniApp | undefined, next: MiniApp, dirty: R
 /** Écrit les apps sans rien marquer à envoyer (ce qui vient du compte, ou une remise en ordre). */
 export function writeMiniApps(all: Record<string, MiniApp>, notify = true): void {
   write(MINI_KEY, all);
-  if (notify) emit();
+  if (notify) {
+    publishMiniStats();
+    emit();
+  }
+}
+
+/** Compteurs du Personnage venus de « Mes apps » (saisies des apps qui font monter une stat), par semaine. */
+function publishMiniStats(): void {
+  const weeks = trimWeeks(miniAppStatWeeks(Object.values(readMiniApps())), localToday());
+  if (Object.keys(weeks).length || readStats('miniapps')) publishStats('miniapps', { weeks });
 }
 
 export function saveMiniApp(app: MiniApp): void {
@@ -336,6 +344,7 @@ export function saveMiniApp(app: MiniApp): void {
   markMiniDirty(all[app.id], app, dirty);
   write(MINI_KEY, { ...all, [app.id]: app });
   writeMiniDirty(dirty);
+  publishMiniStats();
   emit();
   onChange?.();
 }

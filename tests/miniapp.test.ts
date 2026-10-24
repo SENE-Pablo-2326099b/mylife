@@ -7,6 +7,7 @@ import {
   adoptMiniHead,
   mergeLegacyMiniApp,
   miniHead,
+  miniAppStatWeeks,
   splitMiniEntryRid,
   aggregate,
   cleanValues,
@@ -164,4 +165,14 @@ describe('Mes apps : saisies et calculs', () => {
     expect(splitMiniEntryRid('../x.abc')).toBeNull();
     expect(splitMiniEntryRid('lect01')).toBeNull();
   });
+
+  it('une app peut faire monter une stat du Personnage : stat vérifiée, compteurs par semaine', () => {
+    const lecture = MINI_TEMPLATES[0]!;
+    expect(parseSpec({ ...lecture, stat: 'culture' }).spec?.stat).toBe('culture');
+    expect(parseSpec({ ...lecture, stat: 'argent' }).spec?.stat).toBeUndefined();
+    let a = emptyMiniApp('lect01', { ...lecture, stat: 'culture' });
+    for (const [id, day] of [['1', '2026-10-19'], ['2', '2026-10-21'], ['3', '2026-10-27']]) a = addEntry(a, { id: id!, day: day!, values: { pages: 3 } });
+    expect(miniAppStatWeeks([a, emptyMiniApp('eau001', MINI_TEMPLATES[1]!)])).toEqual({ '2026-10-19': { 'stat:culture': 2 }, '2026-10-26': { 'stat:culture': 1 } });
+  });
 });
+

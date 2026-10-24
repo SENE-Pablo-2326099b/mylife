@@ -25,7 +25,7 @@ import { Tilt } from '../ui/Tilt';
 import { Pending } from '../ui/extras';
 import { setAmbient } from '../ui/mood';
 import { setGlance } from '../ui/glance';
-import { writeCopilotCard } from '../vendor/lumen';
+import { writeAgenda, writeCopilotCard } from '../vendor/lumen';
 import { BackupReminder } from '../ui/BackupReminder';
 import { downloadBackup } from '../domain/backupDownload';
 import { useTabActive } from '../ui/tabActive';
@@ -118,6 +118,17 @@ export default function TodayPage() {
       // Les récurrents du cycle, avec leur identifiant : Copilot peut proposer d'en sauter un ce mois (action validée).
       recurring: recurringItems.slice(0, 40).map((i) => ({ id: i.id, label: i.label, kind: i.kind, amount: eur(i.amount), nextDate: i.nextDate, paidThisCycle: i.paid !== null, skippedThisCycle: i.skipped })),
     });
+    // Agenda commun (sur l'appareil) : ce qui va passer sur le compte d'ici cinq semaines, sauté ce mois exclu.
+    const horizon = new Date(`${today}T12:00:00`);
+    horizon.setDate(horizon.getDate() + 35);
+    const until = horizon.toISOString().slice(0, 10);
+    writeAgenda(
+      'finances',
+      today,
+      recurringItems
+        .filter((i) => !i.direct && !i.skipped && i.nextDate !== null && i.nextDate >= today && i.nextDate <= until)
+        .map((i) => ({ id: i.id, kind: i.kind === 'subscription' ? 'charge' : i.kind, title: i.label, date: i.nextDate!, amount: i.amount, url: '/finances/recurrents' })),
+    );
   }, [ready, b, today, recurringItems]);
 
   // Données pas encore lues : ni faux chiffres ni faux « bienvenue ».

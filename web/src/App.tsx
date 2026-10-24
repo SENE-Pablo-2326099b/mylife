@@ -28,6 +28,7 @@ import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
 import { usePendingRecovery, useSession } from './ui/session';
 import { refreshReminders } from './reminders';
+import { useHomeAgenda } from './agendaHome';
 
 const TABS: TabDef[] = [
   { to: '/', label: 'Accueil', icon: 'home', active: 'home-fill', match: ['/'] },
@@ -66,6 +67,8 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
   const { stats, rest } = useStatsInput();
   // Mon score dans mes Crews, tenu à jour (seulement quand il change).
   useCrewPublisher(character, stats, rest);
+  // Agenda commun : les sorties à venir (agendaHome.ts).
+  useHomeAgenda();
   // Rappels écrits par l'appareil : le plan local et les heures de réveil suivent « Mes apps » (reminders.ts).
   useEffect(() => {
     if (!session) return;

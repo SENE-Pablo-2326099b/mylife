@@ -8,7 +8,7 @@ import { recordEvents } from '@/domain/analytics';
 import { addDays, today } from '@/domain/dates';
 import { RELIABLE_MAX_REPS } from '@/domain/reference';
 import { forceWeeks } from '@/domain/rpg';
-import { readStats, sameStats, statsKey, writeCopilotCard, type AppStats } from '@/vendor/lumen';
+import { readStats, sameStats, statsKey, writeAgenda, writeCopilotCard, type AppStats } from '@/vendor/lumen';
 import { listPlanned } from '@/db/repos/planning';
 import { listMesocycles } from '@/db/repos/cycles';
 import { phaseFor } from '@/domain/mesocycle';
@@ -83,6 +83,14 @@ export function publishCopilotCard(day = today()): void {
     .filter((w) => w.status === 'completed' && w.setCount > 0)
     .slice(0, 8)
     .map((w) => ({ date: w.date, name: w.name, sets: w.setCount, minutes: w.endedAt ? Math.round((w.endedAt - w.startedAt) / 60_000) : null }));
+  // Agenda commun (sur l'appareil) : les séances prévues des trois prochaines semaines.
+  writeAgenda(
+    'perf',
+    day,
+    listPlanned(day, addDays(day, 21))
+      .filter((p) => p.workoutId === null)
+      .map((p) => ({ id: p.id, kind: 'session' as const, title: p.title, date: p.date, url: '/perf/' })),
+  );
   writeCopilotCard('perf', {
     day,
     weeklyGoal: o.weeklyGoal,

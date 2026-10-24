@@ -536,4 +536,5 @@ export * from './pacte';
 export * from './miniapp';
 export * from './homeApps';
 export * from './actions';
+export * from './agenda';
 // new-app: moteurs (repère du générateur, ne pas retirer)

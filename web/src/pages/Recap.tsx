@@ -9,6 +9,7 @@ import { pushSupported, setWeekly, weeklyStatus } from '../push';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { markSeen, useStatsInput, wasSeen } from '../ui/stats';
+import { STAT_ICON } from '../ui/statIcons';
 
 /**
  * Bilans : « Ta semaine » (carte du dimanche et du lundi sur l'accueil, page /bilan pour parcourir les
@@ -122,7 +123,7 @@ export function WrappedCard() {
   );
 }
 
-const QUEST_ICON: Record<Quest['stat'], IconName> = { force: 'barbell', discipline: 'diamond-fill', social: 'people-fill', constance: 'flame', culture: 'sparkles' };
+const QUEST_ICON: Record<Quest['stat'], IconName> = STAT_ICON;
 
 function Delta({ now, before, unit }: { now: number; before: number | null; unit: string }) {
   if (before === null) return null;

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { MYLIFE_APPS, XP, DISCIPLINE_TARGET, type Character, type Quest, type StatId, type StatState } from '../vendor/lumen';
 import { ColumnChart, Ring } from '../ui/charts';
-import { Icon, type IconName } from '../ui/icons';
+import { Icon } from '../ui/icons';
 import { Badge, Button, Card, Disclosure, ProgressBar, Reveal, SectionTitle } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { canRest, readCharacterPrefs, setRestWeek, useCharacter } from '../ui/stats';
 import { toast } from '../ui/toastStore';
+import { STAT_ICON } from '../ui/statIcons';
 
 /**
  * Le Personnage : un RPG de la vraie vie. Les stats montent toutes seules avec ce que tu fais dans
@@ -14,7 +15,7 @@ import { toast } from '../ui/toastStore';
  * réussies d'affilée. Calcul : packages/lumen/src/character.ts.
  */
 
-const ICON: Record<StatId, IconName> = { force: 'barbell', discipline: 'diamond-fill', social: 'people-fill', constance: 'flame', culture: 'sparkles' };
+const ICON = STAT_ICON;
 const APP_OF: Partial<Record<StatId, string>> = { force: 'perf', discipline: 'finances', social: 'raveloc' };
 
 const nf = new Intl.NumberFormat('fr-FR');

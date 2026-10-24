@@ -1,5 +1,5 @@
 // GÉNÉRÉ depuis MyLife/packages/lumen — ne pas modifier ici (MyLife : npm run vendor).
-import { addWeeks, weekStart } from './character';
+import { addWeeks, STAT_IDS, weekStart, type StatId } from './character';
 
 /**
  * Mes apps : de petites apps personnelles SANS CODE. Une app est une description en JSON (format
@@ -57,6 +57,8 @@ export interface MiniSpec {
   stats: MiniStat[];
   /** Graphique des 8 dernières semaines. */
   chart?: { agg: 'count' | 'sum' | 'avg'; field?: string };
+  /** Stat du Personnage que chaque saisie fait un peu monter (V4) : jamais le poids d'une séance. */
+  stat?: StatId;
 }
 
 export type MiniValue = number | string | boolean;
@@ -203,7 +205,8 @@ export function parseSpec(raw: unknown): ParsedSpec {
   const icon = (MINI_ICONS as readonly string[]).includes(o.icon as string) ? (o.icon as MiniIcon) : 'sparkles';
   const color = typeof o.color === 'string' && o.color in MINI_COLORS ? (o.color as MiniColor) : 'or';
   const description = str(o.description, 120);
-  return { spec: { format: 'mylife-app', v: 1, name, ...(description ? { description } : {}), icon, color, fields, ...(goal ? { goal } : {}), stats, ...(chart ? { chart } : {}) } };
+  const stat = STAT_IDS.includes(o.stat as StatId) ? (o.stat as StatId) : undefined;
+  return { spec: { format: 'mylife-app', v: 1, name, ...(description ? { description } : {}), icon, color, fields, ...(goal ? { goal } : {}), stats, ...(chart ? { chart } : {}), ...(stat ? { stat } : {}) } };
 }
 
 function defaultStatLabel(agg: MiniAgg, field: MiniField | undefined, period: MiniPeriod): string {
@@ -618,3 +621,18 @@ export const MINI_TEMPLATES: MiniSpec[] = [
     chart: { agg: 'count', field: 'fait' },
   }),
 ];
+
+/** Compteurs du Personnage venus de « Mes apps » : par semaine, le nombre de saisies de chaque stat choisie. */
+export function miniAppStatWeeks(apps: readonly MiniApp[]): Record<string, Record<string, number>> {
+  const weeks: Record<string, Record<string, number>> = {};
+  for (const a of apps) {
+    if (!a.spec?.stat) continue;
+    const key = `stat:${a.spec.stat}`;
+    for (const e of a.entries) {
+      const w = (weeks[weekStart(e.day)] ??= {});
+      w[key] = (w[key] ?? 0) + 1;
+    }
+  }
+  return weeks;
+}
+

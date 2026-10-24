@@ -20,6 +20,10 @@ import {
   setMiniReminder,
   statValue,
   EVERY_DAY,
+  DECLARED_STATS,
+  STATS,
+  XP,
+  type StatId,
   weeklySeries,
   type MiniApp,
   type MiniField,
@@ -28,7 +32,7 @@ import {
 } from '../vendor/lumen';
 import { ColumnChart } from '../ui/charts';
 import { Icon, type IconName } from '../ui/icons';
-import { Button, Card, Chip, EmptyState, Field, ProgressBar, Reveal, SectionTitle, StatTile, TextField, Toggle, ToggleRow } from '../ui/index';
+import { Button, Card, Chip, EmptyState, Field, ProgressBar, Reveal, SectionTitle, SelectField, StatTile, TextField, Toggle, ToggleRow } from '../ui/index';
 import { ensureSubscription } from '../push';
 import { refreshReminders } from '../reminders';
 import { NotFoundScreen, Screen } from '../ui/Screen';
@@ -427,6 +431,10 @@ export function MiniAppPage() {
         </Reveal>
 
         <Reveal index={5}>
+          <StatChoice app={app} />
+        </Reveal>
+
+        <Reveal index={5}>
           <div className="flex flex-col gap-2 pt-2">
             <Button variant="secondary" icon="share" onClick={() => void shareSpec(spec)}>
               Partager l’app (sans mes saisies)
@@ -505,6 +513,33 @@ function ReminderCard({ app }: { app: MiniApp }) {
           {busy && <p className="t-caption text-muted">Activation des notifications…</p>}
         </div>
       )}
+    </Card>
+  );
+}
+
+const STAT_OPTIONS: { value: StatId | ''; label: string }[] = [
+  { value: '', label: 'Aucune' },
+  ...STATS.filter((s) => s.id !== 'constance').map((s) => ({ value: s.id, label: s.name })),
+  ...DECLARED_STATS.map((s) => ({ value: s.id, label: s.name })),
+];
+
+/** La stat du Personnage que chaque saisie fait un peu monter (V4) : quelques points, jamais le poids d'une séance. */
+function StatChoice({ app }: { app: MiniApp }) {
+  const spec = app.spec!;
+  return (
+    <Card>
+      <SelectField
+        label="Fait monter ton Personnage"
+        value={spec.stat ?? ''}
+        onChange={(v) => {
+          const { stat: _old, ...rest } = spec;
+          void _old;
+          saveMiniApp({ ...app, at: Date.now(), spec: v ? { ...rest, stat: v } : rest });
+          toast({ message: v ? `Chaque saisie fait monter : ${STAT_OPTIONS.find((o) => o.value === v)?.label}` : 'Ne fait plus monter de stat' });
+        }}
+        options={STAT_OPTIONS}
+        hint={`${XP.miniEntry} points par saisie, ${XP.miniEntryCap} saisies comptées par semaine au plus.`}
+      />
     </Card>
   );
 }

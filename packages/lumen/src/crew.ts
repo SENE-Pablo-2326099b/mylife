@@ -1,4 +1,4 @@
-import type { Character, StatId } from './character';
+import { STAT_IDS, type Character, type StatId } from './character';
 
 /**
  * Le Crew : un espace partagé où chaque membre publie son score du Personnage, et rien d'autre. Par
@@ -7,7 +7,7 @@ import type { Character, StatId } from './character';
  */
 
 export const CREW_TABLE = 'score';
-export const SHAREABLE_STATS: readonly StatId[] = ['force', 'discipline', 'social', 'constance', 'culture'];
+export const SHAREABLE_STATS: readonly StatId[] = STAT_IDS;
 
 export interface CrewScore {
   v: 1;

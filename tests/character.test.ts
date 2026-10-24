@@ -146,7 +146,7 @@ describe('bilans', () => {
     expect(r.questsTotal).toBe(3);
     expect(r.questsDone).toBe(2);
     expect(r.xp).toBe(timeline({ perf, finances, raveloc }, TODAY).find((w) => w.week === prev(1))!.total);
-    expect(recap({ perf }, TODAY, prev(1), prev(1)).apps).toEqual({ perf: true, finances: false, raveloc: false, music: false });
+    expect(recap({ perf }, TODAY, prev(1), prev(1)).apps).toMatchObject({ perf: true, finances: false, raveloc: false, music: false, chef: false });
   });
 
   it('période : sommes, meilleure semaine, niveaux gagnés, plus longue série', () => {
@@ -213,5 +213,27 @@ describe('Crew', () => {
       ['Dan', 4, 0, false],
     ]);
     expect(sameCrewScore(s(1, '2026-10', 1), { ...s(1, '2026-10', 1), at: 99 })).toBe(true);
+  });
+});
+
+describe('stats déclarées et « Mes apps » (V4)', () => {
+  const at = 1;
+  it('une stat déclarée reste cachée tant que son app n’a rien publié, puis compte selon sa règle, plafonnée', async () => {
+    const { computeCharacter, DECLARED_STATS } = await import('../packages/lumen/src/character');
+    const base = { perf: { v: 1 as const, at, weeks: { '2026-10-19': { sessions: 2 } }, goal: 3 } };
+    expect(computeCharacter(base, '2026-10-24').stats.map((s) => s.id)).toEqual(['force', 'discipline', 'social', 'constance', 'culture']);
+    const chef = DECLARED_STATS.find((d) => d.app === 'chef')!;
+    // 20 repas faits maison dans la semaine : 14 comptés (plafond).
+    const c = computeCharacter({ ...base, chef: { v: 1, at, weeks: { '2026-10-19': { meals: 20 } } } }, '2026-10-24');
+    const vit = c.stats.find((s) => s.id === 'vitalite')!;
+    expect(vit).toMatchObject({ name: 'Vitalité', locked: false, xp: chef.points.meals!.xp * 14, week: chef.points.meals!.xp * 14 });
+  });
+
+  it('« Mes apps » fait monter la stat choisie, peu et plafonné ; la Culture se déverrouille aussi par là', async () => {
+    const { computeCharacter, XP } = await import('../packages/lumen/src/character');
+    const c = computeCharacter({ miniapps: { v: 1, at, weeks: { '2026-10-19': { 'stat:culture': 9, 'stat:force': 2 } } } }, '2026-10-24');
+    expect(c.stats.find((s) => s.id === 'culture')).toMatchObject({ locked: false, xp: XP.miniEntry * XP.miniEntryCap });
+    expect(c.stats.find((s) => s.id === 'force')!.xp).toBe(XP.miniEntry * 2);
+    expect(c.empty).toBe(false);
   });
 });

@@ -135,6 +135,7 @@ const READ_LABEL: Record<string, string> = {
   get_time_split: 'ton temps',
   list_sorties: 'tes sorties',
   get_my_apps: 'tes apps',
+  get_agenda: 'ton agenda',
   propose_action: 'une action à valider',
 };
 

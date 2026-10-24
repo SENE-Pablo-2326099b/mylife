@@ -5,7 +5,11 @@
  * tous les appareils, sans registre d'XP à synchroniser ni à tricher.
  */
 
-export type StatsApp = 'perf' | 'finances' | 'raveloc' | 'music';
+/**
+ * Apps qui publient des compteurs : les quatre de départ, « Mes apps » (`miniapps`), et celles des stats déclarées
+ * (`DECLARED_STATS`, plus bas).
+ */
+export type StatsApp = 'perf' | 'finances' | 'raveloc' | 'music' | 'miniapps' | DeclaredStatsApp;
 
 /**
  * Compteurs d'une app, par semaine (clé : le lundi, `AAAA-MM-JJ`).
@@ -13,6 +17,8 @@ export type StatsApp = 'perf' | 'finances' | 'raveloc' | 'music';
  * - finances : `under` (jours sous le budget du jour), `tracked` (jours suivis), `saved` (cycles terminés cette semaine avec l'épargne prévue tenue).
  * - raveloc : `groups` (groupes actifs), `friends` (amis distincts dans ces groupes).
  * - music : `minutes` (minutes d'écoute), `discoveries` (artistes écoutés pour la première fois).
+ * - miniapps : `stat:<stat>` (saisies de la semaine dans les apps sans code qui font monter cette stat).
+ * - une app de stat déclarée : les compteurs de sa règle (`DeclaredStat.points`).
  */
 export interface AppStats {
   v: 1;
@@ -24,7 +30,38 @@ export interface AppStats {
 
 export type StatsByApp = Partial<Record<StatsApp, AppStats | null>>;
 
-export type StatId = 'force' | 'discipline' | 'social' | 'constance' | 'culture';
+export type CoreStatId = 'force' | 'discipline' | 'social' | 'constance' | 'culture';
+export type StatId = CoreStatId | DeclaredStatId;
+
+// ---------------------------------------------------------------- stats déclarées (contrat d'app, V4)
+
+/**
+ * Une stat apportée par une app (MyChef, plein air, culture, foyer…) : ses points viennent des compteurs par semaine de
+ * son app, chacun plafonné (une semaine hors norme ne fait pas tout). **Cachée tant que son app n'a rien publié** :
+ * pas de « bientôt » partout. Les règles se règlent quand l'app arrive ; une nouvelle stat s'ajoute ici.
+ */
+export type DeclaredStatId = 'vitalite' | 'savoir' | 'endurance' | 'foyer';
+export type DeclaredStatsApp = 'chef' | 'culture' | 'pleinair' | 'foyer';
+
+export interface DeclaredStat {
+  id: DeclaredStatId;
+  name: string;
+  source: string;
+  app: DeclaredStatsApp;
+  /** Points par unité de chaque compteur, et nombre d'unités comptées au plus par semaine. */
+  points: Record<string, { xp: number; cap: number }>;
+}
+
+export const DECLARED_STATS: readonly DeclaredStat[] = [
+  { id: 'vitalite', name: 'Vitalité', source: 'Repas faits maison et gaspillage évité (MyChef)', app: 'chef', points: { meals: { xp: 15, cap: 14 }, saved: { xp: 10, cap: 10 } } },
+  { id: 'savoir', name: 'Savoir', source: 'Livres finis, films et séries vus (MyCulture)', app: 'culture', points: { books: { xp: 120, cap: 3 }, pages: { xp: 1, cap: 300 }, watched: { xp: 20, cap: 7 } } },
+  { id: 'endurance', name: 'Endurance', source: 'Kilomètres et sorties de course, vélo, rando (MyPlein air)', app: 'pleinair', points: { km: { xp: 3, cap: 80 }, outings: { xp: 30, cap: 7 } } },
+  { id: 'foyer', name: 'Foyer', source: 'Corvées faites pour ta maison (MyFoyer)', app: 'foyer', points: { chores: { xp: 10, cap: 21 } } },
+];
+
+/** Toutes les stats qu'on peut montrer ou partager (celles de départ, puis les déclarées). */
+export const STAT_IDS: readonly StatId[] = ['force', 'discipline', 'social', 'constance', 'culture', ...DECLARED_STATS.map((d) => d.id)];
+const zeroXp = (): Record<StatId, number> => Object.fromEntries(STAT_IDS.map((id) => [id, 0])) as Record<StatId, number>;
 
 export interface StatDef {
   id: StatId;
@@ -66,6 +103,9 @@ export const XP = {
   listenCapMinutes: 600,
   discovery: 20,
   discoveryCap: 10,
+  /** « Mes apps » : une saisie de la semaine dans une app qui fait monter une stat (5 comptées au plus par stat). */
+  miniEntry: 5,
+  miniEntryCap: 5,
 } as const;
 
 /** Jours sous le budget demandés par la quête Discipline (et jours suivis nécessaires pour qu'elle existe). */
@@ -186,11 +226,11 @@ interface WeekResult {
   good: boolean;
 }
 
-function evaluateWeek(stats: StatsByApp, week: string, starts: Record<StatsApp, string | null>, isCurrent: boolean): WeekResult {
+function evaluateWeek(stats: StatsByApp, week: string, starts: Partial<Record<StatsApp, string | null>>, isCurrent: boolean): WeekResult {
   const { perf, finances, raveloc } = stats;
-  const xp: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
+  const xp = zeroXp();
   const quests: Quest[] = [];
-  const open = (app: StatsApp) => starts[app] !== null && week >= starts[app]!;
+  const open = (app: StatsApp) => starts[app] != null && week >= starts[app]!;
 
   // Force
   const sessions = count(perf, week, 'sessions');
@@ -224,6 +264,12 @@ function evaluateWeek(stats: StatsByApp, week: string, starts: Record<StatsApp, 
   // Culture (pas de quête : l'historique d'écoute est importé, pas suivi en direct)
   xp.culture += Math.floor(Math.min(count(stats.music, week, 'minutes'), XP.listenCapMinutes) / XP.listenMinutesPerXp) + XP.discovery * Math.min(count(stats.music, week, 'discoveries'), XP.discoveryCap);
 
+  // Stats déclarées par les apps : leur règle, compteur par compteur, plafonnée.
+  for (const d of DECLARED_STATS) for (const [key, rule] of Object.entries(d.points)) xp[d.id] += rule.xp * Math.min(count(stats[d.app], week, key), rule.cap);
+
+  // « Mes apps » : quelques points pour la stat que chaque app sans code fait monter (jamais le poids d'une séance).
+  for (const id of STAT_IDS) xp[id] += XP.miniEntry * Math.min(count(stats.miniapps, week, `stat:${id}`), XP.miniEntryCap);
+
   const required = quests.filter((q) => !q.bonus);
   const good = required.length > 0 && required.filter((q) => q.done).length >= Math.min(2, required.length);
   if (quests.length >= 2) {
@@ -249,14 +295,20 @@ export interface TimelineWeek {
   streak: number;
 }
 
-function appStarts(stats: StatsByApp): Record<StatsApp, string | null> {
-  return {
+function appStarts(stats: StatsByApp): Partial<Record<StatsApp, string | null>> {
+  const starts: Partial<Record<StatsApp, string | null>> = {
     perf: firstWeek(stats.perf, ['sessions']),
     finances: firstWeek(stats.finances, ['tracked']),
     raveloc: firstWeek(stats.raveloc, ['groups']),
     music: firstWeek(stats.music, ['minutes']),
+    miniapps: firstWeek(stats.miniapps, STAT_IDS.map((id) => `stat:${id}`)),
   };
+  for (const d of DECLARED_STATS) starts[d.app] = firstWeek(stats[d.app], Object.keys(d.points));
+  return starts;
 }
+
+/** Une stat déclarée se montre dès que son app a publié quelque chose. */
+const declaredShown = (stats: StatsByApp, d: DeclaredStat) => Object.values(stats[d.app]?.weeks ?? {}).some((c) => Object.keys(d.points).some((k) => (c[k] ?? 0) > 0));
 
 /**
  * Toute l'histoire du personnage, semaine par semaine, de la première semaine où une app a servi jusqu'à la
@@ -293,10 +345,10 @@ export function timeline(stats: StatsByApp, today: string, rest: readonly string
 export function computeCharacter(stats: StatsByApp, today: string, rest: readonly string[] = []): Character {
   const current = weekStart(today);
   const line = timeline(stats, today, rest);
-  const totals: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
-  for (const w of line) for (const id of Object.keys(totals) as StatId[]) totals[id] += w.xp[id];
+  const totals = zeroXp();
+  for (const w of line) for (const id of STAT_IDS) totals[id] += w.xp[id] ?? 0;
   const now = line[line.length - 1]?.week === current ? line[line.length - 1]! : null;
-  const weekly = now?.xp ?? { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
+  const weekly = now?.xp ?? zeroXp();
   const xp = line[line.length - 1]?.cumulative ?? 0;
   const global = levelFor(xp, GLOBAL_BASE);
   return {
@@ -306,12 +358,19 @@ export function computeCharacter(stats: StatsByApp, today: string, rest: readonl
     levelXp: global.levelXp,
     nextXp: global.nextXp,
     progress: global.progress,
-    stats: STATS.map((d) => {
-      const l = levelFor(totals[d.id]);
-      // Culture : verrouillée tant qu'aucun historique d'écoute n'a été importé.
-      const locked = !!d.locked || (d.id === 'culture' && !Object.keys(stats.music?.weeks ?? {}).length);
-      return { id: d.id, name: d.name, source: locked && d.id === 'culture' ? 'Importe ton historique Spotify dans MyMusique' : d.source, locked, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
-    }),
+    stats: [
+      ...STATS.map((d) => {
+        const l = levelFor(totals[d.id]);
+        // Culture : verrouillée tant qu'aucun historique d'écoute n'a été importé (et que « Mes apps » n'y a rien mis).
+        const locked = !!d.locked || (d.id === 'culture' && !Object.keys(stats.music?.weeks ?? {}).length && totals.culture === 0);
+        return { id: d.id, name: d.name, source: locked && d.id === 'culture' ? 'Importe ton historique Spotify dans MyMusique' : d.source, locked, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
+      }),
+      // Les stats déclarées, seulement une fois leur app (ou « Mes apps ») au travail.
+      ...DECLARED_STATS.filter((d) => declaredShown(stats, d) || totals[d.id] > 0).map((d) => {
+        const l = levelFor(totals[d.id]);
+        return { id: d.id, name: d.name, source: d.source, locked: false, xp: totals[d.id], level: l.level, progress: l.progress, week: weekly[d.id] };
+      }),
+    ],
     quests: now?.quests ?? [],
     streak: line[line.length - 1]?.streak ?? 0,
     weekXp: now?.total ?? 0,
@@ -329,7 +388,7 @@ export interface Recap {
   to: string;
   /** Semaines de la période déjà commencées. */
   weeks: number;
-  apps: Record<StatsApp, boolean>;
+  apps: Partial<Record<StatsApp, boolean>>;
   sessions: number;
   records: number;
   /** Semaines où l'objectif de séances a été atteint. */
@@ -362,8 +421,8 @@ export function recap(stats: StatsByApp, today: string, from: string, to: string
   const startXp = before[before.length - 1]?.cumulative ?? 0;
   const endXp = inside[inside.length - 1]?.cumulative ?? startXp;
   const sum = (s: AppStats | null | undefined, key: string) => inside.reduce((n, w) => n + count(s, w.week, key), 0);
-  const xpByStat: Record<StatId, number> = { force: 0, discipline: 0, social: 0, constance: 0, culture: 0 };
-  for (const w of inside) for (const id of Object.keys(xpByStat) as StatId[]) xpByStat[id] += w.xp[id];
+  const xpByStat = zeroXp();
+  for (const w of inside) for (const id of STAT_IDS) xpByStat[id] += w.xp[id] ?? 0;
   const main = inside.flatMap((w) => w.quests.filter((q) => q.id !== 'full'));
   const best = inside.reduce<TimelineWeek | null>((b, w) => (w.total > (b?.total ?? 0) ? w : b), null);
   const used = (s: AppStats | null | undefined, keys: readonly string[]) => inside.some((w) => keys.some((k) => count(s, w.week, k) > 0));
@@ -371,7 +430,13 @@ export function recap(stats: StatsByApp, today: string, from: string, to: string
     from,
     to,
     weeks: inside.length,
-    apps: { perf: used(stats.perf, ['sessions']), finances: used(stats.finances, ['tracked']), raveloc: used(stats.raveloc, ['groups']), music: used(stats.music, ['minutes']) },
+    apps: {
+      perf: used(stats.perf, ['sessions']),
+      finances: used(stats.finances, ['tracked']),
+      raveloc: used(stats.raveloc, ['groups']),
+      music: used(stats.music, ['minutes']),
+      ...Object.fromEntries(DECLARED_STATS.map((d) => [d.app, used(stats[d.app], Object.keys(d.points))])),
+    },
     sessions: sum(stats.perf, 'sessions'),
     records: sum(stats.perf, 'records'),
     goalWeeks: inside.filter((w) => w.quests.some((q) => q.id === 'force' && q.done)).length,
@@ -442,7 +507,7 @@ export function wrappedFor(today: string): { kind: 'month' | 'year'; period: str
 // ---------------------------------------------------------------- stockage (web : même adresse pour toutes les apps)
 
 export const statsKey = (app: StatsApp) => `mylife:stats:${app}`;
-export const STATS_APPS: readonly StatsApp[] = ['perf', 'finances', 'raveloc', 'music'];
+export const STATS_APPS: readonly StatsApp[] = ['perf', 'finances', 'raveloc', 'music', 'miniapps', ...DECLARED_STATS.map((d) => d.app)];
 
 export function parseStats(raw: unknown): AppStats | null {
   if (!raw || typeof raw !== 'object') return null;

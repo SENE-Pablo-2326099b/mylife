@@ -14,6 +14,7 @@ import { useSession } from '../ui/session';
 import { useInstallState } from '../install';
 import { CharacterCard } from './Character';
 import { WeekRecapCard, WrappedCard } from './Recap';
+import { DayCard } from './DayCard';
 
 const APP_ICON: Record<MyLifeApp['id'], IconName> = { finances: 'diamond-fill', perf: 'barbell', raveloc: 'navigate' };
 
@@ -109,6 +110,7 @@ export function HomePage() {
           <Reveal index={1}>
             <div className="flex flex-col gap-3">
               <WrappedCard />
+              <DayCard />
               <CharacterCard />
               <Card to="/copilot" label="Copilot : une IA pour toutes tes apps">
                 <div className="flex items-center gap-3">

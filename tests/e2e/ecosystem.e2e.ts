@@ -850,6 +850,22 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
+  it('Ta journée : l’agenda commun montre la sortie du jour sur l’accueil (autre appareil du compte)', async () => {
+    // Un parcours précédent a connecté un autre compte dans la page principale : on revient avec le premier.
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.getByText('Ta journée', { exact: true }).waitFor({ timeout: 20_000 });
+    await p.getByText('Festival test', { exact: false }).first().waitFor({ timeout: 30_000 });
+    await shot(p, '35-ta-journee');
+    expect(await p.evaluate(() => Object.keys(localStorage))).toContain('mylife:agenda:home');
+    await ctx.close();
+  });
+
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
     // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
     const [anon, a] = await device();
