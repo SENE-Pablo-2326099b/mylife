@@ -1,4 +1,7 @@
-import { EVERY_DAY, localToday, type MiniApp } from './vendor/lumen';
+import { EVERY_DAY, STARTER_RECIPES, addDaysIso, findFood, foodKey, localToday, type MiniApp, type PantryItem, type PlannedMeal, type Recipe } from './vendor/lumen';
+import { pantry, plan as chefPlan, recipes } from './myChefData';
+
+const mealList = () => chefPlan.list().map((m) => m.value);
 import { currentSession } from './vendor/mylife-sync/web';
 import { currentEndpoint, sendWakeups, setRemindersCount } from './push';
 import { readMiniApps } from './ui/stats';
@@ -21,6 +24,8 @@ export interface PlannedReminder {
   days: number;
   /** Jours (AAAA-MM-JJ) où il ne sonne pas : déjà fait. */
   skip: string[];
+  /** Un seul jour (AAAA-MM-JJ) : un rappel ponctuel (MyChef : sortir un aliment du congélateur la veille). */
+  date?: string;
 }
 
 const DB = 'mylife-reminders';
@@ -60,6 +65,27 @@ export function miniAppReminders(apps: readonly MiniApp[], today = localToday())
     }));
 }
 
+const keyOf = (name: string) => foodKey(findFood(name)?.name ?? name);
+
+/**
+ * MyChef : la veille d'un repas prévu, à 20 h, « sors le poulet du congélateur » pour chaque ingrédient rangé au
+ * congélateur. Rappels ponctuels (une date).
+ */
+export function chefReminders(meals: readonly PlannedMeal[], mine: readonly { id: string; value: Recipe }[], stock: readonly PantryItem[], today = localToday()): PlannedReminder[] {
+  const frozen = new Map(stock.filter((p) => p.place === 'congel' && p.level !== 'out').map((p) => [keyOf(p.name), p.name]));
+  if (!frozen.size) return [];
+  const all = [...mine, ...STARTER_RECIPES.map((r, k) => ({ id: `fournie-${k}`, value: r }))];
+  const out: PlannedReminder[] = [];
+  for (const m of meals) {
+    if (m.leftover || !m.recipeId || m.day <= today) continue;
+    const r = all.find((x) => x.id === m.recipeId)?.value;
+    const items = [...new Set((r?.ingredients ?? []).map((i) => frozen.get(keyOf(i.name))).filter((n): n is string => !!n))];
+    if (!items.length) continue;
+    out.push({ id: `chef:${m.day}-${m.slot}`, title: 'MyChef', body: `Sors du congélateur pour demain : ${items.join(', ').toLowerCase()} (${m.title}).`, url: '/chef?vue=semaine', minute: 20 * 60, days: EVERY_DAY, skip: [], date: addDaysIso(m.day, -1) });
+  }
+  return out;
+}
+
 /** Minutes UTC des réveils, pour un fuseau donné (décalage en minutes, comme `getTimezoneOffset`). */
 export function wakeupMinutes(plan: readonly PlannedReminder[], offset = new Date().getTimezoneOffset()): number[] {
   return [...new Set(plan.map((r) => (((r.minute + offset) % 1440) + 1440) % 1440))].sort((a, b) => a - b);
@@ -70,7 +96,7 @@ let lastSent = '';
 /** Recalcule le plan de l'appareil et ses heures de réveil (au lancement, et quand « Mes apps » change). */
 export async function refreshReminders(): Promise<void> {
   if (typeof indexedDB === 'undefined' || !currentSession()) return;
-  const plan = miniAppReminders(Object.values(readMiniApps()));
+  const plan = [...miniAppReminders(Object.values(readMiniApps())), ...chefReminders(mealList(), recipes.list(), pantry.list().map((p) => p.value))];
   setRemindersCount(plan.length);
   try {
     await writePlan(plan);

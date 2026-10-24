@@ -543,4 +543,5 @@ export * from './agenda';
 export * from './objectifs';
 export * from './chef';
 export * from './recipes';
+export * from './mealplan';
 // new-app: moteurs (repère du générateur, ne pas retirer)

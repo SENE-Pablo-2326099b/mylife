@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   RECIPE_PROMPT,
-  STARTER_RECIPES,
   afterCooking,
   expiringSoon,
   extractJson,
@@ -15,7 +14,7 @@ import {
   type Availability,
   type Recipe,
 } from '../vendor/lumen';
-import { cooked, pantry, recipes } from '../myChefData';
+import { cooked, pantry, recipes, withStarters } from '../myChefData';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, EmptyState, Group, Reveal, Row, SectionTitle, Segmented, Sheet, toast } from '../ui/index';
 import { publishStats } from '../ui/stats';
@@ -25,7 +24,6 @@ import { publishStats } from '../ui/stats';
  * `addToList` : ajoute un aliment à la liste de courses active (la tienne ou celle du foyer).
  */
 const newId = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
-const STARTER_IDS = STARTER_RECIPES.map((_, i) => `fournie-${i}`);
 const qtyText = (q?: number, unit?: string) => (q === undefined ? '' : `${String(q).replace('.', ',')}${unit ? ` ${unit}` : ''} `);
 
 function statusBadge(a: Availability) {
@@ -176,7 +174,7 @@ function CookMode({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) 
   );
 }
 
-function RecipeDetail({ id, recipe, availability, mine, addToList, onClose }: { id: string; recipe: Recipe; availability: Availability; mine: boolean; addToList: (name: string) => void; onClose: () => void }) {
+export function RecipeDetail({ id, recipe, availability, mine, addToList, onClose }: { id: string; recipe: Recipe; availability: Availability; mine: boolean; addToList: (name: string) => void; onClose: () => void }) {
   const [servings, setServings] = useState(recipe.servings);
   const [cooking, setCooking] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -264,7 +262,7 @@ export function ChefRecipes({ addToList }: { addToList: (name: string) => void }
   const [open, setOpen] = useState<string | null>(null);
   const [filter, setFilter] = useState<'possible' | 'toutes'>('possible');
   const today = localToday();
-  const all = useMemo(() => [...mine.map((m) => ({ id: m.id, value: m.value, mine: true })), ...STARTER_RECIPES.map((r, k) => ({ id: STARTER_IDS[k]!, value: r, mine: false }))], [mine]);
+  const all = useMemo(() => withStarters(mine), [mine]);
   const ranked = useMemo(() => rankRecipes(all, stock.map((s) => s.value), expiringSoon(stock, today).map((i) => i.value.name)), [all, stock, today]);
   const shown = filter === 'possible' ? ranked.filter((r) => r.availability.status !== 'no') : ranked;
   const current = ranked.find((r) => r.id === open) ?? null;

@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/chef?vue=semaine', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -1016,6 +1016,29 @@ describe('MyLife, une seule app', () => {
     // La stat Vitalité apparaît sur le Personnage (repas fait maison).
     await p.goto(`${server.url}/personnage`);
     await p.getByText('Vitalité').first().waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
+  it('MyChef semaine : proposer la semaine, les courses qui en découlent, le repas du soir dans « Ta journée »', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    // L'accueil a mis la sortie du jour dans l'agenda commun.
+    await p.getByText('Festival test', { exact: false }).first().waitFor({ timeout: 30_000 });
+    await p.goto(`${server.url}/chef?vue=semaine`);
+    await p.getByRole('button', { name: 'Proposer ma semaine' }).click();
+    await p.getByText(/repas proposés? : change/).waitFor();
+    // Le soir de la sortie du jour (agenda commun) reste sans dîner.
+    await p.getByText('Dehors ce soir').first().waitFor();
+    await shot(p, '41-chef-semaine');
+    await p.getByRole('button', { name: 'Les courses' }).click();
+    await p.getByText(/ajoutés? à la liste|déjà tout ce qu’il faut/).waitFor();
+    await p.goto(`${server.url}/`);
+    await p.getByText(/Soir : /).first().waitFor({ timeout: 20_000 });
     await ctx.close();
   });
 

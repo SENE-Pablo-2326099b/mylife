@@ -39,7 +39,7 @@ async function dueReminders(now = new Date()) {
   const minute = now.getHours() * 60 + now.getMinutes();
   const due = plan.filter((r) => {
     const late = (minute - r.minute + 1440) % 1440;
-    return (r.days & bit) && (late <= 20 || late >= 1435) && !(r.skip || []).includes(today) && shown[r.id] !== today;
+    return (r.days & bit) && (!r.date || r.date === today) && (late <= 20 || late >= 1435) && !(r.skip || []).includes(today) && shown[r.id] !== today;
   });
   for (const r of due) shown[r.id] = today;
   if (due.length) await put(db, 'shown', shown);

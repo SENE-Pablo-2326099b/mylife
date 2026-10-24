@@ -81,10 +81,12 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
     };
     soon();
     window.addEventListener('mylife:stats', soon);
+    window.addEventListener('mylife:collections', soon);
     window.addEventListener('storage', soon);
     return () => {
       if (timer) clearTimeout(timer);
       window.removeEventListener('mylife:stats', soon);
+      window.removeEventListener('mylife:collections', soon);
       window.removeEventListener('storage', soon);
     };
   }, [session]);

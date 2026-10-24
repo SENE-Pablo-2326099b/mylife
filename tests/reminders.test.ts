@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import * as core from '../server/core';
 import { pushDispatch, sendWakeups, sendWeekly, type PushEnv, type PushSender } from '../server/push';
 import { addEntry, emptyMiniApp, MINI_TEMPLATES, setMiniReminder } from '../packages/lumen/src/miniapp';
-import { miniAppReminders, wakeupMinutes, type PlannedReminder } from '../web/src/reminders';
+import { chefReminders, miniAppReminders, wakeupMinutes, type PlannedReminder } from '../web/src/reminders';
+import { newPantryItem } from '../packages/lumen/src/chef';
+import { STARTER_RECIPES } from '../packages/lumen/src/recipes';
 
 /** Rappels écrits par l'appareil (V4, F2) : le serveur ne connaît que des heures de réveil et envoie un signal vide. */
 const secret = 'x'.repeat(40);
@@ -79,6 +81,22 @@ describe('appareil : le plan des rappels', () => {
   });
 });
 
+describe('MyChef : sortir un aliment du congélateur la veille', () => {
+  it('la veille à 20 h, pour chaque ingrédient d’un repas prévu rangé au congélateur ; rien pour des restes ou le jour même', () => {
+    const curry = STARTER_RECIPES.findIndex((r) => r.title === 'Poulet au curry');
+    const meals = [
+      { v: 1 as const, day: '2026-10-27', slot: 'soir' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry', servings: 2 },
+      { v: 1 as const, day: '2026-10-28', slot: 'midi' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry (restes)', servings: 2, leftover: true },
+      { v: 1 as const, day: '2026-10-24', slot: 'soir' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry', servings: 2 },
+    ];
+    const stock = [{ ...newPantryItem('poulet', '2026-10-20'), place: 'congel' as const }, newPantryItem('riz', '2026-10-20')];
+    expect(chefReminders(meals, [], stock, '2026-10-24')).toEqual([
+      { id: 'chef:2026-10-27-soir', title: 'MyChef', body: 'Sors du congélateur pour demain : poulet (Poulet au curry).', url: '/chef?vue=semaine', minute: 1200, days: 127, skip: [], date: '2026-10-26' },
+    ]);
+    expect(chefReminders(meals, [], [newPantryItem('poulet', '2026-10-20')], '2026-10-24')).toEqual([]);
+  });
+});
+
 describe('service worker : il écrit lui-même le rappel du moment', () => {
   /** Exécute push-sw.js avec un faux navigateur : une base locale en mémoire, des notifications notées. */
   function worker(plan: PlannedReminder[], now: string) {
@@ -135,6 +153,16 @@ describe('service worker : il écrit lui-même le rappel du moment', () => {
     expect(w.shown.map((n) => n.title)).toEqual(['Lecture']);
     await w.push({ type: 'wake' });
     expect(w.shown).toHaveLength(1);
+  });
+
+  it('un rappel ponctuel ne sonne que le jour prévu', async () => {
+    const once: PlannedReminder = { id: 'chef:x', title: 'MyChef', body: 'Sors le poulet', url: '/', minute: 20 * 60, days: 127, skip: [], date: '2026-10-26' };
+    const w = worker([once], '2026-10-25T20:01:00');
+    await w.push({ type: 'wake' });
+    expect(w.shown).toEqual([]);
+    const w2 = worker([once], '2026-10-26T20:01:00');
+    await w2.push({ type: 'wake' });
+    expect(w2.shown.map((n) => n.body)).toEqual(['Sors le poulet']);
   });
 
   it('le message du dimanche reste générique', async () => {

@@ -5,8 +5,8 @@
  * Chaque app recalcule les siens quand elle s'ouvre ; un agenda trop ancien est signalé (`stale`).
  */
 
-export type AgendaApp = 'finances' | 'perf' | 'home';
-export type AgendaKind = 'session' | 'income' | 'charge' | 'savings' | 'sortie' | 'other';
+export type AgendaApp = 'finances' | 'perf' | 'home' | 'chef';
+export type AgendaKind = 'session' | 'income' | 'charge' | 'savings' | 'sortie' | 'meal' | 'other';
 
 export interface AgendaEvent {
   /** Unique dans son app. */
@@ -32,14 +32,14 @@ interface AgendaCard {
   events: AgendaEvent[];
 }
 
-export const AGENDA_APPS: readonly AgendaApp[] = ['finances', 'perf', 'home'];
+export const AGENDA_APPS: readonly AgendaApp[] = ['finances', 'perf', 'home', 'chef'];
 export const agendaKey = (app: AgendaApp) => `mylife:agenda:${app}`;
 /** Émis dans la page quand une app y réécrit son agenda (l'événement `storage` ne vient que des autres onglets). */
 export const AGENDA_EVENT = 'mylife:agenda';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME = /^\d{2}:\d{2}$/;
-const KINDS: readonly AgendaKind[] = ['session', 'income', 'charge', 'savings', 'sortie', 'other'];
+const KINDS: readonly AgendaKind[] = ['session', 'income', 'charge', 'savings', 'sortie', 'meal', 'other'];
 
 /** Lecture prudente d'un événement. */
 export function parseAgendaEvent(raw: unknown, app: AgendaApp): AgendaEvent | null {

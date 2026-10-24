@@ -22,6 +22,7 @@ import {
 import type { Space } from '../vendor/mylife-sync';
 import { listItemFor, pantry, shopping } from '../myChefData';
 import { ChefRecipes } from './ChefRecipes';
+import { ChefWeek } from './ChefWeek';
 import { CREW_URL, client, loadCrews, useCrews } from '../crew';
 import { forgetSpace, useSpaceData, writeSpace } from '../spaceSync';
 import { useSession } from '../ui/session';
@@ -33,7 +34,7 @@ import { Screen } from '../ui/Screen';
  * MyChef (V4, 3.4), palier 1 : la liste de courses et le garde-manger. Les indispensables bientôt finis reviennent seuls
  * sur la liste ; un article coché en magasin entre dans le stock. Moteur : packages/lumen/src/chef.ts.
  */
-type Tab = 'courses' | 'stock' | 'recettes';
+type Tab = 'courses' | 'stock' | 'recettes' | 'semaine';
 const LEVEL: Record<Level, string> = { ok: 'En stock', low: 'Bientôt fini', out: 'Fini' };
 
 function when(expires: string, today: string): { text: string; tone: 'danger' | 'warning' | 'muted' } {
@@ -403,13 +404,13 @@ function Pantry({ today }: { today: string }) {
 export function MyChefPage() {
   const [params, setParams] = useSearchParams();
   const vue = params.get('vue');
-  const tab: Tab = vue === 'stock' || vue === 'recettes' ? vue : 'courses';
+  const tab: Tab = vue === 'stock' || vue === 'recettes' || vue === 'semaine' ? vue : 'courses';
   const today = localToday();
   const list = useShoppingList();
   const toBuy = list.items.filter((l) => !l.value.done).length;
-  const addToList = (name: string) => {
+  const addToList = (name: string, qty?: number, unit?: string) => {
     const { id, item } = listItemFor(name);
-    if (!list.items.some((i) => i.id === id && !i.value.done)) list.put(id, item);
+    if (!list.items.some((i) => i.id === id && !i.value.done)) list.put(id, { ...item, ...(qty !== undefined ? { qty, ...(unit ? { unit } : {}) } : {}) });
   };
   const soon = expiringSoon(pantry.useList(), today).length;
   return (
@@ -423,9 +424,10 @@ export function MyChefPage() {
             { value: 'courses', label: toBuy ? `Courses (${toBuy})` : 'Courses' },
             { value: 'stock', label: soon ? `Stock (${soon})` : 'Stock' },
             { value: 'recettes', label: 'Recettes' },
+            { value: 'semaine', label: 'Semaine' },
           ]}
         />
-        {tab === 'courses' ? <Shopping today={today} /> : tab === 'stock' ? <Pantry today={today} /> : <ChefRecipes addToList={addToList} />}
+        {tab === 'courses' ? <Shopping today={today} /> : tab === 'stock' ? <Pantry today={today} /> : tab === 'recettes' ? <ChefRecipes addToList={addToList} /> : <ChefWeek addToList={addToList} />}
       </div>
     </Screen>
   );

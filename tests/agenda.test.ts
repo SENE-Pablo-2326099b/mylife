@@ -36,7 +36,7 @@ describe('agenda commun', () => {
     writeAgenda('perf', '2026-10-20', [{ id: 'p1', kind: 'session', title: 'Haut', date: 'demain' }, { id: 'p2', kind: 'bizarre' as 'session', title: 'X'.repeat(200), date: '2026-10-28', time: '25h', url: 'https://ailleurs.test' }]);
     const v = readAgenda('2026-10-24', '2026-10-31');
     expect(v.events).toEqual([{ id: 'p2', app: 'perf', kind: 'other', title: 'X'.repeat(80), date: '2026-10-28' }]);
-    expect(v.sources).toEqual({ finances: null, perf: '2026-10-20', home: null });
+    expect(v.sources).toEqual({ finances: null, perf: '2026-10-20', home: null, chef: null });
     expect(v.stale).toEqual(['perf']);
   });
 

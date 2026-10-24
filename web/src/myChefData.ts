@@ -1,4 +1,4 @@
-import { findFood, foodId, parsePantryItem, parseRecipe, parseShoppingItem } from './vendor/lumen';
+import { STARTER_RECIPES, findFood, foodId, parsePantryItem, parsePlannedMeal, parseRecipe, parseShoppingItem, type Recipe } from './vendor/lumen';
 import { defineCollection } from './ui/collectionSync';
 
 /**
@@ -30,3 +30,11 @@ export const listItemFor = (name: string) => {
   const food = findFood(name);
   return { id: foodId(name), item: { v: 1 as const, name: food?.name ?? name, aisle: food?.aisle ?? ('autre' as const) } };
 };
+
+/** Les repas prévus de la semaine (une ligne par jour et par repas : `AAAA-MM-JJ-midi`). */
+export const plan = defineCollection({ app: 'chef', name: 'plan', parse: parsePlannedMeal, max: 400 });
+
+/** Tes recettes puis les recettes fournies (identifiants `fournie-<n>`), comme les voient Recettes et Semaine. */
+export function withStarters(mine: readonly { id: string; value: Recipe }[]): { id: string; value: Recipe; mine: boolean }[] {
+  return [...mine.map((m) => ({ id: m.id, value: m.value, mine: true })), ...STARTER_RECIPES.map((r, k) => ({ id: `fournie-${k}`, value: r, mine: false }))];
+}

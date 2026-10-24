@@ -8,8 +8,8 @@ import { formatCents } from '../ui/money';
  * « Ta journée » (V4, F3) : ce qui t'attend aujourd'hui et les jours suivants, toutes apps confondues, depuis l'agenda
  * commun (séances prévues, paie et prélèvements, investissements, sorties). Rien n'est envoyé : tout est sur l'appareil.
  */
-const ICON: Record<AgendaKind, IconName> = { session: 'barbell', income: 'cash', charge: 'card', savings: 'diamond', sortie: 'flag-fill', other: 'calendar' };
-const APP_NAME: Record<AgendaApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Sorties' };
+const ICON: Record<AgendaKind, IconName> = { session: 'barbell', income: 'cash', charge: 'card', savings: 'diamond', sortie: 'flag-fill', meal: 'leaf', other: 'calendar' };
+const APP_NAME: Record<AgendaApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Sorties', chef: 'MyChef' };
 const addDays = (iso: string, n: number) => {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + n);
