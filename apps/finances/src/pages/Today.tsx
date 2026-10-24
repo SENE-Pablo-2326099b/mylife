@@ -9,6 +9,7 @@ import { db, getMeta } from '../db/db';
 import type { Transaction } from '../db/types';
 import { isVariable, type Status } from '../domain/budget';
 import { useBudget } from '../domain/useBudget';
+import { useRecurringList } from '../domain/useInsights';
 import { OVERRUN_LABEL, overrunKind } from '../domain/budgetEngine';
 import { useAlerts } from '../domain/useAlerts';
 import { useAccounts, useCategories, useCategoryMap } from '../hooks';
@@ -47,6 +48,7 @@ export default function TodayPage() {
   const accounts = useAccounts();
   const today = todayISO();
   const { state: b, txs: windowTxs, loading } = useBudget(today);
+  const { items: recurringItems } = useRecurringList(b.cycle);
   const txs = windowTxs.filter((t) => t.date >= b.cycle.start && t.date <= b.cycle.end);
   const total = useLiveQuery(() => db.transactions.count(), []);
   const toClassify = useToClassifyCount();
@@ -113,8 +115,10 @@ export default function TodayPage() {
       overrunCoveredByFreeMoney: b.overrun?.covered != null,
       realFree: b.realFree === null ? null : eur(b.realFree),
       upcoming: b.upcoming.slice(0, 6).map((u) => ({ date: u.date, label: u.label, amount: eur(u.amount) })),
+      // Les récurrents du cycle, avec leur identifiant : Copilot peut proposer d'en sauter un ce mois (action validée).
+      recurring: recurringItems.slice(0, 40).map((i) => ({ id: i.id, label: i.label, kind: i.kind, amount: eur(i.amount), nextDate: i.nextDate, paidThisCycle: i.paid !== null, skippedThisCycle: i.skipped })),
     });
-  }, [ready, b, today]);
+  }, [ready, b, today, recurringItems]);
 
   // Données pas encore lues : ni faux chiffres ni faux « bienvenue ».
   if (total === undefined || loading) {

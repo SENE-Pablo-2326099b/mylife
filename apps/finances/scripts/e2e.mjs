@@ -213,6 +213,29 @@ try {
       await page.getByRole('dialog', { name: 'Rechercher et agir' }).waitFor({ state: 'detached' });
     });
 
+    await step('action validée dans Copilot : MyFinances l’exécute à son ouverture (sauter un récurrent ce mois) et rend son annulation', async () => {
+      await open('/');
+      let card = null;
+      for (let i = 0; i < 20 && !card?.recurring?.length; i++) {
+        card = await page.evaluate(() => JSON.parse(localStorage.getItem('mylife:copilot:finances') ?? 'null'));
+        if (!card?.recurring?.length) await page.waitForTimeout(300);
+      }
+      const item = card.recurring.find((r) => r.kind !== 'income' && !r.paidThisCycle && !r.skippedThisCycle);
+      expect(item, 'un récurrent à sauter dans la fiche Copilot');
+      await page.evaluate((id) => {
+        localStorage.setItem('mylife:actions', JSON.stringify([{ id: `e2e-${id}`, app: 'finances', kind: 'finances.skipRecurring', summary: 'Sauter ce mois', params: { itemId: id, skip: true }, createdAt: Date.now(), status: 'pending' }]));
+      }, item.id);
+      await open('/recurrents');
+      let action = null;
+      for (let i = 0; i < 30 && action?.status !== 'done'; i++) {
+        action = await page.evaluate(() => JSON.parse(localStorage.getItem('mylife:actions') ?? '[]')[0]);
+        if (action?.status !== 'done') await page.waitForTimeout(300);
+      }
+      expect(action?.status === 'done', `action exécutée (${JSON.stringify(action)})`);
+      expect(action.undo?.params?.skip === false, 'annulation fournie');
+      await page.locator('main#contenu button').filter({ hasText: item.label }).filter({ hasText: 'Sauté ce mois' }).first().waitFor();
+    });
+
     await step('navigation : Prévision et Récurrents en haut du Budget, Banques depuis Opérations, Réglages sans doublons', async () => {
       await open('/budget');
       await page.locator('main#contenu a[href$="/previsions"]').first().waitFor();

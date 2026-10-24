@@ -8,6 +8,7 @@ import {
   listeningStreak,
   monthWeeks,
   musicPeriod,
+  parseActionSpec,
   peakHour,
   recap,
   statValue,
@@ -15,6 +16,7 @@ import {
   weekStart,
   weeklySeries,
   yearWeeks,
+  type ActionSpec,
   type GamesData,
   type MiniApp,
   type MusicSummary,
@@ -23,9 +25,10 @@ import {
 
 /**
  * Copilot : l'IA de l'accueil MyLife, qui voit toutes les apps (avec la clé de l'utilisateur, depuis son
- * appareil, comme l'assistant de MyFinances et le coach de MyPerf). Lecture seule : il lit des résumés
- * (Personnage, bilans, fiches de contexte de MyFinances et MyPerf, musique, jeux, sorties) et propose ;
- * il ne modifie jamais rien. Ce module n'a pas d'interface : les sources de données lui sont fournies.
+ * appareil, comme l'assistant de MyFinances et le coach de MyPerf). Il lit des résumés (Personnage, bilans, fiches
+ * de contexte de MyFinances et MyPerf, musique, jeux, sorties) et propose ; il peut préparer des actions
+ * (`propose_action`) que l'utilisateur valide, exécutées ensuite par l'app concernée (actions.ts de lumen) : il ne
+ * modifie jamais rien lui-même. Ce module n'a pas d'interface : les sources de données lui sont fournies.
  */
 
 export const COPILOT_MODEL = 'claude-opus-5-5';
@@ -69,7 +72,7 @@ export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qu
 Ce que tu fais :
 - Tu réponds aux questions de l'utilisateur sur sa vie à partir de SES données, que tu lis avec tes outils. Lis avant de répondre : ne devine jamais un chiffre.
 - Tu croises les apps : un achat face au budget et à l'épargne, une semaine d'entraînement face à une sortie prévue, le temps passé à jouer face au sport.
-- Tu proposes, tu ne fais rien : tu n'as aucun moyen de modifier ses données. Quand une action est utile, dis précisément où la faire (« dans MyFinances, Réglages → … », « dans MyPerf, Planning → … »).
+- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf), noter une saisie dans une de ses apps (Mes apps). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training, apps et champs de get_my_apps), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
 
 Règles :
 - Réponds en français, tutoie, sois concret et bref : quelques phrases ou une courte liste. Les montants en euros, les dates en clair.
@@ -95,6 +98,21 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   { name: 'get_games', description: 'MyGames : heures de jeu par jeu sur les N dernières semaines (1 à 12), et depuis toujours.', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_time_split', description: 'Où va le temps : minutes de sport (séances MyPerf), de musique (MyMusique) et de jeu (MyGames) sur les N dernières semaines (1 à 12).', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
   { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  {
+    name: 'propose_action',
+    description:
+      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ) ; miniapp.addEntry (params : appId de get_my_apps, day AAAA-MM-JJ, values { identifiant de champ: valeur }). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['finances.skipRecurring', 'perf.movePlanned', 'miniapp.addEntry'] },
+        params: { type: 'object' },
+        summary: { type: 'string' },
+      },
+      required: ['kind', 'params', 'summary'],
+      additionalProperties: false,
+    },
+  },
   { name: 'list_sorties', description: 'Les sorties (festivals, week-ends) de l’utilisateur : dates, lieu, décision (« ça se fait »), sa réponse, planning des sets avec qui y va, budget partagé (son solde), choses à emporter restantes.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
 ];
 
@@ -154,8 +172,9 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
           const spec = a.spec!;
           const field = (id?: string) => spec.fields.find((f) => f.id === id);
           return {
+            appId: a.id,
             app: spec.name,
-            fields: spec.fields.map((f) => ({ label: f.label, type: f.type, unit: f.unit })),
+            fields: spec.fields.map((f) => ({ id: f.id, label: f.label, type: f.type, unit: f.unit, options: f.options, required: f.required })),
             goal: spec.goal ? { ...goalProgress(spec, a.entries, src.today), per: spec.goal.per, agg: spec.goal.agg, field: field(spec.goal.field)?.label } : null,
             stats: spec.stats.map((s) => ({ stat: s.label, value: formatMini(field(s.field), statValue(a.entries, s, src.today), s.agg) })),
             weeks: weeklySeries(spec, a.entries, src.today),
@@ -167,6 +186,11 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
     }
     case 'list_sorties':
       return json(src.sorties);
+    case 'propose_action': {
+      const parsed = parseActionSpec(input);
+      if (!parsed.action) return { content: parsed.error, isError: true };
+      return { content: 'Proposition affichée à l’utilisateur : elle attend sa validation (rien n’est encore fait).' };
+    }
     default:
       return { content: `Outil inconnu : ${name}`, isError: true };
   }
@@ -208,30 +232,34 @@ export interface TurnResult {
   /** Outils lus pendant ce tour (pour l'afficher). */
   read: string[];
   note: string | null;
+  /** Actions préparées pendant ce tour, à valider par l'utilisateur (identifiant = celui de l'appel d'outil). */
+  proposals: { id: string; action: ActionSpec }[];
 }
 
 /** Fait tourner Claude jusqu'à la fin de son tour (lectures comprises). `messages` finit par l'utilisateur. */
 export async function advance(messages: readonly Msg[], create: CreateMessage, sources: () => CopilotSources): Promise<TurnResult> {
   const history = [...messages];
   const read: string[] = [];
+  const proposals: TurnResult['proposals'] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
     const response = await create(requestParams(history));
     history.push({ role: 'assistant', content: response.content });
-    if (response.stop_reason === 'refusal') return { messages: history, read, note: 'Cette demande a été déclinée par les filtres de sécurité.' };
-    if (response.stop_reason === 'max_tokens') return { messages: history, read, note: 'Réponse coupée (trop longue) : demande plus court.' };
+    if (response.stop_reason === 'refusal') return { messages: history, read, note: 'Cette demande a été déclinée par les filtres de sécurité.', proposals };
+    if (response.stop_reason === 'max_tokens') return { messages: history, read, note: 'Réponse coupée (trop longue) : demande plus court.', proposals };
     if (response.stop_reason === 'pause_turn') continue;
     const uses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use');
-    if (response.stop_reason !== 'tool_use' || uses.length === 0) return { messages: history, read, note: null };
+    if (response.stop_reason !== 'tool_use' || uses.length === 0) return { messages: history, read, note: null, proposals };
     const src = sources();
     const results: Anthropic.Beta.BetaToolResultBlockParam[] = uses.map((u) => {
       read.push(u.name);
       const input = typeof u.input === 'object' && u.input !== null && !Array.isArray(u.input) ? (u.input as Record<string, unknown>) : {};
       const r = runTool(u.name, input, src);
+      if (u.name === 'propose_action' && !r.isError) proposals.push({ id: u.id, action: parseActionSpec(input).action! });
       return { type: 'tool_result', tool_use_id: u.id, content: r.content, ...(r.isError ? { is_error: true } : {}) };
     });
     history.push({ role: 'user', content: results });
   }
-  return { messages: history, read, note: 'Trop d’étapes pour une seule réponse : reformule ta question.' };
+  return { messages: history, read, note: 'Trop d’étapes pour une seule réponse : reformule ta question.', proposals };
 }
 
 /** Le texte à afficher d'un message de Claude. */

@@ -35,6 +35,7 @@ import { applyIdentity, BOOT_BG, identity, space, useShownTheme, useTheme } from
 import { themeInfo } from '@/ui/themes';
 import { cloudBoot, useCloud } from '@/services/cloud';
 import { watchPerfStats } from '@/services/rpgStats';
+import { startActionInbox } from '@/services/actionInbox';
 import { installSyncTriggers } from '@/services/cloud/sqliteStore';
 
 void SplashScreen.preventAutoHideAsync();
@@ -172,6 +173,8 @@ export default function RootLayout() {
     cloudBoot();
     // Compteurs du Personnage MyLife (séances, records), tenus à jour au fil des séances.
     watchPerfStats(() => useCloud.getState().joined);
+    // Actions validées dans Copilot (décaler une séance prévue), exécutées par MyPerf (web).
+    startActionInbox();
   }, [boot.kind]);
   // Les polices des autres identités, une fois l'app lancée : aperçus fidèles et bascule immédiate.
   useEffect(() => {

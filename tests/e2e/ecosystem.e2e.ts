@@ -791,6 +791,65 @@ describe('MyLife, une seule app', () => {
     await ctx2.close();
   });
 
+  it('actions validées : Copilot (simulé) propose une saisie, rien n’est fait avant « Valider », puis l’annulation la retire', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.goto(`${server.url}/mes-apps`);
+    await p.getByRole('link', { name: 'Ouvrir Lecture' }).waitFor({ timeout: 30_000 });
+    const appId = await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('mylife:miniapps') ?? '{}') as Record<string, { id: string; spec: { name: string } | null }>).find((a) => a.spec?.name === 'Lecture')!.id);
+    const day = await p.evaluate(() => new Date().toLocaleDateString('sv-SE'));
+    let n = 0;
+    await p.route('https://api.anthropic.com/**', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      n += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: `msg_a${n}`,
+          type: 'message',
+          role: 'assistant',
+          model: body.model,
+          stop_reason: n === 1 ? 'tool_use' : 'end_turn',
+          stop_sequence: null,
+          usage: { input_tokens: 10, output_tokens: 10 },
+          content:
+            n === 1
+              ? [{ type: 'tool_use', id: 'toolu_act', name: 'propose_action', input: { kind: 'miniapp.addEntry', summary: 'Noter 42 pages de lecture aujourd’hui', params: { appId, day, values: { pages: 42 } } } }]
+              : [{ type: 'text', text: 'Je te propose de noter 42 pages : valide la carte.' }],
+        }),
+      });
+    });
+    await p.goto(`${server.url}/copilot`);
+    await p.getByLabel('Clé API').fill('sk-ant-test-e2e');
+    await p.getByRole('button', { name: 'Enregistrer la clé' }).click();
+    await p.getByLabel('Ta question').fill('Note 42 pages de lecture');
+    await p.getByRole('button', { name: 'Demander' }).click();
+    await p.getByText('Noter 42 pages de lecture aujourd’hui').waitFor({ timeout: 20_000 });
+    await p.getByText('A lu : une action à valider').waitFor();
+    // Proposée, pas faite : rien dans l'app ni dans la boîte d'envoi.
+    expect(await p.evaluate(() => localStorage.getItem('mylife:actions'))).toBeNull();
+    await shot(p, '34-action-proposee');
+    await p.getByRole('button', { name: 'Valider' }).click();
+    await p.getByText('Fait par Mes apps.').waitFor();
+    await p.goto(`${server.url}/mes-apps/${appId}`);
+    await p.getByText('42 pages').first().waitFor();
+    // L'annulation défait (elle aussi validée d'un toucher).
+    await p.goto(`${server.url}/copilot`);
+    await p.getByRole('button', { name: 'Annuler' }).click();
+    await p.getByText('Annulée.').waitFor();
+    await p.goto(`${server.url}/mes-apps/${appId}`);
+    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
+    expect(await p.getByText('42 pages').count()).toBe(0);
+    await p.unroute('https://api.anthropic.com/**');
+    await ctx.close();
+  });
+
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
     // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
     const [anon, a] = await device();

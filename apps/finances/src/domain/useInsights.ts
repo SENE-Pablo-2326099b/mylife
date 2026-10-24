@@ -3,11 +3,12 @@ import { useMemo } from 'react';
 import { db } from '../db/db';
 import type { Holding, InvestmentPlan, RecurringOverride, Transaction } from '../db/types';
 import { useAccountsState, useCategoryMap, useSettings } from '../hooks';
-import { cycleFor, todayISO, type Cycle, type ISODate } from '../lib/dates';
+import { todayISO, type Cycle, type ISODate } from '../lib/dates';
 import { averageDailySpend, buildForecast, forecastAccounts, type Forecast } from './forecast';
 import { useRecentTransactions } from './recentTransactions';
 import { detectRecurring, type Recurring } from './recurring';
 import { buildRecurringList, RECURRING_SKIPS_KEY, type RecurringItem, type RecurringSkips } from './recurringList';
+import { currentCycle } from './budgetEngine';
 import { getMeta } from '../db/db';
 
 const NO_TX: Transaction[] = [];
@@ -49,9 +50,10 @@ export function useRecurringList(cycle?: Cycle): { items: RecurringItem[]; plans
   const holdings = useLiveQuery(() => db.holdings.toArray(), []) ?? NO_H;
   const skips = useLiveQuery(() => getMeta<RecurringSkips>(RECURRING_SKIPS_KEY), []) ?? NO_SKIPS;
   const today = todayISO();
-  const nominal = cycleFor(today, settings.payday);
-  const start = cycle?.start ?? nominal.start;
-  const end = cycle?.end ?? nominal.end;
+  // Le cycle réel (paie arrivée en avance comprise), comme le budget : les sauts « ce mois » y sont rangés.
+  const resolved = useMemo(() => cycle ?? currentCycle({ txs, cats, settings, today }), [cycle, txs, cats, settings, today]);
+  const start = resolved.start;
+  const end = resolved.end;
   const plans = useMemo(() => {
     const names = new Map(holdings.map((h) => [h.id, h.name]));
     return rawPlans.map((p) => ({ ...p, label: `Investissement · ${names.get(p.holdingId) ?? ''}` }));

@@ -24,6 +24,7 @@ import { ToastHost } from './ui/toast';
 import { toast } from './ui/toastStore';
 import { useToClassifyCount } from './domain/unclassified';
 import { useRpgStats } from './domain/useRpgStats';
+import { ActionInbox } from './components/ActionInbox';
 
 
 /** Les onglets (dock) : gardés montés une fois visités. */
@@ -185,6 +186,8 @@ function Shell() {
       <a href="#contenu" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[80] focus:rounded-md focus:px-3 focus:py-2 liquid">
         Aller au contenu
       </a>
+      {/* Actions validées dans Copilot, exécutées ici (V4, F1). */}
+      {onboarded && <ActionInbox />}
       <ErrorBoundary resetKey={pathname}>
       <Suspense fallback={pageFallback}>
       <KeptTabs pages={{ '/': <TodayPage />, '/budget': <CyclePage />, '/operations': <TransactionsPage />, '/patrimoine': <WealthPage />, '/reglages': <SettingsPage /> }} />

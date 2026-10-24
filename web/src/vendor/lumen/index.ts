@@ -536,4 +536,5 @@ export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> |
 export * from './pacte';
 export * from './miniapp';
 export * from './homeApps';
+export * from './actions';
 // new-app: moteurs (repère du générateur, ne pas retirer)

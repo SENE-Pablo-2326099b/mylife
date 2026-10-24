@@ -91,7 +91,7 @@ export function publishCopilotCard(day = today()): void {
     workoutsLast30Days: o.workouts30,
     planned: listPlanned(day, addDays(day, 21))
       .filter((p) => p.workoutId === null)
-      .map((p) => ({ date: p.date, session: p.title })),
+      .map((p) => ({ id: p.id, date: p.date, session: p.title })),
     cycle: meso && phase ? { name: meso.name, start: meso.startDate, workWeeks: meso.workWeeks, deloadWeeks: meso.deloadWeeks, phase: phase.kind, week: 'week' in phase ? phase.week : null } : null,
     recentWorkouts: recent,
     recentRecords: o.recentRecords.map((r) => ({ date: r.date, exercise: r.name, weight: r.weight, reps: r.reps, e1rm: Math.round(r.e1rm * 10) / 10 })),
