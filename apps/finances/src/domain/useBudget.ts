@@ -6,6 +6,7 @@ import { useAccounts, useCategoryMap, useSettings } from '../hooks';
 import { addDays, cycleFor, todayISO } from '../lib/dates';
 import { computeBudget, currentCycle, EARLY_PAY_DAYS, type Allocations, type BudgetState, type ExceptionalAllocation, type SavingsClosed, type UpcomingOutflow } from './budgetEngine';
 import { CAT } from './defaults';
+import { RECURRING_SKIPS_KEY, type RecurringSkip, type RecurringSkips } from './recurringList';
 import { forecastAccounts } from './forecast';
 import { useForecast } from './useInsights';
 import { useRecentTransactions } from './recentTransactions';
@@ -16,6 +17,20 @@ const NO_ALLOCATIONS: Allocations = {};
 /** Cycles (date de début) où l'épargne est déclarée complète : « c'est tout pour ce cycle ». Synchronisé. */
 export const SAVINGS_CLOSED_KEY = 'savingsClosed';
 const NO_CLOSED: SavingsClosed = {};
+
+const NO_SKIPS: RecurringSkips = {};
+
+/** Sauter (ou reprendre) un récurrent pour le cycle qui commence le `cycleStart`. */
+export async function setRecurringSkip(cycleStart: string, skip: RecurringSkip, on: boolean): Promise<void> {
+  const current = (await getMeta<Record<string, RecurringSkip[]>>(RECURRING_SKIPS_KEY)) ?? {};
+  const list = (current[cycleStart] ?? []).filter((s) => s.id !== skip.id);
+  const next = { ...current, [cycleStart]: on ? [...list, skip] : list };
+  if (!next[cycleStart]!.length) delete next[cycleStart];
+  // On ne garde que les 24 derniers cycles.
+  const keys = Object.keys(next).sort().reverse();
+  for (const k of keys.slice(24)) delete next[k];
+  await setMeta(RECURRING_SKIPS_KEY, next);
+}
 
 /** « C'est tout pour ce cycle » (ou annuler) : seul ce qui a été versé compte comme épargne du cycle. */
 export async function setSavingsClosed(cycleStart: string, closed: boolean): Promise<void> {
@@ -36,11 +51,12 @@ export async function allocateExceptional(txId: string, allocation: ExceptionalA
 }
 
 /** Ce dont le moteur a besoin en plus des opérations : affectations, début des données, épargne déclarée complète. */
-export function useBudgetContext(): { allocations: Allocations; dataStart: string | null; savingsClosed: SavingsClosed } {
+export function useBudgetContext(): { allocations: Allocations; dataStart: string | null; savingsClosed: SavingsClosed; recurringSkips: RecurringSkips } {
   const allocations = useLiveQuery(() => getMeta<Allocations>(ALLOCATIONS_KEY), []);
   const dataStart = useLiveQuery(async () => (await db.transactions.orderBy('date').first())?.date ?? null, []);
   const savingsClosed = useLiveQuery(() => getMeta<SavingsClosed>(SAVINGS_CLOSED_KEY), []);
-  return { allocations: allocations ?? NO_ALLOCATIONS, dataStart: dataStart ?? null, savingsClosed: savingsClosed ?? NO_CLOSED };
+  const recurringSkips = useLiveQuery(() => getMeta<RecurringSkips>(RECURRING_SKIPS_KEY), []);
+  return { allocations: allocations ?? NO_ALLOCATIONS, dataStart: dataStart ?? null, savingsClosed: savingsClosed ?? NO_CLOSED, recurringSkips: recurringSkips ?? NO_SKIPS };
 }
 
 /** État du budget du jour, à partir de la base (voir budgetEngine.ts pour le calcul). */
@@ -55,7 +71,7 @@ export function useBudget(today = todayISO()): { state: BudgetState; txs: Transa
   // Opérations du cycle, prises dans la lecture partagée des opérations récentes.
   const recent = useRecentTransactions();
   const txs = useMemo(() => recent?.filter((t) => t.date >= from && t.date <= to), [recent, from, to]);
-  const { allocations, dataStart, savingsClosed } = useBudgetContext();
+  const { allocations, dataStart, savingsClosed, recurringSkips } = useBudgetContext();
   const list = txs ?? NO_TX;
   // Comptes « du quotidien » (pas l'épargne) : leur solde réel est le plafond du budget.
   const current = forecastAccounts(accounts);
@@ -63,8 +79,8 @@ export function useBudget(today = todayISO()): { state: BudgetState; txs: Transa
   const cashKey = current.map((a) => a.id).join(',');
   const cashAccounts = useMemo(() => (cashKey ? new Set(cashKey.split(',')) : null), [cashKey]);
   // Sorties déjà engagées d'ici la paie, détectées dans l'historique réel (prévision de trésorerie).
-  const cycleEnd = useMemo(() => currentCycle({ txs: list, cats, settings, today }).end, [list, cats, settings, today]);
-  const { forecast } = useForecast(cycleEnd);
+  const cycle = useMemo(() => currentCycle({ txs: list, cats, settings, today }), [list, cats, settings, today]);
+  const { forecast } = useForecast(cycle.end, cycle);
   const upcoming = useMemo<UpcomingOutflow[] | null>(
     () =>
       forecast
@@ -76,8 +92,8 @@ export function useBudget(today = todayISO()): { state: BudgetState; txs: Transa
   );
 
   const state = useMemo(
-    () => computeBudget({ txs: list, cats, settings, today, allocations, dataStart, balance, upcoming, savingsClosed, cashAccounts }),
-    [list, cats, settings, today, allocations, dataStart, balance, upcoming, savingsClosed, cashAccounts],
+    () => computeBudget({ txs: list, cats, settings, today, allocations, dataStart, balance, upcoming, savingsClosed, cashAccounts, recurringSkips }),
+    [list, cats, settings, today, allocations, dataStart, balance, upcoming, savingsClosed, cashAccounts, recurringSkips],
   );
   return { state, txs: list, loading: txs === undefined };
 }

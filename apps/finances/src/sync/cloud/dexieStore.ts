@@ -18,7 +18,7 @@ import { clearRestorePoints, createRestorePoint, restoreDb, type RestoreDB } fro
 const QUEUE_KEY = 'mylife-queue-finances';
 const STATE_KEY = 'mylife-sync-finances';
 /** Entrées de `meta` qui sont des choix de l'utilisateur (le reste est propre à l'appareil). */
-const SYNCED_META = new Set(['exceptionalAllocations', 'savingsClosed']);
+const SYNCED_META = new Set(['exceptionalAllocations', 'savingsClosed', 'recurringSkips']);
 const SEP = '\u0001';
 
 type Queue = Map<string, { ver: number; at: number }>;

@@ -81,7 +81,9 @@ describe('prévision de trésorerie', () => {
       TODAY,
     );
     const f = buildForecast({ today: TODAY, until: '2026-11-06', startBalance: 0, recurring, cats, settings: { incomes: [], fixedCharges: settings.fixedCharges }, plans: [plan], dailySpend: 0 });
-    expect(f.events.map((e) => e.label)).toEqual(['TRADE REPUBLIC', 'FONCIA LOYER']);
+    // Une seule échéance chacun : le virement Trade Republic rejoint le plan, le prélèvement Foncia la ligne « Loyer »
+    // (avec le jour et le montant vus à la banque).
+    expect(f.events.map((e) => `${e.date} ${e.label} ${e.amount} ${e.source}`)).toEqual(['2026-11-02 Investissement · ETF -15000 recurring', '2026-11-05 Loyer -70000 recurring']);
   });
 
   it('un virement récurrent entre mes comptes n’est pas une sortie d’argent', () => {

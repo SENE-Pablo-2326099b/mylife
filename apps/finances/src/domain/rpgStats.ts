@@ -2,6 +2,7 @@ import type { Settings, Transaction } from '../db/types';
 import { addDays, type ISODate } from '../lib/dates';
 import { weekStart, type AppStats } from '../vendor/lumen';
 import { cycleEnvelope, cycleSavings, daySeries, payDates, resolveCycle, type Allocations, type CatMap, type SavingsClosed } from './budgetEngine';
+import type { RecurringSkips } from './recurringList';
 
 /**
  * Compteurs de MyFinances pour le Personnage (stat Discipline), par semaine : jours sous le budget du
@@ -17,10 +18,11 @@ export function disciplineWeeks(input: {
   allocations: Allocations;
   dataStart: ISODate | null;
   savingsClosed?: SavingsClosed;
+  recurringSkips?: RecurringSkips;
   today: ISODate;
   weeks?: number;
 }): AppStats['weeks'] {
-  const { txs, cats, settings, allocations, dataStart, savingsClosed, today } = input;
+  const { txs, cats, settings, allocations, dataStart, savingsClosed, recurringSkips, today } = input;
   const out: AppStats['weeks'] = {};
   if (!dataStart) return out;
   const horizon = addDays(weekStart(today), -7 * ((input.weeks ?? 104) - 1));
@@ -34,7 +36,7 @@ export function disciplineWeeks(input: {
 
   let cycle = resolveCycle(today, settings.payday, pays);
   for (let guard = 0; guard < 40 && cycle.end >= from; guard++) {
-    const envelope = cycleEnvelope({ txs, cats, settings, allocations, dataStart, savingsClosed }, cycle).total;
+    const envelope = cycleEnvelope({ txs, cats, settings, allocations, dataStart, savingsClosed, recurringSkips }, cycle).total;
     if (envelope > 0 && yesterday >= cycle.start) {
       for (const p of daySeries(txs, cats, cycle, envelope, yesterday < cycle.end ? yesterday : cycle.end)) {
         if (p.date < from) continue;
@@ -44,7 +46,7 @@ export function disciplineWeeks(input: {
       }
     }
     // Cycle terminé : l'épargne prévue a-t-elle été mise de côté ?
-    if (cycle.end < today && cycle.end >= from && cycleSavings({ txs, settings, savingsClosed }, cycle).kept) bump(weekStart(cycle.end), 'saved');
+    if (cycle.end < today && cycle.end >= from && cycleSavings({ txs, settings, savingsClosed, recurringSkips }, cycle).kept) bump(weekStart(cycle.end), 'saved');
     cycle = resolveCycle(addDays(cycle.start, -1), settings.payday, pays);
   }
   return out;

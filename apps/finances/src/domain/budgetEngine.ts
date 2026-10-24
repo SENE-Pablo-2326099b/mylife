@@ -2,6 +2,7 @@ import type { BudgetLine, Category, Settings, Transaction } from '../db/types';
 import { addDays, cycleFor, cycleLength, diffDays, type Cycle, type ISODate } from '../lib/dates';
 import { normalizeText } from '../lib/text';
 import { CAT, plannedSavings, totalFixed } from './defaults';
+import { sameFlow, significantWords, skippedAmounts, type RecurringSkips } from './recurringList';
 
 /**
  * Moteur du budget : transactions + réglages + date du jour → état du budget.
@@ -72,6 +73,8 @@ export interface BudgetInput {
   savingsClosed?: SavingsClosed;
   /** Comptes du quotidien (ceux du solde) : pour retrouver l'argent qu'ils contenaient au début du cycle. */
   cashAccounts?: ReadonlySet<string> | null;
+  /** Récurrents sautés, par cycle (« sauter ce mois ») : ni dans l'enveloppe, ni réservés. */
+  recurringSkips?: RecurringSkips;
 }
 
 export type SavingsClosed = Readonly<Record<string, true>>;
@@ -264,12 +267,6 @@ export function splitIncomes(txs: readonly Transaction[], cats: CatMap, settings
   return { regular: incomes.filter((t) => regular.has(t)), exceptional: incomes.filter((t) => !regular.has(t)) };
 }
 
-function significantWords(label: string): string[] {
-  return normalizeText(label)
-    .split(' ')
-    .filter((w) => w.length >= 4 && !['loyer', 'charge', 'charges', 'abonnement', 'forfait', 'mensuel', 'facture'].includes(w));
-}
-
 /** Charges fixes : débitées dans le cycle, ou encore réservées. */
 export function chargeStatuses(lines: readonly BudgetLine[], cycleTxs: readonly Transaction[], cats: CatMap): ChargeStatus[] {
   const used = new Set<string>();
@@ -299,8 +296,9 @@ export function currentCycle(input: Pick<BudgetInput, 'txs' | 'cats' | 'settings
 }
 
 /** Épargne d'un cycle : prévue, versée, ce que l'enveloppe en retire et ce qui reste à verser. */
-export function cycleSavings(input: Pick<BudgetInput, 'txs' | 'settings' | 'savingsClosed'>, cycle: Cycle): CycleSavings {
-  const planned = plannedSavings(input.settings);
+export function cycleSavings(input: Pick<BudgetInput, 'txs' | 'settings' | 'savingsClosed' | 'recurringSkips'>, cycle: Cycle): CycleSavings {
+  // Un investissement sauté ce mois (« sauter ce mois ») n'est pas attendu ce cycle.
+  const planned = Math.max(0, plannedSavings(input.settings) - skippedAmounts(input.recurringSkips, cycle.start).savings);
   const done = input.txs.filter((t) => t.date >= cycle.start && t.date <= cycle.end && t.amount < 0 && t.categoryId === CAT.epargne).reduce((s, t) => s - t.amount, 0);
   const closed = input.savingsClosed?.[cycle.start] === true;
   const counted = closed ? done : Math.max(planned, done);
@@ -308,12 +306,12 @@ export function cycleSavings(input: Pick<BudgetInput, 'txs' | 'settings' | 'savi
 }
 
 /** Enveloppe d'un cycle (revenus − charges − épargne + exceptionnels affectés, au prorata si partiel). */
-export function cycleEnvelope(input: Pick<BudgetInput, 'txs' | 'cats' | 'settings' | 'allocations' | 'dataStart' | 'savingsClosed'>, cycle: Cycle): BudgetState['envelope'] & { exceptionalList: ExceptionalIncome[] } {
+export function cycleEnvelope(input: Pick<BudgetInput, 'txs' | 'cats' | 'settings' | 'allocations' | 'dataStart' | 'savingsClosed' | 'recurringSkips'>, cycle: Cycle): BudgetState['envelope'] & { exceptionalList: ExceptionalIncome[] } {
   const { settings, cats } = input;
   const inCycle = input.txs.filter((t) => t.date >= cycle.start && t.date <= cycle.end);
   const { regular, exceptional } = splitIncomes(inCycle, cats, settings);
   const allocations = input.allocations ?? {};
-  const fixed = totalFixed(settings);
+  const fixed = Math.max(0, totalFixed(settings) - skippedAmounts(input.recurringSkips, cycle.start).lineCharges);
   const savingsDetail = cycleSavings(input, cycle);
   const savings = savingsDetail.counted;
   const configured = settings.incomes.reduce((s, l) => s + l.amount, 0);
@@ -354,10 +352,10 @@ export function computeBudget(input: BudgetInput): BudgetState {
   const upcoming = (input.upcoming ?? []).filter((u) => u.date > today && u.date <= cycle.end && u.amount > 0 && !(sv.closed && u.savings));
   // Une charge des réglages pas encore débitée est réservée, même sans jour de prélèvement, sauf si la
   // prévision la compte déjà (même montant à 20 % près, ou libellé qui la cite).
+  const skippedLines = skippedAmounts(input.recurringSkips, cycle.start).lineIds;
   for (const c of charges) {
-    if (c.paidBy) continue;
-    const words = significantWords(c.line.label);
-    const seen = upcoming.some((u) => !u.savings && (near(u.amount, c.line.amount, CHARGE_TOLERANCE) || words.some((w) => normalizeText(u.label).includes(w))));
+    if (c.paidBy || skippedLines.has(c.line.id)) continue;
+    const seen = upcoming.some((u) => !u.savings && sameFlow({ amount: c.line.amount, label: c.line.label }, { amount: u.amount, label: u.label }));
     if (!seen) upcoming.push({ date: cycle.end, label: c.line.label, amount: c.line.amount, undated: true });
   }
   const reservedCharges = upcoming.filter((u) => !u.savings).reduce((s, u) => s + u.amount, 0);

@@ -7,7 +7,7 @@ navigation rangée. Une étape à la fois, avec un arrêt pour tester après cha
 |---|---|
 | 1. Filet de sécurité (points de restauration) | **fait** (24/10/2026) |
 | 2. Un seul modèle d'argent (cycle, argent libre, épargne) | **fait** (24/10/2026) |
-| 3. Une seule liste de récurrents (revenus, charges, abonnements, investissements) | à faire |
+| 3. Une seule liste de récurrents (revenus, charges, abonnements, investissements) | **fait** (24/10/2026) |
 | 4. Navigation et réglages remis en ordre | à faire |
 | 5. Vocabulaire et affichage cohérents | à faire |
 
@@ -131,4 +131,65 @@ enveloppe qui ignore l'argent déjà sur le compte, et une charge sans jour de p
 ### Limites connues
 - Une charge déjà payée mais dont le libellé et le montant ne ressemblent pas à la ligne des réglages reste réservée :
   l'étape 3 (une seule liste de récurrents, confirmés) le règlera.
+
+---
+
+## Étape 3 : une seule liste de récurrents
+
+### Pourquoi
+Trois détecteurs de la même chose (récurrents détectés, lignes des réglages, plans d'investissement), chacun avec ses
+règles de rapprochement (10 % + 1 € et 5 jours pour la prévision, 20 % et mots-clés pour le budget) : d'où des doublons
+(un virement Trade Republic compté à côté du plan) ou des oublis (un loyer saisi sans jour, invisible pour la prévision).
+
+### Comment (décisions)
+- **Une liste** (`src/domain/recurringList.ts`, `buildRecurringList`) : revenus et charges des réglages, investissements
+  programmés, puis ce qui est détecté dans les opérations. Un détecté qui correspond à une ligne ou à un plan **ne fait
+  qu'un** avec elle : il lui donne son jour (un loyer saisi sans jour prend celui vu à la banque), son rythme réel, et dit
+  s'il est déjà passé ce cycle. Un détecté seul reste dans la liste, « à confirmer ».
+- **Une règle de rapprochement** (`sameFlow`) : même montant à 10 % près (plus 1 €) au même moment du mois (5 jours) quand
+  les deux jours sont connus, ou un libellé qui cite l'autre. Le budget s'en sert aussi pour ne pas réserver deux fois
+  une charge.
+- **La prévision lit la liste** : chaque flux n'y a qu'une échéance, au rythme vu à la banque, sinon au jour saisi ou
+  selon le plan. Un revenu versé directement à un tiers (APL au CROUS) n'y est plus compté comme une entrée d'argent.
+- **« Sauter ce mois »** (fiche d'un récurrent) : pour une charge, un abonnement ou un investissement, jusqu'à la paie.
+  Il sort de la prévision ; une charge des réglages sort de l'enveloppe et n'est plus réservée ; un investissement sauté
+  baisse l'épargne prévue du cycle (ton BTC). Gardé par cycle (24 cycles), synchronisé (`recurringSkips`) ; les cycles
+  passés gardent leurs sauts.
+- **Écran Abonnements et récurrents** : sections Revenus, Charges, Abonnements, Épargne et investissements ; pour chaque
+  ligne, d'où elle vient (« Réglages · vu à la banque », « Plan programmé », « Détecté · à confirmer »), si elle est déjà
+  passée ce cycle, sautée, ou quand elle tombe. Fiche : « Prendre le jour constaté » ou saisir le jour d'une ligne des
+  réglages, sauter ce mois, confirmer ou écarter un détecté.
+
+### Fichiers
+| Fichier | Rôle |
+|---|---|
+| `src/domain/recurringList.ts` | **Nouveau** : liste unique, `sameFlow`, échéances, montants sautés par cycle |
+| `src/domain/forecast.ts` | Prévision construite sur la liste ; sauts du cycle en cours |
+| `src/domain/budgetEngine.ts` | Sauts : enveloppe (charges des réglages), épargne prévue, réservations ; `sameFlow` pour les charges |
+| `src/domain/useInsights.ts` | `useRecurringList` (liste, cycle, sauts) ; `useForecast` sur la liste |
+| `src/domain/useBudget.ts`, `sync/cloud/dexieStore.ts` | `setRecurringSkip`, sauts passés au moteur, synchronisés |
+| `src/domain/alerts.ts`, `rpgStats.ts` (+ hooks) | Même enveloppe, sauts compris |
+| `src/pages/insights/Recurring.tsx` | L'écran de la liste unique et sa fiche |
+
+### Tests
+- `tests/recurringList.test.ts` (5) : paie, loyer sans jour, virement Trade Republic, plan BTC, abonnement détecté, APL
+  versée directement : chaque flux une seule fois, le loyer prend le jour vu à la banque et sait qu'il est passé, le
+  virement rejoint le plan ; la règle de rapprochement ; BTC sauté (épargne prévue 400 € au lieu de 500 €, toujours prévu
+  au cycle suivant) ; loyer sauté (hors de l'enveloppe et des réservations ce cycle, pas le précédent) ; APL hors de la
+  prévision.
+- `tests/insights.test.ts` : une ligne saisie déjà vue à la banque n'a qu'une échéance, au jour et au montant constatés.
+- De bout en bout (3 tailles) : l'écran des récurrents, sections et fiche.
+- Totaux MyFinances : 351 unitaires, 52 étapes de bout en bout : tout vert.
+
+### Comment tester
+1. Budget → Abonnements et récurrents : ton loyer, ta paie et ton virement Trade Republic n'apparaissent qu'une fois,
+   avec « vu à la banque ».
+2. Touche le plan BTC (ou ce qui le représente) → « Sauter ce mois » : sur Aujourd'hui, l'épargne prévue du cycle baisse
+   de son montant, et le détail du calcul ne le réserve plus.
+3. Une ligne des réglages sans jour : « Prendre le jour constaté ».
+
+### Limites connues
+- Un même commerçant qui prélève deux montants différents chaque mois est vu comme un seul récurrent (comme avant).
+- Pour un détecté seul (pas dans les réglages), « sauter ce mois » le retire de la prévision et des réservations, mais
+  pas de l'enveloppe (qui ne compte que les charges des réglages).
 

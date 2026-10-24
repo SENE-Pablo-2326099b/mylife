@@ -160,6 +160,17 @@ try {
       await detail.waitFor({ state: 'detached' });
     });
 
+    await step('récurrents : une seule liste (réglages, plans, détectés), le détail dit d’où vient chaque ligne', async () => {
+      await open('/recurrents');
+      await page.getByRole('heading', { name: 'Revenus' }).waitFor();
+      await page.locator('main#contenu button').filter({ hasText: /Réglages|Détecté|Plan/ }).first().click();
+      const sheet = page.getByRole('dialog');
+      await sheet.getByText('Ce cycle').waitFor();
+      if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/recurrents-${width}.png` });
+      await page.keyboard.press('Escape');
+      await sheet.waitFor({ state: 'detached' });
+    });
+
     await step('Aujourd’hui : opération ouverte depuis le détail du budget, reclassée, puis l’app reste utilisable', async () => {
       await open('/');
       await page.locator('main#contenu button').filter({ hasText: /€/ }).first().click();

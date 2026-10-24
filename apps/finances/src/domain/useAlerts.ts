@@ -15,8 +15,8 @@ export function useAlertsState(): { alerts: Alert[]; loaded: boolean } {
   const today = todayISO();
   const raw = useRecentTransactions();
   const txs = raw ?? NO_TX;
-  const { allocations, dataStart, savingsClosed } = useBudgetContext();
-  const alerts = useMemo(() => computeAlerts({ txs, cats, settings, today, allocations, dataStart, savingsClosed }), [txs, cats, settings, today, allocations, dataStart, savingsClosed]);
+  const { allocations, dataStart, savingsClosed, recurringSkips } = useBudgetContext();
+  const alerts = useMemo(() => computeAlerts({ txs, cats, settings, today, allocations, dataStart, savingsClosed, recurringSkips }), [txs, cats, settings, today, allocations, dataStart, savingsClosed, recurringSkips]);
   return { alerts, loaded: raw !== undefined };
 }
 

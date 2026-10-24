@@ -15,7 +15,7 @@ import { useBudgetContext } from './useBudget';
 export function useRpgStats(): void {
   const settings = useSettings();
   const cats = useCategoryMap();
-  const { allocations, dataStart, savingsClosed } = useBudgetContext();
+  const { allocations, dataStart, savingsClosed, recurringSkips } = useBudgetContext();
   const today = todayISO();
   const from = addDays(today, -7 * 105);
   const txs = useLiveQuery(() => db.transactions.where('date').aboveOrEqual(from).toArray(), [from]);
@@ -23,8 +23,8 @@ export function useRpgStats(): void {
   useEffect(() => {
     if (!txs || !settings.onboarded || cats.size === 0) return;
     const timer = setTimeout(() => {
-      publishStats('finances', { weeks: disciplineWeeks({ txs, cats, settings, allocations, dataStart, savingsClosed, today }) });
+      publishStats('finances', { weeks: disciplineWeeks({ txs, cats, settings, allocations, dataStart, savingsClosed, recurringSkips, today }) });
     }, 1200);
     return () => clearTimeout(timer);
-  }, [txs, cats, settings, allocations, dataStart, savingsClosed, today]);
+  }, [txs, cats, settings, allocations, dataStart, savingsClosed, recurringSkips, today]);
 }
