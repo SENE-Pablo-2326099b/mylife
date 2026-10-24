@@ -14,6 +14,7 @@ import { ensureSchema, HttpError, type Db, type Env } from './core.js';
 import { dispatch as ravelocDispatch, ensureRavelocSchema, purge } from './raveloc.js';
 import { ensureSpaceSchema, spaceDispatch } from './space.js';
 import { gamesDispatch } from './games.js';
+import { calendarDispatch } from './calendar.js';
 import { supportDispatch } from './support.js';
 import { pushDispatch } from './push.js';
 import { syncDispatch } from './sync.js';
@@ -81,6 +82,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       if (path === '/api/push') return send(200, await pushDispatch(db, env.secret, auth, body));
       if (path === '/api/support') return send(200, await supportDispatch(db, env.secret, auth, body));
       if (path === '/api/games') return send(200, await gamesDispatch(db, { secret: env.secret, steamKey: process.env.STEAM_API_KEY ?? '' }, auth, body));
+      if (path === '/api/calendar') return send(200, await calendarDispatch(db, { secret: env.secret }, auth, body));
       await purge(db);
       send(200, await ravelocDispatch(db, env.secret, auth, body));
     } catch (e) {

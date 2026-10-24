@@ -1,3 +1,4 @@
+import { calendarEvents, calendarSources } from './myAgendaData';
 import { pantry, shopping } from './myChefData';
 import { objectives } from './myObjectifsData';
 import { readGames, readMiniApps, readMusic } from './ui/stats';
@@ -12,5 +13,6 @@ export const APP_EXPORTS: Record<string, () => unknown> = {
   'mes-apps': () => Object.values(readMiniApps()).filter((a) => a.spec),
   objectifs: () => objectives.list(),
   chef: () => ({ pantry: pantry.list(), shopping: shopping.list() }),
+  calendrier: () => ({ sources: calendarSources.list().map((s) => ({ ...s, value: { ...s.value, url: s.value.url ? '(lien secret, non exporté)' : undefined } })), events: calendarEvents.list() }),
   // new-app: exports (repère du générateur, ne pas retirer)
 };

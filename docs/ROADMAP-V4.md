@@ -315,7 +315,7 @@ de « 3 100 € ») ; objectifs chiffrés dans le compte ; partageables dans le 
 **Terminé quand** : trois objectifs de trois apps différentes avancent tout seuls sur des données de test, un arc de
 quêtes en découle, l'objectif atteint donne un succès et une story.
 
-## 3.2 MyAgenda : la colonne vertébrale du temps (effort M à L)
+## 3.2 MyAgenda : la colonne vertébrale du temps (effort M à L) : **fait** (journal : `docs/V4.md`)
 **Quoi** : un agenda qui se remplit tout seul à partir des apps (fondation F3) : séances prévues, jour de paie,
 prélèvements, Sorties, échéances du Coffre, anniversaires du Cercle, rappels de Mes apps. Tes agendas Google, Apple ou
 Outlook entrent **par lien ICS ou par fichier**, lus sur l'appareil, sans connexion OAuth. Vues jour, semaine et mois,

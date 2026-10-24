@@ -559,7 +559,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/chef?vue=semaine', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/chef?vue=semaine', '/calendrier', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -1087,6 +1087,30 @@ describe('MyLife, une seule app', () => {
     await p.unroute('https://api.anthropic.com/**');
     await p.goto(`${server.url}/chef`);
     await p.getByText('6 pièce').or(p.getByText(/^6\s*$/)).or(p.getByRole('button', { name: /^Œufs/ })).first().waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
+  it('MyAgenda : un agenda importé (fichier ICS) rejoint l’agenda des apps, et un chevauchement est signalé', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.getByRole('link', { name: /^MyAgenda :/ }).click();
+    await p.getByRole('heading', { name: 'MyAgenda' }).waitFor();
+    const d = new Date();
+    d.setDate(d.getDate() + 2);
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+    const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:1\r\nSUMMARY:Cinéma\r\nDTSTART:${ymd}T200000\r\nDTEND:${ymd}T220000\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:2\r\nSUMMARY:Dîner famille\r\nDTSTART:${ymd}T210000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
+    await p.getByRole('button', { name: 'Ajouter un agenda' }).click();
+    await p.getByLabel('Nom').fill('Perso');
+    await p.locator('input[type=file]').setInputFiles({ name: 'perso.ics', mimeType: 'text/calendar', buffer: Buffer.from(ics) });
+    await p.getByText(/Perso : 2 événements importés/).waitFor();
+    await p.getByText('Cinéma').first().waitFor();
+    await p.getByText('« Cinéma » et « Dîner famille » se chevauchent').waitFor();
+    await shot(p, '42-agenda');
     await ctx.close();
   });
 

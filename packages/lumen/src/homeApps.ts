@@ -38,6 +38,7 @@ export const HOME_APPS: readonly HomeAppInfo[] = [
   { id: 'mes-apps', name: 'Mes apps', path: '/mes-apps', icon: 'apps', tagline: 'Lecture, sommeil, habitudes : crée les tiennes, sans code', wide: true, storage: ['mylife:miniapps'], sync: { app: 'miniapps' }, exportable: true, privacy: 'tes apps sans code et leurs saisies' },
   { id: 'objectifs', name: 'MyObjectifs', path: '/objectifs', icon: 'flag', tagline: 'Tes objectifs, mesurés par tes apps', storage: ['mylife:app:objectifs:'], sync: { app: 'objectifs' }, exportable: true, privacy: 'tes objectifs (titre, cible, date limite)' },
   { id: 'chef', name: 'MyChef', path: '/chef', icon: 'leaf', tagline: 'Courses, garde-manger, repas de la semaine', storage: ['mylife:app:chef:'], sync: { app: 'chef' }, exportable: true, privacy: 'ton garde-manger et ta liste de courses' },
+  { id: 'calendrier', name: 'MyAgenda', path: '/calendrier', icon: 'calendar', tagline: 'Ton agenda, rempli par tes apps', storage: ['mylife:app:calendrier:'], sync: { app: 'calendrier' }, exportable: true, privacy: 'tes agendas importés (lien ICS et événements)' },
   // new-app: entrées (repère du générateur, ne pas retirer)
 ];
 

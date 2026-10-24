@@ -41,6 +41,7 @@ const TAB_PATHS = TABS.map((t) => t.to);
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 // Les apps de l'accueil ajoutées en V4 sont chargées à la demande (contrat d'app).
 // new-app: pages (repère du générateur, ne pas retirer)
+const MyAgendaPage = lazy(() => import('./pages/MyAgenda').then((m) => ({ default: m.MyAgendaPage })));
 const MyChefPage = lazy(() => import('./pages/MyChef').then((m) => ({ default: m.MyChefPage })));
 const MyObjectifsPage = lazy(() => import('./pages/MyObjectifs').then((m) => ({ default: m.MyObjectifsPage })));
 
@@ -138,6 +139,7 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               />
               <Route path="/objectifs" element={<Suspense fallback={null}><MyObjectifsPage /></Suspense>} />
               <Route path="/chef" element={<Suspense fallback={null}><MyChefPage /></Suspense>} />
+              <Route path="/calendrier" element={<Suspense fallback={null}><MyAgendaPage /></Suspense>} />
               {/* new-app: routes (repère du générateur, ne pas retirer) */}
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>

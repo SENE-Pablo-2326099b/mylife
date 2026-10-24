@@ -73,6 +73,8 @@ export interface CopilotSources {
   objectives?: Objective[];
   /** MyChef : un résumé de la cuisine (garde-manger, péremptions, liste, semaine, recettes classées). */
   kitchen?: Record<string, unknown> | null;
+  /** MyAgenda : les événements des agendas importés (Google, Apple, Outlook). */
+  imported?: { title: string; date: string; time?: string; endDate?: string; place?: string }[];
 }
 
 export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, MyRave), la musique (MyMusique), le jeu (MyGames), ses propres petites apps de suivi (« Mes apps » : lecture, sommeil, habitudes…) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
@@ -108,7 +110,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_objectives', description: 'MyObjectifs : les objectifs de l’utilisateur (titre, ce qui compte, cible, date limite), où il en est, ce que le rythme régulier attendait aujourd’hui, en avance ou en retard, atteint ou non.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_kitchen', description: 'MyChef : le garde-manger (aliments, niveau, lieu, date limite), ce qui périme bientôt, la liste de courses, les repas prévus de la semaine, et les recettes classées (identifiant, faisable ou ce qui manque, si elles sauvent ce qui périme).', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'get_agenda', description: 'Agenda commun de toutes les apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
+  { name: 'get_agenda', description: 'Agenda commun de toutes les apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties, repas prévus (MyChef), rendez-vous des agendas importés (MyAgenda) ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
   {
     name: 'propose_action',
     description:
@@ -214,7 +216,9 @@ export function runTool(name: string, input: Record<string, unknown>, src: Copil
       const to = new Date(`${src.today}T12:00:00`);
       to.setDate(to.getDate() + days - 1);
       const v = readAgenda(src.today, to.toISOString().slice(0, 10), src.today);
-      return json({ from: src.today, days, events: v.events.map((e) => ({ date: e.date, end: e.end, time: e.time, kind: e.kind, title: e.title, app: e.app, euros: e.amount === undefined ? undefined : e.amount / 100 })), appsLastOpened: v.sources, stale: v.stale });
+      const last = to.toISOString().slice(0, 10);
+      const imported = (src.imported ?? []).filter((e) => (e.endDate ?? e.date) >= src.today && e.date <= last);
+      return json({ from: src.today, days, events: v.events.map((e) => ({ date: e.date, end: e.end, time: e.time, kind: e.kind, title: e.title, app: e.app, euros: e.amount === undefined ? undefined : e.amount / 100 })), importedCalendars: imported, appsLastOpened: v.sources, stale: v.stale });
     }
     case 'propose_action': {
       const parsed = parseActionSpec(input);

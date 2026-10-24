@@ -4,6 +4,7 @@ import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction,
 import { runHomeActions } from '../actionsHome';
 import { runChefActions } from '../actionsChef';
 import { objectives } from '../myObjectifsData';
+import { calendarEvents } from '../myAgendaData';
 import { pantry, plan, recipes, shopping, withStarters } from '../myChefData';
 import { spaceSnapshot } from '../spaceSync';
 import { openMyLifeApp } from '../ui/app';
@@ -288,6 +289,7 @@ export function CopilotPage() {
     miniApps: Object.values(readMiniApps()),
     objectives: objectives.list().map((i) => i.value),
     kitchen: kitchenSummary(crews.lists[0]?.id ?? null),
+    imported: calendarEvents.list().map((e) => ({ title: e.value.title, date: e.value.date, ...(e.value.time ? { time: e.value.time } : {}), ...(e.value.endDate ? { endDate: e.value.endDate } : {}), ...(e.value.place ? { place: e.value.place } : {}) })),
   });
 
   const ask = async (question: string) => {
