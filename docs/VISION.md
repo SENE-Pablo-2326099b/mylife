@@ -259,5 +259,8 @@ coquille et MyFinances sont prêtes, puis module par module.
 | 13/11/2026 | MyChef gelé jusqu'à la fin de la phase 6 ; son moteur est gardé |
 | 13/11/2026 | Données des fonctions retirées : dans l'export une version, puis effacées (dernier accord avant l'effacement) |
 | 13/11/2026 | Maquettes validées avant chaque phase d'interface |
+| 13/11/2026 | Design : verre fumé et cartes de module à bord en dégradé (maquettes validées, `docs/V5.md` 2.1) ; remplace le parti pris « sobre » du § 5 |
+| 13/11/2026 | Les écrans des modules (MyFinances, MyPerf, MyRave) seront repensés de zéro, fonctionnellement et visuellement : aucun ancien écran n'est porté |
+| 13/11/2026 | La nouvelle coquille est servie à `/v5/` à côté de l'ancien accueil jusqu'à ce qu'elle le remplace |
 | 13/11/2026 | Phase 1 : thèmes en trop et cartes en relief reportés à la phase 2 (le design system y est refait entièrement) |
 | 13/11/2026 | Phase 1 : données des fonctions retirées gardées dans le compte, récupérables par « Mes données » → « Télécharger l'archive » |

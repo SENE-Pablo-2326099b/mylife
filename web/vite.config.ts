@@ -52,12 +52,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
-        globIgnores: ['screenshots/**'],
+        globIgnores: ['screenshots/**', 'v5/**'],
         navigateFallback: '/index.html',
         // Les apps ont leur propre service worker et leurs propres pages : celui-ci ne sert que l'accueil.
         // Toutes les pages de l'accueil s'ouvrent hors ligne (Personnage, bilans, Crew, Sorties, MyMusique…).
-        navigateFallbackAllowlist: [/^\/(?!finances|perf|raveloc|api)/],
-        navigateFallbackDenylist: [/^\/(finances|perf|raveloc|api)(\/|$)/],
+        navigateFallbackAllowlist: [/^\/(?!finances|perf|raveloc|api|v5)/],
+        navigateFallbackDenylist: [/^\/(finances|perf|raveloc|api|v5)(\/|$)/],
         runtimeCaching: [],
         // Rappel du dimanche : réception et clic des notifications (web/public/push-sw.js).
         importScripts: ['/push-sw.js'],

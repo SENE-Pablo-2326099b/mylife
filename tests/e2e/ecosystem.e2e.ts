@@ -503,6 +503,67 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
+  it('coquille V5 (/v5/) : même compte, cartes des modules, module éteint qui disparaît, ajout rapide, thème, 320 px', async () => {
+    const [ctx, p] = await device();
+    // Sans compte : la coquille renvoie vers la connexion.
+    await p.goto(`${server.url}/v5/`);
+    await p.getByText('Connecte-toi à MyLife').waitFor();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    // Les apps déposent leur aperçu sur l'appareil : la coquille le lit.
+    await p.evaluate(() => {
+      localStorage.setItem('mylife:glance:finances', JSON.stringify({ title: '25,35 € à dépenser aujourd’hui', detail: 'Dans le budget', at: Date.now() }));
+      localStorage.setItem('mylife:glance:perf', JSON.stringify({ title: 'Jambes', detail: '5 exercices', at: Date.now() }));
+    });
+    await p.goto(`${server.url}/v5/`);
+    await p.getByRole('heading', { name: 'Aujourd\'hui' }).waitFor();
+    await p.getByText('25,35 €', { exact: true }).waitFor();
+    await p.getByText('Jambes', { exact: true }).waitFor();
+    await p.getByRole('link', { name: 'Démarrer' }).waitFor();
+    await shot(p, '40-v5-aujourdhui');
+    // Ajout rapide : une saisie par module allumé.
+    await p.getByRole('button', { name: 'Ajouter' }).click();
+    await p.getByRole('dialog', { name: 'Ajouter' }).getByText('Une dépense').waitFor();
+    await p.waitForTimeout(400);
+    await shot(p, '41-v5-ajout');
+    await p.keyboard.press('Escape');
+    // Modules : un module éteint n'apparaît plus nulle part ; le choix tient après rechargement.
+    await p.getByRole('link', { name: 'Modules' }).click();
+    await p.getByRole('switch', { name: 'MyPerf : allumé' }).click();
+    await shot(p, '42-v5-modules');
+    await p.goto(`${server.url}/v5/`);
+    await p.getByText('25,35 €', { exact: true }).waitFor();
+    expect(await p.getByText('Jambes', { exact: true }).count()).toBe(0);
+    await p.getByRole('button', { name: 'Ajouter' }).click();
+    expect(await p.getByRole('dialog', { name: 'Ajouter' }).getByText('Une séance').count()).toBe(0);
+    await p.keyboard.press('Escape');
+    // Réglages : le thème clair s'applique tout de suite.
+    await p.goto(`${server.url}/v5/reglages`);
+    await p.getByRole('button', { name: 'Clair', exact: true }).click();
+    expect(await p.evaluate(() => document.documentElement.dataset.theme)).toBe('clair');
+    await shot(p, '43-v5-reglages-clair');
+    await p.goto(`${server.url}/v5/kit`);
+    await p.getByRole('heading', { name: 'Le kit' }).waitFor();
+    await shot(p, '44-v5-kit-clair');
+    await ctx.close();
+    const [, small] = await device(320, 640);
+    await small.goto(`${server.url}/`);
+    await small.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await small.getByLabel('Identifiant').fill(LOGIN);
+    await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await small.getByRole('button', { name: 'Se connecter' }).click();
+    await small.getByText(`${LOGIN}`).first().waitFor();
+    for (const path of ['/v5/', '/v5/modules', '/v5/reglages', '/v5/kit']) {
+      await small.goto(`${server.url}${path}`);
+      await small.waitForTimeout(600);
+      expect(await overflow(small), path).toBeLessThanOrEqual(0);
+    }
+  });
+
   it('aucune erreur JavaScript', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });

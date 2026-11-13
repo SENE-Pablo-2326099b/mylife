@@ -1,0 +1,54 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Icon, List, ListRow, ScreenHeader, SectionTitle, Segmented, THEME_CHOICES, readThemeChoice, setThemeChoice, type IconName, type ThemeChoice } from '@mylife/kit';
+import { useLogin } from '../store';
+
+/**
+ * Réglages communs. Le compte, les données et la confidentialité mènent encore aux écrans d'avant la V5 : ils seront
+ * reconstruits dans la coquille avant qu'elle ne remplace l'ancien accueil.
+ */
+const LINKS: { href: string; icon: IconName; title: string; detail: string }[] = [
+  { href: '/compte', icon: 'person', title: 'Ton compte', detail: 'Mot de passe, clé de secours, déconnexion' },
+  { href: '/donnees', icon: 'shield', title: 'Tes données', detail: 'Exporter, archive, supprimer' },
+  { href: '/confidentialite', icon: 'lock', title: 'Confidentialité', detail: 'Ce que MyLife garde, et pourquoi' },
+  { href: '/installer', icon: 'phone', title: 'Installer MyLife', detail: 'Sur l’écran d’accueil du téléphone' },
+];
+
+export function SettingsPage() {
+  const login = useLogin();
+  const [choice, setChoice] = useState<ThemeChoice>(() => readThemeChoice());
+  return (
+    <>
+      <ScreenHeader kicker={login ? `Connecté : ${login}` : undefined} title="Réglages" />
+      <section className="stack" style={{ gap: 8 }}>
+        <SectionTitle>Apparence</SectionTitle>
+        <Segmented
+          label="Apparence"
+          value={choice}
+          options={THEME_CHOICES}
+          onChange={(next) => {
+            setChoice(next);
+            setThemeChoice(next);
+          }}
+        />
+      </section>
+      <section className="stack" style={{ gap: 8 }}>
+        <SectionTitle>Compte et données</SectionTitle>
+        <List>
+          {LINKS.map((l) => (
+            <ListRow key={l.href} href={l.href} lead={<Icon name={l.icon} size={20} />} title={l.title} detail={l.detail} />
+          ))}
+        </List>
+      </section>
+      <section className="stack" style={{ gap: 8 }}>
+        <SectionTitle>Version d'essai</SectionTitle>
+        <List>
+          <ListRow href="/" title="Revenir à l'accueil actuel" detail="Tu testes la nouvelle coquille de MyLife ; l'ancienne reste en place." />
+        </List>
+        <Link to="/kit" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }}>
+          Voir le kit d'interface
+        </Link>
+      </section>
+    </>
+  );
+}

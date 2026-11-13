@@ -44,7 +44,11 @@
       "destination": "https://myraveloc.vercel.app/raveloc/:path+"
     },
     {
-      "source": "/((?!api/|finances|perf|raveloc).*)",
+      "source": "/v5/:path*",
+      "destination": "/v5/index.html"
+    },
+    {
+      "source": "/((?!api/|finances|perf|raveloc|v5/).*)",
       "destination": "/index.html"
     }
   ],
