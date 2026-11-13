@@ -75,7 +75,7 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 `android/app/build/outputs/apk/release/app-release.apk` vers les Téléchargements Windows. Un `./gradlew clean` peut être
 nécessaire (chemins absolus en cache).
 
-**Commits** : en français, descriptifs, terminés par `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+**Commits** : en français, descriptifs, terminés par la ligne `Co-Authored-By` du modèle utilisé (`Claude Fable 5.2 <noreply@anthropic.com>` ou `Claude Opus 5.5 <noreply@anthropic.com>`).
 
 ---
 

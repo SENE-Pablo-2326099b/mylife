@@ -27,7 +27,7 @@ pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances�
   bout tournent sur une base Postgres en mémoire (PGlite) : aucune base réelle ni secret nécessaire.
 - Noter chaque évolution importante dans `docs/V5.md` (et `CONTEXTE.md` si l'architecture change).
 - Messages de commit en français, descriptifs, terminés par
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+  la ligne `Co-Authored-By` du modèle utilisé (`Claude Fable 5.2 <noreply@anthropic.com>` ou `Claude Opus 5.5 <noreply@anthropic.com>`).
 
 ## Dans le cloud (claude.ai/code)
 - Le hook SessionStart (`.claude/settings.json` → `scripts/cloud-setup.sh`) installe les dépendances de l'accueil et
