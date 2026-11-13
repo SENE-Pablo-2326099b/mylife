@@ -1,5 +1,7 @@
 # Feuille de route MyLife V4
 
+> **Remplacé le 13/11/2026 par `docs/VISION.md`** (V5). Gardé pour l'historique.
+
 **D'où on part** : la V3 est faite (`docs/V3.md`). Personnage, Bilan et Wrapped, Crew, Sortie, MyMusique, MyGames,
 Copilot, Pacte, ouverture au public côté app, et le premier palier de « Mes apps ». La refonte de MyFinances a commencé
 (`docs/REFONTE-FINANCES.md`, étape 1 faite).
