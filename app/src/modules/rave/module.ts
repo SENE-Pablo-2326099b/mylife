@@ -4,7 +4,7 @@ import { GroupCard } from './GroupCard';
 export const rave: ModuleManifest = {
   id: 'rave',
   name: 'MyRave',
-  tagline: 'Sorties entre amis, se retrouver en festival',
+  tagline: 'Sorties entre amis',
   icon: 'navigate',
   tone: 'rave',
   status: 'active',

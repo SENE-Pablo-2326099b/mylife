@@ -27,6 +27,7 @@
   --line: rgba(255, 255, 255, 0.1);
   --glass: linear-gradient(180deg, rgba(26, 28, 46, 0.7), rgba(10, 11, 22, 0.78));
   --glass-solid: #14162a;
+  --card-under: rgba(10, 11, 22, 0.55);
   --glass-border: rgba(255, 255, 255, 0.16);
   --glass-hi: rgba(255, 255, 255, 0.28);
   --glass-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
@@ -66,6 +67,7 @@
   --line: rgba(16, 19, 38, 0.08);
   --glass: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.56));
   --glass-solid: #ffffff;
+  --card-under: rgba(255, 255, 255, 0.55);
   --glass-border: rgba(255, 255, 255, 0.95);
   --glass-hi: #ffffff;
   --glass-shadow: 0 14px 34px rgba(70, 80, 140, 0.18);
@@ -95,10 +97,10 @@
 
 /* ---------------------------------------------------------------- la couleur d'un module */
 
-.tone-finances { --edge: #cfc0ff; --edge-2: rgba(124, 92, 255, 0.7); --tint: rgba(124, 92, 255, 0.4); --tint-2: rgba(56, 198, 244, 0.14); --glow: rgba(124, 92, 255, 0.6); --tone: #cdbeff; --tone-solid: #a58bff; --tone-grad: linear-gradient(135deg, #a58bff, #6a49f2); }
-.tone-perf { --edge: #ffd0b0; --edge-2: rgba(255, 110, 50, 0.65); --tint: rgba(255, 120, 60, 0.36); --tint-2: rgba(255, 80, 140, 0.12); --glow: rgba(255, 110, 50, 0.5); --tone: #ffc29b; --tone-solid: #ff9a62; --tone-grad: linear-gradient(135deg, #ffb07a, #f0601c); }
-.tone-rave { --edge: #bff3ff; --edge-2: rgba(34, 200, 240, 0.65); --tint: rgba(34, 200, 240, 0.32); --tint-2: rgba(90, 110, 255, 0.14); --glow: rgba(34, 200, 240, 0.5); --tone: #9be9f8; --tone-solid: #5ccbe6; --tone-grad: linear-gradient(135deg, #7fe6f7, #1da6cc); }
-.tone-chef { --edge: #c6f7d8; --edge-2: rgba(47, 179, 106, 0.65); --tint: rgba(60, 200, 120, 0.3); --tint-2: rgba(34, 200, 240, 0.12); --glow: rgba(47, 179, 106, 0.45); --tone: #b9f5cf; --tone-solid: #6fe0a0; --tone-grad: linear-gradient(135deg, #9bf0b7, #2fb36a); }
+.tone-finances { --edge: rgba(207, 192, 255, 0.95); --edge-2: rgba(124, 92, 255, 0.5); --tint: rgba(124, 92, 255, 0.4); --tint-2: rgba(56, 198, 244, 0.14); --glow: rgba(124, 92, 255, 0.6); --tone: #cdbeff; --tone-solid: #a58bff; --tone-grad: linear-gradient(135deg, #a58bff, #6a49f2); }
+.tone-perf { --edge: rgba(255, 208, 176, 0.95); --edge-2: rgba(255, 110, 50, 0.45); --tint: rgba(255, 120, 60, 0.36); --tint-2: rgba(255, 80, 140, 0.12); --glow: rgba(255, 110, 50, 0.5); --tone: #ffc29b; --tone-solid: #ff9a62; --tone-grad: linear-gradient(135deg, #ffb07a, #f0601c); }
+.tone-rave { --edge: rgba(191, 243, 255, 0.95); --edge-2: rgba(34, 200, 240, 0.45); --tint: rgba(34, 200, 240, 0.32); --tint-2: rgba(90, 110, 255, 0.14); --glow: rgba(34, 200, 240, 0.5); --tone: #9be9f8; --tone-solid: #5ccbe6; --tone-grad: linear-gradient(135deg, #7fe6f7, #1da6cc); }
+.tone-chef { --edge: rgba(198, 247, 216, 0.95); --edge-2: rgba(47, 179, 106, 0.45); --tint: rgba(60, 200, 120, 0.3); --tint-2: rgba(34, 200, 240, 0.12); --glow: rgba(47, 179, 106, 0.45); --tone: #b9f5cf; --tone-solid: #6fe0a0; --tone-grad: linear-gradient(135deg, #9bf0b7, #2fb36a); }
 .tone-neutral { --edge: #ffffff; --edge-2: rgba(255, 255, 255, 0.35); --tint: rgba(255, 255, 255, 0.08); --tint-2: transparent; --glow: rgba(0, 0, 0, 0.4); --tone: var(--ink); --tone-solid: var(--ink); --tone-grad: linear-gradient(135deg, #8b6cff, #3cc8f0); }
 
 :root[data-theme='clair'] .tone-finances { --edge: #7b5cff; --edge-2: rgba(124, 92, 255, 0.55); --tint: rgba(124, 92, 255, 0.26); --glow: rgba(124, 92, 255, 0.5); --tone: #4a2fc4; --tone-solid: #6a49f2; }
@@ -164,39 +166,45 @@ button { font: inherit; color: inherit; cursor: pointer; }
   border-radius: var(--r-panel);
 }
 /* Carte de module : le bord prend la lumière dans un coin, la teinte du module se fond dans le verre. */
+/*
+ * Carte de module. Un seul bord : le dégradé EST la bordure (deux fonds superposés, le premier découpé au contenu),
+ * donc jamais deux traits qui se chevauchent dans les coins. La lumière entre par le coin haut gauche et se fond dans
+ * le verre ; une ombre colorée diffuse sous la carte. Pas de trait néon uniforme.
+ */
 .card-module {
   position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--r-card);
+  background:
+    linear-gradient(var(--card-under), var(--card-under)) padding-box,
+    linear-gradient(135deg, var(--edge) 0%, var(--edge-mid-1) 32%, var(--edge-mid-2) 62%, var(--edge-2) 100%) border-box;
+  box-shadow: 0 26px 54px -20px var(--glow), var(--glass-shadow);
+  overflow: hidden;
+}
+.card-module::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
   background:
     radial-gradient(120% 95% at 0% 0%, var(--tint), transparent 58%),
     radial-gradient(90% 70% at 100% 100%, var(--tint-2), transparent 60%),
     var(--card-base);
   -webkit-backdrop-filter: blur(26px) saturate(170%);
   backdrop-filter: blur(26px) saturate(170%);
-  border: 1px solid var(--card-border);
-  box-shadow: inset 0 1px 0 var(--card-hi), 0 26px 54px -18px var(--glow), var(--glass-shadow);
-  border-radius: var(--r-card);
-}
-.card-module::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1.5px;
-  background: linear-gradient(135deg, var(--edge), var(--edge-mid-1) 28%, var(--edge-mid-2) 58%, var(--edge-2));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  box-shadow: inset 0 1px 0 var(--card-hi);
   pointer-events: none;
 }
+.card-module > * { position: relative; }
 .tile { background: var(--tile); border: 1px solid var(--tile-border); box-shadow: inset 0 1px 0 var(--card-hi); border-radius: var(--r-control); }
 
 /* Appareil lent, ou transparence réduite demandée : le verre devient une surface pleine, rien d'autre ne change. */
-.no-blur .glass, .no-blur .card-module { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--glass-solid); }
+.no-blur .glass, .no-blur .card-module::before { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--glass-solid); }
 @media (prefers-reduced-transparency: reduce) {
-  .glass, .card-module { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--glass-solid); }
+  .glass, .card-module::before { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--glass-solid); }
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .card-module { background-color: var(--glass-solid); }
+  .glass, .card-module::before { background-color: var(--glass-solid); }
 }
 
 /* ---------------------------------------------------------------- composants */
@@ -303,6 +311,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .navdot { width: 10px; height: 10px; border-radius: 999px; background: var(--tone-solid); box-shadow: 0 0 12px var(--tone-solid); flex: none; }
 
 @media (min-width: 900px) {
+  .grid-modules { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .tabbar { display: none; }
   .sidebar { display: flex; flex-direction: column; gap: 22px; width: 250px; flex: none; margin: 20px 0 20px 20px; padding: 22px 14px; border-radius: 32px; position: sticky; top: 20px; height: calc(100dvh - 40px); }
   .shell-main { padding: 40px clamp(20px, 3vw, 44px) 40px; }

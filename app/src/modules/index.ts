@@ -10,7 +10,7 @@ import { rave } from './rave/module';
 const chef: ModuleManifest = {
   id: 'chef',
   name: 'MyChef',
-  tagline: 'Courses, placard, repas de la semaine',
+  tagline: 'Courses et repas',
   icon: 'chef',
   tone: 'chef',
   status: 'soon',

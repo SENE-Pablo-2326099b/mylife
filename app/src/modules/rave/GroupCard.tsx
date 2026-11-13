@@ -8,8 +8,8 @@ export function GroupCard() {
     <ModuleCard tone="rave" href="/raveloc/" label="Ouvrir MyRave">
       <div className="pad stack" style={{ gap: 6 }}>
         <ModuleLabel tone="rave">MyRave</ModuleLabel>
-        <span className="t-card">{glance?.title ?? 'Tes sorties et tes groupes'}</span>
-        <span className="t-small muted">{glance ? glance.detail : 'Crée un groupe pour ta prochaine sortie.'}</span>
+        <span className="t-card">{glance?.title ?? 'Tes sorties'}</span>
+        {glance?.detail && <span className="t-small muted">{glance.detail}</span>}
       </div>
     </ModuleCard>
   );

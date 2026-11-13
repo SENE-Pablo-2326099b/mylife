@@ -4,7 +4,7 @@ import { SessionCard } from './SessionCard';
 export const perf: ModuleManifest = {
   id: 'perf',
   name: 'MyPerf',
-  tagline: 'Séances, programme, progression',
+  tagline: 'Séances et progression',
   icon: 'barbell',
   tone: 'perf',
   status: 'active',

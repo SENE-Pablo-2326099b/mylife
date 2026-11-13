@@ -9,10 +9,10 @@ export function SessionCard() {
       <div className="pad stack" style={{ gap: 6 }}>
         <ModuleLabel tone="perf">MyPerf</ModuleLabel>
         <span className="t-card">{glance?.title ?? 'Ta séance du jour'}</span>
-        <span className="t-small muted">{glance ? glance.detail : 'Ouvre MyPerf une fois sur cet appareil pour la voir ici.'}</span>
+        {glance?.detail && <span className="t-small muted" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{glance.detail}</span>}
         <div style={{ marginTop: 6 }}>
           <Button variant={glance ? 'action' : 'secondary'} href="/perf/" block>
-            {glance ? 'Démarrer' : 'Ouvrir MyPerf'}
+            {glance ? 'Démarrer' : 'Ouvrir'}
           </Button>
         </div>
       </div>

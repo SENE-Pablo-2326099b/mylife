@@ -37,15 +37,10 @@ export function SettingsPage() {
           ))}
         </List>
       </section>
-      <section className="stack" style={{ gap: 8 }}>
-        <SectionTitle>Version d'essai</SectionTitle>
-        <List>
-          <ListRow href="/" title="Revenir à l'accueil actuel" detail="Tu testes la nouvelle coquille de MyLife ; l'ancienne reste en place." />
-        </List>
-        <Link to="/kit" className="btn btn-quiet" style={{ alignSelf: 'flex-start' }}>
-          Voir le kit d'interface
-        </Link>
-      </section>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <a href="/" className="btn btn-quiet">Ancien accueil</a>
+        <Link to="/kit" className="btn btn-quiet">Le kit</Link>
+      </div>
     </>
   );
 }

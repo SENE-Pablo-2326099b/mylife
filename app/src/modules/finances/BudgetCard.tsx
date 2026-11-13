@@ -22,10 +22,7 @@ export function BudgetCard() {
             {glance.detail && <span className="t-small muted">{glance.detail}</span>}
           </>
         ) : (
-          <>
-            <span className="t-card">Ton budget du jour</span>
-            <span className="t-small muted">Ouvre MyFinances une fois sur cet appareil pour le voir ici.</span>
-          </>
+          <span className="t-card">Ton budget du jour</span>
         )}
       </div>
     </ModuleCard>

@@ -4,7 +4,7 @@ import { BudgetCard } from './BudgetCard';
 export const finances: ModuleManifest = {
   id: 'finances',
   name: 'MyFinances',
-  tagline: 'Budget du jour, opérations, patrimoine',
+  tagline: 'Budget et patrimoine',
   icon: 'card',
   tone: 'finances',
   status: 'active',
