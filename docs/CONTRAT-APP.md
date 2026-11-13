@@ -1,5 +1,8 @@
 # Le contrat d'app MyLife
 
+> **Décrit le code actuel** (registre `HOME_APPS`, collections, test de contrat). Il sera remplacé en phase 2 par le
+> contrat de module de la V5 (`docs/VISION.md` § 4), puis archivé. Le générateur `npm run new-app` part en phase 1.
+
 Une app de l'accueil (MyMusique, MyGames, Mes apps, et les nouvelles apps de la V4 : MyObjectifs, MyChef…) n'est
 **finie que si elle branche toute la prise MyLife**. Sinon, c'est une pile d'apps, pas un écosystème, et un oubli finit
 par laisser les données d'un compte à un autre.

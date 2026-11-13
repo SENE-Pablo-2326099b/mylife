@@ -1,7 +1,7 @@
 # MyLife : la vision (V5)
 
-> Document de référence, décidé le 13/11/2026. Il remplace la suite de `docs/ROADMAP-V4.md` et le plan
-> `docs/MYCHEF.md`. Toute nouvelle décision importante s'ajoute ici (section « Décisions »).
+> Document de référence, décidé le 13/11/2026. Il remplace la suite de la feuille de route V4 et le plan
+> MyChef (archivés dans `docs/archives/`). Toute nouvelle décision importante s'ajoute ici (section « Décisions »).
 
 ## Pourquoi ce document
 

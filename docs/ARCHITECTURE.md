@@ -4,6 +4,9 @@
 > (`api/`, `server/`), les paquets partagés (`packages/`) et les trois applications (`apps/finances`,
 > `apps/perf`, `apps/raveloc`). Les diagrammes sont en Mermaid.js (rendus par GitHub et la plupart des
 > éditeurs Markdown).
+>
+> **Décrit l'architecture actuelle**, celle qui tourne en production. L'architecture cible de la V5 (une seule app web,
+> un seul déploiement, des modules isolés) est dans `docs/VISION.md` § 4 ; ce document sera réécrit en phase 2.
 
 ## Sommaire
 
@@ -59,7 +62,7 @@ MyLife/
 │   └── raveloc/               MyRave — React 18 + Vite
 │       └── src/{domain,lib,services,state,screens,components}
 ├── tests/                     Tests serveur et paquets (vitest) + parcours e2e de tout l'écosystème
-└── docs/                      Ce document, UNIFICATION.md (décisions notées)
+└── docs/                      Ce document, VISION.md (la direction), V5.md (journal), archives/ (historique)
 ```
 
 Responsabilités détaillées :

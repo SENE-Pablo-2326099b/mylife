@@ -106,7 +106,7 @@ Tout vit dans `src/ui` ; les écrans n'utilisent que ces briques.
 
 ## Ergonomie
 
-Un écran = un objectif ; l'info utile maintenant en haut, le reste à un tap (feuille, section repliée, écran de détail). Audit et plan : `ERGONOMIE.md`.
+Un écran = un objectif ; l'info utile maintenant en haut, le reste à un tap (feuille, section repliée, écran de détail). Audit et plan : `docs/archives/perf/ERGONOMIE.md`.
 - **Séance** : seul l'exercice en cours est déplié, les autres tiennent sur une ligne. Ligne de série = numéro · précédent · kg · reps · ✓. Toucher le numéro (ou appui long) ouvre la feuille de la série : type, vitesse de barre, test, note, suppression. La vitesse de barre n'est demandée qu'une fois le top set validé. Menu ⋯ par exercice (remplacer, échauffement, note, ordre, historique, retirer). « Repos » et « Terminer » en bas.
 - **Accueil** : la séance du jour et « Démarrer » ; dessous, la semaine du cycle, la prochaine et la dernière séance. Les autres séances types : « Autre séance ».
 - **Stats** : 3 chiffres, lifts principaux en lignes, volume vs cibles ; le reste replié.

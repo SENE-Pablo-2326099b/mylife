@@ -6,7 +6,7 @@ et les libellés typiques de BNP Paribas et Revolut. Elles servent aux tests uni
 (`tests/ebMapping.test.ts`, `tests/sync.test.ts`).
 
 Le format exact renvoyé par chaque banque n'a pas pu être vérifié sans compte réel :
-voir `ASSUMPTIONS.md`. Une fois ta connexion faite, tu peux remplacer ces fichiers par
+voir `docs/archives/finances/ASSUMPTIONS.md`. Une fois ta connexion faite, tu peux remplacer ces fichiers par
 de vraies réponses anonymisées pour durcir les tests.
 
 - `session-bnp.json`, `session-revolut.json` : réponse de `POST /sessions`
