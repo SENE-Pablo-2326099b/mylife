@@ -70,7 +70,7 @@ export function TodayPage() {
     <>
       <ScreenHeader
         kicker={longDay(new Date())}
-        title="Aujourd'hui"
+        title="Aujourd’hui"
         right={
           <Link to="/reglages" className="glass icon-btn t-strong" aria-label="Réglages et compte">
             {(login ?? '?').charAt(0).toUpperCase()}

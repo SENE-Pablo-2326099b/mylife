@@ -12,8 +12,8 @@
 ## 1. Où on en est
 
 - **V5** : phases 0 et 1 faites ; **phase 2 en cours** : la nouvelle coquille (`app/`, kit `packages/kit`, contrat de
-  module) est servie à `/v5/` à côté de l'ancien accueil (`docs/V5.md`, étape 2.2). Prochaine étape : 2.3 (compte,
-  données, Copilot dans la coquille, puis bascule de `/`).
+  module) est servie à `/v5/` à côté de l'ancien accueil (`docs/V5.md`, étape 2.2). Étape 2.3 faite : la coquille a son
+  compte, ses données, sa confidentialité, Copilot. Prochaine étape : 2.4, la bascule de `/` (manifeste, hors ligne).
 - **Production** : https://mylife-liart.vercel.app ; elle n'a pas encore la phase 1 (à déployer).
 - **Dépôt** : `~/PersoDev/MyLife`, GitHub privé `SENE-Pablo-2326099b/mylife`, branche `master`. Il contient le
   programme et l'historique d'entraînement de l'utilisateur (build privé de MyPerf) : il reste privé.

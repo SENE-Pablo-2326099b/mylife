@@ -7,6 +7,7 @@ export default defineConfig({
   esbuild: { jsx: 'automatic' },
   resolve: {
     alias: [
+      { find: '@legacy', replacement: here('./web/src') },
       { find: '@mylife/kit', replacement: here('./packages/kit/src/index.ts') },
       { find: '@mylife/lumen', replacement: here('./packages/lumen/src/index.ts') },
       { find: /^@mylife\/core\/(.*)$/, replacement: `${here('./packages/sync-client/src/')}$1` },

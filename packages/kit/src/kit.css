@@ -203,6 +203,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .pad { padding: 16px; }
 .stack { display: flex; flex-direction: column; gap: 13px; }
+.stack-0 { display: flex; flex-direction: column; }
 .row { display: flex; align-items: center; gap: 12px; }
 .grow { flex: 1; min-width: 0; }
 .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

@@ -13,7 +13,8 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // La coquille V5 regroupe l'écran et ses petites aides dans un même fichier : pas de rechargement à chaud à préserver.
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true, allowExportNames: ['AccountForms', 'RecoveryKeyPanel', 'RecoveryReminder', 'WelcomePage', 'AccountPage', 'InstallPage', 'SupportCard', 'DataPage'] }],
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
   },

@@ -73,3 +73,11 @@ export function useDeviceTick(): number {
 export function useLogin(): string | null {
   return useSyncExternalStore(onSessionChange, () => currentSession()?.login ?? null);
 }
+
+/** Se redessine quand la session ou la clé de secours en attente changent. */
+export function useSessionTick(): number {
+  return useSyncExternalStore(onSessionChange, () => {
+    const s = currentSession();
+    return s ? s.login.length + s.token.length : 0;
+  });
+}

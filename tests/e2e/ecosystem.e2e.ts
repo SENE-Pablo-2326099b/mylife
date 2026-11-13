@@ -507,7 +507,7 @@ describe('MyLife, une seule app', () => {
     const [ctx, p] = await device();
     // Sans compte : la coquille renvoie vers la connexion.
     await p.goto(`${server.url}/v5/`);
-    await p.getByText('Connecte-toi à MyLife').waitFor();
+    await p.getByRole('button', { name: 'Commencer' }).waitFor();
     await p.goto(`${server.url}/`);
     await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
     await p.getByLabel('Identifiant').fill(LOGIN);
@@ -520,7 +520,7 @@ describe('MyLife, une seule app', () => {
       localStorage.setItem('mylife:glance:perf', JSON.stringify({ title: 'Jambes', detail: '5 exercices', at: Date.now() }));
     });
     await p.goto(`${server.url}/v5/`);
-    await p.getByRole('heading', { name: 'Aujourd\'hui' }).waitFor();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await p.getByText('25,35 €', { exact: true }).waitFor();
     await p.getByText('Jambes', { exact: true }).waitFor();
     await p.getByRole('link', { name: 'Démarrer' }).waitFor();
@@ -562,6 +562,69 @@ describe('MyLife, une seule app', () => {
       await small.waitForTimeout(600);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
     }
+  });
+
+  it('coquille V5 : compte créé en un écran et clé de secours, Copilot (Claude simulé), données et archive, confidentialité sans compte, déconnexion', async () => {
+    const [ctx, p] = await device();
+    const who = `${LOGIN}-v5`;
+    // Sans compte : bienvenue, et la confidentialité reste lisible.
+    await p.goto(`${server.url}/v5/reglages`);
+    await p.getByRole('button', { name: 'Commencer' }).waitFor();
+    await p.goto(`${server.url}/v5/confidentialite`);
+    await p.getByRole('heading', { name: 'Tes données restent à toi' }).waitFor();
+    await p.goto(`${server.url}/v5/bienvenue`);
+    await shot(p, '50-v5-bienvenue');
+    await p.getByRole('button', { name: 'Commencer' }).click();
+    await p.getByLabel('Identifiant').fill(who);
+    await p.getByText('Libre').waitFor();
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await shot(p, '51-v5-creation');
+    await p.getByRole('button', { name: 'Créer mon compte' }).click();
+    await p.getByText('Ta clé de secours').waitFor();
+    await shot(p, '52-v5-cle');
+    await p.getByRole('button', { name: 'Plus tard' }).click();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    // La clé n'est pas mise de côté : le rappel reste, jusqu'à « C'est fait ».
+    await p.getByRole('button', { name: /Mets de côté ta clé de secours/ }).click();
+    await p.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
+    expect(await p.getByText('Mets de côté ta clé de secours').count()).toBe(0);
+    // Copilot, Claude simulé : la vue d'ensemble est lue sur l'appareil.
+    const bodies: { model: string }[] = [];
+    await p.route('https://api.anthropic.com/**', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}');
+      bodies.push(body);
+      const first = bodies.length === 1;
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: `msg_${bodies.length}`, type: 'message', role: 'assistant', model: body.model, stop_reason: first ? 'tool_use' : 'end_turn', stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 }, content: first ? [{ type: 'tool_use', id: 'toolu_1', name: 'get_overview', input: {} }] : [{ type: 'text', text: 'Rien à signaler cette semaine.' }] }) });
+    });
+    await p.getByRole('link', { name: 'Copilot' }).click();
+    await p.getByLabel('Clé API').fill('sk-ant-test-e2e');
+    await p.getByRole('button', { name: 'Enregistrer la clé' }).click();
+    await p.getByRole('button', { name: 'Résume ma semaine.' }).click();
+    await p.getByText('Rien à signaler cette semaine.').waitFor({ timeout: 20_000 });
+    await p.getByText('A lu : tes modules').waitFor();
+    expect(bodies[0]!.model).toBe('claude-opus-5-5');
+    await shot(p, '53-v5-copilot');
+    await p.unroute('https://api.anthropic.com/**');
+    // Données : export et archive ; support.
+    await p.goto(`${server.url}/v5/donnees`);
+    const dl = p.waitForEvent('download');
+    await p.getByRole('button', { name: 'Exporter' }).click();
+    expect((await dl).suggestedFilename()).toMatch(/^mylife-\d{4}-\d{2}-\d{2}\.json$/);
+    const arch = p.waitForEvent('download');
+    await p.getByRole('button', { name: 'Télécharger l’archive' }).click();
+    const a = JSON.parse(readFileSync((await (await arch).path())!, 'utf8')) as { format: string; account: string; errors: Record<string, string> };
+    expect(a).toMatchObject({ format: 'mylife-archive-v5', account: who, errors: {} });
+    await p.getByLabel('Ton message').fill('Un essai depuis la V5.');
+    await p.getByRole('button', { name: 'Envoyer' }).click();
+    await p.getByText('Message envoyé : merci !').waitFor();
+    await shot(p, '54-v5-donnees');
+    // Compte : déconnexion → bienvenue, et la clé d'IA ne reste pas.
+    await p.goto(`${server.url}/v5/compte`);
+    await shot(p, '55-v5-compte');
+    await p.getByRole('button', { name: 'Se déconnecter' }).click();
+    await p.getByRole('button', { name: 'Commencer' }).waitFor();
+    expect(await p.evaluate(() => localStorage.getItem('mylife-session'))).toBeNull();
+    await ctx.close();
   });
 
   it('aucune erreur JavaScript', () => {

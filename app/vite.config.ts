@@ -14,6 +14,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      { find: '@legacy', replacement: here('../web/src') },
       { find: '@mylife/kit/kit.css', replacement: here('../packages/kit/src/kit.css') },
       { find: '@mylife/kit', replacement: here('../packages/kit/src/index.ts') },
       { find: '@mylife/lumen', replacement: here('../packages/lumen/src/index.ts') },

@@ -19,8 +19,9 @@
       "@mylife/kit": ["../packages/kit/src/index.ts"],
       "@mylife/kit/kit.css": ["../packages/kit/src/kit.css"],
       "@mylife/lumen": ["../packages/lumen/src/index.ts"],
-      "@mylife/core/*": ["../packages/sync-client/src/*"]
+      "@mylife/core/*": ["../packages/sync-client/src/*"],
+      "@legacy/*": ["../web/src/*"]
     }
   },
-  "include": ["src", "../packages/kit/src"]
+  "include": ["src", "../packages/kit/src", "../web/src/copilot.ts", "../web/src/sortieDigest.ts", "../web/src/spaces.ts", "../web/src/spaceSync.ts"]
 }

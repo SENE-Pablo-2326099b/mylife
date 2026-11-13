@@ -3,15 +3,12 @@ import { Link } from 'react-router-dom';
 import { Icon, List, ListRow, ScreenHeader, SectionTitle, Segmented, THEME_CHOICES, readThemeChoice, setThemeChoice, type IconName, type ThemeChoice } from '@mylife/kit';
 import { useLogin } from '../store';
 
-/**
- * Réglages communs. Le compte, les données et la confidentialité mènent encore aux écrans d'avant la V5 : ils seront
- * reconstruits dans la coquille avant qu'elle ne remplace l'ancien accueil.
- */
+/** Réglages communs : apparence, puis le compte, les données, la confidentialité et l'installation. */
 const LINKS: { href: string; icon: IconName; title: string; detail: string }[] = [
-  { href: '/compte', icon: 'person', title: 'Ton compte', detail: 'Mot de passe, clé de secours, déconnexion' },
-  { href: '/donnees', icon: 'shield', title: 'Tes données', detail: 'Exporter, archive, supprimer' },
-  { href: '/confidentialite', icon: 'lock', title: 'Confidentialité', detail: 'Ce que MyLife garde, et pourquoi' },
-  { href: '/installer', icon: 'phone', title: 'Installer MyLife', detail: 'Sur l’écran d’accueil du téléphone' },
+  { href: '/v5/compte', icon: 'person', title: 'Ton compte', detail: 'Mot de passe, clé de secours, déconnexion' },
+  { href: '/v5/donnees', icon: 'shield', title: 'Tes données', detail: 'Exporter, archive, supprimer' },
+  { href: '/v5/confidentialite', icon: 'lock', title: 'Confidentialité', detail: 'Ce que MyLife garde, et pourquoi' },
+  { href: '/v5/installer', icon: 'phone', title: 'Installer MyLife', detail: 'Sur l’écran d’accueil du téléphone' },
 ];
 
 export function SettingsPage() {
