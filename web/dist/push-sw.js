@@ -1,5 +1,5 @@
 /* Notifications (Web Push), chargé par le service worker de l'accueil (workbox importScripts).
-   - Le rappel du dimanche : un message générique, le serveur ne sait rien des données.
+   - Un message générique envoyé par le serveur (le rappel du dimanche, retiré en V5, en était un) : affiché tel quel.
    - Les rappels écrits par l'appareil (V4) : le serveur n'envoie qu'un signal vide { type: 'wake' } ; on lit ici le plan
      que l'appareil a rangé dans sa base locale (web/src/reminders.ts) et on écrit le rappel du moment. */
 

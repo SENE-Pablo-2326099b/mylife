@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HOME_APPS, MYLIFE_DESTINATIONS } from '../packages/lumen/src/index';
 import { PERSONAL_PREFIXES } from '../packages/sync-client/src/device';
 import { SYNC_APPS } from '../server/core';
-import { APP_EXPORTS } from '../web/src/appData';
+import { RETIRED_PREFIXES, RETIRED_SYNC_APPS } from '../web/src/archive';
 
 /**
  * Le contrat d'app (docs/CONTRAT-APP.md) : chaque app de l'accueil branche toutes ses prises. Une app ajoutée sans
@@ -39,8 +39,7 @@ describe('contrat d’app : chaque app de l’accueil branche toutes ses prises'
         if ('mylife' in app.sync) for (const tbl of app.sync.mylife) expect(prefs, `ligne ${tbl} de mylife`).toContain(`tbl: '${tbl}'`);
       });
 
-      it('dans « Mes données » si elle est exportable, et décrite sur la page de confidentialité', () => {
-        if (app.exportable) expect(APP_EXPORTS[app.id], `export de ${app.id}`).toBeTypeOf('function');
+      it('décrite pour la page de confidentialité', () => {
         expect(app.privacy.length).toBeGreaterThan(5);
       });
     });
@@ -54,9 +53,25 @@ describe('contrat d’app : chaque app de l’accueil branche toutes ses prises'
     }
   });
 
-  it('la page de confidentialité et l’accueil lisent le registre', () => {
-    expect(read('web/src/pages/Privacy.tsx')).toContain('HOME_APPS');
+  it('l’accueil lit le registre', () => {
     expect(read('web/src/pages/Home.tsx')).toContain('HOME_APPS');
-    expect(read('web/src/pages/Data.tsx')).toContain('APP_EXPORTS');
+  });
+});
+
+describe('V5 : les fonctions retirées', () => {
+  it('leurs données restent récupérables (archive de « Mes données ») tant que le serveur les garde', () => {
+    for (const app of RETIRED_SYNC_APPS) expect(Object.keys(SYNC_APPS), `SYNC_APPS.${app}`).toContain(app);
+    expect(read('web/src/pages/Data.tsx')).toContain('buildRetiredArchive');
+  });
+
+  it('ce qu’elles gardaient sur l’appareil est toujours effacé quand un autre compte se connecte', () => {
+    for (const prefix of RETIRED_PREFIXES) expect(PERSONAL_PREFIXES.some((p) => prefix.startsWith(p)), prefix).toBe(true);
+  });
+
+  it('plus aucun écran ni lien vers elles', () => {
+    for (const path of ['/personnage', '/bilan', '/wrapped', '/crew"', '/musique', '/jeux', '/temps', '/mes-apps', '/objectifs', '/chef', '/calendrier', '/foyer']) {
+      expect(routes, `route ${path}`).not.toContain(`path="${path.replace('"', '')}"`);
+      expect(MYLIFE_DESTINATIONS.some((d) => d.path === path.replace('"', '')), `palette ${path}`).toBe(false);
+    }
   });
 });

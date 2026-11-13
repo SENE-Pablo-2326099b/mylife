@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import * as core from '../server/core';
-import { pushDispatch, sendWeekly, type PushEnv, type PushSender } from '../server/push';
+import { pushDispatch, type PushEnv } from '../server/push';
 import { supportDispatch } from '../server/support';
 
 /** Ouverture au public : support (« Un problème, une idée ? ») et rappel du dimanche (Web Push). */
@@ -60,22 +60,5 @@ describe('rappel du dimanche', () => {
     const { rows } = await d.query<{ endpoint: string }>('SELECT endpoint FROM push_subscriptions');
     expect(rows).toHaveLength(10);
     expect(rows.map((r) => r.endpoint)).not.toContain(sub(0).endpoint);
-  }, 30_000);
-
-  it('envoi : le même message à tous, sans aucune donnée ; abonnements expirés effacés', async () => {
-    const d = await db();
-    for (let i = 0; i < 3; i++) await pushDispatch(d, secret, token(`u${i}`), sub(i), env);
-    const payloads: string[] = [];
-    const send: PushSender = async (s, payload) => {
-      payloads.push(payload);
-      if (s.endpoint.endsWith('-1')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
-      if (s.endpoint.endsWith('-2')) throw Object.assign(new Error('Boom'), { statusCode: 500 });
-      return { statusCode: 201 };
-    };
-    expect(await sendWeekly(d, send)).toEqual({ sent: 1, removed: 1, failed: 1 });
-    expect(new Set(payloads).size).toBe(1);
-    expect(JSON.parse(payloads[0]!)).toEqual({ title: 'Ta semaine est bouclée', body: 'Ton bilan t’attend : séances, budget, quêtes.', url: '/bilan' });
-    const { rows } = await d.query('SELECT endpoint FROM push_subscriptions');
-    expect(rows).toHaveLength(2);
   }, 30_000);
 });

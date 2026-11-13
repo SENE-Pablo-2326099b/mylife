@@ -53,7 +53,7 @@ export function WelcomePage() {
             ))}
           </div>
           <m.p className="t-small mt-5 text-secondary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ ...springs.soft, delay: 0.35 }}>
-            Et autour : ton Personnage qui monte de niveau avec ta vraie vie, ton bilan du dimanche, tes Crews et tes sorties entre amis, ta musique et tes jeux en chiffres.
+            Et autour : tes sorties entre amis, et Copilot, une IA qui connaît toutes tes apps.
           </m.p>
           <div className="flex-1" />
           <div className="mt-8 flex flex-col gap-2">

@@ -1,12 +1,9 @@
 // GÉNÉRÉ depuis MyLife/packages/lumen — ne pas modifier ici (MyLife : npm run vendor).
-import type { StatId } from './character';
-
 /**
  * Registre des apps qui vivent dans l'accueil MyLife (web/src/pages), le « contrat d'app » de la V4
  * (docs/CONTRAT-APP.md). Chaque app y déclare ses prises une fois ; l'accueil (tuiles), « Mes données » (export) et
  * la page de confidentialité en découlent, et `tests/contract.test.ts` vérifie le reste : effacement quand un autre
- * compte se connecte, route, destinations de la palette, app de synchro déclarée au serveur.
- * Une nouvelle app : `npm run new-app <id> "<Nom>"`, qui ajoute son entrée avant le repère ci-dessous.
+ * compte se connecte, route, destinations de la palette. Remplacé en phase 2 par le contrat de module de la V5.
  */
 export interface HomeAppInfo {
   id: string;
@@ -27,21 +24,10 @@ export interface HomeAppInfo {
   exportable: boolean;
   /** Ce qu'elle garde, en quelques mots, pour la page de confidentialité. */
   privacy: string;
-  /** Stat du Personnage qu'elle fait monter. */
-  stat?: StatId;
 }
 
 export const HOME_APPS: readonly HomeAppInfo[] = [
-  { id: 'sorties', name: 'Sorties', path: '/sorties', icon: 'flag-fill', tagline: 'Chaud ? Planning, budget, sac', storage: ['mylife:space:'], sync: { spaces: true }, exportable: false, privacy: 'tes sorties (réponses, planning, dépenses, liste, ID)', stat: 'social' },
-  { id: 'crew', name: 'Crew', path: '/crew', icon: 'people-fill', tagline: 'Ton niveau face à tes amis', storage: ['mylife:space:'], sync: { spaces: true }, exportable: false, privacy: 'tes scores et pactes dans tes Crews' },
-  { id: 'musique', name: 'MyMusique', path: '/musique', icon: 'sparkles', tagline: 'Tes stats d’écoute', storage: ['mylife:music'], sync: { mylife: ['music'] }, exportable: true, privacy: 'le résumé de ton écoute (jamais l’export Spotify entier)', stat: 'culture' },
-  { id: 'jeux', name: 'MyGames', path: '/jeux', icon: 'play', tagline: 'Heures de jeu, ton temps', storage: ['mylife:games'], sync: { mylife: ['games'] }, exportable: true, privacy: 'tes heures de jeu' },
-  { id: 'mes-apps', name: 'Mes apps', path: '/mes-apps', icon: 'apps', tagline: 'Lecture, sommeil, habitudes : crée les tiennes, sans code', wide: true, storage: ['mylife:miniapps'], sync: { app: 'miniapps' }, exportable: true, privacy: 'tes apps sans code et leurs saisies' },
-  { id: 'objectifs', name: 'MyObjectifs', path: '/objectifs', icon: 'flag', tagline: 'Tes objectifs, mesurés par tes apps', storage: ['mylife:app:objectifs:'], sync: { app: 'objectifs' }, exportable: true, privacy: 'tes objectifs (titre, cible, date limite)' },
-  { id: 'chef', name: 'MyChef', path: '/chef', icon: 'leaf', tagline: 'Courses, garde-manger, repas de la semaine', storage: ['mylife:app:chef:'], sync: { app: 'chef' }, exportable: true, privacy: 'ton garde-manger et ta liste de courses' },
-  { id: 'calendrier', name: 'MyAgenda', path: '/calendrier', icon: 'calendar', tagline: 'Ton agenda, rempli par tes apps', storage: ['mylife:app:calendrier:'], sync: { app: 'calendrier' }, exportable: true, privacy: 'tes agendas importés (lien ICS et événements)' },
-  { id: 'foyer', name: 'MyFoyer', path: '/foyer', icon: 'home', tagline: 'Dépenses communes, corvées, factures', storage: ['mylife:space:'], sync: { spaces: true }, exportable: false, privacy: 'les dépenses communes, corvées et factures de ton foyer', stat: 'foyer' },
-  // new-app: entrées (repère du générateur, ne pas retirer)
+  { id: 'sorties', name: 'Sorties', path: '/sorties', icon: 'flag-fill', tagline: 'Chaud ? Planning, budget, sac', storage: ['mylife:space:'], sync: { spaces: true }, exportable: false, privacy: 'tes sorties (réponses, planning, dépenses, liste, ID)' },
 ];
 
 export const homeApp = (id: string): HomeAppInfo | undefined => HOME_APPS.find((a) => a.id === id);

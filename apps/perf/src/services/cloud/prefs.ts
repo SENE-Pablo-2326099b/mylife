@@ -1,7 +1,4 @@
-import { Platform } from 'react-native';
-
 import { db } from '@/db/db';
-import { nativeStats, onPerfStatsChange } from '@/services/rpgStats';
 import { appearanceAt, useSettings } from '@/state/settingsStore';
 import { DEFAULT_APPEARANCE, parseAppearance, type SharedAppearance } from '@/vendor/lumen';
 import { loadState, syncNow, type LocalStore, type SyncState } from '@/vendor/mylife-sync';
@@ -22,22 +19,15 @@ function local(): SharedAppearance {
   return { ...DEFAULT_APPEARANCE, theme: s.theme, followSystem: s.followSystem, at: appearanceAt() };
 }
 
-/** App Android : les compteurs du Personnage partent aussi par ici (sur le web, l'accueil s'en charge). */
-const statsRow = () => (Platform.OS === 'web' ? null : nativeStats());
-
 const prefsStore: LocalStore = {
   app: 'mylife',
   async pending() {
     const a = local();
-    const out = a.at > Number(kv('prefs_pushed') ?? 0) ? [{ tbl: 'prefs', rid: 'appearance', ver: a.at, updatedAt: a.at, row: a as unknown }] : [];
-    const st = statsRow();
-    if (st && st.at > Number(kv('stats_perf_pushed') ?? 0)) out.push({ tbl: 'stats', rid: 'perf', ver: st.at, updatedAt: st.at, row: st });
-    return out;
+    return a.at > Number(kv('prefs_pushed') ?? 0) ? [{ tbl: 'prefs', rid: 'appearance', ver: a.at, updatedAt: a.at, row: a as unknown }] : [];
   },
   async ack(done) {
     for (const d of done) {
       if (d.rid === 'appearance') setKv('prefs_pushed', String(d.ver));
-      if (d.tbl === 'stats' && d.rid === 'perf') setKv('stats_perf_pushed', String(d.ver));
     }
   },
   async apply(rows) {
@@ -51,15 +41,13 @@ const prefsStore: LocalStore = {
     }
   },
   async snapshot() {
-    const st = statsRow();
-    return [{ tbl: 'prefs', rid: 'appearance', row: local() as unknown }, ...(st ? [{ tbl: 'stats', rid: 'perf', row: st as unknown }] : [])];
+    return [{ tbl: 'prefs', rid: 'appearance', row: local() as unknown }];
   },
   async replace(rows) {
     await this.apply(rows);
   },
   async clearPending() {
     setKv('prefs_pushed', String(appearanceAt()));
-    setKv('stats_perf_pushed', String(statsRow()?.at ?? 0));
   },
   async getState() {
     const raw = kv('prefs_state');
@@ -81,7 +69,7 @@ export async function syncPrefs(): Promise<void> {
     if (state.joinedAs !== session.login) {
       await prefsStore.setState({ ...state, joinedAs: session.login, cursor: 0 });
       setKv('prefs_pushed', '0');
-      // Compteurs du Personnage de l'ancien compte : jamais envoyés au nouveau (ils seront recalculés).
+      // Anciens compteurs du Personnage (avant la V5) : effacés, jamais envoyés à un autre compte.
       db().run("DELETE FROM sync_state WHERE k IN ('stats_perf', 'stats_perf_pushed')");
     }
     await syncNow(prefsStore, platform.api, session, platform.random);
@@ -100,9 +88,8 @@ export function syncPrefsSoon(ms = 300): void {
   timer = setTimeout(() => void syncPrefs(), ms);
 }
 
-/** Suit les choix de thème faits dans MyPerf, et les compteurs du Personnage (app Android). */
+/** Suit les choix de thème faits dans MyPerf. */
 export function watchAppearance(): void {
-  onPerfStatsChange(() => syncPrefsSoon(2000));
   let last = `${useSettings.getState().settings.theme}|${useSettings.getState().settings.followSystem}`;
   useSettings.subscribe((s) => {
     const now = `${s.settings.theme}|${s.settings.followSystem}`;

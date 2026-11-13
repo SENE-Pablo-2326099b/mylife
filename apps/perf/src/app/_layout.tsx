@@ -34,7 +34,7 @@ import { IDENTITY_FONTS } from '@/ui/fonts';
 import { applyIdentity, BOOT_BG, identity, space, useShownTheme, useTheme } from '@/ui/theme';
 import { themeInfo } from '@/ui/themes';
 import { cloudBoot, useCloud } from '@/services/cloud';
-import { watchPerfStats } from '@/services/rpgStats';
+import { watchCopilotCard } from '@/services/copilotCard';
 import { startActionInbox } from '@/services/actionInbox';
 import { installSyncTriggers } from '@/services/cloud/sqliteStore';
 
@@ -171,8 +171,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (boot.kind !== 'ready') return;
     cloudBoot();
-    // Compteurs du Personnage MyLife (séances, records), tenus à jour au fil des séances.
-    watchPerfStats(() => useCloud.getState().joined);
+    // Fiche Copilot et agenda commun (web), tenus à jour au fil des séances.
+    watchCopilotCard(() => useCloud.getState().joined);
     // Actions validées dans Copilot (décaler une séance prévue), exécutées par MyPerf (web).
     startActionInbox();
   }, [boot.kind]);

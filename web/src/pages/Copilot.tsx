@@ -1,21 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, expiringSoon, localToday, parseShoppingItem, rankRecipes, readActions, readCopilotCard, type ActionSpec } from '../vendor/lumen';
-import { runHomeActions } from '../actionsHome';
-import { runChefActions } from '../actionsChef';
-import { objectives } from '../myObjectifsData';
-import { calendarEvents } from '../myAgendaData';
-import { pantry, plan, recipes, shopping, withStarters } from '../myChefData';
-import { spaceSnapshot } from '../spaceSync';
+import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '../vendor/lumen';
 import { openMyLifeApp } from '../ui/app';
 import { readAiKey, writeAiKey } from '../vendor/mylife-sync/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '../copilot';
-import { loadCrews, useCrews } from '../crew';
+import { loadSpaces, useSpaces } from '../spaces';
 import { sortieDigests } from '../sortieDigest';
 import { Icon } from '../ui/icons';
 import { Badge, Button, Card, Disclosure, Reveal, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { readGames, readMiniApps, readMusic, useStatsInput } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -55,24 +48,6 @@ function saveProposals(list: Proposal[]) {
 
 const APP_PATH = { finances: '/finances/', perf: '/perf/' } as const;
 
-/** Le résumé de MyChef pour Copilot (sur l'appareil). `listSpace` : la liste du foyer, s'il y en a une. */
-function kitchenSummary(listSpace: string | null): Record<string, unknown> | null {
-  const today = localToday();
-  const stock = pantry.list();
-  const list = listSpace ? spaceSnapshot(listSpace).records.filter((r) => r.tbl === 'item').flatMap((r) => (parseShoppingItem(r.row) ? [{ id: r.rid, value: parseShoppingItem(r.row)! }] : [])) : shopping.list();
-  if (!stock.length && !list.length && !recipes.list().length && !plan.list().length) return null;
-  const expiring = expiringSoon(stock, today);
-  return {
-    today,
-    pantry: stock.map((p) => ({ food: p.value.name, level: p.value.level, place: p.value.place, qty: p.value.qty, unit: p.value.unit, expires: p.value.expires, staple: p.value.staple })),
-    expiringSoon: expiring.map((p) => ({ food: p.value.name, expires: p.value.expires })),
-    shoppingList: list.filter((l) => !l.value.done).map((l) => ({ itemId: l.id, food: l.value.name, qty: l.value.qty, unit: l.value.unit })),
-    sharedWithHousehold: listSpace !== null,
-    plannedMeals: plan.list().filter((m) => m.value.day >= today).map((m) => ({ day: m.value.day, slot: m.value.slot, meal: m.value.title, leftover: m.value.leftover })),
-    recipes: rankRecipes(withStarters(recipes.list()), stock.map((s) => s.value), expiring.map((e) => e.value.name)).slice(0, 30).map((r) => ({ recipeId: r.id, title: r.value.title, minutes: r.value.minutes, status: r.availability.status, missing: r.availability.missing.map((m) => m.name), savesExpiring: r.availability.usesExpiring > 0 })),
-  };
-}
-
 /** Une action proposée : la valider ou la refuser ; ensuite son état en direct (l'app concernée l'exécute). */
 function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) => void }) {
   const app = ACTION_APP[p.action.kind];
@@ -81,15 +56,11 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
   const validate = async () => {
     enqueueAction(p.action, p.id);
     onChange({ ...p, state: 'validated' });
-    if (app === 'home') await runHomeActions();
-    if (app === 'chef') await runChefActions();
   };
   const cancel = async () => {
     if (!queued?.undo) return;
     enqueueAction(queued.undo, `${p.id}:annule`);
     onChange({ ...p, undone: true });
-    if (app === 'home') await runHomeActions();
-    if (app === 'chef') await runChefActions();
   };
   return (
     <Card>
@@ -118,11 +89,9 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
           {!queued || queued.status === 'pending' ? (
             <>
               <p className="t-small text-secondary">Validée : {ACTION_APP_NAME[app]} l’applique dès son ouverture.</p>
-              {(app === 'finances' || app === 'perf') && (
-                <Button size="sm" variant="secondary" onClick={() => openMyLifeApp(APP_PATH[app])}>
-                  Ouvrir {ACTION_APP_NAME[app]}
-                </Button>
-              )}
+              <Button size="sm" variant="secondary" onClick={() => openMyLifeApp(APP_PATH[app])}>
+                Ouvrir {ACTION_APP_NAME[app]}
+              </Button>
             </>
           ) : queued.status === 'failed' ? (
             <p className="t-small text-danger">Pas faite : {queued.error}</p>
@@ -147,22 +116,14 @@ const SUGGESTIONS = [
   'Je peux me payer un billet à 80 € ce mois-ci ?',
   'Résume ma semaine.',
   'Quelle semaine alléger avant ma prochaine sortie ?',
-  'Où part mon temps ce mois-ci ?',
-  'Qu’est-ce que j’écoute le plus en ce moment ?',
+  'Qu’est-ce qui m’attend cette semaine ?',
 ];
 const READ_LABEL: Record<string, string> = {
-  get_overview: 'ton personnage',
+  get_overview: 'tes apps',
   get_finances: 'ton budget',
   get_training: 'ton entraînement',
-  get_recap: 'tes bilans',
-  get_music: 'ta musique',
-  get_games: 'tes jeux',
-  get_time_split: 'ton temps',
   list_sorties: 'tes sorties',
-  get_my_apps: 'tes apps',
   get_agenda: 'ton agenda',
-  get_objectives: 'tes objectifs',
-  get_kitchen: 'ta cuisine',
   propose_action: 'une action à valider',
 };
 
@@ -236,8 +197,7 @@ function KeyCard({ onSaved }: { onSaved: () => void }) {
 }
 
 export function CopilotPage() {
-  const { stats, rest } = useStatsInput();
-  const crews = useCrews();
+  const spaces = useSpaces();
   const [apiKey, setApiKey] = useState<string | null>(() => readAiKey());
   const [messages, setMessages] = useState<Msg[]>(() => loadHistory());
   const [text, setText] = useState('');
@@ -248,9 +208,8 @@ export function CopilotPage() {
   const [, tick] = useState(0);
   const end = useRef<HTMLDivElement>(null);
 
-  // L'état des actions validées change quand une app les exécute (autre onglet, ou ici pour « Mes apps »).
+  // L'état des actions validées change quand une app les exécute (dans son onglet).
   useEffect(() => {
-    void Promise.all([runHomeActions(), runChefActions()]).then(() => tick((n) => n + 1));
     const bump = () => tick((n) => n + 1);
     const onStorage = (e: StorageEvent) => e.key === ACTIONS_KEY && bump();
     window.addEventListener(ACTIONS_EVENT, bump);
@@ -270,8 +229,8 @@ export function CopilotPage() {
     });
 
   useEffect(() => {
-    if (crews.status === 'idle') void loadCrews();
-  }, [crews.status]);
+    if (spaces.status === 'idle') void loadSpaces();
+  }, [spaces.status]);
   useEffect(() => {
     // Accolades : scrollIntoView renvoie une promesse dans les navigateurs récents, pas une fonction de nettoyage.
     end.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });
@@ -279,17 +238,9 @@ export function CopilotPage() {
 
   const sources = (): CopilotSources => ({
     today: localToday(),
-    stats,
-    rest,
     finances: readCopilotCard('finances'),
     perf: readCopilotCard('perf'),
-    music: readMusic(),
-    games: readGames(),
-    sorties: sortieDigests(crews.sorties, crews.uid),
-    miniApps: Object.values(readMiniApps()),
-    objectives: objectives.list().map((i) => i.value),
-    kitchen: kitchenSummary(crews.lists[0]?.id ?? null),
-    imported: calendarEvents.list().map((e) => ({ title: e.value.title, date: e.value.date, ...(e.value.time ? { time: e.value.time } : {}), ...(e.value.endDate ? { endDate: e.value.endDate } : {}), ...(e.value.place ? { place: e.value.place } : {}) })),
+    sorties: sortieDigests(spaces.sorties, spaces.uid),
   });
 
   const ask = async (question: string) => {
@@ -333,7 +284,7 @@ export function CopilotPage() {
           <Reveal index={0}>
             <Card level="raised" glow>
               <p className="t-title">Pose une question sur ta vie</p>
-              <p className="t-small mt-1 text-secondary">Copilot lit ton budget, tes séances, tes bilans, ta musique, tes jeux et tes sorties pour te répondre. Il peut préparer une action (sauter un récurrent, décaler une séance, noter une saisie) : rien n’est fait sans ta validation.</p>
+              <p className="t-small mt-1 text-secondary">Copilot lit ton budget, tes séances, ton agenda et tes sorties pour te répondre. Il peut préparer une action (sauter un récurrent, décaler une séance) : rien n’est fait sans ta validation.</p>
               <div className="mt-3 flex flex-col gap-2">
                 {SUGGESTIONS.map((s) => (
                   <Button key={s} variant="secondary" size="sm" className="justify-start text-left" onClick={() => void ask(s)}>

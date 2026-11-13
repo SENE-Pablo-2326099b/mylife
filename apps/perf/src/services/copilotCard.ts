@@ -1,0 +1,77 @@
+import { Platform } from 'react-native';
+
+import { subscribeData } from '@/db/db';
+import { workoutSummaries } from '@/db/repos/history';
+import { addDays, today } from '@/domain/dates';
+import { writeAgenda, writeCopilotCard } from '@/vendor/lumen';
+import { listPlanned } from '@/db/repos/planning';
+import { listMesocycles } from '@/db/repos/cycles';
+import { phaseFor } from '@/domain/mesocycle';
+import { statsOverview } from './statsService';
+
+/**
+ * Fiche de contexte pour Copilot (accueil MyLife, web seulement) : objectif de la semaine, séances prévues,
+ * cycle en cours, dernières séances et records. Sur l'appareil, jamais synchronisée.
+ */
+export function publishCopilotCard(day = today()): void {
+  if (Platform.OS !== 'web') return;
+  const o = statsOverview(day);
+  const meso = [...listMesocycles()].reverse().find((m) => {
+    const p = phaseFor(m, day);
+    return p.kind === 'work' || p.kind === 'deload' || p.kind === 'before';
+  });
+  const phase = meso ? phaseFor(meso, day) : null;
+  const recent = workoutSummaries(addDays(day, -28), day)
+    .filter((w) => w.status === 'completed' && w.setCount > 0)
+    .slice(0, 8)
+    .map((w) => ({ date: w.date, name: w.name, sets: w.setCount, minutes: w.endedAt ? Math.round((w.endedAt - w.startedAt) / 60_000) : null }));
+  // Agenda commun (sur l'appareil) : les séances prévues des trois prochaines semaines.
+  writeAgenda(
+    'perf',
+    day,
+    listPlanned(day, addDays(day, 21))
+      .filter((p) => p.workoutId === null)
+      .map((p) => ({ id: p.id, kind: 'session' as const, title: p.title, date: p.date, url: '/perf/' })),
+  );
+  writeCopilotCard('perf', {
+    day,
+    weeklyGoal: o.weeklyGoal,
+    sessionsThisWeek: o.consistency.weeks[o.consistency.weeks.length - 1]?.sessions ?? 0,
+    goalStreakWeeks: o.consistency.streak,
+    workoutsLast30Days: o.workouts30,
+    planned: listPlanned(day, addDays(day, 21))
+      .filter((p) => p.workoutId === null)
+      .map((p) => ({ id: p.id, date: p.date, session: p.title })),
+    cycle: meso && phase ? { name: meso.name, start: meso.startDate, workWeeks: meso.workWeeks, deloadWeeks: meso.deloadWeeks, phase: phase.kind, week: 'week' in phase ? phase.week : null } : null,
+    recentWorkouts: recent,
+    recentRecords: o.recentRecords.map((r) => ({ date: r.date, exercise: r.name, weight: r.weight, reps: r.reps, e1rm: Math.round(r.e1rm * 10) / 10 })),
+    mainLifts: o.mainLifts.map((l) => ({ exercise: l.name, bestE1rm: Math.round(l.best * 10) / 10, lest: l.lest })),
+    stagnant: o.stagnant.map((s) => s.name),
+  });
+}
+
+let watching = false;
+/**
+ * Fiche Copilot et agenda commun : au lancement, puis quelques secondes après chaque écriture en base (une séance finie,
+ * un import). (Les compteurs du Personnage sont partis avec lui en V5.)
+ * `ready` : l'appareil est relié au compte connecté (pendant un changement de compte, les données sur
+ * l'appareil sont encore celles de l'ancien : rien n'est publié).
+ */
+export function watchCopilotCard(ready: () => boolean): void {
+  if (watching) return;
+  watching = true;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const soon = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (!ready()) return soon();
+      try {
+        publishCopilotCard();
+      } catch {
+        /* base en cours de remplacement : au prochain changement */
+      }
+    }, 3000);
+  };
+  subscribeData(soon);
+  soon();
+}

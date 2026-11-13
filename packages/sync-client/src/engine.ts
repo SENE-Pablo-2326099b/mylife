@@ -12,7 +12,7 @@ import { decryptRow, encryptRow, fromB64, type RandomBytes } from './crypto';
 import { ApiError, type MyLifeApi, type Session } from './account';
 
 /**
- * `mylife` : réglages communs à toutes les apps (apparence) ; `miniapps` : « Mes apps » et leurs saisies ; et les apps
+ * `mylife` : réglages communs à toutes les apps (apparence) ; et les apps
  * de l'accueil qui ont leur propre synchro (registre `SYNC_APPS` du serveur, qui fait foi).
  */
 export type AppId = 'finances' | 'perf' | 'mylife' | 'miniapps' | (string & {});
@@ -133,6 +133,25 @@ async function downloadAll(store: LocalStore, api: MyLifeApi, session: Session, 
   await store.replace(all.filter((r) => !r.deleted));
   await store.clearPending();
   return cursor;
+}
+
+/**
+ * Lecture seule de tout ce que le compte garde pour une app, déchiffré sur l'appareil (lignes supprimées écartées).
+ * Ne touche ni à l'appareil ni au serveur : sert à l'archive des apps retirées (« Mes données »).
+ */
+export async function readAccountApp(api: MyLifeApi, session: Session, app: AppId, random: RandomBytes): Promise<RemoteRow[]> {
+  const dek = fromB64(session.dek);
+  const all: RemoteRow[] = [];
+  let cursor = 0;
+  // Un appareil inconnu du serveur : il renvoie tout (il n'écarte que ce qu'un appareil a écrit lui-même).
+  const device = `archive-${hex(random(8))}`;
+  for (let guard = 0; guard < 500; guard++) {
+    const res = await api.call<SyncResponse>('/api/sync', { action: 'sync', app, device, cursor }, session.token);
+    all.push(...decrypt(dek, app, res.changes));
+    cursor = res.cursor;
+    if (!res.more) break;
+  }
+  return all.filter((r) => !r.deleted);
 }
 
 export type JoinMode = 'auto' | 'useAccount' | 'useDevice';

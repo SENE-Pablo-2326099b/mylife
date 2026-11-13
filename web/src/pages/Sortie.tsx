@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
-  addWeeks,
   balances,
   decide,
   localToday,
@@ -17,7 +16,6 @@ import {
   setAt,
   settle,
   sortSets,
-  weekStart,
   type Answer,
   type Expense,
   type IdNote,
@@ -26,14 +24,13 @@ import {
   type SortieSet,
 } from '../vendor/lumen';
 import type { Space } from '../vendor/mylife-sync';
-import { CREW_URL, client, loadCrews, useCrews } from '../crew';
+import { SPACE_URL, client, loadSpaces, useSpaces } from '../spaces';
 import { forgetSpace, newRid, useSpaceData, writeSpace, type CachedRecord } from '../spaceSync';
 import { Icon } from '../ui/icons';
 import { formatCents, tryDecimalToCents } from '../ui/money';
 import { Badge, Button, Card, Disclosure, EmptyState, Reveal, Segmented, SectionTitle, SelectField, TextField, ToggleRow } from '../ui/index';
 import { Screen } from '../ui/Screen';
 import { useSession } from '../ui/session';
-import { publishStats } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -85,13 +82,13 @@ async function shareLink(link: string, name: string): Promise<void> {
 
 export function SortiesPage() {
   const session = useSession();
-  const spaces = useCrews();
+  const spaces = useSpaces();
   const navigate = useNavigate();
   const today = localToday();
   const [form, setForm] = useState({ name: '', place: '', start: today, end: today });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    void loadCrews();
+    void loadSpaces();
   }, []);
 
   const create = async () => {
@@ -106,7 +103,7 @@ export function SortiesPage() {
         { tbl: 'info', rid: 'main', row: info },
         { tbl: 'rsvp', rid: spaces.uid, row: { answer: 'chaud' } },
       ]);
-      await loadCrews();
+      await loadSpaces();
       navigate(`/sorties/${space.id}?inviter=1`);
     } catch (e) {
       toast({ message: errorText(e) });
@@ -213,7 +210,7 @@ export function SortiePage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const spaces = useCrews();
+  const spaces = useSpaces();
   const space: Space | undefined = spaces.sorties.find((s) => s.id === id);
   const data = useSpaceData(space);
   const uid = spaces.uid ?? '';
@@ -225,14 +222,14 @@ export function SortiePage() {
   const today = localToday();
 
   useEffect(() => {
-    if (spaces.status === 'idle') void loadCrews();
+    if (spaces.status === 'idle') void loadSpaces();
   }, [spaces.status]);
 
   const invite = async () => {
     const c = client();
     if (!c || !space) return;
     try {
-      const r = await c.invite(space, CREW_URL());
+      const r = await c.invite(space, SPACE_URL());
       setLink(r.link);
       await shareLink(r.link, p.info?.name ?? space.name);
     } catch (e) {
@@ -247,14 +244,6 @@ export function SortiePage() {
   const decision = p.info ? decide(members, p.answers, p.info.threshold) : null;
   const phase = p.info ? phaseOf(p.info, today) : 'avant';
   const mine = p.answers.get(uid) ?? null;
-
-  // Personnage : une sortie faite (« chaud », ça se fait, commencée) compte dans la stat Social.
-  useEffect(() => {
-    if (!p.info || !decision?.on || mine !== 'chaud' || phase === 'avant') return;
-    const weeks: Record<string, Record<string, number>> = {};
-    for (let w = weekStart(p.info.start); w <= weekStart(p.info.end); w = addWeeks(w, 1)) weeks[w] = { groups: 1, friends: Math.max(0, decision.chaud.length - 1) };
-    publishStats('raveloc', { weeks });
-  }, [p.info, decision?.on, decision?.chaud.length, mine, phase]);
 
   if (!space) {
     return (
@@ -341,7 +330,7 @@ export function SortiePage() {
                     ?.leave(space)
                     .then(async () => {
                       forgetSpace(space.id);
-                      await loadCrews();
+                      await loadSpaces();
                       navigate('/sorties', { replace: true });
                     }, (e: unknown) => toast({ message: errorText(e) }))
                 }

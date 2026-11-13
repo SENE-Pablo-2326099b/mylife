@@ -6,11 +6,9 @@
  * CHROME_PATH pour un autre navigateur que /usr/bin/google-chrome ; SHOTS=dossier pour des captures.
  */
 import { readFileSync } from 'node:fs';
-import { deflateRawSync, crc32 } from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright-core';
 import { startLocalServer, type LocalServer } from '../../server/local';
-import { addWeeks, localToday, weekStart } from '../../packages/lumen/src/character';
 
 const PORT = 4330;
 let server: LocalServer;
@@ -19,8 +17,6 @@ let phone: BrowserContext;
 let page: Page;
 const errors: string[] = [];
 const LOGIN = 'test-e2e-mylife';
-/** Libellé de la carte du Personnage sur le premier appareil (le second doit afficher le même). */
-let personnage = '';
 const PASSWORD = 'cheval-Agrafe-2026';
 const shot = async (p: Page, name: string) => void (process.env.SHOTS && (await p.screenshot({ path: `${process.env.SHOTS}/${name}.png` })));
 
@@ -31,48 +27,6 @@ async function device(width = 390, height = 844): Promise<[BrowserContext, Page]
   p.on('pageerror', (e) => errors.push(`${p.url()} : ${e.message}`));
   p.on('console', (m) => m.type() === 'error' && !/Failed to load resource|favicon/.test(m.text()) && errors.push(`${p.url()} : ${m.text()}`));
   return [ctx, p];
-}
-
-/** Une petite archive .zip (fichiers compressés), comme l'export de données de Spotify. */
-function makeZip(files: { name: string; content: string }[]): Buffer {
-  const locals: Buffer[] = [];
-  const centrals: Buffer[] = [];
-  let offset = 0;
-  for (const f of files) {
-    const raw = Buffer.from(f.content);
-    const data = deflateRawSync(raw);
-    const name = Buffer.from(f.name);
-    const crc = crc32(raw);
-    const local = Buffer.alloc(30);
-    local.writeUInt32LE(0x04034b50, 0);
-    local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(8, 8);
-    local.writeUInt32LE(crc, 14);
-    local.writeUInt32LE(data.length, 18);
-    local.writeUInt32LE(raw.length, 22);
-    local.writeUInt16LE(name.length, 26);
-    locals.push(local, name, data);
-    const central = Buffer.alloc(46);
-    central.writeUInt32LE(0x02014b50, 0);
-    central.writeUInt16LE(20, 4);
-    central.writeUInt16LE(20, 6);
-    central.writeUInt16LE(8, 10);
-    central.writeUInt32LE(crc, 16);
-    central.writeUInt32LE(data.length, 20);
-    central.writeUInt32LE(raw.length, 24);
-    central.writeUInt16LE(name.length, 28);
-    central.writeUInt32LE(offset, 42);
-    centrals.push(central, name);
-    offset += 30 + name.length + data.length;
-  }
-  const dir = Buffer.concat(centrals);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(files.length, 8);
-  end.writeUInt16LE(files.length, 10);
-  end.writeUInt32LE(dir.length, 12);
-  end.writeUInt32LE(offset, 16);
-  return Buffer.concat([...locals, dir, end]);
 }
 
 const style = (p: Page) => p.evaluate(() => document.documentElement.dataset.style ?? null);
@@ -166,8 +120,8 @@ describe('MyLife, une seule app', () => {
     await page.getByText(LOGIN).first().waitFor({ timeout: 40_000 });
     await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
     await shot(page, '07-perf-compte');
-    // MyPerf publie ses compteurs pour le Personnage (objectif de séances compris), une fois relié au compte.
-    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mylife:stats:perf') ?? 'null')?.goal ?? null), { timeout: 15_000, interval: 500 }).toBe(4);
+    // MyPerf pose sa fiche pour Copilot (objectif de séances compris), une fois relié au compte.
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mylife:copilot:perf') ?? 'null')?.weeklyGoal ?? null), { timeout: 15_000, interval: 500 }).toBe(4);
   });
 
   it('MyPerf : importer un programme (texte collé, programme prêt), le retrouver, l’exporter', async () => {
@@ -205,60 +159,6 @@ describe('MyLife, une seule app', () => {
     const json = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; sessions: { name: string }[] };
     expect(json.format).toBe('myperf-program');
     expect(json.sessions.map((s) => s.name)).toEqual(expect.arrayContaining(['Lundi – Push', 'Jeudi – Pull', 'Full body A', 'Full body B']));
-  });
-
-  it('le Personnage : niveau, stats et quêtes calculés à partir des compteurs des apps', async () => {
-    // Des compteurs comme ceux que publient MyPerf et MyFinances : 6 semaines à 3 séances, des jours sous le budget.
-    const now = weekStart(localToday());
-    const perf: Record<string, Record<string, number>> = {};
-    const finances: Record<string, Record<string, number>> = {};
-    for (let i = 1; i <= 6; i++) {
-      perf[addWeeks(now, -i)] = { sessions: 3, records: i % 2 };
-      finances[addWeeks(now, -i)] = { under: 6, tracked: 7 };
-    }
-    perf[now] = { sessions: 1 };
-    await page.goto(`${server.url}/`);
-    await page.evaluate(
-      ([p, f]) => {
-        localStorage.setItem('mylife:stats:perf', JSON.stringify({ v: 1, at: Date.now(), weeks: p, goal: 3 }));
-        localStorage.setItem('mylife:stats:finances', JSON.stringify({ v: 1, at: Date.now(), weeks: f }));
-      },
-      [perf, finances],
-    );
-    await page.reload();
-    const card = page.getByRole('link', { name: /Ton personnage : niveau \d+/ });
-    await card.waitFor();
-    await shot(page, '04b-accueil-personnage');
-    await card.click();
-    await page.getByText('Quêtes de la semaine').waitFor();
-    await page.getByText('Fais 3 séances').waitFor();
-    await page.getByText('Reste sous ton budget du jour 5 jours').waitFor();
-    await page.getByText('Série de 6 semaines réussies').waitFor();
-    // Culture n'est pas encore branchée.
-    await page.getByText('Bientôt', { exact: true }).waitFor();
-    await page.waitForTimeout(700);
-    await shot(page, '04c-personnage');
-    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/04d-personnage-complet.png`, fullPage: true });
-    // La semaine de repos se déclare (une toutes les quatre semaines).
-    await page.getByRole('button', { name: 'Déclarer une semaine de repos' }).click();
-    await page.getByRole('button', { name: 'Annuler le repos' }).waitFor();
-    await page.getByRole('button', { name: 'Annuler le repos' }).click();
-    // Bilan et Wrapped à l'heure réelle (animations comprises).
-    await page.goto(`${server.url}/bilan?semaine=${addWeeks(now, -1)}`);
-    await page.getByText('3 séances').first().waitFor();
-    await page.waitForTimeout(900);
-    await shot(page, '04e-bilan');
-    await page.goto(`${server.url}/wrapped?periode=${addWeeks(now, -1).slice(0, 7)}`);
-    await page.getByRole('dialog', { name: /Wrapped de/ }).waitFor();
-    await page.waitForTimeout(900);
-    await shot(page, '04f-wrapped-intro');
-    await page.mouse.click(300, 420);
-    await page.waitForTimeout(900);
-    await shot(page, '04g-wrapped-force');
-    await page.getByRole('button', { name: 'Fermer le Wrapped' }).click();
-    await page.goto(`${server.url}/`);
-    personnage = (await page.getByRole('link', { name: /Ton personnage : niveau \d+/ }).getAttribute('aria-label')) ?? '';
-    expect(personnage).toMatch(/niveau \d+, /);
   });
 
   it('un thème choisi sur l’accueil habille toutes les apps', async () => {
@@ -317,59 +217,7 @@ describe('MyLife, une seule app', () => {
     await other.getByRole('button', { name: 'Se connecter' }).click();
     await other.getByText(`${LOGIN}`).first().waitFor();
     await expect.poll(() => style(other), { timeout: 20_000, interval: 500 }).toBe('brut');
-    // Le Personnage suit aussi : mêmes compteurs (chiffrés dans le compte), même niveau.
-    await expect
-      .poll(() => other.getByRole('link', { name: /Ton personnage : niveau \d+/ }).getAttribute('aria-label').catch(() => null), { timeout: 20_000, interval: 500 })
-      .toBe(personnage);
     await shot(other, '13-second-appareil');
-  });
-
-  it('MyMusique : l’export Spotify (.zip) lu sur l’appareil, tops et habitudes, Culture déverrouillée, rien de sensible gardé', async () => {
-    const plays = [];
-    const now = Date.now();
-    for (let d = 1; d <= 50; d++) {
-      const ts = new Date(now - d * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
-      plays.push({ ts, ms_played: 200_000, master_metadata_track_name: d % 3 ? 'Nuit blanche' : 'Lever du jour', master_metadata_album_artist_name: d % 5 ? 'Artiste Un' : 'Artiste Deux', ip_addr: '198.51.100.7', conn_country: 'FR', platform: 'android' });
-      if (d < 20) plays.push({ ts: new Date(now - d * 86_400_000 + 3_600_000).toISOString().replace(/\.\d+Z$/, 'Z'), ms_played: 180_000, master_metadata_track_name: `Découverte ${d}`, master_metadata_album_artist_name: `Nouveau ${d}`, ip_addr: '198.51.100.7', conn_country: 'FR', platform: 'android' });
-    }
-    const zip = makeZip([
-      { name: 'Spotify Extended Streaming History/Streaming_History_Audio_2026.json', content: JSON.stringify(plays) },
-      { name: 'Spotify Extended Streaming History/ReadMeFirst.pdf', content: 'pas un json' },
-    ]);
-    await page.goto(`${server.url}/musique`);
-    const chooser = page.waitForEvent('filechooser');
-    await page.getByRole('button', { name: 'Ouvrir mon export Spotify' }).click();
-    await (await chooser).setFiles({ name: 'my_spotify_data.zip', mimeType: 'application/zip', buffer: zip });
-    await page.getByText(/écoutes lues dans 1 fichier/).waitFor({ timeout: 20_000 });
-    await page.getByText('Tes artistes').waitFor();
-    await page.getByText('Artiste Un').first().waitFor();
-    await page.getByText(/Obsession de/).waitFor();
-    await page.waitForTimeout(700);
-    await shot(page, '13f-musique');
-    const stored = await page.evaluate(() => localStorage.getItem('mylife:music') ?? '');
-    expect(stored).toContain('Artiste Un');
-    expect(stored).not.toMatch(/198\.51\.100|android|conn_country/);
-    // La stat Culture est déverrouillée.
-    await page.goto(`${server.url}/personnage`);
-    await page.getByText('Ce que tu écoutes et découvres (MyMusique)', { exact: false }).waitFor();
-  });
-
-  it('MyGames et « Où va ton temps ? » : Steam sans clé (message clair), partie notée à la main, temps réparti', async () => {
-    await page.goto(`${server.url}/jeux`);
-    await page.getByLabel('Ton profil Steam').fill('https://steamcommunity.com/id/quelquun/');
-    await page.getByRole('button', { name: 'Mettre à jour depuis Steam' }).click();
-    await page.getByText(/connexion à Steam n’est pas encore activée/).waitFor();
-    await page.getByText('Noter une partie').click();
-    await page.getByLabel('Jeu', { exact: true }).fill('Mario Kart');
-    await page.getByLabel('Durée aujourd’hui (minutes)').fill('90');
-    await page.getByRole('button', { name: 'Noter', exact: true }).click();
-    await page.getByText('Mario Kart').first().waitFor();
-    await page.getByText('1,5 h').first().waitFor();
-    await shot(page, '13g-jeux');
-    await page.goto(`${server.url}/temps`);
-    await page.getByText('Jeu', { exact: true }).waitFor();
-    await page.getByText(/surtout en/).waitFor();
-    await shot(page, '13h-temps');
   });
 
   it('Copilot : clé saisie, question, lecture des apps (Claude simulé), réponse ; fiches de contexte posées par les apps', async () => {
@@ -400,70 +248,13 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: 'Enregistrer la clé' }).click();
     await page.getByRole('button', { name: 'Résume ma semaine.' }).click();
     await page.getByText('Belle semaine : tu es niveau au-dessus de la moyenne.').waitFor({ timeout: 20_000 });
-    await page.getByText('A lu : ton personnage').waitFor();
+    await page.getByText('A lu : tes apps').waitFor();
     expect(bodies[0]!.model).toBe('claude-opus-5-5');
-    // Le résultat de l'outil (le personnage, lu sur l'appareil) part dans la deuxième requête.
-    expect(JSON.stringify(bodies[1]!.messages)).toContain('character');
+    // Le résultat de l'outil (la vue d'ensemble, lue sur l'appareil) part dans la deuxième requête.
+    expect(JSON.stringify(bodies[1]!.messages)).toContain('cards');
     await shot(page, '13i-copilot');
     await page.unroute('https://api.anthropic.com/**');
     await page.evaluate(() => localStorage.removeItem('mylife:anthropic-key'));
-  });
-
-  it('Crew : créer, inviter (même sans compte chez l’ami), se voir au classement, choisir ce qu’on montre', async () => {
-    await page.goto(`${server.url}/crew`);
-    await page.getByText('Ce que tes amis voient').waitFor();
-    await page.getByLabel('Nom du Crew').fill('La bande');
-    await page.getByLabel('Ton pseudo dans ce Crew').fill('Alpha');
-    await page.getByRole('button', { name: 'Créer le Crew' }).click();
-    // Le lien d'invitation est créé tout de suite (copié, ou partagé sur téléphone) et affiché.
-    const linkText = page.getByText(/\/rejoindre#espace=/);
-    await linkText.waitFor({ timeout: 20_000 });
-    const link = (await linkText.textContent())!.trim();
-    expect(link.startsWith(`${server.url}/rejoindre#espace=`)).toBe(true);
-    await page.getByText('Alpha').first().waitFor();
-    await shot(page, '13b-crew-cree');
-
-    // Un ami sans compte ouvre le lien : il crée son compte, puis l'invitation reprend.
-    const [friendCtx, friend] = await device();
-    await friend.goto(link);
-    await friend.getByRole('button', { name: 'Commencer' }).click();
-    await friend.getByLabel('Identifiant').fill(`${LOGIN}-crew`);
-    await friend.getByText('Libre').waitFor();
-    await friend.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await friend.getByRole('button', { name: 'Créer mon compte' }).click();
-    await friend.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
-    await friend.getByText('Rejoindre « La bande » ?').waitFor({ timeout: 20_000 });
-    await friend.getByLabel('Ton pseudo dans ce Crew').fill('Bravo');
-    await friend.getByRole('button', { name: 'Rejoindre' }).click();
-    await friend.getByText('Classement de', { exact: false }).waitFor();
-    await friend.getByText('Alpha').waitFor();
-    await friend.getByText('Bravo').first().waitFor();
-    // Le score d'Alpha (son personnage) est là ; Bravo n'a encore rien publié.
-    await friend.getByText(/Niv\. \d+ · /).first().waitFor();
-    await shot(friend, '13c-crew-ami');
-
-    // Alpha montre aussi son niveau de Force : Bravo le voit.
-    await page.reload();
-    await page.getByText('Bravo').waitFor();
-    await page.getByRole('switch', { name: 'Niveau Force' }).click();
-    await page.waitForTimeout(800);
-    await friend.reload();
-    await friend.getByText(/^Force \d+$/).waitFor({ timeout: 20_000 });
-
-    // Pacte : Alpha lance « 3 séances par semaine », validé tout seul par MyPerf ; Bravo s'engage.
-    await page.getByText('Lancer un pacte').click();
-    await page.getByRole('button', { name: 'Lancer le pacte' }).click();
-    await page.getByText('3 séances par semaine').waitFor({ timeout: 20_000 });
-    // La semaine en cours d'Alpha (1 séance d'après ses compteurs) s'affiche déjà.
-    await page.getByText('1/3').waitFor({ timeout: 20_000 });
-    await friend.reload();
-    await friend.getByRole('button', { name: 'Je m’engage' }).click();
-    await friend.getByText('Bravo (toi)').waitFor({ timeout: 20_000 });
-    await friend.getByText('Alpha', { exact: true }).first().waitFor();
-    await friend.getByText('Bravo (toi)').evaluate((el) => el.scrollIntoView({ block: 'center' }));
-    await friend.waitForTimeout(400);
-    await shot(friend, '13j-pacte');
-    await friendCtx.close();
   });
 
   it('Sortie : chaud ?, planning et set en cours, budget partagé, sac commun, carnet d’ID, hors ligne', async () => {
@@ -483,13 +274,15 @@ describe('MyLife, une seule app', () => {
     await linkText.waitFor({ timeout: 20_000 });
     const link = (await linkText.textContent())!.trim();
 
-    // L'ami (déjà inscrit) rejoint et répond « chaud ».
+    // L'ami (un nouveau compte) rejoint et répond « chaud ».
     const [friendCtx, friend] = await device();
     await friend.goto(`${server.url}/`);
-    await friend.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await friend.getByLabel('Identifiant').fill(`${LOGIN}-crew`);
+    await friend.getByRole('button', { name: 'Commencer' }).click();
+    await friend.getByLabel('Identifiant').fill(`${LOGIN}-ami`);
+    await friend.getByText('Libre').waitFor();
     await friend.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await friend.getByRole('button', { name: 'Se connecter' }).click();
+    await friend.getByRole('button', { name: 'Créer mon compte' }).click();
+    await friend.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
     await friend.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
     await friend.goto(link);
     await friend.getByText('Rejoindre « Festival test » ?').waitFor({ timeout: 20_000 });
@@ -559,7 +352,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/personnage', '/crew', '/sorties', '/musique', '/jeux', '/temps', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/bilan', '/mes-apps', '/mes-apps/nouvelle', '/objectifs', '/chef', '/chef?vue=stock', '/chef?vue=recettes', '/chef?vue=semaine', '/calendrier', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/sorties', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/rejoindre', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -589,10 +382,8 @@ describe('MyLife, une seule app', () => {
     expect(await page.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
     expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
     expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
-    // Le Personnage du premier compte ne suit pas : le nouveau part de zéro.
-    expect(await page.evaluate(() => localStorage.getItem('mylife:stats:perf'))).toBeNull();
     await page.goto(`${server.url}/`);
-    await page.getByText('Ton personnage t’attend').waitFor();
+    await page.getByRole('button', { name: /Ouvrir MyFinances/ }).waitFor();
     await page.goto(`${server.url}/finances/`);
     await shot(page, '14-autre-compte');
     // MyPerf : relié au nouveau compte, sans rien du précédent.
@@ -644,212 +435,6 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
-  it('bilan et Wrapped : carte du dimanche, carte de début de mois, stories, image partagée', async () => {
-    const [ctx, p] = await device();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    const plusDays = (day: string, n: number) => iso(new Date(Date.parse(`${day}T12:00:00Z`) + n * 86_400_000));
-    // Un dimanche à venir, et le 3 du mois qui le suit.
-    const sunday = plusDays(weekStart(localToday()), 13);
-    const nextMonth = new Date(Date.parse(`${sunday}T12:00:00Z`));
-    nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1, 3);
-    const third = iso(nextMonth);
-    const weeks = (to: string, n: number, counters: Record<string, number>) => Object.fromEntries(Array.from({ length: n }, (_, i) => [addWeeks(weekStart(to), -i), counters]));
-    const inject = (at: string) =>
-      p.evaluate(
-        ([perf, finances, raveloc]) => {
-          localStorage.setItem('mylife:stats:perf', JSON.stringify({ v: 1, at: Date.now(), weeks: perf, goal: 3 }));
-          localStorage.setItem('mylife:stats:finances', JSON.stringify({ v: 1, at: Date.now(), weeks: finances }));
-          localStorage.setItem('mylife:stats:raveloc', JSON.stringify({ v: 1, at: Date.now(), weeks: raveloc }));
-        },
-        [weeks(at, 10, { sessions: 3, records: 1 }), weeks(at, 10, { under: 6, tracked: 7 }), weeks(at, 2, { groups: 1, friends: 3 })],
-      );
-
-    // Horloge figée : les animations ne s'y jouent pas (captures de ces écrans : voir l'étape du Personnage).
-    await p.clock.setFixedTime(new Date(`${sunday}T10:00:00`));
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(`${LOGIN}`).first().waitFor();
-    await inject(sunday);
-    await p.goto(`${server.url}/`);
-    // Dimanche : « Ta semaine, en bref ».
-    await p.getByText('Ta semaine, en bref').waitFor();
-    await shot(p, '16-carte-semaine');
-    await p.getByRole('link', { name: /^Ta semaine du/ }).click();
-    await p.getByText('3 séances · 1 record').waitFor();
-    await p.getByText('6 jours sous ton budget sur 7').waitFor();
-    await p.getByText('Semaine réussie').first().waitFor();
-    // Masquée une fois vue.
-    await p.goto(`${server.url}/`);
-    await p.getByRole('link', { name: /Ton personnage/ }).waitFor();
-    expect(await p.getByText('Ta semaine, en bref').count()).toBe(0);
-
-    // Le 3 du mois suivant : le Wrapped du mois fini.
-    await p.clock.setFixedTime(new Date(`${third}T10:00:00`));
-    await p.goto(`${server.url}/`);
-    await inject(third);
-    await p.reload();
-    const card = p.getByRole('link', { name: /Ton Wrapped de .+ est prêt/ });
-    await card.waitFor();
-    await card.click();
-    await p.getByRole('dialog', { name: /Wrapped de/ }).waitFor();
-    for (let i = 0; i < 8 && !(await p.getByRole('button', { name: 'Partager l’image' }).isVisible()); i++) {
-      await p.mouse.click(300, 420);
-      await p.waitForTimeout(450);
-    }
-    await p.getByRole('button', { name: 'Partager l’image' }).waitFor();
-    const download = p.waitForEvent('download');
-    await p.getByRole('button', { name: 'Partager l’image' }).click();
-    const file = await download;
-    expect(file.suggestedFilename()).toMatch(/^mylife-wrapped-\d{4}-\d{2}\.png$/);
-    if (process.env.SHOTS) await file.saveAs(`${process.env.SHOTS}/21-wrapped-image.png`);
-    await ctx.close();
-  });
-
-  it('Mes apps : un modèle, une réponse d’IA collée, un lien partagé (sans les saisies), un second appareil, une suppression', async () => {
-    const login = async (p: Page) => {
-      await p.goto(`${server.url}/`);
-      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-      await p.getByLabel('Identifiant').fill(LOGIN);
-      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-      await p.getByRole('button', { name: 'Se connecter' }).click();
-      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    };
-    const [ctx, p] = await device();
-    await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: server.url });
-    await login(p);
-    await p.getByRole('link', { name: /^Mes apps :/ }).click();
-    await p.getByText('Crée tes propres apps').waitFor();
-    await p.getByRole('link', { name: 'Créer une app' }).click();
-    // Un modèle : aperçu, puis l'app.
-    await p.getByRole('button', { name: 'Modèle Lecture' }).click();
-    await p.getByText('Objectif : 150 pages par semaine').waitFor();
-    await shot(p, '32-mes-apps-apercu');
-    await p.getByRole('button', { name: 'Créer cette app' }).click();
-    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
-    // Saisie refusée sans le champ obligatoire, puis notée.
-    await p.getByLabel('Livre (facultatif)').fill('Dune');
-    await p.getByRole('button', { name: 'Noter' }).click();
-    await p.getByText('« Pages lues » est à remplir.').waitFor();
-    await p.getByLabel('Pages lues (pages)').fill('40');
-    await p.getByRole('button', { name: 'Noter' }).click();
-    await p.getByText('Noté', { exact: true }).waitFor();
-    await p.getByText('sur 150 pages par semaine').waitFor();
-    await p.getByText('Dune').first().waitFor();
-    await p.evaluate(() => window.scrollTo(0, 0));
-    await p.waitForTimeout(400);
-    await shot(p, '33-mes-apps-lecture');
-
-    // Partager : le lien porte l'app, pas les saisies.
-    await p.getByRole('button', { name: 'Partager l’app (sans mes saisies)' }).click();
-    const link = await p.evaluate(() => navigator.clipboard.readText());
-    expect(link).toMatch(/\/mes-apps\/nouvelle#app=[A-Za-z0-9_-]+$/);
-    const shared = JSON.parse(Buffer.from(link.split('#app=')[1]!, 'base64url').toString('utf8')) as Record<string, unknown>;
-    expect(shared.name).toBe('Lecture');
-    expect(JSON.stringify(shared)).not.toContain('Dune');
-
-    // Une réponse d'IA collée (avec du texte autour) : vérifiée, puis créée.
-    await p.goto(`${server.url}/mes-apps/nouvelle`);
-    await p.getByLabel('Ce que tu veux suivre').fill('mes séances de piano');
-    await p.getByRole('button', { name: 'Copier la demande' }).click();
-    expect(await p.evaluate(() => navigator.clipboard.readText())).toContain('mes séances de piano');
-    await p.getByLabel('Réponse de l’IA').fill('Voici :\n```json\n{"format":"mylife-app","v":1,"name":"Piano","icon":"time","color":"violet","fields":[{"id":"duree","label":"Durée","type":"duration"},{"id":"ressenti","label":"Ressenti","type":"rating"}],"goal":{"agg":"count","per":"week","target":3},"stats":[{"label":"Minutes cette semaine","agg":"sum","field":"duree","period":"week"}],"chart":{"agg":"sum","field":"duree"}}\n```');
-    await p.getByRole('button', { name: 'Lire la réponse' }).click();
-    await p.getByText('Objectif : 3 saisies par semaine').waitFor();
-    await p.getByRole('button', { name: 'Créer cette app' }).click();
-    await p.getByRole('heading', { name: 'Piano' }).waitFor();
-    await p.getByLabel('Durée (facultatif) en minutes').fill('75');
-    await p.getByRole('button', { name: 'Ressenti : 4' }).click();
-    await p.getByRole('button', { name: 'Noter' }).click();
-    await p.getByText('1 h 15').first().waitFor();
-
-    // Le lien reçu : l'app arrive vide.
-    await p.goto(link);
-    await p.getByRole('heading', { name: 'App reçue' }).waitFor();
-    await p.getByText(/tu reçois sa forme, pas ses saisies/).waitFor();
-    await p.getByRole('button', { name: 'Créer cette app' }).click();
-    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
-    expect(await p.getByText('Dernières saisies').count()).toBe(0);
-    // Supprimer (confirmé) : elle disparaît de la liste.
-    await p.getByRole('button', { name: 'Supprimer l’app' }).click();
-    await p.getByRole('button', { name: /Confirmer : supprimer/ }).click();
-    await p.getByRole('heading', { name: 'Mes apps' }).waitFor();
-    await expect.poll(() => p.getByRole('link', { name: /^Ouvrir / }).count()).toBe(2);
-    await p.waitForTimeout(3500);
-    await ctx.close();
-
-    // Second appareil : les apps et leurs saisies suivent (chiffrées), la supprimée non.
-    const [ctx2, q] = await device();
-    await login(q);
-    await q.goto(`${server.url}/mes-apps`);
-    await q.getByRole('link', { name: 'Ouvrir Piano' }).waitFor({ timeout: 30_000 });
-    expect(await q.getByRole('link', { name: /^Ouvrir / }).count()).toBe(2);
-    await q.getByRole('link', { name: 'Ouvrir Lecture' }).click();
-    await q.getByText('Dune').first().waitFor();
-    await ctx2.close();
-  });
-
-  it('actions validées : Copilot (simulé) propose une saisie, rien n’est fait avant « Valider », puis l’annulation la retire', async () => {
-    const [ctx, p] = await device();
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    await p.goto(`${server.url}/mes-apps`);
-    await p.getByRole('link', { name: 'Ouvrir Lecture' }).waitFor({ timeout: 30_000 });
-    const appId = await p.evaluate(() => Object.values(JSON.parse(localStorage.getItem('mylife:miniapps') ?? '{}') as Record<string, { id: string; spec: { name: string } | null }>).find((a) => a.spec?.name === 'Lecture')!.id);
-    const day = await p.evaluate(() => new Date().toLocaleDateString('sv-SE'));
-    let n = 0;
-    await p.route('https://api.anthropic.com/**', async (route) => {
-      const body = JSON.parse(route.request().postData() ?? '{}');
-      n += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: `msg_a${n}`,
-          type: 'message',
-          role: 'assistant',
-          model: body.model,
-          stop_reason: n === 1 ? 'tool_use' : 'end_turn',
-          stop_sequence: null,
-          usage: { input_tokens: 10, output_tokens: 10 },
-          content:
-            n === 1
-              ? [{ type: 'tool_use', id: 'toolu_act', name: 'propose_action', input: { kind: 'miniapp.addEntry', summary: 'Noter 42 pages de lecture aujourd’hui', params: { appId, day, values: { pages: 42 } } } }]
-              : [{ type: 'text', text: 'Je te propose de noter 42 pages : valide la carte.' }],
-        }),
-      });
-    });
-    await p.goto(`${server.url}/copilot`);
-    await p.getByLabel('Clé API').fill('sk-ant-test-e2e');
-    await p.getByRole('button', { name: 'Enregistrer la clé' }).click();
-    await p.getByLabel('Ta question').fill('Note 42 pages de lecture');
-    await p.getByRole('button', { name: 'Demander' }).click();
-    await p.getByText('Noter 42 pages de lecture aujourd’hui').waitFor({ timeout: 20_000 });
-    await p.getByText('A lu : une action à valider').waitFor();
-    // Proposée, pas faite : rien dans l'app ni dans la boîte d'envoi.
-    expect(await p.evaluate(() => localStorage.getItem('mylife:actions'))).toBeNull();
-    await shot(p, '34-action-proposee');
-    await p.getByRole('button', { name: 'Valider' }).click();
-    await p.getByText('Fait par Mes apps.').waitFor();
-    await p.goto(`${server.url}/mes-apps/${appId}`);
-    await p.getByText('42 pages').first().waitFor();
-    // L'annulation défait (elle aussi validée d'un toucher).
-    await p.goto(`${server.url}/copilot`);
-    await p.getByRole('button', { name: 'Annuler' }).click();
-    await p.getByText('Annulée.').waitFor();
-    await p.goto(`${server.url}/mes-apps/${appId}`);
-    await p.getByRole('heading', { name: 'Lecture' }).waitFor();
-    expect(await p.getByText('42 pages').count()).toBe(0);
-    await p.unroute('https://api.anthropic.com/**');
-    await ctx.close();
-  });
-
   it('Ta journée : l’agenda commun montre la sortie du jour sur l’accueil (autre appareil du compte)', async () => {
     // Un parcours précédent a connecté un autre compte dans la page principale : on revient avec le premier.
     const [ctx, p] = await device();
@@ -864,294 +449,6 @@ describe('MyLife, une seule app', () => {
     await shot(p, '35-ta-journee');
     expect(await p.evaluate(() => Object.keys(localStorage))).toContain('mylife:agenda:home');
     await ctx.close();
-  });
-
-  it('MyObjectifs : un objectif branché sur « Mes apps », mesuré tout seul, retrouvé sur un second appareil', async () => {
-    const signIn = async (p: Page) => {
-      await p.goto(`${server.url}/`);
-      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-      await p.getByLabel('Identifiant').fill(LOGIN);
-      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-      await p.getByRole('button', { name: 'Se connecter' }).click();
-      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    };
-    const [ctx, p] = await device();
-    await signIn(p);
-    await p.goto(`${server.url}/mes-apps`);
-    await p.getByRole('link', { name: 'Ouvrir Lecture' }).waitFor({ timeout: 30_000 });
-    await p.goto(`${server.url}/`);
-    await p.getByRole('link', { name: /^MyObjectifs :/ }).click();
-    await p.getByRole('heading', { name: 'MyObjectifs' }).waitFor();
-    await p.getByRole('button', { name: 'Nouvel objectif' }).click();
-    await p.getByLabel('Ce qui compte').selectOption({ label: 'Lecture : nombre de saisies' });
-    await p.getByLabel('Cible (saisies)').fill('10');
-    await p.getByRole('button', { name: 'Créer l’objectif' }).click();
-    await p.getByText(/\/ 10 saisies · jusqu’au/).waitFor();
-    await shot(p, '36-objectifs');
-    await p.waitForTimeout(3500);
-    await ctx.close();
-    // Second appareil : l'objectif suit (chiffré), avec la même mesure.
-    const [ctx2, q] = await device();
-    await signIn(q);
-    await q.goto(`${server.url}/objectifs`);
-    await q.getByText(/\/ 10 saisies · jusqu’au/).waitFor({ timeout: 30_000 });
-    await ctx2.close();
-  });
-
-  it('MyChef : courses par rayon, coché = en stock, indispensable bientôt fini qui revient seul ; second appareil', async () => {
-    const signIn = async (p: Page) => {
-      await p.goto(`${server.url}/`);
-      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-      await p.getByLabel('Identifiant').fill(LOGIN);
-      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-      await p.getByRole('button', { name: 'Se connecter' }).click();
-      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    };
-    const [ctx, p] = await device();
-    await signIn(p);
-    await p.getByRole('link', { name: /^MyChef :/ }).click();
-    await p.getByRole('heading', { name: 'MyChef' }).waitFor();
-    await p.getByLabel('Ajouter à la liste').fill('lai');
-    await p.getByRole('button', { name: 'Lait', exact: true }).click();
-    await p.getByLabel('Ajouter à la liste').fill('Lessive');
-    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
-    await p.getByRole('heading', { name: 'Frais (crèmerie, œufs)' }).waitFor();
-    await p.getByRole('heading', { name: 'Maison' }).waitFor();
-    await shot(p, '37-chef-courses');
-    // Coché en magasin : il entre dans le garde-manger, au frigo, avec une date proposée.
-    await p.getByRole('checkbox', { name: 'Lait : à prendre' }).click();
-    await p.getByRole('checkbox', { name: 'Lait : pris' }).waitFor();
-    await p.getByRole('radio', { name: /^Stock/ }).click();
-    await p.getByRole('heading', { name: 'Frigo' }).waitFor();
-    await p.getByRole('button', { name: /^Lait/ }).click();
-    await p.getByRole('radio', { name: 'Bientôt fini' }).click();
-    await p.getByRole('switch', { name: /Indispensable/ }).click();
-    await p.keyboard.press('Escape');
-    await shot(p, '38-chef-garde-manger');
-    // Indispensable bientôt fini : il revient tout seul sur la liste.
-    await p.getByRole('button', { name: 'Retirer les 1 article pris' }).waitFor({ state: 'detached' }).catch(() => undefined);
-    await p.getByRole('radio', { name: /Courses/ }).click();
-    await p.getByText('Indispensable à racheter').waitFor();
-    await p.waitForTimeout(3500);
-    await ctx.close();
-    const [ctx2, q] = await device();
-    await signIn(q);
-    await q.goto(`${server.url}/chef`);
-    await q.getByText('Indispensable à racheter').waitFor({ timeout: 30_000 });
-    await q.getByText('Lessive').waitFor();
-    await ctx2.close();
-  });
-
-  it('MyChef à deux : la liste partagée avec le foyer, ce que l’un coche entre dans le garde-manger de l’autre', async () => {
-    const signIn = async (p: Page, login: string) => {
-      await p.goto(`${server.url}/`);
-      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-      await p.getByLabel('Identifiant').fill(login);
-      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-      await p.getByRole('button', { name: 'Se connecter' }).click();
-      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    };
-    const [ctxA, a] = await device();
-    await ctxA.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await signIn(a, LOGIN);
-    await a.goto(`${server.url}/chef`);
-    await a.getByText('Lessive').waitFor({ timeout: 30_000 });
-    await a.getByRole('button', { name: 'Partager avec mon foyer' }).click();
-    await a.getByText('Liste du foyer').waitFor({ timeout: 20_000 });
-    const link = (await a.getByText(/\/rejoindre#espace=/).textContent())!.trim();
-    // Ta liste est devenue celle du foyer.
-    await a.getByText('Lessive').waitFor();
-    const [ctxB, b] = await device();
-    await signIn(b, `${LOGIN}-crew`);
-    await b.goto(link);
-    await b.getByText('Invitation à rejoindre un foyer').waitFor({ timeout: 20_000 });
-    await b.getByRole('button', { name: 'Rejoindre' }).click();
-    await b.getByRole('heading', { name: 'MyChef' }).waitFor();
-    await b.getByText('Lessive').waitFor({ timeout: 20_000 });
-    await b.getByLabel('Ajouter à la liste').fill('Pain');
-    await b.getByRole('button', { name: 'Ajouter', exact: true }).click();
-    await shot(b, '39-chef-foyer');
-    // A voit le pain (synchro de l'espace) et le coche au magasin.
-    await expect.poll(async () => { await a.reload(); return a.getByText('Pain', { exact: true }).count(); }, { timeout: 30_000, interval: 2000 }).toBeGreaterThan(0);
-    await a.getByRole('checkbox', { name: 'Pain : à prendre' }).click();
-    await a.getByRole('checkbox', { name: 'Pain : pris' }).waitFor();
-    // Chez B, la coche arrive et le pain entre dans son garde-manger.
-    await expect.poll(async () => { await b.reload(); return b.getByRole('checkbox', { name: 'Pain : pris' }).count(); }, { timeout: 30_000, interval: 2000 }).toBe(1);
-    await b.goto(`${server.url}/chef?vue=stock`);
-    await b.getByRole('heading', { name: 'Placard' }).waitFor();
-    // Il se garde 2 jours : il est au placard et dans « À finir vite ».
-    await b.getByRole('heading', { name: 'À finir vite' }).waitFor();
-    expect(await b.getByRole('button', { name: /^Pain/ }).count()).toBe(2);
-    await ctxA.close();
-    await ctxB.close();
-  });
-
-  it('MyChef recettes : une recette collée, possible avec le garde-manger, mode cuisine, « J’ai cuisiné » retire du stock et fait monter la Vitalité', async () => {
-    const [ctx, p] = await device();
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    await p.goto(`${server.url}/chef?vue=stock`);
-    await p.getByRole('button', { name: /^Lait/ }).first().waitFor({ timeout: 30_000 });
-    await p.getByRole('radio', { name: 'Recettes' }).click();
-    await p.getByRole('button', { name: 'Ajouter une recette' }).click();
-    await p.getByLabel('Ta recette').fill('Lait chaud\nPour 1 personne\n25 cl de lait\nPréparation :\nFais chauffer le lait 3 min.');
-    await p.getByRole('button', { name: 'Ajouter la recette' }).click();
-    await p.getByRole('button', { name: /^Lait chaud/ }).click();
-    await p.getByText('Tout est là').waitFor();
-    await p.getByRole('button', { name: 'Mode cuisine' }).click();
-    await p.getByText('Fais chauffer le lait 3 min.').waitFor();
-    await p.getByRole('button', { name: 'Minuteur 3 min' }).click();
-    await p.getByText(/^[23]:\d\d$/).waitFor();
-    await shot(p, '40-chef-mode-cuisine');
-    await p.getByRole('button', { name: 'Terminé' }).click();
-    await p.getByRole('button', { name: 'J’ai cuisiné' }).click();
-    await p.getByText(/Bon appétit/).waitFor();
-    // Le lait était « bientôt fini » : il passe à « fini ».
-    await p.getByRole('radio', { name: /^Stock/ }).click();
-    await p.getByRole('heading', { name: 'Finis' }).waitFor();
-    // La stat Vitalité apparaît sur le Personnage (repas fait maison).
-    await p.goto(`${server.url}/personnage`);
-    await p.getByText('Vitalité').first().waitFor({ timeout: 20_000 });
-    await ctx.close();
-  });
-
-  it('MyChef semaine : proposer la semaine, les courses qui en découlent, le repas du soir dans « Ta journée »', async () => {
-    const [ctx, p] = await device();
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    // L'accueil a mis la sortie du jour dans l'agenda commun.
-    await p.getByText('Festival test', { exact: false }).first().waitFor({ timeout: 30_000 });
-    await p.goto(`${server.url}/chef?vue=semaine`);
-    await p.getByRole('button', { name: 'Proposer ma semaine' }).click();
-    await p.getByText(/repas proposés? : change/).waitFor();
-    // Le soir de la sortie du jour (agenda commun) reste sans dîner.
-    await p.getByText('Dehors ce soir').first().waitFor();
-    await shot(p, '41-chef-semaine');
-    await p.getByRole('button', { name: 'Les courses' }).click();
-    await p.getByText(/ajoutés? à la liste|déjà tout ce qu’il faut/).waitFor();
-    await p.goto(`${server.url}/`);
-    await p.getByText(/Soir : /).first().waitFor({ timeout: 20_000 });
-    await ctx.close();
-  });
-
-  it('MyChef ticket et Copilot : un ticket collé range les articles et retient les prix ; Copilot (simulé) propose un ajout à la liste, validé', async () => {
-    const [ctx, p] = await device();
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    await p.goto(`${server.url}/chef?vue=stock`);
-    await p.getByRole('button', { name: 'Importer un ticket de caisse' }).click();
-    await p.getByLabel('Texte du ticket').fill('MON MAGASIN\nLESSIVE LIQUIDE 2L   6,49\nPATES PENNE 500G   1,15\nTOTAL   7,64\nCB   7,64');
-    await p.getByRole('button', { name: 'Lire le ticket' }).click();
-    await p.getByRole('button', { name: 'Ranger 2 articles' }).click();
-    await p.getByText(/2 articles rangés/).waitFor();
-    // Les prix retenus estiment la liste (la lessive y était : elle en sort, achetée).
-    await p.getByRole('radio', { name: /^Courses/ }).click();
-    await p.getByLabel('Ajouter à la liste').fill('Pâtes');
-    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
-    await p.getByText(/d’après tes derniers tickets/).waitFor({ timeout: 20_000 });
-    // Copilot propose d'ajouter des œufs à la liste ; validé, MyChef l'exécute aussitôt.
-    let n = 0;
-    await p.route('https://api.anthropic.com/**', async (route) => {
-      const body = JSON.parse(route.request().postData() ?? '{}');
-      n += 1;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: `msg_c${n}`, type: 'message', role: 'assistant', model: body.model, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 },
-          stop_reason: n === 1 ? 'tool_use' : 'end_turn',
-          content: n === 1 ? [{ type: 'tool_use', id: 'toolu_chef', name: 'propose_action', input: { kind: 'chef.addToList', summary: 'Ajouter 6 œufs à la liste', params: { name: 'Œufs', qty: 6 } } }] : [{ type: 'text', text: 'Je te propose d’ajouter des œufs.' }],
-        }),
-      });
-    });
-    await p.goto(`${server.url}/copilot`);
-    await p.getByLabel('Clé API').fill('sk-ant-test-e2e');
-    await p.getByRole('button', { name: 'Enregistrer la clé' }).click();
-    await p.getByLabel('Ta question').fill('Ajoute des œufs');
-    await p.getByRole('button', { name: 'Demander' }).click();
-    await p.getByText('Ajouter 6 œufs à la liste').waitFor({ timeout: 20_000 });
-    await p.getByRole('button', { name: 'Valider' }).click();
-    await p.getByText('Fait par MyChef.').waitFor();
-    await p.unroute('https://api.anthropic.com/**');
-    await p.goto(`${server.url}/chef`);
-    await p.getByText('6 pièce').or(p.getByText(/^6\s*$/)).or(p.getByRole('button', { name: /^Œufs/ })).first().waitFor({ timeout: 20_000 });
-    await ctx.close();
-  });
-
-  it('MyAgenda : un agenda importé (fichier ICS) rejoint l’agenda des apps, et un chevauchement est signalé', async () => {
-    const [ctx, p] = await device();
-    await p.goto(`${server.url}/`);
-    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await p.getByLabel('Identifiant').fill(LOGIN);
-    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-    await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    await p.getByRole('link', { name: /^MyAgenda :/ }).click();
-    await p.getByRole('heading', { name: 'MyAgenda' }).waitFor();
-    const d = new Date();
-    d.setDate(d.getDate() + 2);
-    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    const ics = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:1\r\nSUMMARY:Cinéma\r\nDTSTART:${ymd}T200000\r\nDTEND:${ymd}T220000\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:2\r\nSUMMARY:Dîner famille\r\nDTSTART:${ymd}T210000\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n`;
-    await p.getByRole('button', { name: 'Ajouter un agenda' }).click();
-    await p.getByLabel('Nom').fill('Perso');
-    await p.locator('input[type=file]').setInputFiles({ name: 'perso.ics', mimeType: 'text/calendar', buffer: Buffer.from(ics) });
-    await p.getByText(/Perso : 2 événements importés/).waitFor();
-    await p.getByText('Cinéma').first().waitFor();
-    await p.getByText('« Cinéma » et « Dîner famille » se chevauchent').waitFor();
-    await shot(p, '42-agenda');
-    await ctx.close();
-  });
-
-  it('MyFoyer à deux : une corvée chacun son tour, une dépense commune et qui doit quoi, la stat Foyer', async () => {
-    const signIn = async (p: Page, login: string) => {
-      await p.goto(`${server.url}/`);
-      await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-      await p.getByLabel('Identifiant').fill(login);
-      await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
-      await p.getByRole('button', { name: 'Se connecter' }).click();
-      await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    };
-    // Le foyer créé pour la liste de courses (test MyChef à deux) est celui de MyFoyer.
-    const [ctxA, a] = await device();
-    await signIn(a, LOGIN);
-    await a.goto(`${server.url}/foyer`);
-    await a.getByText('Avec 1 personne').waitFor({ timeout: 30_000 });
-    await a.getByRole('button', { name: 'Ajouter' }).nth(1).click();
-    await a.getByLabel('Quelle corvée').fill('Poubelles');
-    await a.getByRole('button', { name: 'Ajouter', exact: true }).last().click();
-    // Le tour commence par celui qui l'ajoute.
-    await a.getByText('ton tour', { exact: false }).waitFor();
-    await a.getByRole('button', { name: 'Ajouter' }).first().click();
-    await a.getByLabel('Quelle dépense').fill('Courses');
-    await a.getByLabel('Montant (€)').fill('30');
-    await a.getByRole('button', { name: 'Ajouter', exact: true }).last().click();
-    await a.getByText('payé par toi, partagé par tous').waitFor();
-    await shot(a, '43-foyer');
-    // Chez B : la dépense est partagée (B doit la moitié), la corvée est au tour de A.
-    const [ctxB, b] = await device();
-    await signIn(b, `${LOGIN}-crew`);
-    await b.goto(`${server.url}/foyer`);
-    await b.getByText(/Tu dois 15,00/).waitFor({ timeout: 30_000 });
-    await b.getByText(/Poubelles pour/).waitFor();
-    // A fait sa corvée : elle compte pour sa stat Foyer.
-    await a.getByRole('button', { name: 'Fait' }).click();
-    await a.getByText('Faite').waitFor();
-    await a.goto(`${server.url}/personnage`);
-    await a.getByText('Foyer').first().waitFor({ timeout: 20_000 });
-    await ctxA.close();
-    await ctxB.close();
   });
 
   it('ouverture au public : confidentialité lisible sans compte, support, export de mes données', async () => {
@@ -1191,10 +488,18 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Exporter' }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/^mylife-\d{4}-\d{2}-\d{2}\.json$/);
-    const data = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; account: string; counters: Record<string, unknown> };
+    const data = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; account: string; appearance: { theme: string } };
     expect(data.format).toBe('mylife-export');
     expect(data.account).toBe(LOGIN);
-    expect(Object.keys(data.counters)).toContain('perf');
+    expect(typeof data.appearance.theme).toBe('string');
+    // L'archive des fonctions retirées (V5) : lue dans le compte et déchiffrée sur l'appareil.
+    const archived = p.waitForEvent('download');
+    await p.getByRole('button', { name: 'Télécharger l’archive' }).click();
+    const archive = await archived;
+    expect(archive.suggestedFilename()).toMatch(/^mylife-archive-\d{4}-\d{2}-\d{2}\.json$/);
+    const arch = JSON.parse(readFileSync((await archive.path())!, 'utf8')) as { format: string; account: string; account_data: Record<string, unknown[]>; errors: Record<string, string> };
+    expect(arch).toMatchObject({ format: 'mylife-archive-v5', account: LOGIN, errors: {} });
+    expect(Object.keys(arch.account_data).sort()).toEqual(['calendrier', 'chef', 'miniapps', 'mylife', 'objectifs']);
     await ctx.close();
   });
 

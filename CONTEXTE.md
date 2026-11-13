@@ -11,8 +11,9 @@
 
 ## 1. Où on en est
 
-- **V5, phase 0 faite** (vision écrite, documentation rangée). **Prochaine étape : phase 1, le ménage** (§ 8).
-- **Production** : https://mylife-liart.vercel.app, à jour avec le code (vérifié le 13/11/2026).
+- **V5, phases 0 et 1 faites** (vision, documentation rangée, ménage du code : § 8). **Prochaine étape : phase 2, la
+  fondation** (après ton test de la phase 1 et un `npm run deploy:all`).
+- **Production** : https://mylife-liart.vercel.app ; elle n'a pas encore la phase 1 (à déployer).
 - **Dépôt** : `~/PersoDev/MyLife`, GitHub privé `SENE-Pablo-2326099b/mylife`, branche `master`. Il contient le
   programme et l'historique d'entraînement de l'utilisateur (build privé de MyPerf) : il reste privé.
 - **De ton côté, toujours en attente** : clés VAPID et `CRON_SECRET` sur Vercel (sans elles, aucun rappel ne part) ;
@@ -27,8 +28,8 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 
 | Chemin | Partie | Dossier | Projet Vercel | Techno |
 |---|---|---|---|---|
-| `/` | **Accueil** : apps et aperçus, compte, apparence, installation, Copilot, fonctions de l'accueil (§ 8) ; **seul manifeste** | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
-| `/api/*` | Comptes, synchro chiffrée, espaces partagés, MyRave, notifications, support, relais | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
+| `/` | **Accueil** : « Ta journée », Copilot, Sorties, apps et aperçus, compte, apparence, installation ; **seul manifeste** | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
+| `/api/*` | Comptes, synchro chiffrée, espaces partagés, MyRave, notifications, support | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
 | `/finances/` | **MyFinances** | `apps/finances` | `myfinances` | React 18 + Vite + Tailwind + Dexie |
 | `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
 | `/perf/` | **MyPerf** | `apps/perf` | `myperf` | Expo / React Native (React 19) + SQLite ; web + APK Android |
@@ -85,15 +86,16 @@ nécessaire (chemins absolus en cache).
   session : `password`, `renewRecovery`, `deleteAccount` (efface compte, lignes, groupes, espaces, messages au support,
   abonnements aux notifications).
 - `/api/sync` (`server/sync.ts`) : `status`, `sync`. Registre des apps de synchro et de leurs quotas : `SYNC_APPS`
-  (`server/core.ts`) + `AppId` (sync-client) : `finances`, `perf`, `mylife` (réglages communs, compteurs), `miniapps`,
-  `objectifs`, `chef`, `calendrier`. Seules les lignes vivantes comptent dans le quota ; une ligne trop grosse est écartée
+  (`server/core.ts`) + `AppId` (sync-client) : `finances`, `perf`, `mylife` (réglages communs) ; et `miniapps`,
+  `objectifs`, `chef`, `calendrier`, plus lues par aucun écran depuis la phase 1 (gardées jusqu'à la purge, § 8). Seules les lignes vivantes comptent dans le quota ; une ligne trop grosse est écartée
   seule (`tooBig`). Traces de suppression purgées après 90 jours (cron du dimanche) ; un appareil plus ancien reçoit
   `resync`.
-- `/api/space` (`server/space.ts`) : espaces partagés chiffrés (Crew, Sorties, liste du foyer).
+- `/api/space` (`server/space.ts`) : espaces partagés chiffrés (les Sorties ; les anciens Crew et foyers restent stockés).
 - `/api/raveloc` : groupes, invitations, positions chiffrées de MyRave.
-- `/api/push`, `/api/cron-weekly`, `/api/cron-reminders` : notifications (le serveur n'envoie qu'un signal vide, le
-  service worker écrit le rappel depuis les données locales).
-- `/api/support`, `/api/games` (relais Steam), `/api/calendar` (relais ICS sans mémoire).
+- `/api/push`, `/api/cron-reminders` : rappels écrits par l'appareil (le serveur n'envoie qu'un signal vide, le service
+  worker écrit le rappel depuis les données locales ; aucune app n'en prévoit pour l'instant).
+- `/api/cron-weekly` : purge des traces de suppression, le dimanche.
+- `/api/support` : messages au support.
 - Le même code sert en local (`server/local.ts`) et dans les tests. Cœur indépendant de Vercel : `server/core.ts` ne
   dépend que d'une interface `Db { query() }`.
 
@@ -123,8 +125,8 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
 ### Base et variables
 - Neon Postgres ; tables créées au premier appel. Fichier local : `.env.local` (racine, ignoré par git).
 - Variables (**ne jamais afficher leurs valeurs**) : `DATABASE_URL`, `SESSION_SECRET` (aussi sur `myfinances`),
-  `SIGNUP`, `INVITE_CODE` ; facultatives : `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`, `CRON_SECRET`,
-  `STEAM_API_KEY` (part avec MyGames) ; côté `myfinances` : clé Enable Banking, `BRIDGE_PASSWORD`.
+  `SIGNUP`, `INVITE_CODE` ; facultatives : `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`, `CRON_SECRET`
+  (`STEAM_API_KEY` ne sert plus) ; côté `myfinances` : clé Enable Banking, `BRIDGE_PASSWORD`.
 - Comptes de test sur la vraie base : `test-e2e-*`, à supprimer après usage. Les parcours de bout en bout tournent sur
   une base en mémoire.
 
@@ -134,11 +136,12 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
 
 | Paquet | Copié dans | Contenu |
 |---|---|---|
-| `sync-client` | `src/vendor/mylife-sync` | Compte, chiffrement, moteur de synchro (`join`, `autoJoin`, `syncNow`), session web, espaces, clé d'API commune (`aiKey.ts`). TypeScript pur (web et React Native). |
-| `lumen` | `src/vendor/lumen` | Jetons (thèmes, styles, couleurs), registre des apps (`MYLIFE_APPS`, `HOME_APPS`), destinations de la palette, aperçus, apparence commune ; et les moteurs purs des fonctions de l'accueil (§ 8). |
-| `ui` | `src/ui` (accueil, MyFinances, MyRave) | Kit d'interface web : `lumen.css`, thème, coque (`boot.ts`, `Navigation`, `Screen`, `Sheet`, `PageTransition`), compte (`account.tsx`, `AccountGate`), Espaces, palette, aperçus, collections synchronisées, notifications. MyPerf (React Native) ne peut pas l'utiliser et le reproduit. |
+| `sync-client` | `src/vendor/mylife-sync` | Compte, chiffrement, moteur de synchro (`join`, `autoJoin`, `syncNow`, lecture seule `readAccountApp`), session web, espaces, clé d'API commune (`aiKey.ts`). TypeScript pur (web et React Native). |
+| `lumen` | `src/vendor/lumen` | Jetons (thèmes, styles, couleurs), registre des apps (`MYLIFE_APPS`, `HOME_APPS` : les Sorties), destinations de la palette, aperçus, apparence commune, fiches Copilot ; moteurs purs : `sortie.ts`, `agenda.ts` (agenda commun), `actions.ts` (actions validées), `dates.ts` ; MyChef gelé (`chef.ts`, `recipes.ts`, `mealplan.ts`, `ticket.ts`). |
+| `ui` | `src/ui` (accueil, MyFinances, MyRave) | Kit d'interface web : `lumen.css`, thème, coque (`boot.ts`, `Navigation`, `Screen`, `Sheet`, `PageTransition`), compte (`account.tsx`, `AccountGate`), Espaces, palette, aperçus, collections synchronisées (`collectionSync.ts`, gardé pour MyChef), synchro de l'apparence (`prefsSync.ts`). MyPerf (React Native) ne peut pas l'utiliser et le reproduit. |
 
-Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut). La V5 n'en garde qu'un clair et un sombre.
+Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut). La V5 n'en garde qu'un clair et un sombre
+(phase 2, avec le nouveau design system).
 
 ---
 
@@ -182,8 +185,9 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
 
 ### Copilot (accueil, gardé)
 - `web/src/copilot.ts`, `web/src/pages/Copilot.tsx` : une IA pour toutes les apps, avec la clé de l'utilisateur, depuis
-  l'appareil. Lit les fiches de contexte posées par chaque app ; propose des **actions validées** (carte « Valider »,
-  exécutée par l'app concernée, annulable : `packages/lumen/src/actions.ts`, `web/src/actionsHome.ts`).
+  l'appareil. Outils : vue d'ensemble, fiches de MyFinances et MyPerf (posées par chaque app : `Today.tsx`,
+  `services/copilotCard.ts`), agenda commun, sorties ; **actions validées** (sauter un récurrent, décaler une séance :
+  carte « Valider », exécutée par l'app concernée, annulable : `packages/lumen/src/actions.ts`).
 
 ---
 
@@ -204,29 +208,19 @@ de secret affiché ; clé d'API Anthropic sur l'appareil seulement ; aucune anal
 
 ---
 
-## 8. Ce qui part en phase 1 (et où c'est)
+## 8. Les fonctions retirées en phase 1
 
-| Fonction | Écrans et code (accueil) | Moteur pur / serveur | Données |
-|---|---|---|---|
-| Personnage | `pages/Character.tsx` | `lumen/character.ts`, `ui/stats.ts` ; compteurs publiés par MyFinances (`domain/rpgStats.ts`), MyPerf (`services/rpgStats.ts`), MyRave | `mylife` : `stats/*` |
-| Bilan, Wrapped | `pages/Recap.tsx`, `Wrapped.tsx`, `wrappedImage.ts`, `recapText.ts` | dans `lumen/character.ts` | — |
-| Crew, Pacte | `pages/Crew.tsx`, `crew.ts` | `lumen/crew.ts`, `lumen/pacte.ts` | espaces |
-| MyGames, « Ton temps » | `pages/Games.tsx` | `lumen/games.ts`, `server/games.ts`, `api/games.ts` | `mylife` |
-| MyMusique | `pages/Music.tsx`, `zip.ts` | `lumen/music.ts` | `mylife` |
-| MyObjectifs | `pages/MyObjectifs.tsx`, `myObjectifsData.ts` | `lumen/objectifs.ts` | `objectifs` |
-| MyAgenda | `pages/MyAgenda.tsx`, `myAgendaData.ts`, `agendaHome.ts` | `lumen/calendrier.ts`, `server/calendar.ts`, `api/calendar.ts` | `calendrier` |
-| MyFoyer | `pages/MyFoyer.tsx`, `foyerSpace.ts` | `lumen/foyer.ts` | espace du foyer |
-| Mes apps | `pages/MiniApps.tsx` | `lumen/miniapp.ts`, `ui/miniSync.ts`, `scripts/new-app.mjs` | `miniapps` |
-| MyChef (**gelé** : écrans retirés, moteur gardé) | `pages/MyChef.tsx`, `ChefRecipes.tsx`, `ChefTicket.tsx`, `ChefWeek.tsx`, `myChefData.ts`, `actionsChef.ts` | gardés : `lumen/chef.ts`, `recipes.ts`, `mealplan.ts`, `ticket.ts` | `chef` (gardée) |
-| Thèmes en trop | sélecteurs de thème | `lumen` (`THEMES`, `STYLES`), `ui/lumen.css`, MyPerf `src/ui/themes.ts` | `mylife` : apparence |
+Personnage, bilan et Wrapped, Crew et Pactes, MyMusique, MyGames, « Mes apps », MyObjectifs, MyAgenda, MyFoyer et
+MyChef (gelé : moteur gardé dans `packages/lumen`) sont partis le 13/11/2026 ; le détail est dans `docs/V5.md`.
 
-**Restent** : Copilot, les Sorties (`pages/Sortie.tsx`, `lumen/sortie.ts`, `sortieDigest.ts`, `spaceSync.ts`, en
-attendant de rejoindre MyRave), le compte, « Mes données », la confidentialité, les notifications.
-L'**agenda commun** (`lumen/agenda.ts`, publié par les apps, lu par Copilot) est à garder : c'est la base de la
-communication entre modules de la V5. À vérifier pendant la phase 1 : qui d'autre utilise `zip.ts` et `agendaHome.ts`.
-
-**Données** : elles restent dans l'export une version, puis le serveur les efface (retrait de `SYNC_APPS`, purge),
-**après un dernier accord explicite**.
+- **Restent pour les Sorties** : `web/src/spaces.ts` (espaces « sortie »), `spaceSync.ts`, `sortieDigest.ts`,
+  `pages/Sortie.tsx`, `pages/Join.tsx` (`/rejoindre`). Elles rejoindront MyRave en phase 5.
+- **Leurs données** sont encore dans le compte (`SYNC_APPS` inchangé, lignes `stats`, `music`, `games`, `miniapp` de
+  `mylife`) : « Mes données » → « Télécharger l'archive » (`web/src/archive.ts`) les emporte. **La purge** (retrait de
+  `SYNC_APPS`, effacement des lignes, des espaces Crew et foyer orphelins) attend une prochaine version et **un accord
+  explicite de l'utilisateur**.
+- Les préfixes de stockage qu'elles utilisaient restent dans `PERSONAL_PREFIXES` (effacés quand un autre compte se
+  connecte).
 
 ---
 

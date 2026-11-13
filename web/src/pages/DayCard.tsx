@@ -9,7 +9,7 @@ import { formatCents } from '../ui/money';
  * commun (séances prévues, paie et prélèvements, investissements, sorties). Rien n'est envoyé : tout est sur l'appareil.
  */
 const ICON: Record<AgendaKind, IconName> = { session: 'barbell', income: 'cash', charge: 'card', savings: 'diamond', sortie: 'flag-fill', meal: 'leaf', other: 'calendar' };
-const APP_NAME: Record<AgendaApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Sorties', chef: 'MyChef' };
+const APP_NAME: Record<AgendaApp, string> = { finances: 'MyFinances', perf: 'MyPerf', home: 'Sorties' };
 const addDays = (iso: string, n: number) => {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + n);

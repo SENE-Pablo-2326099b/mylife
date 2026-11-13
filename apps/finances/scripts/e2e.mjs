@@ -80,19 +80,16 @@ try {
       await open('/reglages/donnees');
       await page.getByRole('button', { name: 'Charger la démo' }).click();
       await page.getByText('opérations de démo chargées').waitFor({ timeout: 20000 });
-      // Personnage MyLife : MyFinances publie ses compteurs (jours sous le budget, par semaine ; jamais de montant).
-      let stats = null;
-      for (let i = 0; i < 30 && !stats; i++) {
-        stats = await page.evaluate(() => JSON.parse(localStorage.getItem('mylife:stats:finances') ?? 'null'));
-        if (!stats || !Object.keys(stats.weeks).length) {
-          stats = null;
-          await page.waitForTimeout(500);
-        }
+      // Copilot : MyFinances pose sa fiche de contexte (sur l'appareil) en ouvrant Aujourd'hui.
+      await open('/');
+      let card = null;
+      for (let i = 0; i < 30 && !card; i++) {
+        card = await page.evaluate(() => JSON.parse(localStorage.getItem('mylife:copilot:finances') ?? 'null'));
+        if (!card) await page.waitForTimeout(500);
       }
-      expect(stats !== null, 'compteurs du Personnage publiés');
-      const keys = new Set(Object.values(stats.weeks).flatMap((w) => Object.keys(w)));
-      expect([...keys].every((k) => ['under', 'tracked', 'saved'].includes(k)), `compteurs inattendus : ${[...keys]}`);
-      expect(Object.values(stats.weeks).some((w) => (w.under ?? 0) > 0), 'des jours sous le budget');
+      expect(card !== null, 'fiche Copilot posée');
+      // Le Personnage est parti (V5) : plus aucun compteur publié.
+      expect((await page.evaluate(() => localStorage.getItem('mylife:stats:finances'))) === null, 'plus de compteurs du Personnage');
     });
 
     await step(`${ROUTES.length} écrans sans erreur ni débordement`, async () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { Space, SpaceMember } from './vendor/mylife-sync';
-import { client } from './crew';
+import { client } from './spaces';
 
 /**
  * Données d'un espace partagé sur l'appareil, d'abord hors ligne (festival : réseau capricieux) :

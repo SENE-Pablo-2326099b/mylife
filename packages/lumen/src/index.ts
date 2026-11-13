@@ -394,20 +394,7 @@ export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
   { app: 'home', title: 'Compte MyLife', path: '/compte', keywords: 'compte connexion mot de passe cle secours synchro deconnexion supprimer' },
   { app: 'home', title: 'Apparence', path: '/apparence', keywords: 'theme couleurs sombre clair identite circuit ardoise argile brut' },
   { app: 'home', title: 'Installer MyLife', path: '/installer', keywords: 'installer telephone ecran accueil application pwa' },
-  { app: 'home', title: 'Ton personnage', path: '/personnage', keywords: 'personnage niveau rpg stats quetes xp serie force discipline social constance' },
-  { app: 'home', title: 'Ta semaine', path: '/bilan', keywords: 'bilan semaine resume recap progres' },
-  { app: 'home', title: 'Ton Wrapped', path: '/wrapped', keywords: 'wrapped mois annee resume partager image story' },
-  { app: 'home', title: 'Ton Crew', path: '/crew', keywords: 'crew amis classement groupe inviter defi bande' },
   { app: 'home', title: 'Copilot', path: '/copilot', keywords: 'copilot ia assistant question claude conseil budget entrainement' },
-  { app: 'home', title: 'MyGames', path: '/jeux', keywords: 'jeux jeu video steam heures console' },
-  { app: 'home', title: 'Mes apps', path: '/mes-apps', keywords: 'mes apps creer app sans code suivi habitude lecture sommeil eau humeur tracker' },
-  { app: 'home', title: 'MyObjectifs', path: '/objectifs', keywords: 'objectifs objectif but annee cible progression rythme' },
-  { app: 'home', title: 'MyChef', path: '/chef', keywords: 'chef courses liste garde manger frigo placard cuisine repas recette peremption' },
-  { app: 'home', title: 'MyAgenda', path: '/calendrier', keywords: 'agenda calendrier semaine rendez vous evenement google ics conflit' },
-  { app: 'home', title: 'MyFoyer', path: '/foyer', keywords: 'foyer coloc couple famille depenses communes corvees factures loyer menage' },
-  // new-app: destinations (repère du générateur, ne pas retirer)
-  { app: 'home', title: 'Où va ton temps ?', path: '/temps', keywords: 'temps heures sport musique jeu ecran repartition' },
-  { app: 'home', title: 'MyMusique', path: '/musique', keywords: 'musique spotify ecoute artistes morceaux stats wrapped culture' },
   { app: 'home', title: 'Sorties', path: '/sorties', keywords: 'sortie festival soiree week end chaud planning sets budget partage depenses liste id' },
   { app: 'finances', title: 'Budget du jour', path: '/finances/', keywords: 'argent depenser reste aujourd hui budget finances' },
   { app: 'finances', title: 'Budget du cycle', path: '/finances/budget', keywords: 'cycle paie calendrier depenses' },
@@ -505,11 +492,8 @@ export function writeSharedAppearance(a: Partial<SharedAppearance> & { theme: Th
   }
   return next;
 }
-export * from './character';
-export * from './crew';
+export * from './dates';
 export * from './sortie';
-export * from './music';
-export * from './games';
 
 // ---------------------------------------------------------------- Copilot : fiches de contexte
 
@@ -536,16 +520,11 @@ export function readCopilotCard(app: MyLifeApp['id']): Record<string, unknown> |
     return null;
   }
 }
-export * from './pacte';
-export * from './miniapp';
 export * from './homeApps';
 export * from './actions';
 export * from './agenda';
-export * from './objectifs';
+// MyChef, gelé (docs/VISION.md) : le moteur reste exporté et testé, aucun écran ne s'en sert pour l'instant.
 export * from './chef';
 export * from './recipes';
 export * from './mealplan';
 export * from './ticket';
-export * from './calendrier';
-export * from './foyer';
-// new-app: moteurs (repère du générateur, ne pas retirer)

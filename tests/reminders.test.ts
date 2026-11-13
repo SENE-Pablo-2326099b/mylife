@@ -3,11 +3,8 @@ import { runInNewContext } from 'node:vm';
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import * as core from '../server/core';
-import { pushDispatch, sendWakeups, sendWeekly, type PushEnv, type PushSender } from '../server/push';
-import { addEntry, emptyMiniApp, MINI_TEMPLATES, setMiniReminder } from '../packages/lumen/src/miniapp';
-import { chefReminders, miniAppReminders, wakeupMinutes, type PlannedReminder } from '../web/src/reminders';
-import { newPantryItem } from '../packages/lumen/src/chef';
-import { STARTER_RECIPES } from '../packages/lumen/src/recipes';
+import { pushDispatch, sendWakeups, type PushEnv, type PushSender } from '../server/push';
+import { wakeupMinutes, type PlannedReminder } from '../web/src/reminders';
 
 /** Rappels écrits par l'appareil (V4, F2) : le serveur ne connaît que des heures de réveil et envoie un signal vide. */
 const secret = 'x'.repeat(40);
@@ -35,7 +32,7 @@ describe('serveur : heures de réveil et signal vide', () => {
     expect(cols.rows.map((r) => r.column_name)).toEqual(['endpoint', 'minute']);
   }, 30_000);
 
-  it('au réveil : un signal vide aux seuls appareils concernés, minuit compris ; un abonné « rappels seulement » n’a pas le dimanche', async () => {
+  it('au réveil : un signal vide aux seuls appareils concernés, minuit compris', async () => {
     const d = await db();
     await pushDispatch(d, secret, token('u1'), sub(1, false), env);
     await pushDispatch(d, secret, token('u2'), sub(2), env);
@@ -54,46 +51,18 @@ describe('serveur : heures de réveil et signal vide', () => {
     await sendWakeups(d, send, at('23:50'));
     await sendWakeups(d, send, Date.parse('2026-10-25T00:04:00Z'));
     expect(got.map((g) => g[0])).toEqual(['1']);
-    // Le dimanche ne part qu'à l'abonné qui l'a voulu.
-    got.length = 0;
-    await sendWeekly(d, send);
-    expect(got.map((g) => g[0])).toEqual(['2']);
     // Désabonné : ses heures disparaissent avec lui.
     await pushDispatch(d, secret, token('u1'), { action: 'unsubscribe', endpoint: sub(1).endpoint }, env);
     expect((await d.query('SELECT 1 FROM push_wakeups')).rows).toHaveLength(1);
   }, 30_000);
 });
 
-describe('appareil : le plan des rappels', () => {
-  const lecture = MINI_TEMPLATES[0]!;
-  it('une app avec un rappel ; pas le jour où elle a déjà une saisie ; heures de réveil en UTC', () => {
-    const a = setMiniReminder(emptyMiniApp('lect01', lecture), { minute: 21 * 60, days: 0b0011111 });
-    const b = addEntry(setMiniReminder(emptyMiniApp('lect02', lecture), { minute: 7 * 60 + 30, days: 0b1111111 }), { id: 'x', day: '2026-10-24', values: { pages: 3 } });
-    const plan = miniAppReminders([a, b, emptyMiniApp('lect03', lecture)], '2026-10-24');
-    expect(plan.map((r) => [r.id, r.minute, r.days, r.skip])).toEqual([
-      ['miniapp:lect01', 1260, 31, []],
-      ['miniapp:lect02', 450, 127, ['2026-10-24']],
-    ]);
-    expect(plan[0]!.title).toBe(lecture.name);
-    // Paris en été (UTC+2 : décalage −120) : 21 h → 19 h UTC, 7 h 30 → 5 h 30 UTC ; et l'autre sens autour de minuit.
-    expect(wakeupMinutes(plan, -120)).toEqual([330, 1140]);
-    expect(wakeupMinutes([{ ...plan[0]!, minute: 30 }], -120)).toEqual([1350]);
-  });
-});
-
-describe('MyChef : sortir un aliment du congélateur la veille', () => {
-  it('la veille à 20 h, pour chaque ingrédient d’un repas prévu rangé au congélateur ; rien pour des restes ou le jour même', () => {
-    const curry = STARTER_RECIPES.findIndex((r) => r.title === 'Poulet au curry');
-    const meals = [
-      { v: 1 as const, day: '2026-10-27', slot: 'soir' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry', servings: 2 },
-      { v: 1 as const, day: '2026-10-28', slot: 'midi' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry (restes)', servings: 2, leftover: true },
-      { v: 1 as const, day: '2026-10-24', slot: 'soir' as const, recipeId: `fournie-${curry}`, title: 'Poulet au curry', servings: 2 },
-    ];
-    const stock = [{ ...newPantryItem('poulet', '2026-10-20'), place: 'congel' as const }, newPantryItem('riz', '2026-10-20')];
-    expect(chefReminders(meals, [], stock, '2026-10-24')).toEqual([
-      { id: 'chef:2026-10-27-soir', title: 'MyChef', body: 'Sors du congélateur pour demain : poulet (Poulet au curry).', url: '/chef?vue=semaine', minute: 1200, days: 127, skip: [], date: '2026-10-26' },
-    ]);
-    expect(chefReminders(meals, [], [newPantryItem('poulet', '2026-10-20')], '2026-10-24')).toEqual([]);
+describe('appareil : les heures de réveil', () => {
+  it('en minutes UTC, une par heure de rappel, autour de minuit comprise', () => {
+    const r = (id: string, minute: number): PlannedReminder => ({ id, title: 'x', body: 'x', url: '/', minute, days: 127, skip: [] });
+    // Paris en été (UTC+2 : décalage −120) : 21 h → 19 h UTC, 7 h 30 → 5 h 30 UTC ; deux rappels à la même heure, un réveil.
+    expect(wakeupMinutes([r('a', 21 * 60), r('b', 7 * 60 + 30), r('c', 21 * 60)], -120)).toEqual([330, 1140]);
+    expect(wakeupMinutes([r('a', 30)], -120)).toEqual([1350]);
   });
 });
 
@@ -165,9 +134,9 @@ describe('service worker : il écrit lui-même le rappel du moment', () => {
     expect(w2.shown.map((n) => n.body)).toEqual(['Sors le poulet']);
   });
 
-  it('le message du dimanche reste générique', async () => {
+  it('un message générique du serveur est affiché tel quel', async () => {
     const w = worker([], '2026-10-25T17:00:00');
-    await w.push({ title: 'Ta semaine est bouclée', body: 'Ton bilan t’attend', url: '/bilan' });
-    expect(w.shown).toEqual([{ title: 'Ta semaine est bouclée', body: 'Ton bilan t’attend', tag: 'mylife-weekly' }]);
+    await w.push({ title: 'MyLife', body: 'Un message', url: '/' });
+    expect(w.shown).toEqual([{ title: 'MyLife', body: 'Un message', tag: 'mylife-weekly' }]);
   });
 });

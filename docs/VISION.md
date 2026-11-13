@@ -259,3 +259,5 @@ coquille et MyFinances sont prêtes, puis module par module.
 | 13/11/2026 | MyChef gelé jusqu'à la fin de la phase 6 ; son moteur est gardé |
 | 13/11/2026 | Données des fonctions retirées : dans l'export une version, puis effacées (dernier accord avant l'effacement) |
 | 13/11/2026 | Maquettes validées avant chaque phase d'interface |
+| 13/11/2026 | Phase 1 : thèmes en trop et cartes en relief reportés à la phase 2 (le design system y est refait entièrement) |
+| 13/11/2026 | Phase 1 : données des fonctions retirées gardées dans le compte, récupérables par « Mes données » → « Télécharger l'archive » |

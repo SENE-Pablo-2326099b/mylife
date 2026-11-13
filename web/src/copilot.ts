@@ -1,36 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
-import {
-  addWeeks,
-  computeCharacter,
-  formatMini,
-  gameTotals,
-  goalProgress,
-  listeningStreak,
-  monthWeeks,
-  musicPeriod,
-  parseActionSpec,
-  readAgenda,
-  objectiveLine,
-  objectiveProgress,
-  peakHour,
-  recap,
-  statValue,
-  timeSplit,
-  weekStart,
-  weeklySeries,
-  yearWeeks,
-  type ActionSpec,
-  type Objective,
-  type GamesData,
-  type MiniApp,
-  type MusicSummary,
-  type StatsByApp,
-} from './vendor/lumen';
+import { parseActionSpec, readAgenda, type ActionSpec } from './vendor/lumen';
 
 /**
  * Copilot : l'IA de l'accueil MyLife, qui voit toutes les apps (avec la clé de l'utilisateur, depuis son
- * appareil, comme l'assistant de MyFinances et le coach de MyPerf). Il lit des résumés (Personnage, bilans, fiches
- * de contexte de MyFinances et MyPerf, musique, jeux, sorties) et propose ; il peut préparer des actions
+ * appareil, comme l'assistant de MyFinances et le coach de MyPerf). Il lit des résumés (fiches de contexte de
+ * MyFinances et MyPerf, agenda commun, sorties) et propose ; il peut préparer des actions
  * (`propose_action`) que l'utilisateur valide, exécutées ensuite par l'app concernée (actions.ts de lumen) : il ne
  * modifie jamais rien lui-même. Ce module n'a pas d'interface : les sources de données lui sont fournies.
  */
@@ -60,65 +34,38 @@ export interface SortieDigest {
 
 export interface CopilotSources {
   today: string;
-  stats: StatsByApp;
-  rest: readonly string[];
   finances: Record<string, unknown> | null;
   perf: Record<string, unknown> | null;
-  music: MusicSummary | null;
-  games: GamesData | null;
   sorties: SortieDigest[];
-  /** « Mes apps » : les apps sans code de l'utilisateur et leurs saisies. */
-  miniApps: MiniApp[];
-  /** MyObjectifs : ses objectifs (facultatif : absent, l'outil le dit). */
-  objectives?: Objective[];
-  /** MyChef : un résumé de la cuisine (garde-manger, péremptions, liste, semaine, recettes classées). */
-  kitchen?: Record<string, unknown> | null;
-  /** MyAgenda : les événements des agendas importés (Google, Apple, Outlook). */
-  imported?: { title: string; date: string; time?: string; endDate?: string; place?: string }[];
 }
 
-export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf), les sorties entre amis (Sorties, MyRave), la musique (MyMusique), le jeu (MyGames), ses propres petites apps de suivi (« Mes apps » : lecture, sommeil, habitudes…) et un « Personnage » (RPG de la vraie vie : stats Force, Discipline, Social, Constance, Culture).
+export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qui réunit le budget (MyFinances), la musculation (MyPerf) et les sorties entre amis (Sorties, MyRave).
 
 Ce que tu fais :
 - Tu réponds aux questions de l'utilisateur sur sa vie à partir de SES données, que tu lis avec tes outils. Lis avant de répondre : ne devine jamais un chiffre.
-- Tu croises les apps : un achat face au budget et à l'épargne, une semaine d'entraînement face à une sortie prévue, le temps passé à jouer face au sport.
-- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf), noter une saisie dans une de ses apps (Mes apps), ajouter un aliment à la liste de courses ou prévoir un repas (MyChef). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training, apps et champs de get_my_apps), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
+- Tu croises les apps : un achat face au budget et à l'épargne, une semaine d'entraînement face à une sortie prévue.
+- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
 
 Règles :
 - Réponds en français, tutoie, sois concret et bref : quelques phrases ou une courte liste. Les montants en euros, les dates en clair.
-- Si une donnée manque (fiche absente ou ancienne, app jamais ouverte, export Spotify ancien), dis-le et indique quelle app ouvrir pour la mettre à jour.
+- Si une donnée manque (fiche absente ou ancienne, app jamais ouverte), dis-le et indique quelle app ouvrir pour la mettre à jour.
 - Budget : le « reste à dépenser aujourd'hui » et le budget par jour sont des repères de vie courante ; l'épargne prévue n'est pas de l'argent à dépenser. Ne pousse jamais à s'endetter.
 - Entraînement : prudence avec la santé ; pas de diagnostic médical. Pour alléger avant un événement, raisonne en séries et en charge, pas en conseils généraux.
 - Les données d'autres personnes (membres d'une sortie) sont des pseudos : n'en déduis rien d'autre.`;
 
 const TOOLS: Anthropic.Beta.BetaTool[] = [
-  { name: 'get_overview', description: 'Vue d’ensemble : date, personnage (niveau, stats, quêtes de la semaine, série), quelles apps ont des données et de quand date chaque fiche.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
+  { name: 'get_overview', description: 'Vue d’ensemble : date, quelles apps ont une fiche et de quand elle date, nombre de sorties.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_finances', description: 'Fiche MyFinances (en euros) : reste à dépenser aujourd’hui, budget du jour, cycle de paie (dates, jours restants), enveloppe, dépensé, projection de fin de cycle, épargne prévue, argent réellement libre, prochaines sorties d’argent.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
   { name: 'get_training', description: 'Fiche MyPerf : objectif de séances par semaine, séances faites cette semaine, séances prévues (21 jours), cycle en cours (semaine, deload), dernières séances, records, mouvements principaux (e1RM), mouvements qui stagnent.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  {
-    name: 'get_recap',
-    description: 'Bilan chiffré d’une période : séances, records, jours sous le budget, épargne tenue, semaines avec la bande, minutes d’écoute, quêtes, XP et niveaux gagnés. Période : une semaine (lundi AAAA-MM-JJ), un mois (AAAA-MM) ou une année (AAAA).',
-    input_schema: { type: 'object', properties: { period: { type: 'string', description: 'AAAA-MM-JJ (le lundi d’une semaine), AAAA-MM ou AAAA' } }, required: ['period'], additionalProperties: false },
-  },
-  {
-    name: 'get_music',
-    description: 'MyMusique (export Spotify) : minutes, top artistes et titres d’une période (AAAA-MM, AAAA, ou vide pour tout), heure d’écoute préférée, séries de jours, date de fin de l’historique importé.',
-    input_schema: { type: 'object', properties: { period: { type: 'string' } }, additionalProperties: false },
-  },
-  { name: 'get_games', description: 'MyGames : heures de jeu par jeu sur les N dernières semaines (1 à 12), et depuis toujours.', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
-  { name: 'get_time_split', description: 'Où va le temps : minutes de sport (séances MyPerf), de musique (MyMusique) et de jeu (MyGames) sur les N dernières semaines (1 à 12).', input_schema: { type: 'object', properties: { weeks: { type: 'integer', minimum: 1, maximum: 12 } }, additionalProperties: false } },
-  { name: 'get_my_apps', description: '« Mes apps » : les petites apps de suivi créées par l’utilisateur (lecture, sommeil, habitudes…) : champs, objectif et où il en est, stats, 8 dernières semaines, 15 dernières saisies.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'get_objectives', description: 'MyObjectifs : les objectifs de l’utilisateur (titre, ce qui compte, cible, date limite), où il en est, ce que le rythme régulier attendait aujourd’hui, en avance ou en retard, atteint ou non.', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'get_kitchen', description: 'MyChef : le garde-manger (aliments, niveau, lieu, date limite), ce qui périme bientôt, la liste de courses, les repas prévus de la semaine, et les recettes classées (identifiant, faisable ou ce qui manque, si elles sauvent ce qui périme).', input_schema: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'get_agenda', description: 'Agenda commun de toutes les apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties, repas prévus (MyChef), rendez-vous des agendas importés (MyAgenda) ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
+  { name: 'get_agenda', description: 'Agenda commun des apps sur les N prochains jours (1 à 35, 7 par défaut) : séances prévues (MyPerf), paie, prélèvements et investissements (MyFinances, montants en euros), sorties ; et le jour où chaque app a été ouverte (stale : à rouvrir).', input_schema: { type: 'object', properties: { days: { type: 'integer', minimum: 1, maximum: 35 } }, additionalProperties: false } },
   {
     name: 'propose_action',
     description:
-      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ) ; miniapp.addEntry (params : appId de get_my_apps, day AAAA-MM-JJ, values { identifiant de champ: valeur }) ; chef.addToList (params : name, qty et unit facultatifs) ; chef.planMeal (params : day AAAA-MM-JJ, slot midi ou soir, recipeId de get_kitchen → recipes). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
+      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
     input_schema: {
       type: 'object',
       properties: {
-        kind: { type: 'string', enum: ['finances.skipRecurring', 'perf.movePlanned', 'miniapp.addEntry', 'chef.addToList', 'chef.planMeal'] },
+        kind: { type: 'string', enum: ['finances.skipRecurring', 'perf.movePlanned'] },
         params: { type: 'object' },
         summary: { type: 'string' },
       },
@@ -131,94 +78,24 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
 
 const age = (card: Record<string, unknown> | null, today: string) => (card && typeof card.day === 'string' ? (card.day === today ? 'aujourd’hui' : `du ${card.day}`) : null);
 
-function weeksBack(today: string, n: number): { from: string; to: string } {
-  const to = weekStart(today);
-  return { from: addWeeks(to, -(Math.max(1, Math.min(12, n)) - 1)), to };
-}
-
 /** Exécute un outil ; renvoie du JSON (ou une explication) à donner à Claude. */
 export function runTool(name: string, input: Record<string, unknown>, src: CopilotSources): { content: string; isError?: boolean } {
   const json = (v: unknown) => ({ content: JSON.stringify(v) });
   switch (name) {
-    case 'get_overview': {
-      const c = computeCharacter(src.stats, src.today, src.rest);
-      return json({
-        today: src.today,
-        character: { level: c.level, title: c.title, xp: c.xp, streakWeeks: c.streak, stats: c.stats.map((s) => ({ stat: s.name, level: s.level, locked: s.locked })), weekQuests: c.quests.map((q) => ({ quest: q.title, progress: `${q.progress}/${q.target}`, done: q.done })) },
-        cards: { finances: age(src.finances, src.today), training: age(src.perf, src.today) },
-        musicHistoryUntil: src.music?.to || null,
-        gamesTracked: !!src.games && (src.games.snapshots.length > 0 || src.games.manual.length > 0),
-        sorties: src.sorties.length,
-      });
-    }
+    case 'get_overview':
+      return json({ today: src.today, cards: { finances: age(src.finances, src.today), training: age(src.perf, src.today) }, sorties: src.sorties.length });
     case 'get_finances':
       return src.finances ? json(src.finances) : { content: 'Pas de fiche MyFinances sur cet appareil : ouvre MyFinances (écran Aujourd’hui) une fois.', isError: true };
     case 'get_training':
       return src.perf ? json(src.perf) : { content: 'Pas de fiche MyPerf sur cet appareil : ouvre MyPerf une fois (sur ce navigateur).', isError: true };
-    case 'get_recap': {
-      const p = typeof input.period === 'string' ? input.period : '';
-      const range = /^\d{4}-\d{2}-\d{2}$/.test(p) ? { from: weekStart(p), to: weekStart(p) } : /^\d{4}-\d{2}$/.test(p) ? monthWeeks(p) : /^\d{4}$/.test(p) ? yearWeeks(p) : null;
-      if (!range) return { content: 'Période invalide : AAAA-MM-JJ, AAAA-MM ou AAAA.', isError: true };
-      const r = recap(src.stats, src.today, range.from, range.to, src.rest);
-      return json({ ...r, xpByStat: undefined });
-    }
-    case 'get_music': {
-      if (!src.music || src.music.totalMinutes === 0) return { content: 'Aucun historique d’écoute : importe ton export Spotify dans MyMusique.', isError: true };
-      const p = typeof input.period === 'string' ? input.period : '';
-      const m = musicPeriod(src.music, p);
-      return json({ period: p || 'tout', historyFrom: src.music.from, historyUntil: src.music.to, minutes: m.minutes, plays: m.plays, newArtists: m.newArtists, topArtists: m.artists.map(([a, v]) => ({ artist: a, minutes: v })), topTracks: m.tracks.map(([t, a, v, n]) => ({ track: t, artist: a, minutes: v, plays: n })), peakHour: peakHour(src.music), streak: listeningStreak(src.music.days, src.music.to || src.today) });
-    }
-    case 'get_games': {
-      if (!src.games || (!src.games.snapshots.length && !src.games.manual.length)) return { content: 'Aucune donnée de jeu : MyGames (Steam ou parties notées).', isError: true };
-      const { from, to } = weeksBack(src.today, typeof input.weeks === 'number' ? input.weeks : 4);
-      return json({ from, to, games: gameTotals(src.games, from, to).slice(0, 12).map((g) => ({ game: g.name, minutesInPeriod: g.period, minutesTotal: g.total })) });
-    }
-    case 'get_time_split': {
-      const { from, to } = weeksBack(src.today, typeof input.weeks === 'number' ? input.weeks : 4);
-      return json({ from, to, minutes: timeSplit(src.stats, src.games, from, to), musicHistoryUntil: src.music?.to || null });
-    }
-    case 'get_my_apps': {
-      const apps = src.miniApps.filter((a) => a.spec);
-      if (!apps.length) return { content: 'Aucune app dans « Mes apps » : l’utilisateur peut en créer depuis l’accueil (modèle ou description à une IA).', isError: true };
-      return json(
-        apps.map((a) => {
-          const spec = a.spec!;
-          const field = (id?: string) => spec.fields.find((f) => f.id === id);
-          return {
-            appId: a.id,
-            app: spec.name,
-            fields: spec.fields.map((f) => ({ id: f.id, label: f.label, type: f.type, unit: f.unit, options: f.options, required: f.required })),
-            goal: spec.goal ? { ...goalProgress(spec, a.entries, src.today), per: spec.goal.per, agg: spec.goal.agg, field: field(spec.goal.field)?.label } : null,
-            stats: spec.stats.map((s) => ({ stat: s.label, value: formatMini(field(s.field), statValue(a.entries, s, src.today), s.agg) })),
-            weeks: weeklySeries(spec, a.entries, src.today),
-            entries: a.entries.length,
-            last: a.entries.slice(-15).map((e) => ({ day: e.day, ...Object.fromEntries(Object.entries(e.values).map(([k, v]) => [field(k)?.label ?? k, v])) })),
-          };
-        }),
-      );
-    }
     case 'list_sorties':
       return json(src.sorties);
-    case 'get_objectives': {
-      const list = src.objectives ?? [];
-      if (!list.length) return { content: 'Aucun objectif dans MyObjectifs : l’utilisateur peut en créer depuis l’accueil (séances, jours sous le budget, épargne tenue, Mes apps…).', isError: true };
-      return json(
-        list.map((o) => {
-          const p = objectiveProgress(o, { stats: src.stats, miniApps: src.miniApps, today: src.today, rest: src.rest });
-          return { title: o.title, from: o.start, deadline: o.deadline, value: p.value, target: p.target, unit: p.unit[0], expectedToday: p.expected, status: p.status, daysLeft: p.daysLeft, summary: objectiveLine(p) };
-        }),
-      );
-    }
-    case 'get_kitchen':
-      return src.kitchen ? json(src.kitchen) : { content: 'MyChef est vide sur cet appareil : l’utilisateur peut y noter son garde-manger et ses courses (accueil → MyChef).', isError: true };
     case 'get_agenda': {
       const days = Math.max(1, Math.min(35, typeof input.days === 'number' ? Math.round(input.days) : 7));
       const to = new Date(`${src.today}T12:00:00`);
       to.setDate(to.getDate() + days - 1);
       const v = readAgenda(src.today, to.toISOString().slice(0, 10), src.today);
-      const last = to.toISOString().slice(0, 10);
-      const imported = (src.imported ?? []).filter((e) => (e.endDate ?? e.date) >= src.today && e.date <= last);
-      return json({ from: src.today, days, events: v.events.map((e) => ({ date: e.date, end: e.end, time: e.time, kind: e.kind, title: e.title, app: e.app, euros: e.amount === undefined ? undefined : e.amount / 100 })), importedCalendars: imported, appsLastOpened: v.sources, stale: v.stale });
+      return json({ from: src.today, days, events: v.events.map((e) => ({ date: e.date, end: e.end, time: e.time, kind: e.kind, title: e.title, app: e.app, euros: e.amount === undefined ? undefined : e.amount / 100 })), appsLastOpened: v.sources, stale: v.stale });
     }
     case 'propose_action': {
       const parsed = parseActionSpec(input);

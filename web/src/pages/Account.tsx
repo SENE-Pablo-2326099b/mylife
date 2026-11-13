@@ -38,7 +38,7 @@ function rows(login: string): AccountStatusRow[] {
   const prefs = localSync('mylife');
   out.push({ label: 'Apparence', detail: prefs?.joinedAs === login ? 'La même sur tous tes appareils' : 'Bientôt la même sur tous tes appareils', state: prefs?.joinedAs === login ? 'ok' : 'busy' });
   // Un refus du serveur qui revient à chaque passage se montre ici au lieu de bloquer en silence.
-  for (const [app, label] of [['mylife', 'Réglages communs'], ['miniapps', 'Mes apps']] as const) {
+  for (const [app, label] of [['mylife', 'Réglages communs']] as const) {
     const issue = readSyncIssue(app);
     if (issue) out.push({ label: `${label} : synchro en échec`, detail: `${issue.message} (${relativeTime(issue.at)})`, state: 'error' });
   }

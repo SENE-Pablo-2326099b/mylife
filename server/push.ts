@@ -2,13 +2,13 @@ import webpush from 'web-push';
 import { HttpError, verifyToken, type Db } from './core.js';
 
 /**
- * Notifications (POST /api/push) : le rappel du dimanche (« Ta semaine est bouclée ») et les rappels écrits par
- * l'appareil (V4, F2). Le serveur ne sait rien de tes données : il envoie le même message générique à tous les
- * abonnés pour le dimanche, et pour les rappels un **signal vide** aux heures de réveil que l'appareil a demandées ;
+ * Notifications (POST /api/push) : les rappels écrits par l'appareil (V4, F2). Le serveur ne sait rien de tes données :
+ * il envoie un **signal vide** aux heures de réveil que l'appareil a demandées ;
  * c'est le service worker de l'appareil qui écrit le texte, à partir de ce qu'il garde lui-même. Il garde seulement
  * l'adresse d'abonnement du navigateur (fournie par Google/Apple/Mozilla) et ces heures (en minutes UTC), effacées au
  * désabonnement, à la suppression du compte ou si l'adresse n'est plus valable.
  * Clés VAPID : variables VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (sans elles, la fonction est désactivée).
+ * La colonne `weekly` (rappel du dimanche, retiré en V5) n'est plus lue ; elle reste pour ne pas migrer la table.
  */
 
 export interface PushEnv {
@@ -103,29 +103,6 @@ export type PushSender = (sub: { endpoint: string; keys: { p256dh: string; auth:
 export function webPushSender(env: PushEnv): PushSender {
   webpush.setVapidDetails(env.subject, env.publicKey, env.privateKey);
   return (sub, payload) => webpush.sendNotification(sub, payload, { TTL: 12 * 3600 });
-}
-
-/** Le rappel du dimanche à tous les abonnés ; les abonnements expirés (404/410) sont effacés. */
-export async function sendWeekly(db: Db, send: PushSender): Promise<{ sent: number; removed: number; failed: number }> {
-  await ensurePushSchema(db);
-  const { rows } = await db.query<{ endpoint: string; p256dh: string; auth: string }>('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE weekly');
-  const payload = JSON.stringify({ title: 'Ta semaine est bouclée', body: 'Ton bilan t’attend : séances, budget, quêtes.', url: '/bilan' });
-  let sent = 0;
-  let removed = 0;
-  let failed = 0;
-  for (const r of rows) {
-    try {
-      await send({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }, payload);
-      sent += 1;
-    } catch (e) {
-      const status = (e as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [r.endpoint]);
-        removed += 1;
-      } else failed += 1;
-    }
-  }
-  return { sent, removed, failed };
 }
 
 /**

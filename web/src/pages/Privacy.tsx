@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { HOME_APPS } from '../vendor/lumen';
 import { Icon } from '../ui/icons';
 import { Button, Card } from '../ui/index';
 import { useSession } from '../ui/session';
@@ -35,10 +34,10 @@ export function PrivacyPage() {
           <strong className="text-ink">Ton compte</strong> : ton identifiant (en clair, pour te reconnaître), la date de création, des empreintes de ton mot de passe et de ta clé de secours (jamais le mot de passe lui-même) et ta clé de données « emballée » (illisible sans ton mot de passe ou ta clé de secours).
         </p>
         <p>
-          <strong className="text-ink">Tes données</strong> (budget, séances, réglages, Personnage, {HOME_APPS.filter((a) => !('spaces' in a.sync)).map((a) => a.privacy).join(', ')}) : chiffrées en AES-256-GCM sur ton appareil. Le serveur voit seulement leur taille, leur date et à quelle app elles appartiennent.
+          <strong className="text-ink">Tes données</strong> (budget, séances, réglages) : chiffrées en AES-256-GCM sur ton appareil. Le serveur voit seulement leur taille, leur date et à quelle app elles appartiennent.
         </p>
         <p>
-          <strong className="text-ink">Groupes, Crews et Sorties</strong> : noms, pseudos, positions, scores, réponses, dépenses sont chiffrés avec une clé de groupe qui voyage dans le lien d’invitation (jamais envoyée au serveur). Le serveur sait seulement qui est membre de quoi. Les positions de MyRave sont effacées à l’arrêt du partage (12 h au plus) ; un groupe expiré est effacé entièrement.
+          <strong className="text-ink">Groupes et Sorties</strong> : noms, pseudos, positions, réponses, dépenses sont chiffrés avec une clé de groupe qui voyage dans le lien d’invitation (jamais envoyée au serveur). Le serveur sait seulement qui est membre de quoi. Les positions de MyRave sont effacées à l’arrêt du partage (12 h au plus) ; un groupe expiré est effacé entièrement.
         </p>
         <p>
           <strong className="text-ink">Garde-fous contre les abus</strong> : des compteurs de tentatives (connexion, inscription), dont une empreinte de ton adresse réseau (pas l’adresse elle-même), effacés au bout de deux jours.
@@ -60,9 +59,8 @@ export function PrivacyPage() {
           <strong className="text-ink">Anthropic</strong> (assistant de MyFinances, coach de MyPerf, Copilot) : seulement si tu utilises une de ces fonctions, avec ta propre clé, directement depuis ton appareil. Ta question et les résumés utiles partent alors chez Anthropic.
         </p>
         <p>
-          <strong className="text-ink">Enable Banking</strong> (synchronisation bancaire de MyFinances, en lecture seule) et <strong className="text-ink">Steam</strong> (MyGames) : seulement si tu les actives. Le relais Steam ne garde rien.
+          <strong className="text-ink">Enable Banking</strong> (synchronisation bancaire de MyFinances, en lecture seule) : seulement si tu l’actives.
         </p>
-        <p>Ton export Spotify est lu sur ton appareil : il n’est envoyé nulle part.</p>
       </Section>
 
       <Section title="Aucun pistage">

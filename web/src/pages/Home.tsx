@@ -12,8 +12,6 @@ import { Screen } from '../ui/Screen';
 import { Tilt } from '../ui/Tilt';
 import { useSession } from '../ui/session';
 import { useInstallState } from '../install';
-import { CharacterCard } from './Character';
-import { WeekRecapCard, WrappedCard } from './Recap';
 import { DayCard } from './DayCard';
 
 const APP_ICON: Record<MyLifeApp['id'], IconName> = { finances: 'diamond-fill', perf: 'barbell', raveloc: 'navigate' };
@@ -109,9 +107,7 @@ export function HomePage() {
         {session && (
           <Reveal index={1}>
             <div className="flex flex-col gap-3">
-              <WrappedCard />
               <DayCard />
-              <CharacterCard />
               <Card to="/copilot" label="Copilot : une IA pour toutes tes apps">
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] text-white" style={{ background: 'linear-gradient(150deg, var(--accent-g0), var(--gold))' }} aria-hidden>
@@ -124,18 +120,8 @@ export function HomePage() {
                   <Icon name="chevron-forward" className="text-muted" />
                 </div>
               </Card>
-              <WeekRecapCard />
               {/* Les apps de l'accueil, dans l'ordre du registre (contrat d'app : packages/lumen/src/homeApps.ts). */}
-              <div className="grid grid-cols-2 gap-3">
-                {HOME_APPS.filter((a) => !a.wide).map((a) => (
-                  <Card key={a.id} to={a.path} label={`${a.name} : ${a.tagline}`}>
-                    <Icon name={a.icon as IconName} className="text-gold" />
-                    <p className="t-body-strong mt-1">{a.name}</p>
-                    <p className="t-caption text-muted">{a.tagline}</p>
-                  </Card>
-                ))}
-              </div>
-              {HOME_APPS.filter((a) => a.wide).map((a) => (
+              {HOME_APPS.map((a) => (
                 <Card key={a.id} to={a.path} label={`${a.name} : ${a.tagline}`}>
                   <div className="flex items-center gap-3">
                     <Icon name={a.icon as IconName} className="text-gold" />

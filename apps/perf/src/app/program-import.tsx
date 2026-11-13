@@ -254,7 +254,7 @@ function Preview({ plan, issues, from, onChange, onBack, onImported }: { plan: I
     const result = applyPlan(plan, { pattern: mode, oneRms });
     // Sur le web, la base s'enregistre en différé : un import ne doit pas se perdre si la page se ferme juste après.
     await flushExpoDb();
-    // La semaine type vient d'être posée : l'objectif de séances (et la quête Force du Personnage) la suit.
+    // La semaine type vient d'être posée : l'objectif de séances la suit.
     if (mode === 'replace' && result.patternEntries > 0) useSettings.getState().update({ weeklyGoal: Math.max(1, Math.min(7, result.patternEntries)) });
     onImported(result);
   };

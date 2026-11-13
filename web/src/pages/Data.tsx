@@ -1,12 +1,10 @@
 import { useState } from 'react';
-import { HOME_APPS, STATS_APPS, readStats } from '../vendor/lumen';
-import { APP_EXPORTS } from '../appData';
+import { buildRetiredArchive } from '../archive';
 import { currentSession, webPlatform } from '../vendor/mylife-sync/web';
 import { getAppearance } from '../ui/appearance';
 import { Icon, type IconName } from '../ui/icons';
 import { Button, Card, Reveal, SectionTitle, SelectField, TextField } from '../ui/index';
 import { Screen } from '../ui/Screen';
-import { readCharacterPrefs } from '../ui/stats';
 import { toast } from '../ui/toastStore';
 
 /**
@@ -30,6 +28,7 @@ const LINKS: { to: string; icon: IconName; title: string; detail: string }[] = [
 ];
 
 export function DataPage() {
+  const [archiving, setArchiving] = useState(false);
   const exportMine = () => {
     const session = currentSession();
     download(`mylife-${new Date().toISOString().slice(0, 10)}.json`, {
@@ -37,26 +36,44 @@ export function DataPage() {
       exportedAt: new Date().toISOString(),
       account: session?.login ?? null,
       appearance: getAppearance(),
-      character: readCharacterPrefs(),
-      counters: Object.fromEntries(STATS_APPS.map((a) => [a, readStats(a)])),
-      // Chaque app de l'accueil, selon le registre (les espaces partagés appartiennent à leur groupe).
-      ...Object.fromEntries(HOME_APPS.filter((a) => a.exportable && APP_EXPORTS[a.id]).map((a) => [a.id, APP_EXPORTS[a.id]!()])),
     });
     toast({ message: 'Export téléchargé', tone: 'gold' });
+  };
+  const exportRetired = async () => {
+    setArchiving(true);
+    try {
+      const archive = await buildRetiredArchive();
+      download(`mylife-archive-${new Date().toISOString().slice(0, 10)}.json`, archive);
+      const failed = Object.keys(archive.errors).length;
+      toast({ message: failed ? `Archive téléchargée, sans ${failed} partie${failed > 1 ? 's' : ''} illisible${failed > 1 ? 's' : ''} pour l’instant (réessaie en ligne)` : 'Archive téléchargée', tone: failed ? undefined : 'gold' });
+    } catch (e) {
+      toast({ message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setArchiving(false);
+    }
   };
   return (
     <Screen stack title="Mes données" kicker="Les voir, les emporter, les effacer" mood="settings" back="/compte">
       <div className="flex flex-col gap-3">
         <Reveal index={0}>
           <Card level="raised">
-            <p className="t-headline">Tout ce que l’accueil sait de toi</p>
-            <p className="t-small mt-1 text-secondary">Apparence, Personnage (compteurs par semaine, semaines de repos, choix de partage), résumé d’écoute, heures de jeu, tes apps et leurs saisies. En clair, dans un fichier JSON.</p>
+            <p className="t-headline">Ce que l’accueil sait de toi</p>
+            <p className="t-small mt-1 text-secondary">Tes réglages communs (apparence). Tes sorties appartiennent à leur groupe : elles restent dans la Sortie. En clair, dans un fichier JSON.</p>
             <Button className="mt-3 w-full" icon="download" onClick={exportMine}>
               Exporter
             </Button>
           </Card>
         </Reveal>
         <Reveal index={1}>
+          <Card>
+            <p className="t-body-strong">Les fonctions retirées</p>
+            <p className="t-small mt-1 text-secondary">Personnage, bilans, Crew, MyMusique, MyGames, Mes apps, MyObjectifs, MyAgenda, MyFoyer et MyChef ne sont plus dans MyLife. Leurs données restent dans ton compte encore un temps, puis seront effacées : emporte-les ici, lues et déchiffrées sur ton appareil.</p>
+            <Button className="mt-3 w-full" variant="secondary" icon="download" disabled={archiving} onClick={() => void exportRetired()}>
+              {archiving ? 'Lecture du compte…' : 'Télécharger l’archive'}
+            </Button>
+          </Card>
+        </Reveal>
+        <Reveal index={2}>
           <SectionTitle>Dans chaque app</SectionTitle>
           <div className="flex flex-col gap-2">
             {LINKS.map((l) => (
@@ -73,7 +90,7 @@ export function DataPage() {
             ))}
           </div>
         </Reveal>
-        <Reveal index={2}>
+        <Reveal index={3}>
           <Card>
             <p className="t-body-strong">Tout effacer</p>
             <p className="t-small mt-1 text-secondary">Compte → « Supprimer mon compte » : tout ce que le serveur garde est effacé, pour toutes les apps, tout de suite.</p>

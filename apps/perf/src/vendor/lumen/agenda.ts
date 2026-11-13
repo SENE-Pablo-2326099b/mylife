@@ -2,11 +2,11 @@
 /**
  * Agenda commun (V4, F3) : chaque app publie ses événements à venir dans un format partagé (séance prévue, paie,
  * prélèvement, investissement, sortie…), sur l'appareil seulement (`mylife:agenda:<app>`, jamais synchronisé, effacé
- * quand un autre compte se connecte). L'accueil (« Ta journée »), Copilot et plus tard MyAgenda les lisent ensemble.
+ * quand un autre compte se connecte). L'accueil (« Ta journée ») et Copilot les lisent ensemble ; c'est aussi la base de la communication entre modules de la V5.
  * Chaque app recalcule les siens quand elle s'ouvre ; un agenda trop ancien est signalé (`stale`).
  */
 
-export type AgendaApp = 'finances' | 'perf' | 'home' | 'chef';
+export type AgendaApp = 'finances' | 'perf' | 'home';
 export type AgendaKind = 'session' | 'income' | 'charge' | 'savings' | 'sortie' | 'meal' | 'other';
 
 export interface AgendaEvent {
@@ -33,7 +33,7 @@ interface AgendaCard {
   events: AgendaEvent[];
 }
 
-export const AGENDA_APPS: readonly AgendaApp[] = ['finances', 'perf', 'home', 'chef'];
+export const AGENDA_APPS: readonly AgendaApp[] = ['finances', 'perf', 'home'];
 export const agendaKey = (app: AgendaApp) => `mylife:agenda:${app}`;
 /** Émis dans la page quand une app y réécrit son agenda (l'événement `storage` ne vient que des autres onglets). */
 export const AGENDA_EVENT = 'mylife:agenda';

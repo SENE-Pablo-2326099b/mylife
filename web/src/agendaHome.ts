@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { localToday, writeAgenda } from './vendor/lumen';
-import { loadCrews, useCrews } from './crew';
+import { loadSpaces, useSpaces } from './spaces';
 import { sortieDigests } from './sortieDigest';
+import { useSession } from './ui/session';
 import { spaceSnapshot, syncSpaceNow } from './spaceSync';
 
 /**
@@ -11,11 +12,13 @@ import { spaceSnapshot, syncSpaceNow } from './spaceSync';
 const fetched = new Set<string>();
 
 export function useHomeAgenda(): void {
-  const crews = useCrews();
-  // Sans être passé par Sorties ou Crew, la liste des espaces n'est pas encore chargée : l'accueil la demande.
+  const crews = useSpaces();
+  const login = useSession()?.login ?? null;
+  // Sans être passé par Sorties, la liste des espaces n'est pas encore chargée : l'accueil la demande, y compris juste
+  // après la connexion (la session arrive après le premier affichage).
   useEffect(() => {
-    if (crews.status === 'idle') void loadCrews();
-  }, [crews.status]);
+    if (login && crews.status === 'idle') void loadSpaces();
+  }, [crews.status, login]);
   useEffect(() => {
     if (crews.status !== 'ready') return;
     let alive = true;

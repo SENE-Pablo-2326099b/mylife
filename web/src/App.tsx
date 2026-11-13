@@ -10,19 +10,12 @@ import { ToastHost } from './ui/toast';
 import { HomePalette } from './HomePalette';
 import { AccountPage } from './pages/Account';
 import { AppearancePage } from './pages/Appearance';
-import { CharacterPage } from './pages/Character';
-import { RecapPage } from './pages/Recap';
-import { CrewJoinPage, CrewListPage, CrewPage } from './pages/Crew';
+import { JoinPage } from './pages/Join';
 import { SortiePage, SortiesPage } from './pages/Sortie';
-import { MusicPage } from './pages/Music';
-import { GamesPage, TimePage } from './pages/Games';
 import { DataPage } from './pages/Data';
-import { MiniAppNewPage, MiniAppPage, MiniAppsPage } from './pages/MiniApps';
 import { PrivacyPage } from './pages/Privacy';
-import { stashInvite, takeStashedInvite, useCrewPublisher } from './crew';
-import { useCharacter, useStatsInput } from './ui/stats';
+import { stashInvite, takeStashedInvite } from './spaces';
 import { lazy, Suspense, useEffect } from 'react';
-import { WrappedPage } from './pages/Wrapped';
 import { HomePage } from './pages/Home';
 import { InstallPage } from './pages/Install';
 import { WelcomePage } from './pages/Welcome';
@@ -39,12 +32,6 @@ const TAB_PATHS = TABS.map((t) => t.to);
 
 // Copilot embarque le SDK de l'API Claude : chargé seulement quand on l'ouvre (l'accueil reste léger).
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
-// Les apps de l'accueil ajoutées en V4 sont chargées à la demande (contrat d'app).
-// new-app: pages (repère du générateur, ne pas retirer)
-const MyFoyerPage = lazy(() => import('./pages/MyFoyer').then((m) => ({ default: m.MyFoyerPage })));
-const MyAgendaPage = lazy(() => import('./pages/MyAgenda').then((m) => ({ default: m.MyAgendaPage })));
-const MyChefPage = lazy(() => import('./pages/MyChef').then((m) => ({ default: m.MyChefPage })));
-const MyObjectifsPage = lazy(() => import('./pages/MyObjectifs').then((m) => ({ default: m.MyObjectifsPage })));
 
 /** L'accueil de MyLife : le point d'entrée de l'app installée, avec le compte et l'apparence de toutes les apps. */
 export function App() {
@@ -54,7 +41,7 @@ export function App() {
   // Lisibles sans compte : la bienvenue, et la confidentialité (on doit pouvoir la lire avant de s'inscrire).
   const welcome = pathname === '/bienvenue' || (!session && pathname === '/confidentialite');
   // Pas de compte, pas d'accueil : bienvenue puis création de compte (ou connexion), partout ailleurs aussi.
-  // Une invitation de Crew ouverte sans compte est gardée le temps de le créer.
+  // Une invitation à une sortie ouverte sans compte est gardée le temps de le créer.
   if (!session && !welcome) {
     stashInvite(location.hash);
     return <Navigate to="/bienvenue" replace />;
@@ -67,37 +54,20 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
   const location = useLocation();
   const { pathname } = location;
   const navigate = useNavigate();
-  const character = useCharacter();
-  const { stats, rest } = useStatsInput();
-  // Mon score dans mes Crews, tenu à jour (seulement quand il change).
-  useCrewPublisher(character, stats, rest);
   // Agenda commun : les sorties à venir (agendaHome.ts).
   useHomeAgenda();
-  // Rappels écrits par l'appareil : le plan local et les heures de réveil suivent « Mes apps » (reminders.ts).
+  // Rappels écrits par l'appareil (reminders.ts) : le plan local et les heures de réveil, recalculés au lancement.
   useEffect(() => {
     if (!session) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const soon = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void refreshReminders(), 800);
-    };
-    soon();
-    window.addEventListener('mylife:stats', soon);
-    window.addEventListener('mylife:collections', soon);
-    window.addEventListener('storage', soon);
-    return () => {
-      if (timer) clearTimeout(timer);
-      window.removeEventListener('mylife:stats', soon);
-      window.removeEventListener('mylife:collections', soon);
-      window.removeEventListener('storage', soon);
-    };
+    const timer = setTimeout(() => void refreshReminders(), 800);
+    return () => clearTimeout(timer);
   }, [session]);
   // Invitation reçue avant la connexion : on y va une fois l'accueil terminé, clé de secours mise de côté.
   const keyPending = usePendingRecovery() !== null;
   useEffect(() => {
     if (!session || welcome || keyPending) return;
     const hash = takeStashedInvite();
-    if (hash) navigate(hash.startsWith('#app=') ? `/mes-apps/nouvelle${hash}` : `/rejoindre${hash}`, { replace: true });
+    if (hash) navigate(`/rejoindre${hash}`, { replace: true });
   }, [session, welcome, keyPending, navigate]);
 
   return (
@@ -115,21 +85,10 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
               <Route path="/installer" element={<InstallPage />} />
               <Route path="/confidentialite" element={<PrivacyPage />} />
               <Route path="/donnees" element={<DataPage />} />
-              <Route path="/personnage" element={<CharacterPage />} />
-              <Route path="/bilan" element={<RecapPage />} />
-              <Route path="/wrapped" element={<WrappedPage />} />
-              <Route path="/crew" element={<CrewListPage />} />
-              <Route path="/rejoindre" element={<CrewJoinPage />} />
-              <Route path="/crew/rejoindre" element={<CrewJoinPage />} />
-              <Route path="/crew/:id" element={<CrewPage />} />
+              <Route path="/rejoindre" element={<JoinPage />} />
+              <Route path="/crew/rejoindre" element={<JoinPage />} />
               <Route path="/sorties" element={<SortiesPage />} />
               <Route path="/sorties/:id" element={<SortiePage />} />
-              <Route path="/musique" element={<MusicPage />} />
-              <Route path="/jeux" element={<GamesPage />} />
-              <Route path="/temps" element={<TimePage />} />
-              <Route path="/mes-apps" element={<MiniAppsPage />} />
-              <Route path="/mes-apps/nouvelle" element={<MiniAppNewPage />} />
-              <Route path="/mes-apps/:id" element={<MiniAppPage />} />
               <Route
                 path="/copilot"
                 element={
@@ -138,11 +97,6 @@ function Home({ session, welcome }: { session: boolean; welcome: boolean }) {
                   </Suspense>
                 }
               />
-              <Route path="/objectifs" element={<Suspense fallback={null}><MyObjectifsPage /></Suspense>} />
-              <Route path="/chef" element={<Suspense fallback={null}><MyChefPage /></Suspense>} />
-              <Route path="/calendrier" element={<Suspense fallback={null}><MyAgendaPage /></Suspense>} />
-              <Route path="/foyer" element={<Suspense fallback={null}><MyFoyerPage /></Suspense>} />
-              {/* new-app: routes (repère du générateur, ne pas retirer) */}
               <Route path="*" element={<NotFoundScreen title="Page introuvable" body="Ce lien ne mène nulle part." />} />
             </Routes>
           </PushedScreen>
