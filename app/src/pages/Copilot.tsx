@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Glass, Icon, ModuleCard, ScreenHeader } from '@mylife/kit';
+import { Badge, Button, Field, Glass, Icon, ModuleCard, Notice, ScreenHeader } from '@mylife/kit';
 import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '@mylife/lumen';
 import { readAiKey, writeAiKey } from '@mylife/core/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '@legacy/copilot';
@@ -10,7 +10,7 @@ import { loadSpaces, useSpaces } from '@legacy/spaces';
 /**
  * Copilot : une seule IA pour tous tes modules, avec ta clé, depuis ton appareil. Elle lit tes résumés et propose ;
  * ses actions s’affichent en cartes que tu valides, exécutées ensuite par le module concerné. La logique (outils,
- * boucle, actions) est partagée avec l’ancien accueil (`@legacy/copilot`) jusqu'à ce qu’il disparaisse.
+ * boucle, actions) est partagée avec l’ancien accueil (`@legacy/copilot`) jusqu’à ce qu’il disparaisse.
  */
 const HISTORY_KEY = 'mylife:copilot:history';
 const PROPOSALS_KEY = 'mylife:copilot:proposals';
@@ -107,7 +107,7 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
               <Button href={APP_PATH[app]}>Ouvrir {ACTION_APP_NAME[app]}</Button>
             </>
           ) : queued.status === 'failed' ? (
-            <span className="t-small" style={{ color: 'var(--bad)' }}>Pas faite : {queued.error}</span>
+            <Notice tone="bad">Pas faite : {queued.error}</Notice>
           ) : p.undone ? (
             <span className="t-small muted">{undo?.status === 'done' ? 'Annulée.' : undo?.status === 'failed' ? `Annulation impossible : ${undo.error}` : `Annulation validée : ${ACTION_APP_NAME[app]} l’applique dès son ouverture.`}</span>
           ) : (
@@ -137,7 +137,7 @@ function KeyCard({ onSaved }: { onSaved: () => void }) {
     <ModuleCard tone="neutral">
       <div className="pad stack">
         <span className="t-card">Ta clé API Anthropic</span>
-        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l’assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu'à Anthropic.</span>
+        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l’assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu’à Anthropic.</span>
         <Field id="api-key" label="Clé API" hint="Une clé se crée sur console.anthropic.com (API Keys). Chaque question est facturée sur ton compte Anthropic.">
           <input id="api-key" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" />
         </Field>
@@ -266,9 +266,7 @@ export function CopilotPage() {
       )}
       {!busy && reading.length > 0 && <span className="t-small muted">A lu : {reading.map((r) => READ_LABEL[r] ?? r).join(', ')}</span>}
       {note && (
-        <span className="t-small" style={{ color: 'var(--warn)' }} role="status">
-          {note}
-        </span>
+        <Notice tone="warn">{note}</Notice>
       )}
       <div ref={end} />
       {apiKey && (

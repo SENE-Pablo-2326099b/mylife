@@ -134,13 +134,14 @@ export function App() {
 function Anonymous() {
   const { pathname } = useLocation();
   if (!PUBLIC.includes(pathname)) return <Navigate to="/bienvenue" replace />;
+  // Les écrans d'accès ont leur propre mise en page (marque en haut, centrée) ; la confidentialité, celle des pages.
+  if (pathname === '/bienvenue') return <WelcomePage />;
   return (
     <>
       <div className="ml-bg" aria-hidden="true" />
       <main className="shell-main" id="contenu">
         <div className="shell-content">
           <Routes>
-            <Route path="/bienvenue" element={<WelcomePage />} />
             <Route path="/confidentialite" element={<PrivacyPage />} />
           </Routes>
         </div>

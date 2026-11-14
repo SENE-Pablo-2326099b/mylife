@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Field, Glass, Icon, ModuleCard, ScreenHeader, SectionTitle } from '@mylife/kit';
+import { Badge, Button, Field, Glass, Icon, IconButton, List, ListRow, ModuleCard, Notice, PasswordField, ScreenHeader, SectionTitle } from '@mylife/kit';
 import { ApiError, changePassword, checkLogin, createAccount, deleteAccount, loginIssue, normalizeLogin, passwordIssue, passwordStrength, recoverAccount, renewRecoveryKey, signIn, signOut } from '@mylife/core/index';
 import { currentSession, pendingRecovery, setPendingRecovery, webPlatform } from '@mylife/core/web';
 import { useLogin, useSessionTick } from '../store';
@@ -37,29 +37,56 @@ function useAvailability(login: string, enabled: boolean): 'idle' | 'checking' |
   return state;
 }
 
-function PasswordInput({ id, value, onChange, isNew, label }: { id: string; value: string; onChange: (v: string) => void; isNew: boolean; label: string }) {
-  const [shown, setShown] = useState(false);
-  const strength = passwordStrength(value);
+function PasswordInput({ id, value, onChange, isNew, label, error, aside }: { id: string; value: string; onChange: (v: string) => void; isNew: boolean; label: string; error?: string | null; aside?: ReactNode }) {
   return (
-    <Field id={id} label={label} hint={isNew && value ? ['Trop court', 'Faible', 'Moyen', 'Bon', 'Très bon'][strength] : undefined}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input id={id} type={shown ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={isNew ? 'new-password' : 'current-password'} enterKeyHint="go" style={{ flex: 1, minWidth: 0 }} />
-        <button type="button" className="btn btn-quiet" style={{ flex: 'none', minHeight: 44, fontSize: 13, padding: '0 10px' }} onClick={() => setShown((s) => !s)}>
-          {shown ? 'Cacher' : 'Voir'}
-        </button>
-      </div>
-      {isNew && value && (
-        <div className="progress" aria-hidden="true">
-          <span style={{ width: `${(strength / 4) * 100}%` }} />
-        </div>
-      )}
+    <Field id={id} label={label} error={error} aside={aside}>
+      <PasswordField id={id} value={value} onChange={onChange} isNew={isNew} strength={isNew ? passwordStrength(value) : undefined} />
     </Field>
   );
 }
 
+/** Mise en page des écrans d'accès : la marque en haut (avec un retour éventuel), le contenu, le pied. */
+function AuthScreen({ onBack, children, foot }: { onBack?: () => void; children: ReactNode; foot?: ReactNode }) {
+  return (
+    <>
+      <div className="ml-bg" aria-hidden="true" />
+      <main className="auth" id="contenu">
+        <div className="auth-inner">
+          <div className="auth-top">
+            {onBack && <IconButton icon="back" label="Retour" onClick={onBack} />}
+            <Brand />
+          </div>
+          {children}
+          <div className="auth-foot">
+            {foot}
+            <a href="/confidentialite" className="link link-quiet t-small">
+              Ce que MyLife garde, et pourquoi
+            </a>
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
+
+function Brand() {
+  return (
+    <div className="auth-brand">
+      <img src="/favicon.svg" alt="" />
+      <span>MyLife</span>
+    </div>
+  );
+}
+
+const TITLES = { create: 'Crée ton compte', login: 'Connecte-toi', recover: 'Récupère ton compte' } as const;
+const LEADS = {
+  create: 'Un identifiant et un mot de passe, c’est tout. Tes données sont chiffrées avant de quitter l’appareil.',
+  login: 'Content de te revoir.',
+  recover: 'Avec ta clé de secours, tu choisis un nouveau mot de passe et tu retrouves tout.',
+} as const;
+
 /** Créer un compte, se connecter, ou récupérer son compte. */
-export function AccountForms({ initial = 'create', onDone }: { initial?: Mode; onDone: (created: boolean) => void }) {
-  const [mode, setMode] = useState<Mode>(initial);
+export function AccountForms({ mode, onMode, onDone }: { mode: Mode; onMode: (m: Mode) => void; onDone: (created: boolean) => void }) {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [recovery, setRecovery] = useState('');
@@ -96,59 +123,63 @@ export function AccountForms({ initial = 'create', onDone }: { initial?: Mode; o
     }
   };
   const switchTo = (m: Mode) => {
-    setMode(m);
+    onMode(m);
     setError(null);
   };
+  const loginError = loginProblem ?? (availability === 'taken' ? 'Déjà pris : essaie une variante.' : null);
   const loginHint = mode === 'create' ? (availability === 'free' ? 'Libre' : availability === 'checking' ? 'Vérification…' : availability === 'offline' ? 'Hors ligne : vérifié à la création.' : 'Lettres, chiffres, tirets ; 3 à 24 caractères.') : undefined;
-  const titles = { create: 'Crée ton compte', login: 'Connecte-toi', recover: 'Récupère ton compte' };
   return (
-    <Glass as="section" className="pad">
-      <form
-        className="stack"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void submit();
-        }}
-      >
-        <span className="t-card">{titles[mode]}</span>
-        {mode === 'create' && <span className="t-small muted">Un identifiant et un mot de passe. Pas de courriel, pas de code. Tes données sont chiffrées avant de quitter l’appareil.</span>}
-        <Field id="login" label="Identifiant" hint={loginProblem ?? (availability === 'taken' ? 'Déjà pris : essaie une variante.' : loginHint)}>
-          <input id="login" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" placeholder="Choisis un identifiant" enterKeyHint="next" />
-        </Field>
-        {mode === 'recover' && (
-          <Field id="recovery" label="Clé de secours" hint="32 caractères, donnée à la création du compte.">
-            <input id="recovery" value={recovery} onChange={(e) => setRecovery(e.target.value)} autoCapitalize="characters" autoCorrect="off" placeholder="XXXX-XXXX-XXXX-…" style={{ fontFamily: 'ui-monospace, monospace' }} />
+    <>
+      <Glass as="section" className="auth-card">
+        <form
+          className="stack"
+          style={{ gap: 16 }}
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+        >
+          <div className="stack" style={{ gap: 6 }}>
+            <h1 className="auth-title">{TITLES[mode]}</h1>
+            <span className="t-body muted">{LEADS[mode]}</span>
+          </div>
+          <Field id="login" label="Identifiant" error={loginError} hint={loginHint} hintTone={availability === 'free' ? 'ok' : undefined}>
+            <input id="login" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder={mode === 'create' ? 'Choisis un identifiant' : 'Ton identifiant'} enterKeyHint="next" />
           </Field>
-        )}
-        <PasswordInput id="password" label={mode === 'recover' ? 'Nouveau mot de passe' : 'Mot de passe'} value={password} onChange={setPassword} isNew={mode !== 'login'} />
-        {pwProblem && <span className="t-small" style={{ color: 'var(--warn)' }}>{pwProblem}</span>}
-        {error && (
-          <span className="t-small" role="alert" style={{ color: 'var(--bad)' }}>
-            {error}
-          </span>
-        )}
-        <button type="submit" className="btn btn-action btn-block" disabled={!ready}>
-          {busy ? 'Un instant…' : mode === 'create' ? 'Créer mon compte' : mode === 'login' ? 'Se connecter' : 'Récupérer mon compte'}
+          {mode === 'recover' && (
+            <Field id="recovery" label="Clé de secours" hint="32 caractères, donnée à la création du compte.">
+              <input id="recovery" className="mono" value={recovery} onChange={(e) => setRecovery(e.target.value)} autoCapitalize="characters" autoCorrect="off" spellCheck={false} placeholder="XXXX-XXXX-XXXX-…" />
+            </Field>
+          )}
+          <PasswordInput
+            id="password"
+            label={mode === 'recover' ? 'Nouveau mot de passe' : 'Mot de passe'}
+            value={password}
+            onChange={setPassword}
+            isNew={mode !== 'login'}
+            error={pwProblem}
+            aside={
+              mode === 'login' ? (
+                <button type="button" className="link link-quiet t-small" onClick={() => switchTo('recover')}>
+                  Mot de passe oublié ?
+                </button>
+              ) : undefined
+            }
+          />
+          {error && <Notice tone="bad">{error}</Notice>}
+          <button type="submit" className="btn btn-action btn-block" disabled={!ready}>
+            {busy ? 'Un instant…' : mode === 'create' ? 'Créer mon compte' : mode === 'login' ? 'Se connecter' : 'Récupérer mon compte'}
+          </button>
+        </form>
+      </Glass>
+      <p className="auth-switch" style={{ margin: 0 }}>
+        {mode === 'create' ? 'Déjà un compte ? ' : mode === 'login' ? 'Pas encore de compte ? ' : 'Tu te souviens ? '}
+        <button type="button" className="link" onClick={() => switchTo(mode === 'create' ? 'login' : mode === 'login' ? 'create' : 'login')}>
+          {mode === 'login' ? 'Créer un compte' : 'Se connecter'}
         </button>
-        <div className="row" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 4 }}>
-          {mode !== 'login' && (
-            <Button variant="quiet" onClick={() => switchTo('login')}>
-              J’ai déjà un compte
-            </Button>
-          )}
-          {mode === 'login' && (
-            <>
-              <Button variant="quiet" onClick={() => switchTo('create')}>
-                Créer un compte
-              </Button>
-              <Button variant="quiet" onClick={() => switchTo('recover')}>
-                Mot de passe oublié ?
-              </Button>
-            </>
-          )}
-        </div>
-      </form>
-    </Glass>
+      </p>
+    </>
   );
 }
 
@@ -205,7 +236,7 @@ export function RecoveryKeyPanel({ login, recoveryKey, onDone, first = false }: 
   );
 }
 
-/** Clé pas encore mise de côté : un rappel reste affiché jusqu'à « C’est fait ». */
+/** Clé pas encore mise de côté : un rappel reste affiché jusqu’à « C’est fait ». */
 export function RecoveryReminder() {
   useSessionTick();
   const pending = pendingRecovery();
@@ -233,57 +264,45 @@ export function WelcomeKey() {
   const pending = pendingRecovery();
   if (!pending) return null;
   return (
-    <>
-      <div className="ml-bg" aria-hidden="true" />
-      <main className="shell-main" id="contenu">
-        <div className="stack" style={{ maxWidth: 440, margin: '40px auto 0' }}>
-          <RecoveryKeyPanel login={pending.login} recoveryKey={pending.key} first onDone={() => navigate('/', { replace: true })} />
-        </div>
-      </main>
-    </>
+    <AuthScreen>
+      <RecoveryKeyPanel login={pending.login} recoveryKey={pending.key} first onDone={() => navigate('/', { replace: true })} />
+    </AuthScreen>
   );
 }
 
-/** Bienvenue : le premier écran sans compte. */
+/** Bienvenue : le premier écran sans compte, puis création, connexion ou récupération. */
 export function WelcomePage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [step, setStep] = useState<'intro' | 'account'>(params.get('mode') === 'login' ? 'account' : 'intro');
-  const [initial, setInitial] = useState<Mode>(params.get('mode') === 'login' ? 'login' : 'create');
-  if (step === 'account')
+  const [mode, setMode] = useState<Mode | null>(params.get('mode') === 'login' ? 'login' : null);
+  if (mode)
     return (
-      <div className="stack" style={{ maxWidth: 440, margin: '40px auto 0' }}>
-        <AccountForms initial={initial} onDone={(created) => navigate(created ? '/bienvenue' : '/', { replace: true })} />
-        <a href="/confidentialite" className="t-small muted" style={{ textAlign: 'center', textDecoration: 'underline' }}>
-          Ce que MyLife garde, et pourquoi
-        </a>
-      </div>
+      <AuthScreen onBack={() => (mode === 'recover' ? setMode('login') : setMode(null))}>
+        <AccountForms mode={mode} onMode={setMode} onDone={(created) => navigate(created ? '/bienvenue' : '/', { replace: true })} />
+      </AuthScreen>
     );
   return (
-    <div className="stack" style={{ maxWidth: 440, margin: '60px auto 0', gap: 24 }}>
-      <div className="stack" style={{ gap: 8 }}>
-        <span className="t-hero">MyLife</span>
-        <span className="t-card" style={{ fontWeight: 600 }}>Tes finances, ton entraînement et tes sorties dans une seule app.</span>
-        <span className="t-body muted">Un compte, une installation, et tes données chiffrées sur ton appareil avant de le quitter.</span>
+    <AuthScreen
+      foot={
+        <div className="stack" style={{ gap: 10, width: '100%' }}>
+          <Button variant="action" block onClick={() => setMode('create')}>
+            Commencer
+          </Button>
+          <Button block onClick={() => setMode('login')}>
+            J’ai déjà un compte
+          </Button>
+        </div>
+      }
+    >
+      <div className="stack" style={{ gap: 12, marginTop: 'min(14vh, 120px)' }}>
+        <h1 className="t-hero" style={{ margin: 0 }}>
+          Ta vie,
+          <br />
+          en un seul endroit.
+        </h1>
+        <span className="t-body muted" style={{ fontSize: 17, lineHeight: '25px' }}>Tes finances, ton entraînement et tes sorties dans une seule app. Un compte, et tes données chiffrées sur ton appareil avant de le quitter.</span>
       </div>
-      <div className="stack" style={{ gap: 8 }}>
-        <Button variant="action" block onClick={() => setStep('account')}>
-          Commencer
-        </Button>
-        <Button
-          block
-          onClick={() => {
-            setInitial('login');
-            setStep('account');
-          }}
-        >
-          J’ai déjà un compte
-        </Button>
-      </div>
-      <a href="/confidentialite" className="t-small muted" style={{ textAlign: 'center', textDecoration: 'underline' }}>
-        Ce que MyLife garde, et pourquoi
-      </a>
-    </div>
+    </AuthScreen>
   );
 }
 
@@ -327,27 +346,20 @@ export function AccountPage() {
   return (
     <>
       <ScreenHeader kicker="Ton compte" title={login} />
-      <RecoveryReminder />
       {freshKey ? (
         <RecoveryKeyPanel login={login} recoveryKey={freshKey} onDone={() => setFreshKey(null)} />
       ) : (
         <>
           <SectionTitle>Sécurité</SectionTitle>
-          <Glass className="stack-0">
-            <button type="button" className="list-row" style={{ padding: '6px 16px', background: 'none', border: 0, textAlign: 'left', width: '100%' }} onClick={() => open('password')}>
-              <span className="grow t-body" style={{ fontWeight: 500 }}>Changer le mot de passe</span>
-              <Icon name="chevron" size={18} />
-            </button>
-            <button type="button" className="list-row" style={{ padding: '6px 16px', background: 'none', border: 0, textAlign: 'left', width: '100%' }} onClick={() => open('recovery')}>
-              <span className="grow t-body" style={{ fontWeight: 500 }}>Nouvelle clé de secours</span>
-              <Icon name="chevron" size={18} />
-            </button>
-          </Glass>
+          <List>
+            <ListRow title="Changer le mot de passe" onClick={() => open('password')} />
+            <ListRow title="Nouvelle clé de secours" onClick={() => open('recovery')} />
+          </List>
           {panel === 'password' && (
-            <Panel title="Nouveau mot de passe">
+            <Panel title="Changer le mot de passe">
               <PasswordInput id="new-password" label="Nouveau mot de passe" value={password} onChange={setPassword} isNew />
-              {error && <span className="t-small" style={{ color: 'var(--bad)' }}>{error}</span>}
-              {done && <span className="t-small c-ok">{done}</span>}
+              {error && <Notice tone="bad">{error}</Notice>}
+              {done && <Notice tone="ok">{done}</Notice>}
               <Button
                 variant="action"
                 block
@@ -367,7 +379,7 @@ export function AccountPage() {
           {panel === 'recovery' && (
             <Panel title="Nouvelle clé de secours">
               <span className="t-small muted">L’ancienne ne marchera plus. Tu devras mettre la nouvelle de côté.</span>
-              {error && <span className="t-small" style={{ color: 'var(--bad)' }}>{error}</span>}
+              {error && <Notice tone="bad">{error}</Notice>}
               <Button
                 variant="action"
                 block
@@ -406,7 +418,7 @@ export function AccountPage() {
             <Panel title="Supprimer le compte, pour de bon">
               <span className="t-small muted">Tout ce que le serveur garde pour toi est effacé tout de suite, pour toutes les apps. Les appareils gardent leurs données locales.</span>
               <PasswordInput id="confirm-password" label="Ton mot de passe, pour confirmer" value={password} onChange={setPassword} isNew={false} />
-              {error && <span className="t-small" style={{ color: 'var(--bad)' }}>{error}</span>}
+              {error && <Notice tone="bad">{error}</Notice>}
               <Button
                 variant="danger"
                 block

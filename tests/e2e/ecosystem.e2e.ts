@@ -540,6 +540,12 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Identifiant').fill(who);
     await p.getByText('Libre').waitFor();
     await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    // Un seul gabarit : champs et bouton à la même hauteur (le mot de passe aussi, malgré son bouton « œil »).
+    const heights = await p.evaluate(() => [...document.querySelectorAll('form input, form button[type="submit"]')].map((el) => Math.round(el.getBoundingClientRect().height)));
+    expect(new Set(heights)).toEqual(new Set([48]));
+    await p.getByRole('button', { name: 'Afficher le mot de passe' }).click();
+    expect(await p.getByLabel('Mot de passe', { exact: true }).getAttribute('type')).toBe('text');
+    await p.getByRole('button', { name: 'Cacher le mot de passe' }).click();
     await shot(p, '51-v5-creation');
     await p.getByRole('button', { name: 'Créer mon compte' }).click();
     await p.getByText('Ta clé de secours').waitFor();

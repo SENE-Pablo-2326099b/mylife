@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Field, Glass, Icon, List, ListRow, ModuleCard, ScreenHeader, SectionTitle, type IconName } from '@mylife/kit';
+import { Button, Field, Glass, Icon, List, ListRow, ModuleCard, Notice, ScreenHeader, SectionTitle, type IconName } from '@mylife/kit';
 import { currentSession, webPlatform } from '@mylife/core/web';
 import { readThemeChoice } from '@mylife/kit';
 import { buildRetiredArchive } from '../archive';
@@ -35,7 +35,7 @@ export function SupportCard() {
   const [kind, setKind] = useState<(typeof KINDS)[number]['value']>('bug');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const send = async () => {
     const s = currentSession();
     if (!s) return;
@@ -44,9 +44,9 @@ export function SupportCard() {
     try {
       await webPlatform.api.call('/api/support', { action: 'send', kind, message: message.trim(), app: 'home' }, s.token);
       setMessage('');
-      setStatus('Message envoyé : merci !');
+      setStatus({ ok: true, text: 'Message envoyé : merci !' });
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : String(e));
+      setStatus({ ok: false, text: e instanceof Error ? e.message : String(e) });
     } finally {
       setBusy(false);
     }
@@ -64,9 +64,9 @@ export function SupportCard() {
         </select>
       </Field>
       <Field id="support-message" label="Ton message" hint="Ce message n’est pas chiffré : l’équipe MyLife pourra le lire. N’y mets pas de données sensibles. Effacé une fois traité (90 jours au plus).">
-        <input id="support-message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Raconte-nous" />
+        <textarea id="support-message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Raconte-nous" rows={4} />
       </Field>
-      {status && <span className="t-small c-ok" role="status">{status}</span>}
+      {status && <Notice tone={status.ok ? 'ok' : 'bad'}>{status.text}</Notice>}
       <Button disabled={busy || message.trim().length < 3} onClick={() => void send()}>
         {busy ? 'Envoi…' : 'Envoyer'}
       </Button>
@@ -104,7 +104,7 @@ export function DataPage() {
           <Button variant="action" block onClick={exportMine}>
             Exporter
           </Button>
-          {note && <span className="t-small c-ok" role="status">{note}</span>}
+          {note && <Notice tone="ok">{note}</Notice>}
         </div>
       </ModuleCard>
       <SectionTitle>Dans chaque module</SectionTitle>
@@ -126,8 +126,8 @@ export function DataPage() {
         <Button href="/compte">Aller au compte</Button>
       </Glass>
       <SupportCard />
-      <a href="/confidentialite" className="t-small muted" style={{ textDecoration: 'underline' }}>
-        Ce que MyLife garde, et pourquoi (confidentialité)
+      <a href="/confidentialite" className="link link-quiet t-small" style={{ alignSelf: 'center', padding: '8px 0' }}>
+        Ce que MyLife garde, et pourquoi
       </a>
     </>
   );

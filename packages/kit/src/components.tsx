@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons';
 
 /**
@@ -81,7 +81,8 @@ export function List({ children }: { children: ReactNode }) {
   return <Glass className="list">{children}</Glass>;
 }
 
-export function ListRow({ title, detail, value, href, lead }: { title: ReactNode; detail?: ReactNode; value?: ReactNode; href?: string; lead?: ReactNode }) {
+export function ListRow({ title, detail, value, href, lead, onClick }: { title: ReactNode; detail?: ReactNode; value?: ReactNode; href?: string; lead?: ReactNode; onClick?: () => void }) {
+  const leads = href !== undefined || onClick !== undefined;
   const body = (
     <>
       {lead}
@@ -90,16 +91,22 @@ export function ListRow({ title, detail, value, href, lead }: { title: ReactNode
         {detail && <span className="t-small muted">{detail}</span>}
       </span>
       {value !== undefined && <span className="t-strong">{value}</span>}
-      {href !== undefined && <span className="muted"><Icon name="chevron" size={18} /></span>}
+      {leads && <span className="muted"><Icon name="chevron" size={18} /></span>}
     </>
   );
-  return href !== undefined ? (
-    <a href={href} className="list-row">
-      {body}
-    </a>
-  ) : (
-    <div className="list-row">{body}</div>
-  );
+  if (href !== undefined)
+    return (
+      <a href={href} className="list-row">
+        {body}
+      </a>
+    );
+  if (onClick)
+    return (
+      <button type="button" className="list-row" onClick={onClick}>
+        {body}
+      </button>
+    );
+  return <div className="list-row">{body}</div>;
 }
 
 /** Écran vide : toujours une explication et une action. */
@@ -129,12 +136,73 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-export function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
+/**
+ * Un champ : l'étiquette au-dessus (avec, à droite, un lien éventuel comme « Oublié ? »), la saisie, puis l'aide ou
+ * l'erreur dessous. Le champ enfant (input, select, textarea, ou `PasswordField`) reçoit tout seul `aria-invalid` et
+ * `aria-describedby` : rien à câbler dans les écrans.
+ */
+export function Field({ id, label, hint, hintTone, error, aside, children }: { id: string; label: string; hint?: ReactNode; hintTone?: 'ok' | 'warn'; error?: string | null; aside?: ReactNode; children: ReactNode }) {
+  const note = error || hint;
+  const noteId = note ? `${id}-note` : undefined;
+  const wire = (child: ReactNode) =>
+    isValidElement(child) ? cloneElement(child as ReactElement<Record<string, unknown>>, { 'aria-describedby': noteId, 'aria-invalid': error ? true : undefined }) : child;
   return (
     <div className="field">
-      <label htmlFor={id}>{label}</label>
-      {children}
-      {hint && <span className="t-small muted">{hint}</span>}
+      {aside ? (
+        <div className="field-head">
+          <label htmlFor={id}>{label}</label>
+          {aside}
+        </div>
+      ) : (
+        <label htmlFor={id}>{label}</label>
+      )}
+      {Children.map(children, wire)}
+      {note && (
+        <span id={noteId} className="field-hint" data-tone={error ? 'bad' : hintTone} role={error ? 'alert' : undefined}>
+          {note}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const STRENGTH = ['Trop court', 'Faible', 'Moyen', 'Bon', 'Très bon'] as const;
+
+/**
+ * Mot de passe, avec l'œil pour l'afficher. À poser dans un `Field`. `strength` (0 à 4) affiche la jauge, pour un
+ * nouveau mot de passe.
+ */
+export function PasswordField({ id, value, onChange, isNew = false, strength, ...aria }: { id: string; value: string; onChange: (v: string) => void; isNew?: boolean; strength?: number; 'aria-describedby'?: string; 'aria-invalid'?: boolean }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <>
+      <div className="input-wrap">
+        <input id={id} type={shown ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={isNew ? 'new-password' : 'current-password'} autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="go" {...aria} />
+        <button type="button" className="input-adorn" aria-label={shown ? 'Cacher le mot de passe' : 'Afficher le mot de passe'} aria-pressed={shown} onClick={() => setShown((s) => !s)}>
+          <Icon name={shown ? 'eye-off' : 'eye'} size={20} />
+        </button>
+      </div>
+      {strength !== undefined && value && (
+        <div className="row" style={{ gap: 10 }}>
+          <div className="meter grow" data-level={Math.max(1, strength)} aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <span className="t-small muted" style={{ minWidth: 64, textAlign: 'right' }}>{STRENGTH[strength]}</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Message d'un formulaire ou d'un écran. Une erreur est annoncée aux lecteurs d'écran. */
+export function Notice({ tone = 'neutral', children }: { tone?: 'bad' | 'warn' | 'ok' | 'neutral'; children: ReactNode }) {
+  return (
+    <div className={cx('notice', tone !== 'neutral' && `notice-${tone}`)} role={tone === 'bad' ? 'alert' : 'status'}>
+      <Icon name={tone === 'ok' ? 'check' : 'alert'} size={18} />
+      <span>{children}</span>
     </div>
   );
 }

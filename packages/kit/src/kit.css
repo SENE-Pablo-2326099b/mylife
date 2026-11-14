@@ -10,6 +10,8 @@
   --r-card: 26px;
   --r-panel: 22px;
   --r-control: 14px;
+  /* Une seule hauteur pour tout ce qui se touche : boutons, champs, listes déroulantes. */
+  --control-h: 48px;
   --r-pill: 999px;
   --pad: 18px;
   --safe-top: env(safe-area-inset-top, 0px);
@@ -38,8 +40,14 @@
   --edge-mid-2: rgba(255, 255, 255, 0.04);
   --tile: rgba(255, 255, 255, 0.06);
   --tile-border: rgba(255, 255, 255, 0.12);
-  --field: rgba(0, 0, 0, 0.28);
-  --field-border: rgba(255, 255, 255, 0.28);
+  --field: rgba(0, 0, 0, 0.26);
+  --field-border: rgba(255, 255, 255, 0.16);
+  --field-border-hover: rgba(255, 255, 255, 0.3);
+  --field-inset: inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  --focus: #a58bff;
+  --focus-ring: rgba(139, 108, 255, 0.35);
+  --placeholder: rgba(232, 235, 255, 0.42);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e8ebff' stroke-opacity='.7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --ok: #8df0b9;
   --ok-bg: rgba(90, 220, 150, 0.16);
   --ok-border: rgba(120, 235, 170, 0.45);
@@ -78,8 +86,14 @@
   --edge-mid-2: rgba(255, 255, 255, 0.6);
   --tile: rgba(255, 255, 255, 0.6);
   --tile-border: rgba(255, 255, 255, 0.95);
-  --field: rgba(255, 255, 255, 0.7);
-  --field-border: rgba(16, 19, 38, 0.22);
+  --field: rgba(255, 255, 255, 0.72);
+  --field-border: rgba(16, 19, 38, 0.14);
+  --field-border-hover: rgba(16, 19, 38, 0.28);
+  --field-inset: inset 0 1px 2px rgba(16, 19, 38, 0.06);
+  --focus: #6a49f2;
+  --focus-ring: rgba(106, 73, 242, 0.22);
+  --placeholder: rgba(16, 19, 38, 0.4);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23474c66' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --ok: #146b41;
   --ok-bg: rgba(31, 122, 77, 0.12);
   --ok-border: rgba(31, 122, 77, 0.35);
@@ -137,7 +151,8 @@ body {
 }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
-:focus-visible { outline: 2px solid var(--tone-solid, #8b6cff); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+input, select, textarea { font: inherit; color: inherit; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ---------------------------------------------------------------- texte */
@@ -221,19 +236,25 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  min-height: 44px; padding: 0 18px; border-radius: var(--r-control);
+  min-height: var(--control-h); padding: 0 18px; border-radius: var(--r-control);
   font-size: 15px; font-weight: 700; border: 1px solid transparent; white-space: nowrap;
+  transition: transform 0.12s ease, filter 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+}
+.btn:not(:disabled):active { transform: scale(0.985); }
+@media (hover: hover) {
+  .btn-action:not(:disabled):hover { filter: brightness(1.08); }
+  .btn-secondary:not(:disabled):hover { border-color: var(--field-border-hover); }
 }
 .btn-action { background: var(--action); color: #fff; border-color: var(--action-border); box-shadow: var(--action-shadow); }
 .btn-secondary { background: var(--glass); border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-hi); font-weight: 600; }
-.btn-quiet { background: transparent; color: var(--tone, var(--ink)); font-weight: 600; padding: 0 10px; }
+.btn-quiet { background: transparent; color: var(--tone, var(--ink)); font-weight: 600; padding: 0 10px; min-height: 40px; }
 .btn-danger { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad); font-weight: 600; }
 .btn-block { display: flex; width: 100%; }
-.btn:disabled { opacity: 0.5; cursor: default; }
+.btn:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
 
 .icon-btn { width: 44px; height: 44px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; flex: none; }
 
-.badge { display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--glass-border); }
+.badge { width: fit-content; display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--glass-border); }
 .badge-ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
 .badge-warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
 .badge-bad { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad); }
@@ -246,15 +267,80 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .list { padding: 2px 16px; }
 .list-row { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; }
 .list-row + .list-row { border-top: 1px solid var(--line); }
+button.list-row { width: 100%; background: none; border: 0; text-align: left; padding: 6px 0; }
+.list-row > .muted:last-child { display: inline-flex; }
 
 .progress { height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .progress > span { display: block; height: 100%; border-radius: 999px; background: var(--action); }
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field > label { font-size: 13px; font-weight: 600; }
-.field > input, .field > select {
-  height: 50px; padding: 0 16px; border-radius: 16px; border: 1px solid var(--field-border); background: var(--field);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.25); font: 600 17px var(--font-text); color: var(--ink); width: 100%;
+/*
+ * Saisie. Un champ a la hauteur et l'arrondi d'un bouton ; il est creusé dans le verre, s'éclaire au survol et prend
+ * l'anneau violet au focus, rouge s'il est en erreur. 16 px de texte : pas de zoom forcé sur iPhone.
+ */
+.field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.field-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.field-head > label, .field > label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.input, .field input, .field select, .field textarea {
+  display: block; width: 100%; min-width: 0; height: var(--control-h); padding: 0 15px;
+  border-radius: var(--r-control); border: 1px solid var(--field-border); background: var(--field);
+  box-shadow: var(--field-inset); font: 500 16px/1.3 var(--font-text); color: var(--ink);
+  outline: none; -webkit-appearance: none; appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.field textarea { height: auto; min-height: 112px; padding: 12px 15px; line-height: 1.45; resize: vertical; }
+.field select { padding-right: 44px; background-image: var(--chevron); background-repeat: no-repeat; background-position: right 14px center; background-size: 18px; cursor: pointer; }
+.field ::placeholder { color: var(--placeholder); font-weight: 400; opacity: 1; }
+@media (hover: hover) { .field :is(input, select, textarea):not(:disabled):not(:focus):hover { border-color: var(--field-border-hover); } }
+.field :is(input, select, textarea):focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
+.field :is(input, select, textarea)[aria-invalid='true'] { border-color: var(--bad-border); }
+.field :is(input, select, textarea)[aria-invalid='true']:focus { box-shadow: 0 0 0 3px var(--bad-bg); }
+.field :is(input, select, textarea):disabled { opacity: 0.5; cursor: not-allowed; }
+.field input.mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: 0.04em; }
+.field-hint { font-size: 13px; line-height: 18px; color: var(--ink-2); }
+.field-hint[data-tone='ok'] { color: var(--ok); }
+.field-hint[data-tone='warn'] { color: var(--warn); }
+.field-hint[data-tone='bad'] { color: var(--bad); }
+/* Un bouton posé dans le champ (afficher le mot de passe). */
+.input-wrap { position: relative; }
+.input-wrap > input { padding-right: 52px; }
+.input-adorn {
+  position: absolute; top: 4px; right: 4px; width: 40px; height: calc(var(--control-h) - 8px); border: 0; border-radius: 10px;
+  background: none; color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center;
+}
+@media (hover: hover) { .input-adorn:hover { color: var(--ink); background: var(--tile); } }
+.meter { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.meter > span { height: 4px; border-radius: 999px; background: var(--line); transition: background 0.2s ease; }
+.meter[data-level='1'] > span:nth-child(-n + 1) { background: var(--bad); }
+.meter[data-level='2'] > span:nth-child(-n + 2) { background: var(--warn); }
+.meter[data-level='3'] > span:nth-child(-n + 3), .meter[data-level='4'] > span { background: var(--ok); }
+
+/* Message d'un formulaire ou d'un écran : erreur, avertissement, confirmation. */
+.notice { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border-radius: 12px; font-size: 13.5px; line-height: 19px; border: 1px solid var(--glass-border); background: var(--tile); }
+.notice > svg { flex: none; margin-top: 1px; }
+.notice-bad { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad); }
+.notice-warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+.notice-ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+
+/* Lien dans le texte. */
+.link { color: var(--ink); font-weight: 600; text-decoration: underline; text-decoration-color: var(--field-border-hover); text-underline-offset: 3px; background: none; border: 0; padding: 0; font-size: inherit; cursor: pointer; }
+.link-quiet { color: var(--ink-2); font-weight: 500; }
+@media (hover: hover) { .link:hover { text-decoration-color: currentColor; } }
+
+/* Écran d'accès (bienvenue, connexion, création, récupération) : centré, étroit, la marque en haut. */
+.auth { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; padding: calc(var(--safe-top) + 20px) var(--pad) calc(var(--safe-bottom) + 24px); }
+.auth-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 18px; flex: 1; }
+.auth-top { display: flex; align-items: center; gap: 14px; min-height: 44px; }
+.auth-brand { display: flex; align-items: center; gap: 12px; }
+.auth-brand img { width: 44px; height: 44px; border-radius: 12px; box-shadow: 0 10px 26px -8px rgba(124, 92, 255, 0.7); }
+.auth-brand span { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.03em; }
+.auth-card { padding: 24px 20px 20px; border-radius: var(--r-card); display: flex; flex-direction: column; gap: 16px; }
+.auth-title { font-family: var(--font-display); letter-spacing: -0.03em; font-weight: 800; font-size: 26px; line-height: 31px; margin: 0; }
+.auth-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 8px; text-align: center; }
+.auth-switch { text-align: center; font-size: 14px; color: var(--ink-2); }
+@media (min-width: 900px) {
+  .auth { justify-content: center; }
+  .auth-inner { flex: none; }
+  .auth-card { padding: 30px 28px 26px; }
 }
 
 .empty { border: 1px dashed var(--field-border); background: var(--tile); border-radius: var(--r-card); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Badge, Button, EmptyState, Field, Glass, IconTile, List, ListRow, ModuleCard, ModuleLabel, ScreenHeader, SectionTitle, Sheet, Switch, type Tone } from '@mylife/kit';
+import { Badge, Button, EmptyState, Field, Glass, IconTile, List, ListRow, ModuleCard, ModuleLabel, Notice, PasswordField, ScreenHeader, SectionTitle, Sheet, Switch, type Tone } from '@mylife/kit';
 
 /** La page « kit » : tous les composants, dans leurs états. C’est la référence qui garde MyLife cohérent. */
 const TONES: { tone: Tone; name: string; icon: 'card' | 'barbell' | 'navigate' | 'chef' }[] = [
@@ -12,6 +12,7 @@ const TONES: { tone: Tone; name: string; icon: 'card' | 'barbell' | 'navigate' |
 export function KitPage() {
   const [on, setOn] = useState(true);
   const [sheet, setSheet] = useState(false);
+  const [pw, setPw] = useState('cheval-Agrafe');
   return (
     <>
       <ScreenHeader kicker="Référence" title="Le kit" />
@@ -71,6 +72,30 @@ export function KitPage() {
         <Field id="kit-montant" label="Montant" hint="Un champ est creusé dans le verre ; l’aide est toujours dessous.">
           <input id="kit-montant" defaultValue="12,50" inputMode="decimal" />
         </Field>
+        <Field id="kit-vide" label="Champ vide">
+          <input id="kit-vide" placeholder="Texte d’exemple" />
+        </Field>
+        <Field id="kit-erreur" label="Champ en erreur" error="Lettres, chiffres et tirets seulement.">
+          <input id="kit-erreur" defaultValue="mon identifiant !" />
+        </Field>
+        <Field id="kit-mdp" label="Mot de passe" aside={<button type="button" className="link link-quiet t-small">Oublié ?</button>}>
+          <PasswordField id="kit-mdp" value={pw} onChange={setPw} isNew strength={Math.min(4, Math.floor(pw.length / 4))} />
+        </Field>
+        <Field id="kit-choix" label="Liste déroulante">
+          <select id="kit-choix" defaultValue="b">
+            <option value="a">Premier choix</option>
+            <option value="b">Deuxième choix</option>
+          </select>
+        </Field>
+        <Field id="kit-texte" label="Texte long">
+          <textarea id="kit-texte" placeholder="Plusieurs lignes" rows={3} />
+        </Field>
+        <Notice tone="bad">Une erreur, dite simplement, avec quoi faire.</Notice>
+        <Notice tone="warn">Un avertissement.</Notice>
+        <Notice tone="ok">C’est enregistré.</Notice>
+        <span className="t-body">
+          Un <a className="link" href="#">lien dans le texte</a>, et un <a className="link link-quiet" href="#">lien discret</a>.
+        </span>
         <div className="row">
           <span className="grow t-body">Un interrupteur</span>
           <Switch checked={on} onChange={setOn} label="Interrupteur d’exemple" />
