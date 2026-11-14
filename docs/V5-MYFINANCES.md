@@ -1,124 +1,103 @@
-# MyFinances V5 : inventaire et proposition (étape 3.1)
+# MyFinances V5 : repensé de A à Z (étapes 3.1 et 3.2)
 
-> 14/11/2026. Première étape de la phase 3 (`docs/VISION.md` § 8) : ce que fait l'app actuelle, ce que je propose de
-> garder, fusionner ou retirer, et les questions qui décident des maquettes. Rien n'est codé tant que ce document et
-> les maquettes (3.2) ne sont pas validés.
+> 14/11/2026, deuxième version. La première proposait de garder le modèle et de refaire les écrans : refusée. Tes
+> retours : tu aimes suivre tes dépenses facilement et suivre ton patrimoine et tes investissements ; la page
+> Opérations est brouillonne et pauvre ; le classement et la gestion des dépenses marchent mal ; l'indépendance
+> financière n'apporte rien sous sa forme actuelle ; les alertes servent peu ; et surtout **les comptes, les dépenses,
+> leur gestion et la planification ne sont pas unifiés**. Les banques se synchronisent bien ; le patrimoine sert vraiment.
 
-## 1. L'existant en chiffres
+## 1. Pourquoi ça ne marche pas aujourd'hui (le modèle, pas les écrans)
 
-| Partie | Lignes | Sort proposé |
+| Défaut du modèle actuel | Ce que tu en vois |
+|---|---|
+| **Tout est une « catégorie »**, même ce qui n'est pas une dépense : « Transferts internes », « Épargne & investissement », « Entre amis » sont des catégories « exclues » | Classer oblige à choisir entre des choses de nature différente ; un virement mal reconnu devient une dépense |
+| **Trois mondes de comptes** : comptes bancaires (synchronisés), placements (saisis), biens et dettes (saisis). Un livret peut exister deux fois | Le patrimoine et le budget ne se parlent pas ; un virement vers un placement est une « dépense exclue » d'un côté, un achat saisi ou deviné par mot-clé de l'autre |
+| **La planification vit à cinq endroits** : revenus et charges des réglages, récurrents détectés, plans d'investissement, objectifs d'épargne, objectifs de catégorie ; plus une épargne « auto ou manuelle » et une enveloppe « calculée ou forcée » | On ne sait pas où régler quoi ; la liste des récurrents doit recoller les morceaux |
+| **Classement par mots-clés, opération par opération** : pas de notion de marchand | La file « à classer » se vide une par une ; corriger une opération ne corrige pas les autres ; les règles sont illisibles |
+| **Opérations = une liste** : pas de sélection multiple, pas de ventilation, pas de saisie, pas de fiche marchand | « Brouillon et manque de fonctionnalités » |
+
+## 2. Le nouveau modèle : quatre notions, pas plus
+
+### Compte
+**Tout endroit où il y a de l'argent, ou une dette.** Un seul concept, cinq familles :
+
+| Famille | Exemples | Alimenté par |
 |---|---|---|
-| Domaine (`src/domain` : moteur de budget, récurrents, prévision, règles, patrimoine, indépendance) | 4 600 | **Gardé tel quel**, déplacé dans le module |
-| Synchro bancaire et cloud (`src/sync`) | 1 200 | Gardée |
-| Base locale (`src/db`, Dexie `myfinances`) | 600 | Gardée : mêmes tables, mêmes identifiants de synchro |
-| Assistant (`src/assistant`) | 1 100 | Ses outils passent à Copilot ; la page disparaît |
-| Écrans, composants, kit (`src/pages`, `src/ui`, `src/components`) | 13 000 | **Réécrits de zéro** dans le kit V5 |
+| Quotidien | compte courant, carte | la banque (ou à la main) |
+| Épargne | livrets | la banque (ou à la main) |
+| Placements | PEA, compte-titres, crypto | relevé du courtier, virements reconnus, cours |
+| Biens | voiture, logement | valeur saisie |
+| Dettes | prêt | valeur saisie |
 
-351 tests unitaires couvrent le domaine : c'est lui qui porte la valeur, et il ne bouge pas. Tes données non plus : le
-module lira la même base et les mêmes lignes synchronisées, sans migration.
+Le **patrimoine** est la somme des comptes. Le **budget** regarde les comptes du quotidien. Plus de doublon, plus de
+« portefeuille » à côté des « comptes ».
 
-## 2. Ce que fait l'app aujourd'hui
+### Mouvement
+Chaque opération a une **nature**, décidée avant toute catégorie :
 
-**Le quotidien**
-- **Budget du jour** : enveloppe « vie courante » du cycle de paie ÷ jours restants, avec plafond sur l'argent
-  réellement libre, paie en avance, remboursements rattachés, revenus exceptionnels à affecter. Explication « comment
-  c'est calculé ».
-- **Opérations** : liste par jour, recherche, filtres (période, catégorie, compte), fiche d'opération (catégorie, note,
-  remboursement de…), file « à classer » une par une.
-- **Classement automatique** : règles (mot-clé ou regex, sens, montant), commerçants par défaut, transferts internes
-  détectés, apprentissage depuis les corrections.
+- **Dépense** : la seule nature qui porte une catégorie de dépense.
+- **Revenu** : salaire, aides, exceptionnel.
+- **Virement** : entre deux de tes comptes. Vers un livret ou un placement, c'est de l'**épargne** : elle se voit dans
+  le budget (« mis de côté ») et dans le patrimoine (apport), sans rien ressaisir.
+- **Remboursement** : rattaché à la dépense qu'il rembourse (ou à une personne), il la réduit.
 
-**Le cycle**
-- **Page Budget** : total du cycle, par jour en moyenne, reste par jour, prévision de fin, récurrents à venir,
-  calendrier jour par jour, dépenses cumulées, par catégorie vs cycle précédent, habitudes par jour de semaine,
-  historique des cycles, commerçants, plus grosses dépenses, part de la nourriture, « entre amis ».
-- **Récurrents** : liste unique (réglages + détectés + investissements programmés), sauter ce mois.
-- **Prévision de trésorerie** : solde jour par jour jusqu'à la paie, point bas.
-- **Alertes** : livraisons, Amazon hors budget, budget du jour dépassé N jours, tickets de bus vs abonnement, objectif
-  de catégorie.
+Une opération peut être **ventilée** (un ticket, deux catégories) et **notée à la main** (espèces, ou avant que la
+banque l'envoie : elle est rapprochée à l'arrivée, jamais comptée deux fois).
 
-**Le long terme**
-- **Patrimoine** : liquidités (comptes bancaires), placements (portefeuilles, lignes, cours Yahoo / CoinGecko,
-  mouvements, plans programmés, achats déduits des prélèvements, import de relevé Trade Republic), objectifs d'épargne,
-  biens et dettes, historique quotidien, répartition.
-- **Indépendance financière** : simulateur d'intérêts composés branché sur tes données (Lean / Coast FI, pension).
+### Marchand
+Le libellé bancaire brut (« CB CARREFOUR MKT 1234 PARIS ») devient un **marchand** propre (« Carrefour »). On classe
+**le marchand, une fois** : ses opérations passées et futures suivent. « À classer » regroupe donc par marchand
+(« Carrefour · 9 opérations » : un geste). Les règles par mots-clés restent pour les cas tordus, cachées.
 
-**Autour**
-- Banques : connexion Enable Banking par le relais, synchro auto, application propre pour les proches.
-- Premier lancement guidé, démo (« Camille Martin », fictive), sauvegarde et import, points de restauration.
-- Réglages : revenus, charges, épargne, catégories et objectifs, règles, seuils d'alerte, apparence.
+### Prévu
+**Une seule liste** de ce qui revient : revenus, charges, épargne (versements programmés, objectifs). Chaque ligne a un
+montant, un rythme, un compte. L'app **détecte** les lignes dans l'historique et te les **propose** ; tu confirmes d'un
+geste. Tout le reste en découle :
 
-**Ce qui manque** : **aucune saisie manuelle de dépense.** Toute opération vient de la banque ou de la démo. Or le « + »
-de la coquille propose déjà « Une dépense », et sans banque compatible l'app est vide.
+```
+reste à vivre du cycle = revenus prévus − charges prévues − épargne prévue
+à dépenser aujourd'hui = (reste à vivre − déjà dépensé) ÷ jours restants
+```
 
-## 3. Ce que je propose
+Les budgets par catégorie sont facultatifs et vivent au même endroit. Plus de réglage « auto ou manuel ».
 
-### Les questions auxquelles le module répond (principe 2 de la vision)
+## 3. Les écrans : quatre onglets, un par question
 
-| Question | Fréquence | Où |
+| Onglet | Question | Contenu |
 |---|---|---|
-| Combien je peux dépenser aujourd'hui ? | chaque jour | Carte d'accueil + écran **Jour** |
-| J'ai bien tout noté, tout est bien classé ? | chaque jour | Ajout rapide + **Opérations** (« à classer » en tête) |
-| Je finis le mois dans le vert ? | chaque semaine | **Cycle** |
-| Combien j'ai, et ça progresse ? | chaque mois | **Patrimoine** |
+| **Jour** | Combien je peux dépenser aujourd'hui ? | Le chiffre ; la jauge du cycle ; les dépenses du jour ; ce qui tombe bientôt ; « à classer » s'il y en a |
+| **Opérations** | Où est passé mon argent ? | Tous les comptes dans une seule liste ; recherche ; filtres en pastilles (compte, nature, catégorie, montant, période) ; total par jour ; sélection multiple (classer, changer de nature) ; ventiler ; ajouter ; fiche marchand (historique, moyenne, catégorie) ; « à classer » groupé par marchand |
+| **Plan** | Je finis le mois dans le vert ? | Revenus, charges, épargne prévus (reçu / payé / à venir) ; budgets par catégorie ; où tu finiras le cycle ; cycles précédents |
+| **Patrimoine** | Combien j'ai, et ça progresse ? | Total et courbe ; comptes par famille ; placements (valeur, plus-value, lignes) ; objectifs ; **projection** : « à ce rythme, dans 1, 5, 10 ans » |
 
-Quatre onglets, un par question. Les réglages du module s'ouvrent depuis l'en-tête, pas depuis un onglet.
+**Retiré** : la page Alertes (deux alertes génériques restent, dans « À faire » de la coquille) ; l'assistant propre
+(Copilot le remplace) ; la page Indépendance financière (remplacée par la projection du patrimoine, qui répond à la
+vraie question : « où je vais à ce rythme ? ») ; les statistiques rarement lues de l'ancienne page Budget.
 
-### Gardé, et rendu excellent
-- Le **moteur de budget**, tel quel : c'est le cœur, il est juste et testé.
-- **Opérations** avec la file « à classer » fondue dedans (plus d'écran à part) : un bandeau « 3 à classer » en tête,
-  classement en un geste.
-- **Règles et apprentissage** : invisibles au quotidien, réglables au besoin.
-- **Récurrents** et **prévision**, fondus dans l'écran **Cycle** : « ce qui doit encore tomber » et « où tu finiras ».
-- **Patrimoine** : comptes, placements, objectifs, biens et dettes, sur un seul écran plus court.
-- **Banques** (Enable Banking) et **Trade Republic** : gardés, au second niveau.
-- Démo, sauvegarde, points de restauration.
+## 4. Tes données
 
-### Ajouté
-- **La saisie manuelle** : montant, catégorie, c'est tout (date et note facultatives). Elle sert le « + » partout, les
-  espèces, les comptes sans synchro, et les personnes qui n'auront jamais de banque connectée (phase 6 : pour un
-  proche, créer sa propre application Enable Banking est un vrai obstacle). Une dépense notée à la main puis arrivée
-  par la banque est rapprochée, pas comptée deux fois.
-- Les **cartes d'accueil** (budget du jour, prochains prélèvements), les **saisies rapides** et les **outils Copilot**
-  du module, par le contrat.
+Le modèle change, donc **une migration**, rejouable et testée sur une copie de tes données réelles (sur ton appareil,
+jamais livrée), avec point de restauration avant :
 
-### Fusionné ou retiré
-| Aujourd'hui | Devient | Pourquoi |
-|---|---|---|
-| Page Alertes et ses 5 alertes | 2 alertes génériques (objectif de catégorie dépassé, budget du jour dépassé plusieurs jours) dans la boîte « À faire » de la coquille | Livraisons, Amazon, tickets de bus : taillées pour un seul usage, à refaire en règles si besoin |
-| Assistant de MyFinances | Copilot (outils du module) | Un seul assistant |
-| Page Budget à 12 sections | Écran **Cycle** à 4 blocs : où tu en es, ce qui doit tomber, par catégorie, cycles précédents | Une question, une réponse |
-| Habitudes par jour de semaine, part de la nourriture, dépenses cumulées, calendrier | Retirés (le calcul reste dans le domaine) | Rarement lus |
-| « Entre amis » | Gardé dans la fiche d'opération (personne), section retirée | Rare |
-| Simulateur d'indépendance financière | Une carte « liberté financière » dans Patrimoine (où tu en es, à quelle date) ; le simulateur complet passe en « Plus tard » | Mensuel au mieux ; le moteur reste |
-| Menu des espaces, palette de commandes, apparence, compte | La coquille | Déjà fait en phase 2 |
+- comptes bancaires, placements, biens et dettes → **comptes** ;
+- opérations → nature déduite de leur catégorie actuelle (transferts → virement, épargne → virement vers un compte
+  d'épargne ou de placement, entre amis → remboursement) ; tes corrections manuelles sont gardées ;
+- règles et libellés → **marchands** avec leur catégorie ;
+- lignes de revenus et de charges, récurrents confirmés, plans d'investissement, objectifs → **prévu** ;
+- mouvements de placements, cours, historique du patrimoine : repris tels quels.
 
-### Données et continuité
-- Même base locale (`myfinances`), mêmes tables, mêmes identifiants de synchro : rien à migrer, l'ancienne app et le
-  nouveau module lisent les mêmes données pendant la bascule.
-- Le nom technique `budget-dodge` (ancienne base et ancien format de sauvegarde, encore lus pour reprise) disparaît
-  après cette version.
-- L'opération manuelle ajoute une valeur `source: 'manual'` : version de la base +1, migration testée.
+Les calculs éprouvés (cycle de paie, détection des récurrents, prévision, valorisation, lecture du relevé Trade
+Republic, synchro bancaire) sont **réutilisés** quand ils restent justes dans le nouveau modèle ; le reste est réécrit
+avec ses tests. L'ancienne app reste en ligne à `/finances/` jusqu'à la bascule.
 
-## 4. Les étapes proposées
+## 5. Les étapes
 
 | Étape | Contenu | Tu testes |
 |---|---|---|
-| 3.1 | Ce document | Tu valides ou tu corriges |
-| 3.2 | Maquettes : Jour, Opérations (avec à classer et saisie), Cycle, Patrimoine, premier lancement | Tu valides les écrans |
-| 3.3 | Le module dans la coquille : domaine et base branchés, écran **Jour**, saisie manuelle, carte d'accueil | Ton budget du jour dans la nouvelle app |
-| 3.4 | **Opérations** : liste, recherche, fiche, à classer, règles | Classer une semaine |
-| 3.5 | **Cycle** : où tu en es, à venir, catégories, historique | Ton mois |
-| 3.6 | **Patrimoine** et banques | Tes comptes et placements |
-| 3.7 | Premier lancement, réglages du module, Copilot, export ; bascule de `/finances/` vers le module | Deux semaines d'usage réel |
-
-## 5. Ce que j'ai besoin de savoir (tes tâches réelles)
-
-1. **Banque ou main ?** Tes comptes se synchronisent-ils bien aujourd'hui, et noterais-tu des dépenses à la main
-   (espèces, en attendant la banque) ? Je propose la saisie manuelle de toute façon ; reste à savoir si elle est
-   centrale ou d'appoint.
-2. **Patrimoine** : l'utilises-tu vraiment (Trade Republic, Bitstack, objectifs) ? Si c'est rare, il passe en dernier
-   et plus léger.
-3. **Indépendance financière** : une carte suffit-elle, ou tiens-tu au simulateur complet ?
-4. **Alertes** : livraisons, Amazon, tickets de bus te servent-elles encore ?
-5. **Ce qui t'agace** dans l'app actuelle, au quotidien.
+| 3.1 | Ce document | Le modèle te paraît-il logique ? |
+| 3.2 | Maquettes des écrans clés | Tu valides ou tu corriges |
+| 3.3 | Le nouveau modèle (comptes, mouvements, marchands, prévu), ses tests, la migration | Tes données dans le nouveau modèle, vérifiées |
+| 3.4 | **Opérations** : liste unifiée, filtres, sélection multiple, ventilation, saisie, marchands, à classer | Classer une semaine entière |
+| 3.5 | **Jour** et **Plan** ; cartes d'accueil, ajout rapide | Ton budget au quotidien |
+| 3.6 | **Patrimoine** : comptes, placements, objectifs, projection ; banques et relevés | Tes comptes et placements |
+| 3.7 | Premier lancement, réglages, Copilot, export ; bascule de `/finances/` | Deux semaines d'usage réel |
