@@ -5,8 +5,8 @@ import { readThemeChoice } from '@mylife/kit';
 import { buildRetiredArchive } from '../archive';
 
 /**
- * Tes données : les voir, les emporter, les effacer. L'export de la coquille est encore mince (réglages) : chaque
- * module reconstruit y ajoutera le sien par le contrat (phase 3). L'archive des fonctions retirées en V5 reste là
+ * Tes données : les voir, les emporter, les effacer. L’export de la coquille est encore mince (réglages) : chaque
+ * module reconstruit y ajoutera le sien par le contrat (phase 3). L’archive des fonctions retirées en V5 reste là
  * tant que le serveur garde leurs données.
  */
 function download(name: string, data: unknown) {
@@ -30,7 +30,7 @@ const KINDS = [
   { value: 'donnees', label: 'Mes données (RGPD)' },
 ] as const;
 
-/** « Un problème, une idée ? » : un message à l'équipe (non chiffré, et c'est dit). */
+/** « Un problème, une idée ? » : un message à l’équipe (non chiffré, et c’est dit). */
 export function SupportCard() {
   const [kind, setKind] = useState<(typeof KINDS)[number]['value']>('bug');
   const [message, setMessage] = useState('');
@@ -54,7 +54,7 @@ export function SupportCard() {
   return (
     <Glass className="pad stack">
       <span className="t-strong">Un problème, une idée ?</span>
-      <Field id="support-kind" label="C'est…">
+      <Field id="support-kind" label="C’est…">
         <select id="support-kind" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
           {KINDS.map((k) => (
             <option key={k.value} value={k.value}>
@@ -63,7 +63,7 @@ export function SupportCard() {
           ))}
         </select>
       </Field>
-      <Field id="support-message" label="Ton message" hint="Ce message n'est pas chiffré : l'équipe MyLife pourra le lire. N'y mets pas de données sensibles. Effacé une fois traité (90 jours au plus).">
+      <Field id="support-message" label="Ton message" hint="Ce message n’est pas chiffré : l’équipe MyLife pourra le lire. N’y mets pas de données sensibles. Effacé une fois traité (90 jours au plus).">
         <input id="support-message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Raconte-nous" />
       </Field>
       {status && <span className="t-small c-ok" role="status">{status}</span>}
@@ -87,7 +87,7 @@ export function DataPage() {
       const archive = await buildRetiredArchive();
       download(`mylife-archive-${new Date().toISOString().slice(0, 10)}.json`, archive);
       const failed = Object.keys(archive.errors).length;
-      setNote(failed ? `Archive téléchargée, sans ${failed} partie${failed > 1 ? 's' : ''} illisible${failed > 1 ? 's' : ''} pour l'instant (réessaie en ligne).` : 'Archive téléchargée.');
+      setNote(failed ? `Archive téléchargée, sans ${failed} partie${failed > 1 ? 's' : ''} illisible${failed > 1 ? 's' : ''} pour l’instant (réessaie en ligne).` : 'Archive téléchargée.');
     } catch (e) {
       setNote(e instanceof Error ? e.message : String(e));
     } finally {
@@ -100,7 +100,7 @@ export function DataPage() {
       <ModuleCard tone="neutral">
         <div className="pad stack">
           <span className="t-card">Ce que MyLife sait de toi</span>
-          <span className="t-small muted">Tes réglages communs. Chaque module ajoutera son export ici au fil de sa reconstruction ; en attendant, il s'exporte depuis le module.</span>
+          <span className="t-small muted">Tes réglages communs. Chaque module ajoutera son export ici au fil de sa reconstruction ; en attendant, il s’exporte depuis le module.</span>
           <Button variant="action" block onClick={exportMine}>
             Exporter
           </Button>
@@ -123,10 +123,10 @@ export function DataPage() {
       <Glass className="pad stack">
         <span className="t-strong">Tout effacer</span>
         <span className="t-small muted">Compte → « Supprimer mon compte » : tout ce que le serveur garde est effacé, pour toutes les apps, tout de suite.</span>
-        <Button href="/v5/compte">Aller au compte</Button>
+        <Button href="/compte">Aller au compte</Button>
       </Glass>
       <SupportCard />
-      <a href="/v5/confidentialite" className="t-small muted" style={{ textDecoration: 'underline' }}>
+      <a href="/confidentialite" className="t-small muted" style={{ textDecoration: 'underline' }}>
         Ce que MyLife garde, et pourquoi (confidentialité)
       </a>
     </>

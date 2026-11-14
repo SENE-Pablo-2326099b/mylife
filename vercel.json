@@ -44,17 +44,17 @@
       "destination": "https://myraveloc.vercel.app/raveloc/:path+"
     },
     {
-      "source": "/v5/:path*",
-      "destination": "/v5/index.html"
+      "source": "/ancien/:path*",
+      "destination": "/ancien/index.html"
     },
     {
-      "source": "/((?!api/|finances|perf|raveloc|v5/).*)",
+      "source": "/((?!api/|finances|perf|raveloc|ancien/).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/((?!finances|perf|raveloc|api).*)",
+      "source": "/((?!finances|perf|raveloc|api|ancien).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -93,6 +93,18 @@
     {
       "path": "/api/cron-weekly",
       "schedule": "0 17 * * 0"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/v5",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/v5/:path*",
+      "destination": "/:path*",
+      "permanent": false
     }
   ]
 }

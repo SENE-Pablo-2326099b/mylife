@@ -13,6 +13,7 @@ import { ModulesPage } from './pages/Modules';
 import { SettingsPage } from './pages/Settings';
 import { TodayPage } from './pages/Today';
 import { useLogin, usePrefs } from './store';
+import { useHomeAgenda } from '@legacy/agendaHome';
 
 /**
  * La coquille de MyLife V5 : la navigation (barre du bas sur téléphone, barre latérale sur ordinateur), le bouton
@@ -29,6 +30,12 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
 const COPILOT = '/copilot';
 /** Lisibles sans compte. */
 const PUBLIC = ['/bienvenue', '/confidentialite'];
+/** Anciennes adresses de l'accueil : les Sorties vivent encore dans l'ancien accueil (`/ancien/`) jusqu'à la phase 5. */
+function LegacyRedirect() {
+  const { pathname, hash, search } = useLocation();
+  location.replace(`/ancien${pathname}${search}${hash}`);
+  return null;
+}
 
 function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
   const prefs = usePrefs();
@@ -97,7 +104,7 @@ function Sidebar({ onAdd }: { onAdd: () => void }) {
 
 function TabBar({ onAdd }: { onAdd: () => void }) {
   return (
-    <nav className="glass tabbar" aria-label="Navigation principale">
+    <nav className="glass tabbar" aria-label="Barre de navigation">
       {NAV.map((n) => (
         <NavLink key={n.to} to={n.to} end={n.end} className="tab">
           <Icon name={n.icon} />
@@ -121,25 +128,33 @@ function TabBar({ onAdd }: { onAdd: () => void }) {
 
 export function App() {
   const login = useLogin();
+  return login ? <Shell login={login} /> : <Anonymous />;
+}
+
+function Anonymous() {
+  const { pathname } = useLocation();
+  if (!PUBLIC.includes(pathname)) return <Navigate to="/bienvenue" replace />;
+  return (
+    <>
+      <div className="ml-bg" aria-hidden="true" />
+      <main className="shell-main" id="contenu">
+        <div className="shell-content">
+          <Routes>
+            <Route path="/bienvenue" element={<WelcomePage />} />
+            <Route path="/confidentialite" element={<PrivacyPage />} />
+          </Routes>
+        </div>
+      </main>
+    </>
+  );
+}
+
+/** La coquille une fois connecté. Les Sorties (encore dans l'ancien accueil) publient leur agenda d'ici aussi. */
+function Shell({ login }: { login: string }) {
+  void login;
   const { pathname } = useLocation();
   const [adding, setAdding] = useState(false);
-  if (!login) {
-    if (!PUBLIC.includes(pathname)) return <Navigate to="/bienvenue" replace />;
-    return (
-      <>
-        <div className="ml-bg" aria-hidden="true" />
-        <main className="shell-main" id="contenu">
-          <div className="shell-content">
-            <Routes>
-              <Route path="/bienvenue" element={<WelcomePage />} />
-              <Route path="/confidentialite" element={<PrivacyPage />} />
-            </Routes>
-          </div>
-        </main>
-      </>
-    );
-  }
-  // Compte tout juste créé : la bienvenue montre d'abord la clé de secours, puis mène à l'accueil.
+  useHomeAgenda();
   if (pathname === '/bienvenue' && !pendingRecovery()) return <Navigate to="/" replace />;
   if (pathname === '/bienvenue') return <WelcomeKey />;
   return (
@@ -159,6 +174,11 @@ export function App() {
               <Route path="/confidentialite" element={<PrivacyPage />} />
               <Route path="/installer" element={<InstallPage />} />
               <Route path="/kit" element={<KitPage />} />
+              <Route path="/apparence" element={<Navigate to="/reglages" replace />} />
+              <Route path="/*" element={<Navigate to="/" replace />} />
+              <Route path="/sorties/*" element={<LegacyRedirect />} />
+              <Route path="/rejoindre" element={<LegacyRedirect />} />
+              <Route path="/crew/rejoindre" element={<LegacyRedirect />} />
               <Route
                 path="/copilot"
                 element={
@@ -167,7 +187,7 @@ export function App() {
                   </Suspense>
                 }
               />
-              <Route path="*" element={<EmptyState title="Page introuvable" body="Ce lien ne mène nulle part." action={<Button href="/v5/">Revenir à Aujourd’hui</Button>} />} />
+              <Route path="*" element={<EmptyState title="Page introuvable" body="Ce lien ne mène nulle part." action={<Button href="/">Revenir à Aujourd’hui</Button>} />} />
             </Routes>
           </div>
         </main>

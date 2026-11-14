@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { currentSession, onSessionChange } from '@mylife/core/web';
+import { AGENDA_EVENT } from '@mylife/lumen';
 import { DEFAULT_PREFS, parsePrefs, type ShellPrefs } from './contract';
 
 /** Ce que la coquille garde sur l'appareil, et les petits crochets pour le lire en direct. */
@@ -48,19 +49,22 @@ export function usePrefs(): ShellPrefs {
 }
 
 /**
- * Se redessine quand ce que les modules déposent sur l'appareil a pu changer : un autre onglet a écrit, on revient
- * sur l'app, une minute est passée (« aujourd'hui » change à minuit).
+ * Se redessine quand ce que les modules déposent sur l'appareil a pu changer : un autre onglet a écrit, l'agenda a été
+ * publié dans cette page (les Sorties, après synchro), on revient sur l'app, une minute est passée (« aujourd'hui »
+ * change à minuit).
  */
 export function useDeviceTick(): number {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const bump = () => setTick((n) => n + 1);
     window.addEventListener('storage', bump);
+    window.addEventListener(AGENDA_EVENT, bump);
     window.addEventListener('focus', bump);
     document.addEventListener('visibilitychange', bump);
     const id = setInterval(bump, 60_000);
     return () => {
       window.removeEventListener('storage', bump);
+      window.removeEventListener(AGENDA_EVENT, bump);
       window.removeEventListener('focus', bump);
       document.removeEventListener('visibilitychange', bump);
       clearInterval(id);

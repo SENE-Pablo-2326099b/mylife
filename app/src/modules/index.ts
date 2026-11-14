@@ -14,7 +14,7 @@ const chef: ModuleManifest = {
   icon: 'chef',
   tone: 'chef',
   status: 'soon',
-  entry: { href: '/v5/modules' },
+  entry: { href: '/modules' },
   cards: [],
   quickAdds: [],
 };

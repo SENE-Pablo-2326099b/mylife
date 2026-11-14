@@ -62,7 +62,7 @@ describe('MyLife, une seule app', () => {
 
   it('premier lancement : bienvenue, puis compte créé en un écran', async () => {
     await page.goto(`${server.url}/`);
-    await page.getByText('Tes finances, ton entraînement et tes sorties').waitFor();
+    await page.getByText(/Tes finances, ton entraînement et tes sorties/).waitFor();
     await shot(page, '01-bienvenue');
     await page.getByRole('button', { name: 'Commencer' }).click();
     await page.getByLabel('Identifiant').fill(LOGIN);
@@ -73,8 +73,8 @@ describe('MyLife, une seule app', () => {
     await page.getByText('Ta clé de secours').waitFor();
     await shot(page, '03-cle');
     await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
-    await page.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    for (const name of ['MyFinances', 'MyPerf', 'MyRave']) await page.getByRole('button', { name: new RegExp(`Ouvrir ${name}`) }).waitFor();
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    for (const name of ['MyFinances', 'MyPerf', 'MyRave']) await page.getByRole('main').getByText(name, { exact: true }).first().waitFor();
     await shot(page, '04-accueil');
   });
 
@@ -161,51 +161,17 @@ describe('MyLife, une seule app', () => {
     expect(json.sessions.map((s) => s.name)).toEqual(expect.arrayContaining(['Lundi – Push', 'Jeudi – Pull', 'Full body A', 'Full body B']));
   });
 
-  it('un thème choisi sur l’accueil habille toutes les apps', async () => {
-    await page.goto(`${server.url}/apparence`);
-    await page.getByRole('radio', { name: /Thème Brut/ }).click();
-    expect(await style(page)).toBe('brut');
-    await shot(page, '08-accueil-brut');
+  it('un thème choisi dans les réglages habille les apps d’avant', async () => {
+    await page.goto(`${server.url}/reglages`);
+    await page.getByRole('button', { name: 'Clair', exact: true }).click();
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('clair');
+    await shot(page, '08-reglages-clair');
     for (const path of ['/raveloc/', '/finances/']) {
       await page.goto(`${server.url}${path}`);
       await page.waitForTimeout(800);
-      expect(await style(page), path).toBe('brut');
+      expect(await page.evaluate(() => document.documentElement.dataset.scheme), path).toBe('light');
     }
-    await shot(page, '09-finances-brut');
-  });
-
-  it('les Espaces de chaque app montrent les apps, l’accueil et le compte', async () => {
-    await page.goto(`${server.url}/raveloc/`);
-    await page.getByRole('button', { name: /Espaces MyLife/ }).click();
-    await page.getByRole('dialog', { name: 'Espaces MyLife' }).getByText(`${LOGIN} · chiffré de bout en bout`).waitFor();
-    // L'app ouverte est marquée, l'accueil et les deux autres apps sont à un toucher.
-    await page.getByRole('button', { name: /Rester dans MyRave/ }).waitFor();
-    await page.getByRole('button', { name: /Ouvrir MyFinances/ }).waitFor();
-    await page.getByRole('button', { name: /Ouvrir MyPerf/ }).waitFor();
-    await page.waitForTimeout(700);
-    await shot(page, '10-espaces-raveloc');
-    await page.getByRole('button', { name: /Ouvrir MyLife/ }).click();
-    await page.waitForURL(`${server.url}/`);
-    // L'aperçu déposé par MyRave est sur l'accueil.
-    await page.getByText('Aucun groupe en cours').waitFor();
-    await shot(page, '11-accueil-apercus');
-  });
-
-  it('la palette de l’accueil mène aux écrans des autres apps', async () => {
-    await page.getByRole('button', { name: /Chercher, aller, agir/ }).click();
-    await page.getByPlaceholder('Chercher, aller, agir…').fill('seance');
-    await page.getByRole('option', { name: /Séance du jour/ }).waitFor();
-    await shot(page, '12-palette');
-    await page.keyboard.press('Escape');
-  });
-
-  it('un écran ouvert directement (palette d’une autre app, lien) masque le dock', async () => {
-    for (const path of ['/installer', '/raveloc/groupes/nouveau']) {
-      await page.goto(`${server.url}${path}`);
-      await page.waitForTimeout(1500);
-      const dock = await page.locator('nav[aria-label="Navigation principale"]').evaluate((n) => getComputedStyle(n).opacity);
-      expect(dock, path).toBe('0');
-    }
+    await shot(page, '09-finances-clair');
   });
 
   it('second appareil : connexion, et le thème suit (synchro chiffrée)', async () => {
@@ -215,8 +181,8 @@ describe('MyLife, une seule app', () => {
     await other.getByLabel('Identifiant').fill(LOGIN);
     await other.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await other.getByRole('button', { name: 'Se connecter' }).click();
-    await other.getByText(`${LOGIN}`).first().waitFor();
-    await expect.poll(() => style(other), { timeout: 20_000, interval: 500 }).toBe('brut');
+    await other.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await expect.poll(() => other.evaluate(() => document.documentElement.dataset.theme), { timeout: 20_000, interval: 500 }).toBe('clair');
     await shot(other, '13-second-appareil');
   });
 
@@ -248,7 +214,7 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: 'Enregistrer la clé' }).click();
     await page.getByRole('button', { name: 'Résume ma semaine.' }).click();
     await page.getByText('Belle semaine : tu es niveau au-dessus de la moyenne.').waitFor({ timeout: 20_000 });
-    await page.getByText('A lu : tes apps').waitFor();
+    await page.getByText('A lu : tes modules').waitFor();
     expect(bodies[0]!.model).toBe('claude-opus-5-5');
     // Le résultat de l'outil (la vue d'ensemble, lue sur l'appareil) part dans la deuxième requête.
     expect(JSON.stringify(bodies[1]!.messages)).toContain('cards');
@@ -264,7 +230,7 @@ describe('MyLife, une seule app', () => {
     const later = new Date(now.getTime() + 2 * 86_400_000);
     const from = new Date(now.getTime() - 10 * 60_000);
     const to = new Date(now.getTime() + 50 * 60_000);
-    await page.goto(`${server.url}/sorties`);
+    await page.goto(`${server.url}/ancien/sorties`);
     await page.getByLabel('Quoi').fill('Festival test');
     await page.getByLabel('Où (facultatif)').fill('Quelque part');
     await page.getByLabel('Du').fill(iso(now));
@@ -283,7 +249,7 @@ describe('MyLife, une seule app', () => {
     await friend.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await friend.getByRole('button', { name: 'Créer mon compte' }).click();
     await friend.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
-    await friend.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await friend.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await friend.goto(link);
     await friend.getByText('Rejoindre « Festival test » ?').waitFor({ timeout: 20_000 });
     await friend.getByLabel('Ton pseudo pour cette sortie').fill('Bravo');
@@ -351,8 +317,8 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Identifiant').fill(LOGIN);
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
-    await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/', '/sorties', '/copilot', '/compte', '/apparence', '/installer', '/donnees', '/confidentialite', '/rejoindre', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -383,7 +349,7 @@ describe('MyLife, une seule app', () => {
     expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
     expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
     await page.goto(`${server.url}/`);
-    await page.getByRole('button', { name: /Ouvrir MyFinances/ }).waitFor();
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await page.goto(`${server.url}/finances/`);
     await shot(page, '14-autre-compte');
     // MyPerf : relié au nouveau compte, sans rien du précédent.
@@ -443,8 +409,7 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Identifiant').fill(LOGIN);
     await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
-    await p.getByText('Ta journée', { exact: true }).waitFor({ timeout: 20_000 });
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await p.getByText('Festival test', { exact: false }).first().waitFor({ timeout: 30_000 });
     await shot(p, '35-ta-journee');
     expect(await p.evaluate(() => Object.keys(localStorage))).toContain('mylife:agenda:home');
@@ -455,12 +420,12 @@ describe('MyLife, une seule app', () => {
     // Sans compte : la page de confidentialité s'ouvre (pas de renvoi vers la bienvenue), liée depuis la bienvenue.
     const [anon, a] = await device();
     await a.goto(`${server.url}/`);
-    await a.getByRole('link', { name: /ce que MyLife garde/ }).click();
+    await a.getByRole('link', { name: /ce que MyLife garde/i }).click();
     await a.getByRole('heading', { name: 'Tes données restent à toi' }).waitFor();
     expect(new URL(a.url()).pathname).toBe('/confidentialite');
     await a.getByText('Mentions légales').waitFor();
     await shot(a, '30-confidentialite');
-    await a.getByRole('button', { name: 'Retour à l’accueil' }).click();
+    await a.getByRole('link', { name: 'Retour à l’accueil' }).click();
     await a.getByRole('button', { name: 'Commencer' }).waitFor();
     await anon.close();
 
@@ -470,9 +435,9 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Identifiant').fill(LOGIN);
     await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     // Compte → « Un problème, une idée ? » : envoyé, avec l'avertissement qu'il n'est pas chiffré.
-    await p.goto(`${server.url}/compte`);
+    await p.goto(`${server.url}/donnees`);
     await p.getByText('Un problème, une idée ?').waitFor();
     await p.getByText(/n’est pas chiffré/).waitFor();
     const send = p.getByRole('button', { name: 'Envoyer' });
@@ -480,18 +445,16 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Ton message').fill('Le bilan devrait montrer les records.');
     await send.click();
     await p.getByText('Message envoyé : merci !').waitFor();
-    // Mes données : l'export de l'accueil est un JSON lisible, sans rien d'un autre compte.
-    await p.getByRole('link', { name: /Mes données/ }).click();
-    await p.getByRole('heading', { name: 'Mes données' }).waitFor();
-    await shot(p, '31-mes-donnees');
+    // Tes données (même écran) : l'export de la coquille est un JSON lisible, sans rien d'un autre compte.
+    await p.getByRole('heading', { name: 'Tes données' }).waitFor();
+    await shot(p, '31-tes-donnees');
     const download = p.waitForEvent('download');
     await p.getByRole('button', { name: 'Exporter' }).click();
     const file = await download;
     expect(file.suggestedFilename()).toMatch(/^mylife-\d{4}-\d{2}-\d{2}\.json$/);
-    const data = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; account: string; appearance: { theme: string } };
-    expect(data.format).toBe('mylife-export');
-    expect(data.account).toBe(LOGIN);
-    expect(typeof data.appearance.theme).toBe('string');
+    const data = JSON.parse(readFileSync((await file.path())!, 'utf8')) as { format: string; account: string; theme: string };
+    expect(data).toMatchObject({ format: 'mylife-export', account: LOGIN });
+    expect(['auto', 'sombre', 'clair']).toContain(data.theme);
     // L'archive des fonctions retirées (V5) : lue dans le compte et déchiffrée sur l'appareil.
     const archived = p.waitForEvent('download');
     await p.getByRole('button', { name: 'Télécharger l’archive' }).click();
@@ -506,20 +469,19 @@ describe('MyLife, une seule app', () => {
   it('coquille V5 (/v5/) : même compte, cartes des modules, module éteint qui disparaît, ajout rapide, thème, 320 px', async () => {
     const [ctx, p] = await device();
     // Sans compte : la coquille renvoie vers la connexion.
-    await p.goto(`${server.url}/v5/`);
-    await p.getByRole('button', { name: 'Commencer' }).waitFor();
     await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'Commencer' }).waitFor();
     await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
     await p.getByLabel('Identifiant').fill(LOGIN);
     await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await p.getByRole('button', { name: 'Se connecter' }).click();
-    await p.getByText(/Bonjour|Bonsoir|Bonne nuit/).first().waitFor();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     // Les apps déposent leur aperçu sur l'appareil : la coquille le lit.
     await p.evaluate(() => {
       localStorage.setItem('mylife:glance:finances', JSON.stringify({ title: '25,35 € à dépenser aujourd’hui', detail: 'Dans le budget', at: Date.now() }));
       localStorage.setItem('mylife:glance:perf', JSON.stringify({ title: 'Jambes', detail: '5 exercices', at: Date.now() }));
     });
-    await p.goto(`${server.url}/v5/`);
+    await p.goto(`${server.url}/`);
     await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await p.getByText('25,35 €', { exact: true }).waitFor();
     await p.getByText('Jambes', { exact: true }).waitFor();
@@ -535,18 +497,18 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('link', { name: 'Modules' }).click();
     await p.getByRole('switch', { name: 'MyPerf : allumé' }).click();
     await shot(p, '42-v5-modules');
-    await p.goto(`${server.url}/v5/`);
+    await p.goto(`${server.url}/`);
     await p.getByText('25,35 €', { exact: true }).waitFor();
     expect(await p.getByText('Jambes', { exact: true }).count()).toBe(0);
     await p.getByRole('button', { name: 'Ajouter' }).click();
     expect(await p.getByRole('dialog', { name: 'Ajouter' }).getByText('Une séance').count()).toBe(0);
     await p.keyboard.press('Escape');
     // Réglages : le thème clair s'applique tout de suite.
-    await p.goto(`${server.url}/v5/reglages`);
+    await p.goto(`${server.url}/reglages`);
     await p.getByRole('button', { name: 'Clair', exact: true }).click();
     expect(await p.evaluate(() => document.documentElement.dataset.theme)).toBe('clair');
     await shot(p, '43-v5-reglages-clair');
-    await p.goto(`${server.url}/v5/kit`);
+    await p.goto(`${server.url}/kit`);
     await p.getByRole('heading', { name: 'Le kit' }).waitFor();
     await shot(p, '44-v5-kit-clair');
     await ctx.close();
@@ -556,8 +518,8 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Identifiant').fill(LOGIN);
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
-    await small.getByText(`${LOGIN}`).first().waitFor();
-    for (const path of ['/v5/', '/v5/modules', '/v5/reglages', '/v5/kit']) {
+    await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    for (const path of ['/', '/modules', '/reglages', '/kit']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(600);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -568,11 +530,11 @@ describe('MyLife, une seule app', () => {
     const [ctx, p] = await device();
     const who = `${LOGIN}-v5`;
     // Sans compte : bienvenue, et la confidentialité reste lisible.
-    await p.goto(`${server.url}/v5/reglages`);
+    await p.goto(`${server.url}/reglages`);
     await p.getByRole('button', { name: 'Commencer' }).waitFor();
-    await p.goto(`${server.url}/v5/confidentialite`);
+    await p.goto(`${server.url}/confidentialite`);
     await p.getByRole('heading', { name: 'Tes données restent à toi' }).waitFor();
-    await p.goto(`${server.url}/v5/bienvenue`);
+    await p.goto(`${server.url}/bienvenue`);
     await shot(p, '50-v5-bienvenue');
     await p.getByRole('button', { name: 'Commencer' }).click();
     await p.getByLabel('Identifiant').fill(who);
@@ -606,7 +568,7 @@ describe('MyLife, une seule app', () => {
     await shot(p, '53-v5-copilot');
     await p.unroute('https://api.anthropic.com/**');
     // Données : export et archive ; support.
-    await p.goto(`${server.url}/v5/donnees`);
+    await p.goto(`${server.url}/donnees`);
     const dl = p.waitForEvent('download');
     await p.getByRole('button', { name: 'Exporter' }).click();
     expect((await dl).suggestedFilename()).toMatch(/^mylife-\d{4}-\d{2}-\d{2}\.json$/);
@@ -619,7 +581,7 @@ describe('MyLife, une seule app', () => {
     await p.getByText('Message envoyé : merci !').waitFor();
     await shot(p, '54-v5-donnees');
     // Compte : déconnexion → bienvenue, et la clé d'IA ne reste pas.
-    await p.goto(`${server.url}/v5/compte`);
+    await p.goto(`${server.url}/compte`);
     await shot(p, '55-v5-compte');
     await p.getByRole('button', { name: 'Se déconnecter' }).click();
     await p.getByRole('button', { name: 'Commencer' }).waitFor();

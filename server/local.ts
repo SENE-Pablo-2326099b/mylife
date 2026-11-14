@@ -126,9 +126,10 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       if (path === `/${app}`) return void res.writeHead(301, { location: `/${app}/` }).end();
       if (path.startsWith(`/${app}/`)) return void file(res, builds[app], path, `${app}/index.html`, app).catch(fail);
     }
-    // La coquille V5, servie à /v5/ dans le même déploiement que l'accueil (web/dist/v5).
-    if (path === '/v5') return void res.writeHead(301, { location: '/v5/' }).end();
-    if (path.startsWith('/v5/')) return void file(res, builds.home, path, 'v5/index.html').catch(fail);
+    // L'ancien accueil, servi à /ancien/ (web/dist/ancien) ; /v5 renvoie vers la coquille, maintenant à la racine.
+    if (path === '/v5' || path.startsWith('/v5/')) return void res.writeHead(302, { location: path.replace(/^\/v5\/?/, '/') }).end();
+    if (path === '/ancien') return void res.writeHead(301, { location: '/ancien/' }).end();
+    if (path.startsWith('/ancien/')) return void file(res, builds.home, path, 'ancien/index.html').catch(fail);
     void file(res, builds.home, path, 'index.html').catch(fail);
   });
   await new Promise<void>((r) => server.listen(opts.port, '127.0.0.1', r));

@@ -10,5 +10,5 @@ export const rave: ModuleManifest = {
   status: 'active',
   entry: { href: '/raveloc/', legacy: true },
   cards: [{ id: 'rave.groupe', title: 'Groupe en cours', Component: GroupCard }],
-  quickAdds: [{ id: 'rave.sortie', label: 'Une sortie', detail: 'MyRave · proposer une date à tes amis', icon: 'flag', href: '/sorties' }],
+  quickAdds: [{ id: 'rave.sortie', label: 'Une sortie', detail: 'MyRave · proposer une date à tes amis', icon: 'flag', href: '/ancien/sorties' }],
 };

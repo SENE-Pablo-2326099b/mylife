@@ -6,9 +6,9 @@ import { currentSession, pendingRecovery, setPendingRecovery, webPlatform } from
 import { useLogin, useSessionTick } from '../store';
 
 /**
- * Le compte MyLife dans la coquille V5 : création en un écran (identifiant, mot de passe, c'est tout), connexion,
+ * Le compte MyLife dans la coquille V5 : création en un écran (identifiant, mot de passe, c’est tout), connexion,
  * récupération par la clé de secours, puis gestion (mot de passe, nouvelle clé, déconnexion, suppression).
- * Toute la logique (chiffrement, API) vient du cœur ; ici, seulement l'écran.
+ * Toute la logique (chiffrement, API) vient du cœur ; ici, seulement l’écran.
  */
 
 const errorText = (e: unknown) => (e instanceof ApiError && e.status === 0 ? 'Pas de réseau : réessaie une fois connecté.' : e instanceof Error ? e.message : String(e));
@@ -76,7 +76,7 @@ export function AccountForms({ initial = 'create', onDone }: { initial?: Mode; o
     setError(null);
     try {
       if (mode === 'create') {
-        // La session n'est ouverte qu'une fois la clé de secours rangée sur l'appareil : l'écran suivant la montre.
+        // La session n’est ouverte qu’une fois la clé de secours rangée sur l’appareil : l’écran suivant la montre.
         const held = { ...webPlatform, sessions: { get: webPlatform.sessions.get, set: async () => undefined } };
         const r = await createAccount(held, { login, password });
         setPendingRecovery({ login: r.session.login, key: r.recoveryKey });
@@ -111,7 +111,7 @@ export function AccountForms({ initial = 'create', onDone }: { initial?: Mode; o
         }}
       >
         <span className="t-card">{titles[mode]}</span>
-        {mode === 'create' && <span className="t-small muted">Un identifiant et un mot de passe. Pas de courriel, pas de code. Tes données sont chiffrées avant de quitter l'appareil.</span>}
+        {mode === 'create' && <span className="t-small muted">Un identifiant et un mot de passe. Pas de courriel, pas de code. Tes données sont chiffrées avant de quitter l’appareil.</span>}
         <Field id="login" label="Identifiant" hint={loginProblem ?? (availability === 'taken' ? 'Déjà pris : essaie une variante.' : loginHint)}>
           <input id="login" value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" autoCapitalize="none" autoCorrect="off" placeholder="Choisis un identifiant" enterKeyHint="next" />
         </Field>
@@ -205,7 +205,7 @@ export function RecoveryKeyPanel({ login, recoveryKey, onDone, first = false }: 
   );
 }
 
-/** Clé pas encore mise de côté : un rappel reste affiché jusqu'à « C'est fait ». */
+/** Clé pas encore mise de côté : un rappel reste affiché jusqu'à « C’est fait ». */
 export function RecoveryReminder() {
   useSessionTick();
   const pending = pendingRecovery();
@@ -366,7 +366,7 @@ export function AccountPage() {
           )}
           {panel === 'recovery' && (
             <Panel title="Nouvelle clé de secours">
-              <span className="t-small muted">L'ancienne ne marchera plus. Tu devras mettre la nouvelle de côté.</span>
+              <span className="t-small muted">L’ancienne ne marchera plus. Tu devras mettre la nouvelle de côté.</span>
               {error && <span className="t-small" style={{ color: 'var(--bad)' }}>{error}</span>}
               <Button
                 variant="action"
@@ -391,7 +391,7 @@ export function AccountPage() {
             onClick={() =>
               void run(async () => {
                 await signOut(webPlatform);
-                location.assign('/v5/bienvenue');
+                location.assign('/bienvenue');
               })
             }
           >
@@ -414,7 +414,7 @@ export function AccountPage() {
                 onClick={() =>
                   void run(async () => {
                     await deleteAccount(webPlatform, session, password);
-                    location.assign('/v5/bienvenue');
+                    location.assign('/bienvenue');
                   })
                 }
               >

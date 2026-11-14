@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge, Button, EmptyState, Field, Glass, IconTile, List, ListRow, ModuleCard, ModuleLabel, ScreenHeader, SectionTitle, Sheet, Switch, type Tone } from '@mylife/kit';
 
-/** La page « kit » : tous les composants, dans leurs états. C'est la référence qui garde MyLife cohérent. */
+/** La page « kit » : tous les composants, dans leurs états. C’est la référence qui garde MyLife cohérent. */
 const TONES: { tone: Tone; name: string; icon: 'card' | 'barbell' | 'navigate' | 'chef' }[] = [
   { tone: 'finances', name: 'MyFinances', icon: 'card' },
   { tone: 'perf', name: 'MyPerf', icon: 'barbell' },
@@ -51,9 +51,9 @@ export function KitPage() {
       <SectionTitle>Texte</SectionTitle>
       <Glass className="pad stack">
         <span className="t-hero">25,35 €</span>
-        <span className="t-screen">Titre d'écran</span>
+        <span className="t-screen">Titre d’écran</span>
         <span className="t-card">Titre de carte</span>
-        <span className="t-body">Texte courant, pour ce qu'on lit vraiment.</span>
+        <span className="t-body">Texte courant, pour ce qu’on lit vraiment.</span>
         <span className="t-small muted">Texte second : précisions, dates, unités.</span>
       </Glass>
 
@@ -68,12 +68,12 @@ export function KitPage() {
 
       <SectionTitle>Saisie</SectionTitle>
       <Glass className="pad stack">
-        <Field id="kit-montant" label="Montant" hint="Un champ est creusé dans le verre ; l'aide est toujours dessous.">
+        <Field id="kit-montant" label="Montant" hint="Un champ est creusé dans le verre ; l’aide est toujours dessous.">
           <input id="kit-montant" defaultValue="12,50" inputMode="decimal" />
         </Field>
         <div className="row">
           <span className="grow t-body">Un interrupteur</span>
-          <Switch checked={on} onChange={setOn} label="Interrupteur d'exemple" />
+          <Switch checked={on} onChange={setOn} label="Interrupteur d’exemple" />
         </div>
       </Glass>
 
@@ -84,7 +84,7 @@ export function KitPage() {
       </List>
 
       <SectionTitle>Écran vide : toujours une explication et une action</SectionTitle>
-      <EmptyState title="Aucune séance prévue" body="Importe ton programme ou choisis-en un prêt à l'emploi." action={<Button>Choisir un programme</Button>} />
+      <EmptyState title="Aucune séance prévue" body="Importe ton programme ou choisis-en un prêt à l’emploi." action={<Button>Choisir un programme</Button>} />
 
       <SectionTitle>Feuille</SectionTitle>
       <Button onClick={() => setSheet(true)}>Ouvrir une feuille</Button>

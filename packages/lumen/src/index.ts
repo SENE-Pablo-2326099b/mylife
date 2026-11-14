@@ -390,9 +390,10 @@ export interface MyLifeDestination {
 }
 
 export const MYLIFE_DESTINATIONS: readonly MyLifeDestination[] = [
-  { app: 'home', title: 'Accueil MyLife', path: '/', keywords: 'accueil apps toutes maison' },
+  { app: 'home', title: 'Aujourd’hui', path: '/', keywords: 'accueil aujourd hui apps modules maison' },
+  { app: 'home', title: 'Modules', path: '/modules', keywords: 'modules apps allumer eteindre catalogue' },
   { app: 'home', title: 'Compte MyLife', path: '/compte', keywords: 'compte connexion mot de passe cle secours synchro deconnexion supprimer' },
-  { app: 'home', title: 'Apparence', path: '/apparence', keywords: 'theme couleurs sombre clair identite circuit ardoise argile brut' },
+  { app: 'home', title: 'Réglages', path: '/reglages', keywords: 'reglages apparence theme sombre clair compte donnees' },
   { app: 'home', title: 'Installer MyLife', path: '/installer', keywords: 'installer telephone ecran accueil application pwa' },
   { app: 'home', title: 'Copilot', path: '/copilot', keywords: 'copilot ia assistant question claude conseil budget entrainement' },
   { app: 'home', title: 'Sorties', path: '/sorties', keywords: 'sortie festival soiree week end chaud planning sets budget partage depenses liste id' },

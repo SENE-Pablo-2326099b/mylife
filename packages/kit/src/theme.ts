@@ -1,6 +1,6 @@
 /**
- * Le thème de MyLife V5 : sombre (verre fumé), clair (verre givré), ou comme le téléphone. Le choix reste sur
- * l'appareil. Sur un appareil lent ou qui demande moins de transparence, le flou est coupé (`.no-blur`).
+ * Le thème de MyLife V5 : sombre (verre fumé), clair (verre givré), ou comme le téléphone. Le choix est gardé sur
+ * l'appareil ; la coquille le relie à l'apparence commune synchronisée entre appareils (`app/src/appearance.ts`). Sur un appareil lent ou qui demande moins de transparence, le flou est coupé (`.no-blur`).
  */
 export type ThemeChoice = 'auto' | 'sombre' | 'clair';
 export const THEME_CHOICES: readonly { id: ThemeChoice; label: string }[] = [

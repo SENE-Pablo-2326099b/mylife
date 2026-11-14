@@ -5,7 +5,7 @@ import { enabledModules, type TodoItem } from '../contract';
 import { MODULES } from '../modules';
 import { useDeviceTick, useLogin, usePrefs } from '../store';
 
-/** « Aujourd'hui » : ce qui compte maintenant, fait des cartes des modules allumés. Tout est lu sur l'appareil. */
+/** « Aujourd’hui » : ce qui compte maintenant, fait des cartes des modules allumés. Tout est lu sur l’appareil. */
 
 const longDay = (d: Date) => new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(d);
 const dayName = (iso: string) => new Intl.DateTimeFormat('fr-FR', { weekday: 'long' }).format(new Date(`${iso}T12:00:00`));
@@ -104,7 +104,7 @@ export function TodayPage() {
           )}
         </div>
       ) : (
-        <EmptyState title="Aucun module allumé" body="Leurs cartes apparaîtront ici." action={<Button href="/v5/modules">Choisir mes modules</Button>} />
+        <EmptyState title="Aucun module allumé" body="Leurs cartes apparaîtront ici." action={<Button href="/modules">Choisir mes modules</Button>} />
       )}
       <Week />
     </>

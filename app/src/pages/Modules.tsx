@@ -4,7 +4,7 @@ import { MODULES } from '../modules';
 import { usePrefs, writePrefs } from '../store';
 
 /**
- * Le catalogue : une grande tuile par module, à sa couleur quand il est allumé, éteinte sinon. L'interrupteur allume ou
+ * Le catalogue : une grande tuile par module, à sa couleur quand il est allumé, éteinte sinon. L’interrupteur allume ou
  * éteint ; la flèche ouvre le module. Un module « bientôt » est là, en retrait, sans interrupteur.
  */
 function Tile({ m, on, onToggle }: { m: ModuleManifest; on: boolean; onToggle?: (next: boolean) => void }) {

@@ -9,8 +9,8 @@ import { loadSpaces, useSpaces } from '@legacy/spaces';
 
 /**
  * Copilot : une seule IA pour tous tes modules, avec ta clé, depuis ton appareil. Elle lit tes résumés et propose ;
- * ses actions s'affichent en cartes que tu valides, exécutées ensuite par le module concerné. La logique (outils,
- * boucle, actions) est partagée avec l'ancien accueil (`@legacy/copilot`) jusqu'à ce qu'il disparaisse.
+ * ses actions s’affichent en cartes que tu valides, exécutées ensuite par le module concerné. La logique (outils,
+ * boucle, actions) est partagée avec l’ancien accueil (`@legacy/copilot`) jusqu'à ce qu’il disparaisse.
  */
 const HISTORY_KEY = 'mylife:copilot:history';
 const PROPOSALS_KEY = 'mylife:copilot:proposals';
@@ -43,7 +43,7 @@ const writeJson = (key: string, value: unknown) => {
 const loadProposals = (): Proposal[] => readJson<Proposal[]>(PROPOSALS_KEY, []).filter((p) => p && typeof p.id === 'string' && p.action && ACTION_APP[p.action.kind]);
 const loadHistory = (): Msg[] => readJson<Msg[]>(HISTORY_KEY, []);
 function saveHistory(m: Msg[]) {
-  // Les 40 derniers messages, en commençant par un message de l'utilisateur qui ne soit pas un résultat d'outil.
+  // Les 40 derniers messages, en commençant par un message de l’utilisateur qui ne soit pas un résultat d’outil.
   let start = Math.max(0, m.length - 40);
   while (start < m.length && !(m[start]!.role === 'user' && typeof m[start]!.content !== 'string' && (m[start]!.content as { type: string }[])[0]?.type === 'text')) start++;
   writeJson(HISTORY_KEY, m.slice(start));
@@ -73,7 +73,7 @@ function bubbles(messages: Msg[]): { role: 'user' | 'assistant'; text: string }[
   return out;
 }
 
-/** Une action proposée : la valider ou la refuser ; ensuite son état en direct (le module l'exécute). */
+/** Une action proposée : la valider ou la refuser ; ensuite son état en direct (le module l’exécute). */
 function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) => void }) {
   const app = ACTION_APP[p.action.kind];
   const queued = readActions().find((a) => a.id === p.id);
@@ -85,7 +85,7 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
         <span className="t-strong">{p.action.summary}</span>
         {p.state === 'proposed' && (
           <>
-            <span className="t-small muted">Rien n'est fait sans ta validation. C'est {ACTION_APP_NAME[app]} qui l'exécutera.</span>
+            <span className="t-small muted">Rien n’est fait sans ta validation. C’est {ACTION_APP_NAME[app]} qui l’exécutera.</span>
             <div className="grid-2">
               <Button
                 variant="action"
@@ -103,13 +103,13 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
         {p.state === 'validated' &&
           (!queued || queued.status === 'pending' ? (
             <>
-              <span className="t-small muted">Validée : {ACTION_APP_NAME[app]} l'applique dès son ouverture.</span>
+              <span className="t-small muted">Validée : {ACTION_APP_NAME[app]} l’applique dès son ouverture.</span>
               <Button href={APP_PATH[app]}>Ouvrir {ACTION_APP_NAME[app]}</Button>
             </>
           ) : queued.status === 'failed' ? (
             <span className="t-small" style={{ color: 'var(--bad)' }}>Pas faite : {queued.error}</span>
           ) : p.undone ? (
-            <span className="t-small muted">{undo?.status === 'done' ? 'Annulée.' : undo?.status === 'failed' ? `Annulation impossible : ${undo.error}` : `Annulation validée : ${ACTION_APP_NAME[app]} l'applique dès son ouverture.`}</span>
+            <span className="t-small muted">{undo?.status === 'done' ? 'Annulée.' : undo?.status === 'failed' ? `Annulation impossible : ${undo.error}` : `Annulation validée : ${ACTION_APP_NAME[app]} l’applique dès son ouverture.`}</span>
           ) : (
             <div className="row">
               <span className="grow t-small c-ok">Fait par {ACTION_APP_NAME[app]}.</span>
@@ -137,7 +137,7 @@ function KeyCard({ onSaved }: { onSaved: () => void }) {
     <ModuleCard tone="neutral">
       <div className="pad stack">
         <span className="t-card">Ta clé API Anthropic</span>
-        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l'assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu'à Anthropic.</span>
+        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l’assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu'à Anthropic.</span>
         <Field id="api-key" label="Clé API" hint="Une clé se crée sur console.anthropic.com (API Keys). Chaque question est facturée sur ton compte Anthropic.">
           <input id="api-key" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" />
         </Field>
@@ -231,7 +231,7 @@ export function CopilotPage() {
         <ModuleCard tone="neutral">
           <div className="pad stack">
             <span className="t-card">Pose une question sur ta vie</span>
-            <span className="t-small muted">Copilot lit ton budget, tes séances, ton agenda et tes sorties pour te répondre. Il peut préparer une action (sauter un récurrent, décaler une séance) : rien n'est fait sans ta validation.</span>
+            <span className="t-small muted">Copilot lit ton budget, tes séances, ton agenda et tes sorties pour te répondre. Il peut préparer une action (sauter un récurrent, décaler une séance) : rien n’est fait sans ta validation.</span>
             <div className="stack" style={{ gap: 8 }}>
               {SUGGESTIONS.map((s) => (
                 <button key={s} type="button" className="btn btn-secondary" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => void ask(s)}>
@@ -281,7 +281,7 @@ export function CopilotPage() {
           }}
         >
           <Field id="question" label="Ta question">
-            <input id="question" value={text} onChange={(e) => setText(e.target.value)} placeholder="Je peux me payer… ? Comment s'est passée ma semaine ?" enterKeyHint="send" />
+            <input id="question" value={text} onChange={(e) => setText(e.target.value)} placeholder="Je peux me payer… ? Comment s’est passée ma semaine ?" enterKeyHint="send" />
           </Field>
           <button type="submit" className="btn btn-action btn-block" disabled={busy || !text.trim()}>
             {busy ? 'Réflexion…' : 'Demander'}
@@ -312,7 +312,7 @@ export function CopilotPage() {
             >
               Retirer la clé de cet appareil
             </Button>
-            <span className="t-small muted">La conversation reste sur cet appareil. Les questions et les résumés lus partent vers l'API Claude d'Anthropic, avec ta clé.</span>
+            <span className="t-small muted">La conversation reste sur cet appareil. Les questions et les résumés lus partent vers l’API Claude d’Anthropic, avec ta clé.</span>
           </div>
         </details>
       )}
