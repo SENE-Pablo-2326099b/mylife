@@ -595,6 +595,62 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
+  it('MyFinances V5 : les données de l’ancienne app relues dans le nouveau modèle (comptes, natures, marchands, prévu)', async () => {
+    const [ctx, p] = await device();
+    await p.goto(`${server.url}/`);
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(LOGIN);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    // Sans ancienne base sur l'appareil : rien à reprendre, et c'est dit.
+    await p.goto(`${server.url}/argent`);
+    await p.getByText('Rien à reprendre ici').waitFor();
+    // Une ancienne base (fictive) : deux comptes, quatre opérations, un revenu et une charge prévus.
+    const today = await p.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    await p.evaluate(
+      (date) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open('myfinances', 30);
+          open.onupgradeneeded = () => ['transactions', 'accounts', 'categories', 'settings'].forEach((t) => open.result.createObjectStore(t, { keyPath: 'id' }));
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['transactions', 'accounts', 'categories', 'settings'], 'readwrite');
+            const put = (store: string, row: unknown) => tx.objectStore(store).put(row);
+            put('accounts', { id: 'acc', name: 'Compte courant', bank: 'Banque', balance: 120000, kind: 'current' });
+            put('accounts', { id: 'liv', name: 'Livret', bank: 'Banque', balance: 300000, kind: 'savings' });
+            put('categories', { id: 'courses', name: 'Courses', kind: 'variable', order: 0 });
+            put('categories', { id: 'revenus', name: 'Revenus', kind: 'income', order: 1 });
+            put('categories', { id: 'transferts', name: 'Transferts internes', kind: 'excluded', order: 2 });
+            put('transactions', { id: 't1', accountId: 'acc', date, amount: -1250, label: 'CB EPICERIE DU COIN 1234', categoryId: 'courses' });
+            put('transactions', { id: 't2', accountId: 'acc', date, amount: -3000, label: 'BOULANGERIE DES HALLES', categoryId: null });
+            put('transactions', { id: 't3', accountId: 'acc', date, amount: -10000, label: 'VIR VERS LIVRET', categoryId: 'transferts' });
+            put('transactions', { id: 't4', accountId: 'acc', date, amount: 200000, label: 'VIR EMPLOYEUR', categoryId: 'revenus' });
+            put('settings', { id: 'main', payday: 1, incomes: [{ id: 'i', label: 'Salaire', amount: 200000, day: 1 }], fixedCharges: [{ id: 'c', label: 'Loyer', amount: 70000, day: 3 }] });
+            tx.oncomplete = () => (open.result.close(), resolve());
+            tx.onerror = () => reject(tx.error);
+          };
+        }),
+      today,
+    );
+    await p.reload();
+    await p.getByText('Mouvements : 4').waitFor();
+    await p.getByText('Patrimoine : 4 200 € net').waitFor();
+    // Reste à vivre : 2 000 − 700 ; dépensé aujourd'hui : 12,50 + 30,00 (à classer, compté) ; le virement et le salaire n'y entrent pas.
+    await p.getByText(/42,50\s€ dépensés sur 1\s300\s€/).waitFor();
+    await p.getByText('À classer : 1 marchand, 1 mouvement').waitFor();
+    await p.getByText('Boulangerie Des Halles').waitFor();
+    await shot(p, '60-finances-v5-reprise');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // Rejouable : même résultat.
+    await p.getByRole('button', { name: 'Reprendre à nouveau' }).click();
+    await p.getByText('Mouvements : 4').waitFor();
+    await ctx.close();
+  });
+
   it('aucune erreur JavaScript', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });

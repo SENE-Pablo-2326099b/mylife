@@ -25,6 +25,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.131.0",
     "@vercel/functions": "3.9.11",
+    "dexie": "^4.4.7",
+    "dexie-react-hooks": "^1.1.7",
     "pg": "8.23.1",
     "web-push": "^3.6.7"
   },

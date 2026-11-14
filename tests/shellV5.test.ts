@@ -42,10 +42,19 @@ describe('isolation des modules', () => {
     const dir = 'app/src/modules';
     const folders = readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     expect(folders.sort()).toEqual(['finances', 'perf', 'rave']);
+    // Tous les fichiers du module, sous-dossiers compris.
+    const files = (d: string): string[] => readdirSync(new URL(`../${d}`, import.meta.url), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(`${d}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${d}/${e.name}`] : []));
+    const PACKAGES = /^(react|react-router-dom|dexie|dexie-react-hooks|@mylife\/(kit|lumen|core\/.+))$/;
+    const SHARED = ['app/src/contract', 'app/src/legacy/glance'];
     for (const folder of folders)
-      for (const f of readdirSync(new URL(`../${dir}/${folder}`, import.meta.url))) {
-        const imports = [...read(`${dir}/${folder}/${f}`).matchAll(/from '([^']+)'/g)].map((m) => m[1]!);
-        for (const i of imports) expect(/^(react|react-router-dom|@mylife\/(kit|lumen|core\/.+)|\.\/.+|\.\.\/\.\.\/(contract|legacy\/glance))$/.test(i), `${folder}/${f} importe ${i}`).toBe(true);
+      for (const f of files(`${dir}/${folder}`)) {
+        const imports = [...read(f).matchAll(/from '([^']+)'/g)].map((m) => m[1]!);
+        for (const i of imports) {
+          // Un chemin relatif doit rester dans le dossier du module, ou viser le contrat ou la passerelle.
+          const target = i.startsWith('.') ? new URL(i, `file:///${f}`).pathname.slice(1) : null;
+          const ok = target ? target.startsWith(`${dir}/${folder}/`) || SHARED.includes(target) : PACKAGES.test(i);
+          expect(ok, `${f} importe ${i}`).toBe(true);
+        }
       }
   });
 });

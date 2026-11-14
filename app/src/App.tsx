@@ -21,6 +21,9 @@ import { useHomeAgenda } from '@legacy/agendaHome';
  */
 
 // Copilot embarque le SDK de l'API Claude : chargé seulement quand on l'ouvre.
+// MyFinances V5 embarque sa base locale : chargé seulement quand on l'ouvre. `/argent` est son adresse provisoire, le
+// temps que l'ancienne app garde `/finances/` (bascule à l'étape 3.7).
+const FinancesReprise = lazy(() => import('./modules/finances/pages/Reprise').then((m) => ({ default: m.ReprisePage })));
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -180,6 +183,14 @@ function Shell({ login }: { login: string }) {
               <Route path="/confidentialite" element={<PrivacyPage />} />
               <Route path="/installer" element={<InstallPage />} />
               <Route path="/kit" element={<KitPage />} />
+              <Route
+                path="/argent"
+                element={
+                  <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
+                    <FinancesReprise />
+                  </Suspense>
+                }
+              />
               <Route path="/apparence" element={<Navigate to="/reglages" replace />} />
               <Route path="/*" element={<Navigate to="/" replace />} />
               <Route path="/sorties/*" element={<LegacyRedirect />} />

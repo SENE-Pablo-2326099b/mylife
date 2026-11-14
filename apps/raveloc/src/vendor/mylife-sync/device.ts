@@ -34,7 +34,11 @@ export function claimDevice(login: string): void {
     const keys = Array.from({ length: ls.length }, (_, i) => ls.key(i)).filter((k): k is string => k !== null);
     for (const k of keys) if (PERSONAL_PREFIXES.some((p) => k.startsWith(p))) ls.removeItem(k);
     // Rappels écrits par l'appareil (plan lu par le service worker) : ceux du compte précédent disparaissent.
-    if (typeof indexedDB !== 'undefined') indexedDB.deleteDatabase('mylife-reminders');
+    if (typeof indexedDB !== 'undefined') {
+      indexedDB.deleteDatabase('mylife-reminders');
+      // MyFinances V5 (app/src/modules/finances/data/db.ts) : les comptes et mouvements du compte précédent aussi.
+      indexedDB.deleteDatabase('mylife-finances');
+    }
     ls.setItem(DEVICE_OWNER_KEY, login);
   } catch {
     /* stockage indisponible : rien à effacer */
