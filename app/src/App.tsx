@@ -28,6 +28,8 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/modules', label: 'Modules', icon: 'modules' },
 ];
 const COPILOT = '/copilot';
+/** Pages à cartes, sur toute la largeur ; les autres (lecture, formulaires) gardent une colonne lisible. */
+const WIDE = ['/', '/modules', '/kit'];
 /** Lisibles sans compte. */
 const PUBLIC = ['/bienvenue', '/confidentialite'];
 /** Anciennes adresses de l'accueil : les Sorties vivent encore dans l'ancien accueil (`/ancien/`) jusqu'à la phase 5. */
@@ -67,7 +69,10 @@ function Sidebar({ onAdd }: { onAdd: () => void }) {
   const prefs = usePrefs();
   return (
     <nav className="glass sidebar" aria-label="Navigation principale">
-      <span className="t-card" style={{ padding: '0 14px', fontWeight: 800, fontSize: 22 }}>MyLife</span>
+      <span className="auth-brand">
+        <img src="/favicon.svg" alt="" />
+        <span>MyLife</span>
+      </span>
       <button type="button" className="btn btn-action btn-block" onClick={onAdd}>
         <Icon name="plus" size={18} strong />
         Ajouter
@@ -164,7 +169,7 @@ function Shell({ login }: { login: string }) {
       <div className="shell">
         <Sidebar onAdd={() => setAdding(true)} />
         <main className="shell-main" id="contenu">
-          <div className="shell-content">
+          <div className={`shell-content${WIDE.includes(pathname) ? '' : ' is-narrow'}`}>
             <RecoveryReminder />
             <Routes>
               <Route path="/" element={<TodayPage />} />

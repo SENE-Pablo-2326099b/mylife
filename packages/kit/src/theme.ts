@@ -4,7 +4,7 @@
  */
 export type ThemeChoice = 'auto' | 'sombre' | 'clair';
 export const THEME_CHOICES: readonly { id: ThemeChoice; label: string }[] = [
-  { id: 'auto', label: 'Comme le téléphone' },
+  { id: 'auto', label: 'Auto' },
   { id: 'sombre', label: 'Sombre' },
   { id: 'clair', label: 'Clair' },
 ];

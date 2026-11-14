@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Icon, List, ListRow, ScreenHeader, SectionTitle, Segmented, THEME_CHOICES, readThemeChoice, setThemeChoice, type IconName, type ThemeChoice } from '@mylife/kit';
 import { shareTheme } from '../appearance';
 import { useLogin } from '../store';
@@ -39,10 +38,13 @@ export function SettingsPage() {
           ))}
         </List>
       </section>
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <a href="/" className="btn btn-quiet">Ancien accueil</a>
-        <Link to="/kit" className="btn btn-quiet">Le kit</Link>
-      </div>
+      <section className="stack" style={{ gap: 8 }}>
+        <SectionTitle>Plus</SectionTitle>
+        <List>
+          <ListRow href="/ancien/" lead={<Icon name="flag" size={20} />} title="Ancien accueil" detail="Les Sorties, en attendant MyRave" />
+          <ListRow href="/kit" lead={<Icon name="modules" size={20} />} title="Le kit" detail="Les briques de l’interface" />
+        </List>
+      </section>
     </>
   );
 }

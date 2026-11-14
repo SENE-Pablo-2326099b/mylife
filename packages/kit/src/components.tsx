@@ -77,6 +77,16 @@ export function IconTile({ tone, icon, soft }: { tone: Tone; icon: IconName; sof
   );
 }
 
+/** Panneau de verre avec son titre : le bloc ordinaire des pages (réglages, données, compte…). */
+export function Panel({ title, children, as = 'section' }: { title: ReactNode; children: ReactNode; as?: 'div' | 'section' }) {
+  return (
+    <Glass as={as} className="pad stack">
+      <h2 className="panel-title">{title}</h2>
+      {children}
+    </Glass>
+  );
+}
+
 export function List({ children }: { children: ReactNode }) {
   return <Glass className="list">{children}</Glass>;
 }

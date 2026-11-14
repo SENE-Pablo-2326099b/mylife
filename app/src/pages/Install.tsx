@@ -1,4 +1,4 @@
-import { Button, EmptyState, Glass, ScreenHeader } from '@mylife/kit';
+import { Button, EmptyState, Panel, ScreenHeader } from '@mylife/kit';
 import { promptInstall, useInstallState, type InstallState } from '../install';
 
 /**
@@ -20,22 +20,20 @@ export function InstallPage() {
       {state === 'installed' ? (
         <EmptyState title="MyLife est installée" body="Tu l’ouvres depuis son icône, et elle marche même sans réseau." />
       ) : state === 'prompt' ? (
-        <Glass className="pad stack">
-          <span className="t-strong">Installe MyLife sur cet appareil</span>
+        <Panel title="Installe MyLife sur cet appareil">
           <span className="t-small muted">Une icône sur l’écran d’accueil, plein écran, et l’app s’ouvre même hors ligne.</span>
           <Button variant="action" block onClick={() => void promptInstall()}>
             Installer
           </Button>
-        </Glass>
+        </Panel>
       ) : (
-        <Glass className="pad stack">
-          <span className="t-strong">Comment faire</span>
+        <Panel title="Comment faire">
           <ol className="t-body muted" style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
             {HOW[state].map((s) => (
               <li key={s}>{s}</li>
             ))}
           </ol>
-        </Glass>
+        </Panel>
       )}
     </>
   );

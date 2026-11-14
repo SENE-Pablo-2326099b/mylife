@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Field, Glass, Icon, List, ListRow, ModuleCard, Notice, ScreenHeader, SectionTitle, type IconName } from '@mylife/kit';
+import { Button, Field, Icon, List, ListRow, ModuleCard, Notice, Panel, ScreenHeader, SectionTitle, type IconName } from '@mylife/kit';
 import { currentSession, webPlatform } from '@mylife/core/web';
 import { readThemeChoice } from '@mylife/kit';
 import { buildRetiredArchive } from '../archive';
@@ -52,8 +52,7 @@ export function SupportCard() {
     }
   };
   return (
-    <Glass className="pad stack">
-      <span className="t-strong">Un problème, une idée ?</span>
+    <Panel title="Un problème, une idée ?">
       <Field id="support-kind" label="C’est…">
         <select id="support-kind" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)}>
           {KINDS.map((k) => (
@@ -70,7 +69,7 @@ export function SupportCard() {
       <Button disabled={busy || message.trim().length < 3} onClick={() => void send()}>
         {busy ? 'Envoi…' : 'Envoyer'}
       </Button>
-    </Glass>
+    </Panel>
   );
 }
 
@@ -113,18 +112,16 @@ export function DataPage() {
           <ListRow key={l.href} href={l.href} lead={<Icon name={l.icon} size={20} />} title={l.title} detail={l.detail} />
         ))}
       </List>
-      <Glass className="pad stack">
-        <span className="t-strong">Les fonctions retirées</span>
+      <Panel title="Les fonctions retirées">
         <span className="t-small muted">Personnage, bilans, Crew, MyMusique, MyGames, Mes apps, MyObjectifs, MyAgenda, MyFoyer et MyChef ne sont plus dans MyLife. Leurs données restent dans ton compte encore un temps, puis seront effacées : emporte-les ici, lues et déchiffrées sur ton appareil.</span>
         <Button disabled={archiving} onClick={() => void exportRetired()}>
           {archiving ? 'Lecture du compte…' : "Télécharger l’archive"}
         </Button>
-      </Glass>
-      <Glass className="pad stack">
-        <span className="t-strong">Tout effacer</span>
+      </Panel>
+      <Panel title="Tout effacer">
         <span className="t-small muted">Compte → « Supprimer mon compte » : tout ce que le serveur garde est effacé, pour toutes les apps, tout de suite.</span>
         <Button href="/compte">Aller au compte</Button>
-      </Glass>
+      </Panel>
       <SupportCard />
       <a href="/confidentialite" className="link link-quiet t-small" style={{ alignSelf: 'center', padding: '8px 0' }}>
         Ce que MyLife garde, et pourquoi

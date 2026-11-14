@@ -61,6 +61,8 @@
   --action-shadow: 0 0 22px rgba(90, 140, 255, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --action-border: rgba(255, 255, 255, 0.5);
   --tab-on: #ffffff;
+  /* Bord d'un bouton secondaire : visible sur le verre, dans les deux thèmes. */
+  --control-border: rgba(255, 255, 255, 0.16);
 }
 
 :root[data-theme='clair'] {
@@ -107,6 +109,7 @@
   --action-shadow: 0 10px 22px rgba(90, 110, 240, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   --action-border: rgba(255, 255, 255, 0.7);
   --tab-on: #4a2fc4;
+  --control-border: rgba(16, 19, 38, 0.13);
 }
 
 /* ---------------------------------------------------------------- la couleur d'un module */
@@ -121,7 +124,7 @@
 :root[data-theme='clair'] .tone-perf { --edge: #f0601c; --edge-2: rgba(255, 110, 50, 0.5); --tint: rgba(255, 130, 70, 0.26); --glow: rgba(255, 110, 50, 0.42); --tone: #a83608; --tone-solid: #f0601c; }
 :root[data-theme='clair'] .tone-rave { --edge: #1da6cc; --edge-2: rgba(34, 200, 240, 0.5); --tint: rgba(34, 200, 240, 0.24); --glow: rgba(34, 180, 220, 0.42); --tone: #0a5f77; --tone-solid: #1da6cc; }
 :root[data-theme='clair'] .tone-chef { --edge: #2fb36a; --edge-2: rgba(47, 179, 106, 0.5); --tint: rgba(60, 200, 120, 0.22); --glow: rgba(47, 179, 106, 0.4); --tone: #146b41; --tone-solid: #2fb36a; }
-:root[data-theme='clair'] .tone-neutral { --edge: #101326; --edge-2: rgba(16, 19, 38, 0.3); --tint: rgba(16, 19, 38, 0.05); --glow: rgba(70, 80, 140, 0.25); }
+:root[data-theme='clair'] .tone-neutral { --edge: rgba(16, 19, 38, 0.32); --edge-2: rgba(16, 19, 38, 0.12); --tint: rgba(16, 19, 38, 0.05); --glow: rgba(70, 80, 140, 0.25); }
 
 /* ---------------------------------------------------------------- base */
 
@@ -165,6 +168,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .t-strong { font-size: 15px; font-weight: 600; }
 .t-small { font-size: 13px; line-height: 18px; }
 .t-label { font-size: 12px; font-weight: 600; margin: 0; }
+/* Titre d'un panneau de verre (le titre de carte, plus grand, reste aux cartes de module). */
+.panel-title { font-family: var(--font-display); letter-spacing: -0.02em; font-weight: 700; font-size: 18px; line-height: 23px; margin: 0; }
 .muted { color: var(--ink-2); }
 .c-ok { color: var(--ok); }
 .c-tone { color: var(--tone); }
@@ -246,7 +251,7 @@ input, select, textarea { font: inherit; color: inherit; }
   .btn-secondary:not(:disabled):hover { border-color: var(--field-border-hover); }
 }
 .btn-action { background: var(--action); color: #fff; border-color: var(--action-border); box-shadow: var(--action-shadow); }
-.btn-secondary { background: var(--glass); border-color: var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-hi); font-weight: 600; }
+.btn-secondary { background: var(--glass); border-color: var(--control-border); box-shadow: inset 0 1px 0 var(--glass-hi); font-weight: 600; }
 .btn-quiet { background: transparent; color: var(--tone, var(--ink)); font-weight: 600; padding: 0 10px; min-height: 40px; }
 .btn-danger { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad); font-weight: 600; }
 .btn-block { display: flex; width: 100%; }
@@ -332,6 +337,8 @@ button.list-row { width: 100%; background: none; border: 0; text-align: left; pa
 .auth-top { display: flex; align-items: center; gap: 14px; min-height: 44px; }
 .auth-brand { display: flex; align-items: center; gap: 12px; }
 .auth-brand img { width: 44px; height: 44px; border-radius: 12px; box-shadow: 0 10px 26px -8px rgba(124, 92, 255, 0.7); }
+.sidebar .auth-brand { padding: 0 10px; }
+.sidebar .auth-brand img { width: 36px; height: 36px; border-radius: 10px; }
 .auth-brand span { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: -0.03em; }
 .auth-card { padding: 24px 20px 20px; border-radius: var(--r-card); display: flex; flex-direction: column; gap: 16px; }
 .auth-title { font-family: var(--font-display); letter-spacing: -0.03em; font-weight: 800; font-size: 26px; line-height: 31px; margin: 0; }
@@ -351,7 +358,7 @@ button.list-row { width: 100%; background: none; border: 0; text-align: left; pa
 .switch[aria-checked='true']::after { transform: translateX(20px); background: #fff; }
 
 .segmented { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; border-radius: 16px; }
-.segmented > button { min-height: 40px; border: 0; border-radius: 12px; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.segmented > button { white-space: nowrap; padding: 0 10px; min-height: 40px; border: 0; border-radius: 12px; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .segmented > button[aria-pressed='true'] { background: var(--tile); color: var(--ink); box-shadow: inset 0 1px 0 var(--card-hi), 0 0 0 1px var(--tile-border); }
 
 /* Feuille : par-dessus tout. */
@@ -382,6 +389,8 @@ button.list-row { width: 100%; background: none; border: 0; text-align: left; pa
 .shell { min-height: 100dvh; display: flex; }
 .shell-main { flex: 1; min-width: 0; padding: calc(var(--safe-top) + 26px) var(--pad) calc(var(--safe-bottom) + 108px); }
 .shell-content { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 13px; }
+/* Pages de lecture et de formulaires : une colonne lisible sur ordinateur. */
+.shell-content.is-narrow { max-width: 680px; }
 
 .tabbar {
   position: fixed; left: 12px; right: 12px; bottom: calc(var(--safe-bottom) + 14px); z-index: 30;

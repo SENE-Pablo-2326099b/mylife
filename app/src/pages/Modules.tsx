@@ -12,20 +12,20 @@ function Tile({ m, on, onToggle }: { m: ModuleManifest; on: boolean; onToggle?: 
     <div className="pad stack" style={{ gap: 14, minHeight: 150 }}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <IconTile tone={m.tone} icon={m.icon} soft={!on} />
-        <span className="row" style={{ gap: 8 }}>
-          {on && (
-            <a href={m.entry.href} aria-label={`Ouvrir ${m.name}`} className="tile row" style={{ width: 36, height: 36, borderRadius: 999, justifyContent: 'center' }}>
-              <Icon name="chevron" size={18} />
-            </a>
-          )}
-          {onToggle ? <Switch checked={on} onChange={onToggle} label={`${m.name} : ${on ? 'allumé' : 'éteint'}`} /> : <span className="badge">Bientôt</span>}
-        </span>
+        {onToggle ? <Switch checked={on} onChange={onToggle} label={`${m.name} : ${on ? 'allumé' : 'éteint'}`} /> : <span className="badge">Bientôt</span>}
       </div>
       <span className="grow" />
-      <span className="stack-0" style={{ gap: 2 }}>
-        <span className="t-card" style={{ fontSize: 21 }}>{m.name}</span>
-        <span className="t-small muted">{m.tagline}</span>
-      </span>
+      <div className="row" style={{ alignItems: 'flex-end', gap: 8 }}>
+        <span className="grow stack-0" style={{ gap: 2 }}>
+          <span className="t-card" style={{ fontSize: 21 }}>{m.name}</span>
+          <span className="t-small muted">{m.tagline}</span>
+        </span>
+        {on && (
+          <a href={m.entry.href} aria-label={`Ouvrir ${m.name}`} className="icon-btn tile" style={{ width: 36, height: 36 }}>
+            <Icon name="chevron" size={18} />
+          </a>
+        )}
+      </div>
     </div>
   );
   if (!on)

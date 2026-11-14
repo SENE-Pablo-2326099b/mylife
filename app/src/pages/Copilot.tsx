@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Button, Field, Glass, Icon, ModuleCard, Notice, ScreenHeader } from '@mylife/kit';
+import { Badge, Button, Field, Glass, Icon, ListRow, ModuleCard, Notice, ScreenHeader } from '@mylife/kit';
 import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '@mylife/lumen';
 import { readAiKey, writeAiKey } from '@mylife/core/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '@legacy/copilot';
@@ -232,11 +232,9 @@ export function CopilotPage() {
           <div className="pad stack">
             <span className="t-card">Pose une question sur ta vie</span>
             <span className="t-small muted">Copilot lit ton budget, tes séances, ton agenda et tes sorties pour te répondre. Il peut préparer une action (sauter un récurrent, décaler une séance) : rien n’est fait sans ta validation.</span>
-            <div className="stack" style={{ gap: 8 }}>
+            <div className="tile" style={{ padding: '0 14px' }}>
               {SUGGESTIONS.map((s) => (
-                <button key={s} type="button" className="btn btn-secondary" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => void ask(s)}>
-                  {s}
-                </button>
+                <ListRow key={s} title={s} onClick={() => void ask(s)} />
               ))}
             </div>
           </div>
@@ -279,7 +277,7 @@ export function CopilotPage() {
           }}
         >
           <Field id="question" label="Ta question">
-            <input id="question" value={text} onChange={(e) => setText(e.target.value)} placeholder="Je peux me payer… ? Comment s’est passée ma semaine ?" enterKeyHint="send" />
+            <input id="question" value={text} onChange={(e) => setText(e.target.value)} placeholder="Pose ta question" enterKeyHint="send" />
           </Field>
           <button type="submit" className="btn btn-action btn-block" disabled={busy || !text.trim()}>
             {busy ? 'Réflexion…' : 'Demander'}

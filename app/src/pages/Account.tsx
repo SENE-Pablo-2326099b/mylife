@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Badge, Button, Field, Glass, Icon, IconButton, List, ListRow, ModuleCard, Notice, PasswordField, ScreenHeader, SectionTitle } from '@mylife/kit';
+import { Badge, Button, Field, Glass, Icon, IconButton, List, ListRow, ModuleCard, Notice, Panel, PasswordField, ScreenHeader, SectionTitle } from '@mylife/kit';
 import { ApiError, changePassword, checkLogin, createAccount, deleteAccount, loginIssue, normalizeLogin, passwordIssue, passwordStrength, recoverAccount, renewRecoveryKey, signIn, signOut } from '@mylife/core/index';
 import { currentSession, pendingRecovery, setPendingRecovery, webPlatform } from '@mylife/core/web';
 import { useLogin, useSessionTick } from '../store';
@@ -303,15 +303,6 @@ export function WelcomePage() {
         <span className="t-body muted" style={{ fontSize: 17, lineHeight: '25px' }}>Tes finances, ton entraînement et tes sorties dans une seule app. Un compte, et tes données chiffrées sur ton appareil avant de le quitter.</span>
       </div>
     </AuthScreen>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Glass className="pad stack">
-      <span className="t-strong">{title}</span>
-      {children}
-    </Glass>
   );
 }
 

@@ -9,7 +9,7 @@ import { useLogin } from '../store';
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Glass as="section" className="pad stack">
-      <h2 className="t-card" style={{ margin: 0 }}>{title}</h2>
+      <h2 className="panel-title">{title}</h2>
       <div className="t-small muted stack" style={{ gap: 8 }}>{children}</div>
     </Glass>
   );
