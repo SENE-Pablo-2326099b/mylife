@@ -638,36 +638,66 @@ describe('MyLife, une seule app', () => {
     );
     await p.reload();
     await p.getByRole('heading', { name: 'Pourquoi ce chiffre' }).waitFor();
-    // Budget théorique : 2 000 − 700 = 1 300 de reste à vivre ; 42,50 dépensés (dont 30 à classer, comptés) ; le
-    // virement vers le livret (sans jambe jumelle connue) ne pèse rien, le salaire règle son échéance.
+    // Budget théorique : 2 000 − 700 = 1 300 de reste à vivre ; 42,50 dépensés (dont 30 à classer, comptés).
     const term = (label: string) => p.locator('.list-row', { hasText: label }).first();
-    await expect.poll(() => term('Reste à vivre').innerText()).toMatch(/1\s300\s€/);
-    expect(await term('Déjà dépensé').innerText()).toMatch(/42,50\s€/);
-    // Trésorerie : 1 200 sur le compte du quotidien (le livret n'en est pas), moins le loyer encore à payer.
-    expect(await term('Comptes du quotidien').innerText()).toMatch(/1\s200\s€/);
-    expect(await term('À payer avant la paie').innerText()).toMatch(/700\s€/);
-    expect(await term('Cash libre').innerText()).toMatch(/500\s€/);
-    // Le plus petit des deux : la trésorerie (500 + 42,50 dépensés depuis minuit), pas le budget (1 300).
+    const shows = (label: string, value: RegExp) => expect.poll(() => term(label).innerText()).toMatch(value);
+    await shows('Reste à vivre', /1\s300\s€/);
+    await shows('Déjà dépensé', /42,50\s€/);
+    // Trésorerie : 1 200 sur le compte du quotidien. Le loyer, prélèvement récurrent, n'est pas réservé par défaut :
+    // il ne touchera la trésorerie qu'à son débit réel.
+    await shows('Comptes du quotidien', /1\s200\s€/);
+    await shows('Échéances réservées', /\n0\s€/);
+    await shows('Cash libre', /1\s200\s€/);
     await p.getByText(/Limité par ta trésorerie/).waitFor();
-    expect(await term('Disponible à minuit').innerText()).toMatch(/542,50\s€/);
-    // Une échéance en partie versée : 300 € déjà sortis sur les 700 du loyer, il n'en reste que 400 à payer.
-    await p.getByRole('button', { name: /Loyer/ }).click();
+    await shows('Disponible à minuit', /1\s242,50\s€/);
+    // Réserver le loyer, par choix sur cet engagement : il est déduit dès maintenant.
+    const loyer = p.getByRole('button', { name: /Loyer/ }).first();
+    await loyer.click();
+    await p.getByRole('button', { name: 'Modifier l’engagement' }).click();
+    await p.getByRole('switch', { name: 'Réserver dans la trésorerie' }).click();
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await shows('Échéances réservées', /700\s€/);
+    await shows('Cash libre', /500\s€/);
+    // En partie versée : 300 € déjà sortis, il n'en reste que 400 à payer.
+    await loyer.click();
     await p.getByLabel('Déjà versé').fill('300');
     await p.getByRole('button', { name: 'Enregistrer' }).click();
-    await expect.poll(() => term('À payer avant la paie').innerText()).toMatch(/400\s€/);
-    expect(await term('Cash libre').innerText()).toMatch(/800\s€/);
-    await p.getByText(/300\s€ versés, reste 400\s€/).waitFor();
-    // La décision tient après rechargement ; « laisser le calcul décider » la retire.
-    await p.reload();
-    await expect.poll(() => term('Cash libre').innerText()).toMatch(/800\s€/);
-    await p.getByRole('button', { name: /Loyer/ }).click();
-    await p.getByRole('button', { name: 'Laisser le calcul décider' }).click();
-    await expect.poll(() => term('Cash libre').innerText()).toMatch(/500\s€/);
+    await shows('Échéances réservées', /400\s€/);
+    await shows('Cash libre', /800\s€/);
+    // Une poche de 150 € liée au loyer : verrouillée, et déduite une seule fois (le cash libre ne bouge pas).
+    await p.locator('button.link', { hasText: 'Ajouter' }).nth(1).click();
+    await p.getByLabel('Nom').fill('Réserve loyer');
+    await p.getByLabel('Montant verrouillé').fill('150');
+    await p.getByLabel('Elle couvre').selectOption('chg:c');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await shows('Poches verrouillées', /150\s€/);
+    await shows('Échéances réservées', /250\s€/);
+    await shows('Cash libre', /800\s€/);
+    // Un achat de 400 € en 4 fois, dont une payée : l'échéance du cycle (100 €) pèse sur ce cycle, et elle seule.
+    await p.getByRole('button', { name: 'Paiement en plusieurs fois' }).click();
+    await p.getByLabel('Achat').fill('Vélo');
+    await p.getByLabel('Montant total').fill('400');
+    await p.getByText(/3 échéances de 100\s€ à venir/).waitFor();
+    await p.getByRole('button', { name: 'Créer' }).click();
+    await shows('Charges prévues', /800\s€/);
+    await shows('Reste à vivre', /1\s200\s€/);
+    await shows('Échéances réservées', /350\s€/);
+    await shows('Cash libre', /700\s€/);
+    await p.getByText('Paiements fractionnés restants').waitFor();
+    // Lisser la dépense de 30 € : elle ne pèse plus sur la seule journée.
+    await p.getByRole('button', { name: /BOULANGERIE DES HALLES/ }).click();
+    await p.getByRole('switch', { name: 'Lisser sur le reste du cycle' }).click();
+    await p.getByRole('button', { name: 'Fermer', exact: true }).last().click();
+    await shows('Dépensé aujourd’hui', /12,50\s€/);
     await shot(p, '60-finances-v5-moteur');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
-    // Rejouable : même résultat.
+    // Tout tient après rechargement, et quand les données sont relues depuis l'ancienne app.
+    await p.reload();
+    await shows('Cash libre', /700\s€/);
     await p.getByRole('button', { name: 'Relire mes données' }).click();
-    expect(await term('Cash libre').innerText()).toMatch(/500\s€/);
+    await shows('Cash libre', /700\s€/);
+    await shows('Dépensé aujourd’hui', /12,50\s€/);
+    await p.getByRole('button', { name: /Réserve loyer/ }).waitFor();
     await ctx.close();
   });
 

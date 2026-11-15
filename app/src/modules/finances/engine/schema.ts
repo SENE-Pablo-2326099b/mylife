@@ -150,6 +150,13 @@ export interface Commitment {
   /** Revenu versé à un tiers (aide versée au bailleur) : compté dans le plan, jamais sur le compte. */
   direct: boolean;
   paused: boolean;
+  /**
+   * Réserver l'échéance dans la trésorerie avant qu'elle tombe (elle réduit le cash libre dès maintenant). false : elle
+   * ne touche la trésorerie qu'à l'apparition de l'opération réelle. null : le réglage par défaut de son type.
+   */
+  reserveInCash: boolean | null;
+  /** Charge annuelle ou ponctuelle : mettre de côté un peu chaque cycle, pour que l'argent soit prêt le jour J. */
+  provisionMonthly: boolean;
 }
 
 /**
@@ -188,6 +195,11 @@ export interface Provision {
   installmentPlanId: string | null;
   goalId: string | null;
   status: 'ACTIVE' | 'RELEASED' | 'CONSUMED';
+  /** Poche tenue par le moteur (provision mensuelle d'une charge) : ses cotisations, par début de cycle. */
+  auto?: boolean;
+  contributions?: Record<string, number>;
+  /** La dernière échéance qu'elle a servi à payer. */
+  consumedFor?: string | null;
 }
 
 export interface Receivable {
@@ -209,6 +221,11 @@ export interface EngineSettings {
   /** PRUDENT : le plus petit du budget et de la trésorerie ; CASH : la trésorerie seule. */
   mode: 'PRUDENT' | 'CASH';
   transferToleranceDays: number;
+  /** Par défaut, quelles échéances à venir sont réservées dans la trésorerie (modifiable par engagement). */
+  reserveDue: Record<'CHARGE' | 'INSTALLMENT' | 'SAVING', boolean>;
+  /** Fin de cycle, pour le pot du quotidien : que devient l'excédent, que devient un dépassement. */
+  endPolicy: EndPolicy;
+  overspendPolicy: 'DEDUCT_NEXT' | 'FORGIVE';
 }
 
 /** Tout ce que lit le moteur. */
@@ -231,7 +248,19 @@ export interface Db {
   settings: EngineSettings;
 }
 
-export const DEFAULT_SETTINGS: EngineSettings = { referenceCurrency: 'EUR', payday: 1, earlyDays: 7, openingCommitmentId: null, mode: 'PRUDENT', transferToleranceDays: 3 };
+export const DEFAULT_SETTINGS: EngineSettings = {
+  referenceCurrency: 'EUR',
+  payday: 1,
+  earlyDays: 7,
+  openingCommitmentId: null,
+  mode: 'PRUDENT',
+  transferToleranceDays: 3,
+  // Les prélèvements récurrents ne touchent la trésorerie qu'à leur débit réel (les dates bancaires varient) ; une
+  // échéance de paiement fractionné et une mise de côté prévue sont réservées.
+  reserveDue: { CHARGE: false, INSTALLMENT: true, SAVING: true },
+  endPolicy: 'RESET',
+  overspendPolicy: 'DEDUCT_NEXT',
+};
 
 export const EMPTY_DB: Db = {
   accounts: [],

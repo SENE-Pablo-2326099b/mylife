@@ -1,5 +1,5 @@
-import { daysRemaining, inRange, type Cycle, type ISODate } from '../core/dates';
-import { buildOccurrences, currentCycle, type Occurrence } from './occurrences';
+import { daysInMonth, daysRemaining, inRange, parseISO, toISO, type Cycle, type ISODate } from '../core/dates';
+import { buildOccurrences, currentCycle, isProvisioned, type Occurrence } from './occurrences';
 import type { Account, Allocation, Db, Envelope, Transaction } from './schema';
 
 /**
@@ -69,6 +69,8 @@ export interface Explanation {
   // ---- budget théorique
   revenus: number;
   charges: number;
+  /** Dont : cotisations du cycle aux provisions mensuelles. */
+  provisioning: number;
   epargne: number;
   report: number;
   rav: number;
@@ -130,12 +132,14 @@ export function compute(db: Db, today: ISODate): Explanation {
   // ---- budget théorique
   // Réglée : le montant réel. Due ou en partie versée : le prévu (ou le versé, s'il le dépasse). Sautée : rien.
   const amountOf = (o: Occurrence) => (o.status === 'SKIPPED' ? 0 : o.status === 'PAID' ? (o.actual ?? o.expected) : Math.max(o.expected, o.paid));
-  const sum = (kinds: string[]) => occurrences.filter((o) => kinds.includes(o.commitment.kind)).reduce((s, o) => s + amountOf(o), 0);
+  // Une charge provisionnée ne pèse pas par son échéance : ce sont ses cotisations, cycle après cycle, qui pèsent.
+  const sum = (kinds: string[]) => occurrences.filter((o) => kinds.includes(o.commitment.kind) && !isProvisioned(o.commitment)).reduce((s, o) => s + amountOf(o), 0);
+  const provisioning = db.provisions.filter((p) => p.auto).reduce((s, p) => s + (p.contributions?.[cycle.start] ?? 0), 0);
   const hasIncomePlan = db.commitments.some((c) => c.kind === 'INCOME' && !c.paused);
   const extraIncomes = inCycle.filter(({ a, t }) => a.flow === 'INCOME' && !settled.has(t.id));
   const pendingIncomes = hasIncomePlan ? extraIncomes.filter(({ a }) => !a.incomeUse).map(({ a, t }) => ({ transactionId: t.id, amount: a.amount })) : [];
   const revenus = sum(['INCOME']) + extraIncomes.filter(({ a }) => (hasIncomePlan ? a.incomeUse === 'BUDGET' : a.incomeUse !== 'SAVINGS')).reduce((s, { a, account }) => s + own(db, account, a.amount), 0);
-  const charges = sum(['CHARGE', 'INSTALLMENT']);
+  const charges = sum(['CHARGE', 'INSTALLMENT']) + provisioning;
   const savedActual = inCycle.filter(({ a }) => a.flow === 'SAVING' && a.amount < 0).reduce((s, { a, account }) => s + own(db, account, -a.amount), 0);
   const epargne = Math.max(sum(['SAVING']), savedActual);
   const report = db.carryIn.global;
@@ -187,7 +191,9 @@ export function compute(db: Db, today: ISODate): Explanation {
   const locked = daily.filter((a) => wholeLocked.has(a.id)).reduce((s, a) => s + own(db, a, a.balance ?? 0), 0) + pockets.filter((p) => !wholeLocked.has(p.accountId)).reduce((s, p) => s + own(db, accounts.get(p.accountId)!, p.amount), 0);
   // Ce qu'il reste à payer depuis le quotidien d'ici la fin du cycle. Une poche liée couvre ses échéances, dans
   // l'ordre des dates : cette part est déjà dans « verrouillé », elle n'est pas retirée une seconde fois.
-  const due = occurrences.filter((o) => (o.status === 'DUE' || o.status === 'PARTIAL') && o.commitment.kind !== 'INCOME' && (!o.commitment.accountId || dailyIds.has(o.commitment.accountId)));
+  // Seules les échéances « réservées » comptent ici : les autres ne touchent la trésorerie qu'à leur débit réel.
+  const reserved = (o: Occurrence) => o.commitment.kind !== 'INCOME' && (o.commitment.reserveInCash ?? db.settings.reserveDue[o.commitment.kind]);
+  const due = occurrences.filter((o) => (o.status === 'DUE' || o.status === 'PARTIAL') && reserved(o) && (!o.commitment.accountId || dailyIds.has(o.commitment.accountId)));
   const left = new Map(pockets.map((p) => [p.id, own(db, accounts.get(p.accountId)!, p.amount)]));
   let toPay = 0;
   let covered = 0;
@@ -224,6 +230,7 @@ export function compute(db: Db, today: ISODate): Explanation {
     occurrences,
     revenus,
     charges,
+    provisioning,
     epargne,
     report,
     rav,
@@ -256,8 +263,25 @@ export function compute(db: Db, today: ISODate): Explanation {
   };
 }
 
+/** Échéances d'un paiement fractionné qui restent à tomber à partir d'une date. */
+export function installmentsLeft(c: { anchorDay: number | null; startDate: ISODate | null; endDate: ISODate | null; remainingOccurrences: number | null }, today: ISODate): number {
+  if (!c.endDate || c.anchorDay === null) return c.remainingOccurrences ?? 0;
+  let n = 0;
+  const from = c.startDate && c.startDate > today ? c.startDate : today;
+  const a = parseISO(from);
+  for (let i = 0; i < 240; i++) {
+    const idx = a.y * 12 + (a.m - 1) + i;
+    const y = Math.floor(idx / 12);
+    const m = (idx % 12) + 1;
+    const d = toISO(y, m, Math.min(c.anchorDay, daysInMonth(y, m)));
+    if (d > c.endDate) break;
+    if (d >= from) n++;
+  }
+  return n;
+}
+
 /** Patrimoine net : les comptes inclus (une dette en moins), plus les créances ouvertes, moins les échéances de paiements fractionnés restantes. */
-export function netWorth(db: Db): { assets: number; debts: number; receivables: number; installments: number; net: number } {
+export function netWorth(db: Db, today: ISODate): { assets: number; debts: number; receivables: number; installments: number; net: number } {
   let assets = 0;
   let debts = 0;
   for (const a of db.accounts) {
@@ -267,6 +291,6 @@ export function netWorth(db: Db): { assets: number; debts: number; receivables: 
     else assets += v;
   }
   const receivables = db.receivables.filter((r) => r.status === 'OPEN').reduce((s, r) => s + r.amount, 0);
-  const installments = db.commitments.filter((c) => c.kind === 'INSTALLMENT' && !c.paused).reduce((s, c) => s + c.amount * (c.remainingOccurrences ?? 0), 0);
+  const installments = db.commitments.filter((c) => c.kind === 'INSTALLMENT' && !c.paused).reduce((s, c) => s + c.amount * installmentsLeft(c, today), 0);
   return { assets, debts, receivables, installments, net: assets + receivables - debts - installments };
 }

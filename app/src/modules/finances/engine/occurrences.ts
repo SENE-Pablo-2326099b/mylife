@@ -49,6 +49,19 @@ export function currentCycle(db: Db, today: ISODate): Cycle {
   return { start: startOf(nominal.start), end: addDays(nextStart, -1) };
 }
 
+/** Une charge annuelle ou ponctuelle provisionnée chaque cycle : ce sont ses cotisations qui pèsent, pas son échéance. */
+export const isProvisioned = (c: Commitment) => c.provisionMonthly && c.kind === 'CHARGE' && (c.rhythm === 'YEARLY' || c.rhythm === 'ONCE') && !!c.anchorDate;
+
+/** La prochaine échéance d'un engagement annuel ou ponctuel, à partir d'une date. null : il n'y en a plus. */
+export function nextDue(c: Commitment, from: ISODate): ISODate | null {
+  if (!c.anchorDate) return null;
+  if (c.rhythm === 'ONCE') return c.anchorDate >= from ? c.anchorDate : null;
+  const { m, d } = parseISO(c.anchorDate);
+  const y = parseISO(from).y;
+  const at = (year: number) => toISO(year, m, Math.min(d, daysInMonth(year, m)));
+  return at(y) >= from ? at(y) : at(y + 1);
+}
+
 /** Les dates d'échéance d'un engagement dans un cycle. */
 export function dueDates(c: Commitment, cycle: Cycle): ISODate[] {
   if (c.paused) return [];

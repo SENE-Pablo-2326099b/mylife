@@ -73,6 +73,8 @@ export function fromV3(data: FinanceData): Db {
     installmentPlanId: null,
     direct: p.direct === true,
     paused: !p.active,
+    reserveInCash: null,
+    provisionMonthly: false,
   }));
   const opening = commitments.filter((c) => c.kind === 'INCOME' && !c.direct && !c.paused).sort((a, b) => b.amount - a.amount)[0];
 

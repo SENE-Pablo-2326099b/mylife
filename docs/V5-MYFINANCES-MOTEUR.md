@@ -405,3 +405,19 @@ payé : `Pot = RAV − budgets des enveloppes plafonnées hors quotidien − pay
 plafond`. Une charge fixe payée, même absente du plan, réduit donc le budget théorique de son montant ; côté
 trésorerie, elle est déjà sortie du solde. C'est la règle générique ; le nom « Charges fixes » n'est qu'un réglage de
 départ issu de l'ancienne app.
+
+## F. Ajustement de M2 (15/11/2026) : ce qui est réservé dans la trésorerie
+
+Demande : les abonnements et prélèvements récurrents à venir ne doivent pas être déduits du cash libre par
+anticipation (les dates bancaires varient trop) ; ils ne touchent la trésorerie qu'à l'apparition de l'opération.
+
+Règle, configurable et non figée :
+- chaque engagement porte `reserve_in_cash` (oui, non, ou « comme son type ») ;
+- les réglages portent le défaut par type : charges récurrentes **non réservées**, échéances de paiement fractionné
+  et mises de côté prévues **réservées** ;
+- la formule devient `À_payer = Σ reste des échéances réservées dues d'ici la fin du cycle, hors part en poche` ;
+- le budget théorique ne change pas : une charge prévue y compte toujours. Seule la trésorerie attend le débit réel ;
+- une poche reste verrouillée quoi qu'il arrive : c'est un choix explicite.
+
+Conséquence à connaître : avec des charges non réservées, le cash libre peut dépasser ce qui restera vraiment après
+leurs débits. Le mode prudent protège quand même, puisque le budget théorique, lui, les compte.

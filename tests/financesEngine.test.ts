@@ -4,12 +4,13 @@ import { compute, envelopeOf, netWorth, weight } from '../app/src/modules/financ
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
+import { addInstallmentPlan, applyState, closeCycle, initState, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, type EngineState } from '../app/src/modules/finances/engine/state';
 import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Transaction } from '../app/src/modules/finances/engine/schema';
 
 /** Le moteur financier de MyFinances V5 (étape M1) : scénario de référence, cas limites, invariants. */
 
 const account = (id: string, role: Role, balance: number | null, over: Partial<Account> = {}): Account => ({ id, name: id, provider: '', role, ...roleDefaults(role), currency: 'EUR', ownershipRatio: 1, alertThreshold: null, deferredDebit: null, source: 'bank', balance, balanceAt: null, archivedAt: null, ...over });
-const commitment = (id: string, kind: Commitment['kind'], label: string, amount: number, anchorDay: number | null, over: Partial<Commitment> = {}): Commitment => ({ id, kind, label, amount, tolerance: 0.2, rhythm: 'MONTHLY', anchorDay, anchorDate: null, accountId: null, counterAccountId: null, categoryId: null, startDate: null, endDate: null, remainingOccurrences: null, installmentPlanId: null, direct: false, paused: false, ...over });
+const commitment = (id: string, kind: Commitment['kind'], label: string, amount: number, anchorDay: number | null, over: Partial<Commitment> = {}): Commitment => ({ id, kind, label, amount, tolerance: 0.2, rhythm: 'MONTHLY', anchorDay, anchorDate: null, accountId: null, counterAccountId: null, categoryId: null, startDate: null, endDate: null, remainingOccurrences: null, installmentPlanId: null, direct: false, paused: false, reserveInCash: null, provisionMonthly: false, ...over });
 const envelope = (id: string, over: Partial<Envelope> = {}): Envelope => ({ id, name: id, cap: null, inDailyBudget: true, endPolicy: 'RESET', overspendPolicy: 'DEDUCT_NEXT', isDefault: false, order: 0, categoryIds: [], ...over });
 const category = (id: string, parentId: string | null = null) => ({ id, parentId, scope: 'EXPENSE' as const, name: id, color: '#fff', order: 0, archivedAt: null, mergedIntoId: null });
 
@@ -86,10 +87,17 @@ describe('moteur : scénario de référence', () => {
   it('trésorerie : la poche de 161 € liée au 4x n’est déduite qu’une seule fois', () => {
     expect(e.cash).toBe(36100 + 15000);
     expect(e.locked).toBe(16100);
-    // À payer : le forfait (20 €) + l'échéance du 4x (161 €) − la part déjà en poche (161 €).
+    // À payer : l'échéance du 4x (161 €) − la part déjà en poche (161 €). Le forfait (20 €), prélèvement récurrent,
+    // n'est pas réservé : il ne touchera la trésorerie qu'à son débit réel.
     expect(e.covered).toBe(16100);
-    expect(e.toPay).toBe(2000);
-    expect(e.cashLibre).toBe(51100 - 16100 - 2000);
+    expect(e.toPay).toBe(0);
+    expect(e.cashLibre).toBe(51100 - 16100);
+    // Réservé par choix sur cet engagement : il est alors déduit dès maintenant.
+    const reserving = { ...db, commitments: db.commitments.map((c) => (c.id === 'tel' ? { ...c, reserveInCash: true } : c)) };
+    expect(compute(reserving, TODAY)).toMatchObject({ toPay: 2000, cashLibre: 51100 - 16100 - 2000 });
+    // Et l'inverse : avec « ne rien réserver » pour les paiements fractionnés, seule la poche reste verrouillée.
+    const none = { ...db, settings: { ...db.settings, reserveDue: { CHARGE: false, INSTALLMENT: false, SAVING: false } } };
+    expect(compute(none, TODAY)).toMatchObject({ toPay: 0, covered: 0, cashLibre: 51100 - 16100 });
     // Sans la poche : rien de verrouillé, l'échéance entière reste à payer. Même cash libre, au centime.
     expect(compute({ ...db, provisions: [] }, TODAY).cashLibre).toBe(e.cashLibre);
     // Une poche libre du même montant, elle, s'ajoute à l'échéance : 161 € de moins.
@@ -98,26 +106,26 @@ describe('moteur : scénario de référence', () => {
   });
 
   it('disponible = le plus petit du budget et de la trésorerie ; budget du jour gelé à minuit', () => {
-    // À minuit : budget 71 900 − 30 000 = 41 900 ; trésorerie 33 000 + 1 200 dépensés depuis = 34 200.
+    // À minuit : budget 71 900 − 30 000 = 41 900 ; trésorerie 35 000 + 1 200 dépensés depuis = 36 200.
     expect(e.limitedBy).toBe('cash');
-    expect(e.disponible).toBe(34200);
-    expect(e.marge).toBe(34200 - 41900);
-    expect(e.budgetJour).toBe(Math.round(34200 / 11));
+    expect(e.disponible).toBe(36200);
+    expect(e.marge).toBe(36200 - 41900);
+    expect(e.budgetJour).toBe(Math.round(36200 / 11));
     expect(e.resteAujourdhui).toBe(e.budgetJour - 1200);
-    expect(e.demain).toBe(Math.round((34200 - 1200) / 10));
+    expect(e.demain).toBe(Math.round((36200 - 1200) / 10));
     expect(e.deficit).toBe(0);
   });
 
   it('mode cash : la trésorerie seule ; avec plus de trésorerie que de budget, le budget tient et la marge se montre', () => {
-    expect(compute({ ...db, settings: { ...db.settings, mode: 'CASH' } }, TODAY).disponible).toBe(34200);
+    expect(compute({ ...db, settings: { ...db.settings, mode: 'CASH' } }, TODAY).disponible).toBe(36200);
     const rich = { ...db, accounts: db.accounts.map((a) => (a.id === 'carte' ? { ...a, balance: 90000 } : a)) };
     const r = compute(rich, TODAY);
-    expect([r.limitedBy, r.disponible, r.marge]).toEqual(['budget', 41900, 34200 + 75000 - 41900]);
-    expect(compute({ ...rich, settings: { ...rich.settings, mode: 'CASH' } }, TODAY).disponible).toBe(34200 + 75000);
+    expect([r.limitedBy, r.disponible, r.marge]).toEqual(['budget', 41900, 36200 + 75000 - 41900]);
+    expect(compute({ ...rich, settings: { ...rich.settings, mode: 'CASH' } }, TODAY).disponible).toBe(36200 + 75000);
   });
 
   it('patrimoine net : les comptes, moins ce qu’il reste à payer du 4x', () => {
-    expect(netWorth(db)).toEqual({ assets: 251100, debts: 0, receivables: 0, installments: 32200, net: 218900 });
+    expect(netWorth(db, TODAY)).toEqual({ assets: 251100, debts: 0, receivables: 0, installments: 32200, net: 218900 });
   });
 });
 
@@ -132,7 +140,7 @@ describe('moteur : cas limites', () => {
     expect(after.resteAujourdhui).toBe(before.resteAujourdhui - 5000);
     db.allocations.find((a) => a.id === 'd4#0')!.smoothed = true;
     const smoothed = compute(db, TODAY);
-    expect(smoothed.budgetJour).toBe(Math.round((34200 - 5000) / 11));
+    expect(smoothed.budgetJour).toBe(Math.round((36200 - 5000) / 11));
     expect(smoothed.resteAujourdhui).toBe(smoothed.budgetJour - 1200);
   });
 
@@ -158,7 +166,7 @@ describe('moteur : cas limites', () => {
     db.envelopes.push(envelope('env:shopping', { cap: 10000, inDailyBudget: false, order: 1, categoryIds: ['shopping'] }));
     const base = compute(db, TODAY);
     expect([base.reserve, base.pot, base.offDaily]).toEqual([10000, 61900, 10000]);
-    expect(base.cashLibre).toBe(33000 - 10000);
+    expect(base.cashLibre).toBe(35000 - 10000);
     // 40 € dépensés dans l'enveloppe : il y reste 60 €, et le quotidien n'a pas bougé.
     op(db, 's1', 'carte', '2026-11-05', -4000, 'BOUTIQUE', 'EXPENSE', { categoryId: 'shopping' });
     const some = compute(db, TODAY);
@@ -168,7 +176,7 @@ describe('moteur : cas limites', () => {
     const over = compute(db, TODAY);
     expect(over.offDaily).toBe(0);
     expect(over.envelopes.find((x) => x.envelope.id === 'env:shopping')).toMatchObject({ spent: 20000, remaining: 0 });
-    expect(over.cashLibre).toBe(33000);
+    expect(over.cashLibre).toBe(35000);
   });
 
   it('paie en avance : elle ouvre le cycle ; en retard : le jour de paie reste la limite', () => {
@@ -201,6 +209,8 @@ describe('moteur : cas limites', () => {
     expect(dueDates(commitment('c', 'INSTALLMENT', 'x', 100, 20, { remainingOccurrences: 0 }), cycle)).toEqual([]);
     expect(dueDates(commitment('c', 'CHARGE', 'x', 100, 5, { paused: true }), cycle)).toEqual([]);
     const db = reference();
+    db.commitments.find((c) => c.id === 'tel')!.reserveInCash = true;
+    expect(compute(db, TODAY).toPay).toBe(2000);
     db.occurrenceOverrides = [{ id: 'tel@2026-11-20', status: 'SKIPPED', transactionId: null }];
     const e = compute(db, TODAY);
     expect(e.charges).toBe(40000 + 16100);
@@ -240,7 +250,7 @@ function partialCase(label: string): Db {
   const db = blank({
     accounts: [account('k', 'CHECKING', 36781)],
     categories: [category('fixes')],
-    commitments: [commitment('salaire', 'INCOME', 'Salaire', 140000, 26), commitment('mens', 'CHARGE', 'Mensualité crédit', 46100, null)],
+    commitments: [commitment('salaire', 'INCOME', 'Salaire', 140000, 26), commitment('mens', 'CHARGE', 'Mensualité crédit', 46100, null, { reserveInCash: true })],
     settings: { ...DEFAULT_SETTINGS, payday: 26, openingCommitmentId: 'salaire' },
   });
   db.envelopes.push(envelope('env:fixed', { inDailyBudget: false, order: 1, categoryIds: ['fixes'] }));
@@ -311,7 +321,7 @@ function randomDb(seed: number): Db {
   const db = blank({
     accounts: [account('k1', 'CHECKING', Math.floor(r() * 300000)), account('k2', 'CHECKING', Math.floor(r() * 100000)), account('s', 'SAVINGS', 500000)],
     categories: [...cats.map((c) => category(c)), category('a1', 'a'), category('b1', 'b')],
-    commitments: [commitment('inc', 'INCOME', 'Salaire', 150000 + Math.floor(r() * 100000), 26), commitment('ch', 'CHARGE', 'Loyer', 30000 + Math.floor(r() * 40000), 2), commitment('sv', 'SAVING', 'Livret', Math.floor(r() * 30000), 28)],
+    commitments: [commitment('inc', 'INCOME', 'Salaire', 150000 + Math.floor(r() * 100000), 26), commitment('ch', 'CHARGE', 'Loyer', 30000 + Math.floor(r() * 40000), 2, { reserveInCash: true }), commitment('sv', 'SAVING', 'Livret', Math.floor(r() * 30000), 28)],
     settings: { ...DEFAULT_SETTINGS, payday: 26, openingCommitmentId: 'inc', mode: r() < 0.5 ? 'PRUDENT' : 'CASH' },
   });
   db.envelopes.push(envelope('e1', { cap: Math.floor(r() * 30000), inDailyBudget: r() < 0.5, order: 1, categoryIds: ['a', 'c'] }), envelope('e2', { cap: r() < 0.5 ? null : Math.floor(r() * 20000), inDailyBudget: r() < 0.5, order: 2, categoryIds: ['b1', 'd'] }));
@@ -452,5 +462,168 @@ describe('moteur : reprise depuis l’étape 3.3', () => {
     expect([e.offPlanPaid, e.pot]).toEqual([2500, 117500]);
     expect([e.cash, e.cashLibre]).toEqual([120000, 120000]);
     expect(e.limitedBy).toBe('budget');
+  });
+});
+
+/** Le scénario de référence sans son 4x ni sa poche, pour poser les leviers de M2 un par un. */
+function plain(): Db {
+  const db = reference();
+  db.commitments = db.commitments.filter((c) => c.id !== 'alma');
+  db.provisions = [];
+  db.installmentPlans = [];
+  return db;
+}
+const withState = (base: Db, change: (s: EngineState) => EngineState = (s) => s) => change(initState(base));
+
+describe('moteur M2 : provision mensuelle d’une charge annuelle', () => {
+  const base = plain();
+  const assurance = commitment('assurance', 'CHARGE', 'Assurance habitation', 12000, null, { rhythm: 'YEARLY', anchorDate: '2027-03-10', provisionMonthly: true });
+  let s = withState(base, (x) => saveCommitment(x, assurance));
+
+  it('chaque cycle cotise ce qu’il faut pour être prêt le jour J ; la poche est verrouillée ; l’échéance ne pèse pas une seconde fois', () => {
+    // Échéance le 10 mars : cinq cycles d'ici là (celui-ci compris), 120 € ÷ 5 = 24 € par cycle.
+    s = roll(s, base, TODAY, 1);
+    const pocket = s.provisions.find((p) => p.id === 'auto:assurance')!;
+    expect(pocket).toMatchObject({ amount: 2400, auto: true, accountId: 'paie', commitmentId: 'assurance', contributions: { '2026-10-26': 2400 } });
+    const e = compute(applyState(base, s), TODAY);
+    expect([e.provisioning, e.charges, e.locked]).toEqual([2400, 40000 + 2000 + 2400, 2400]);
+    // Rejouer dans le même cycle ne cotise pas deux fois.
+    expect(roll(s, base, '2026-11-20', 2).provisions).toEqual(s.provisions);
+    for (const day of ['2026-12-01', '2027-01-02', '2027-02-03', '2027-03-01']) s = roll(s, base, day, 3);
+    expect(s.provisions.find((p) => p.id === 'auto:assurance')).toMatchObject({ amount: 12000, contributions: { '2026-10-26': 2400, '2026-11-26': 2400, '2026-12-26': 2400, '2027-01-26': 2400, '2027-02-26': 2400 } });
+    // Le cycle de l'échéance : elle est là, due, mais seule sa cotisation pèse.
+    const dueCycle = compute(applyState(base, s), '2027-03-01');
+    expect(dueCycle.occurrences.find((o) => o.commitment.id === 'assurance')).toMatchObject({ dueDate: '2027-03-10', status: 'DUE' });
+    expect(dueCycle.provisioning).toBe(2400);
+    expect(dueCycle.charges).toBe(40000 + 2000 + 2400);
+  });
+
+  it('le jour J : l’opération règle l’échéance, la poche est vidée, et le cycle suivant recommence pour l’année d’après', () => {
+    const paid = structuredClone(base);
+    op(paid, 'ass', 'paie', '2027-03-10', -12000, 'PRLV ASSURANCE HABITATION', 'EXPENSE');
+    s = roll(s, paid, '2027-03-12', 4);
+    expect(s.provisions.find((p) => p.id === 'auto:assurance')).toMatchObject({ amount: 0, consumedFor: 'assurance@2027-03-10' });
+    const e = compute(applyState(paid, s), '2027-03-12');
+    // Payée par la poche : elle ne pèse ni dans les dépenses, ni une seconde fois dans les charges.
+    expect([e.provisioning, e.spent, e.locked]).toEqual([2400, 0, 0]);
+    s = roll(s, paid, '2027-03-27', 5);
+    expect(s.provisions.find((p) => p.id === 'auto:assurance')).toMatchObject({ amount: 1000 });
+    expect(s.provisions.find((p) => p.id === 'auto:assurance')!.contributions!['2027-03-26']).toBe(1000);
+  });
+
+  it('provision arrêtée : la poche reste, comme une poche ordinaire, et plus rien n’est cotisé', () => {
+    const stopped = roll(saveCommitment(s, { ...assurance, provisionMonthly: false }), base, '2027-04-27', 6);
+    const pocket = stopped.provisions.find((p) => p.id === 'auto:assurance')!;
+    expect(pocket.auto).toBe(false);
+    expect(pocket.contributions!['2027-04-26']).toBeUndefined();
+  });
+});
+
+describe('moteur M2 : paiement en plusieurs fois', () => {
+  const base = plain();
+  const s = withState(base, (x) => addInstallmentPlan(x, { id: 'velo', label: 'Vélo en 4 fois', total: 60000, count: 4, paidCount: 1, nextDate: '2026-11-20', accountId: 'paie' }));
+  const db = applyState(base, s);
+
+  it('chaque échéance pèse sur son propre cycle, et seulement lui ; après la dernière, plus rien', () => {
+    expect(s.commitments.find((c) => c.id === 'inst:velo')).toMatchObject({ kind: 'INSTALLMENT', amount: 15000, anchorDay: 20, startDate: '2026-11-20', endDate: '2027-01-20', installmentPlanId: 'velo' });
+    const charges = (day: string) => compute(db, day).occurrences.filter((o) => o.commitment.id === 'inst:velo').map((o) => o.dueDate);
+    expect(charges('2026-11-15')).toEqual(['2026-11-20']);
+    expect(charges('2026-12-01')).toEqual(['2026-12-20']);
+    expect(charges('2027-01-10')).toEqual(['2027-01-20']);
+    expect(charges('2027-02-10')).toEqual([]);
+    expect(compute(db, TODAY).charges).toBe(40000 + 2000 + 15000);
+  });
+
+  it('l’échéance du cycle est réservée dans la trésorerie ; la dette restante est déduite du patrimoine', () => {
+    expect(compute(db, TODAY)).toMatchObject({ toPay: 15000, cashLibre: 51100 - 15000 });
+    expect(netWorth(db, TODAY).installments).toBe(45000);
+    expect(netWorth(db, '2026-12-21').installments).toBe(15000);
+    expect(netWorth(db, '2027-01-21').installments).toBe(0);
+  });
+
+  it('l’achat lui-même ne pèse pas dans le budget ; supprimer le plan retire son engagement', () => {
+    const bought = structuredClone(base);
+    op(bought, 'achat', 'carte', '2026-11-14', -15000, 'MAGASIN DE VELOS', 'EXPENSE', { installmentPurchaseOf: 'velo' });
+    expect(compute(applyState(bought, s), TODAY).spent).toBe(compute(db, TODAY).spent);
+    const removed = removeInstallmentPlan(s, 'velo');
+    expect([removed.installmentPlans.length, removed.commitments.some((c) => c.id === 'inst:velo')]).toEqual([0, false]);
+  });
+});
+
+describe('moteur M2 : clôture et reports', () => {
+  const END = '2026-11-25';
+  it('excédent : remis à zéro et proposé à l’épargne, ou reporté ; dépassement : déduit du cycle suivant, ou oublié', () => {
+    const db = plain();
+    // Reste à vivre 140 000 − 42 000 − 10 000 = 88 000 ; dépensé 31 200 ; excédent 56 800.
+    expect(closeCycle(db, END, 1)).toMatchObject({ start: '2026-10-26', end: END, rav: 88000, spent: 31200, result: 56800, carryOut: { global: 0, envelopes: {} }, toSave: 56800 });
+    expect(closeCycle({ ...db, settings: { ...db.settings, endPolicy: 'ROLLOVER' } }, END, 1)).toMatchObject({ carryOut: { global: 56800 }, toSave: 0 });
+    expect(closeCycle({ ...db, settings: { ...db.settings, endPolicy: 'AUTO_SAVE' } }, END, 1)).toMatchObject({ carryOut: { global: 0 }, toSave: 56800 });
+    const over = plain();
+    op(over, 'gros', 'carte', '2026-11-18', -70000, 'GROS ACHAT', 'EXPENSE');
+    expect(closeCycle(over, END, 1)).toMatchObject({ result: -13200, carryOut: { global: -13200 }, toSave: 0 });
+    expect(closeCycle({ ...over, settings: { ...over.settings, overspendPolicy: 'FORGIVE' } }, END, 1).carryOut.global).toBe(0);
+  });
+
+  it('chaque enveloppe plafonnée suit sa propre politique', () => {
+    const db = plain();
+    db.categories = [category('shopping'), category('sorties')];
+    db.envelopes.push(envelope('env:shopping', { cap: 10000, inDailyBudget: false, endPolicy: 'ROLLOVER', order: 1, categoryIds: ['shopping'] }), envelope('env:sorties', { cap: 5000, inDailyBudget: false, endPolicy: 'RESET', order: 2, categoryIds: ['sorties'] }));
+    op(db, 's1', 'carte', '2026-11-05', -4000, 'BOUTIQUE', 'EXPENSE', { categoryId: 'shopping' });
+    op(db, 's2', 'carte', '2026-11-06', -7000, 'CONCERT', 'EXPENSE', { categoryId: 'sorties' });
+    const closed = closeCycle(db, END, 1);
+    expect(closed.envelopes).toEqual([
+      { id: 'env:shopping', name: 'env:shopping', budget: 10000, spent: 4000, result: 6000 },
+      { id: 'env:sorties', name: 'env:sorties', budget: 5000, spent: 7000, result: -2000 },
+    ]);
+    // Shopping reporte ses 60 € ; Sorties, dépassée de 20 €, les perd sur son prochain budget.
+    expect(closed.carryOut.envelopes).toEqual({ 'env:shopping': 6000, 'env:sorties': -2000 });
+    const next = compute({ ...db, carryIn: closed.carryOut }, '2026-11-27');
+    expect(next.envelopes.filter((x) => x.budget !== null).map((x) => x.budget)).toEqual([16000, 3000]);
+  });
+
+  it('le temps passe : le cycle terminé est clos une seule fois, son report s’applique, et « remettre à zéro » l’efface', () => {
+    const base = plain();
+    let s = withState(base, (x) => ({ ...x, settings: { ...x.settings, endPolicy: 'ROLLOVER' } }));
+    s = roll(s, base, TODAY, 1);
+    expect([s.lastCycleStart, s.closedCycles.length]).toEqual(['2026-10-26', 0]);
+    s = roll(s, base, '2026-11-27', 2);
+    expect(s.lastCycleStart).toBe('2026-11-26');
+    expect(s.closedCycles.map((c) => [c.start, c.result])).toEqual([['2026-10-26', 56800]]);
+    expect(s.carryIn.global).toBe(56800);
+    expect(compute(applyState(base, s), '2026-11-27')).toMatchObject({ report: 56800, rav: 88000 + 56800 });
+    expect(roll(s, base, '2026-11-30', 3)).toEqual(s);
+    // Deux cycles d'absence : les deux sont clos, dans l'ordre.
+    const late = roll(withState(base), base, TODAY, 1);
+    expect(roll(late, base, '2027-01-05', 2).closedCycles.map((c) => c.start)).toEqual(['2026-11-26', '2026-10-26']);
+  });
+});
+
+describe('moteur M2 : les réglages de l’utilisateur tiennent quand les données sont relues', () => {
+  it('engagements, enveloppes et leviers posés sur une ligne survivent à une nouvelle reprise', () => {
+    const base = plain();
+    let s = withState(base);
+    s = saveCommitment(s, commitment('salle', 'CHARGE', 'Salle de sport', 2990, 5));
+    s = patchAllocation(s, 'd2#0', { smoothed: true });
+    s = patchAllocation(s, 'd1#0', { fundedBySavings: true });
+    // La reprise ramène une opération de plus, et un solde à jour.
+    const fresh = structuredClone(base);
+    op(fresh, 'd9', 'carte', '2026-11-14', -900, 'KIOSQUE', 'EXPENSE');
+    const db = applyState(fresh, s);
+    expect(db.commitments.map((c) => c.id)).toContain('salle');
+    expect(db.transactions.some((t) => t.id === 'd9')).toBe(true);
+    expect(db.allocations.find((a) => a.id === 'd2#0')?.smoothed).toBe(true);
+    expect(compute(db, TODAY).spent).toBe(12000 + 1200 + 900);
+    expect(checkIntegrity(db).errors).toEqual([]);
+  });
+
+  it('une catégorie rangée dans une enveloppe quitte l’autre ; l’enveloppe par défaut ne disparaît jamais', () => {
+    const base = plain();
+    base.categories = [category('a'), category('b')];
+    let s = withState(base);
+    s = saveEnvelope(s, envelope('e1', { categoryIds: ['a', 'b'] }));
+    s = saveEnvelope(s, envelope('e2', { categoryIds: ['b'] }));
+    expect(s.envelopes.map((e) => [e.id, e.categoryIds])).toEqual([['env:default', []], ['e1', ['a']], ['e2', ['b']]]);
+    expect(checkIntegrity(applyState(base, s)).errors).toEqual([]);
+    expect(applyState(base, { ...s, envelopes: s.envelopes.filter((e) => !e.isDefault) }).envelopes.filter((e) => e.isDefault)).toHaveLength(1);
   });
 });
