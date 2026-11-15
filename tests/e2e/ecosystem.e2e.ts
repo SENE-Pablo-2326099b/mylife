@@ -643,6 +643,7 @@ describe('MyLife, une seule app', () => {
     const shows = (label: string, value: RegExp) => expect.poll(() => term(label).innerText()).toMatch(value);
     await shows('Reste à vivre', /1\s300\s€/);
     await shows('Déjà dépensé', /42,50\s€/);
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
     // Trésorerie : 1 200 sur le compte du quotidien. Le loyer, prélèvement récurrent, n'est pas réservé par défaut :
     // il ne touchera la trésorerie qu'à son débit réel.
     await shows('Comptes du quotidien', /1\s200\s€/);
@@ -711,22 +712,6 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Terminé' }).click();
     await shows('Déjà dépensé', /37,50\s€/);
     await p.getByText(/À récupérer : 5\s€/).waitFor();
-    // Une règle de tri.
-    await p.locator('button.link', { hasText: 'Ajouter' }).nth(3).click();
-    await p.getByLabel('Le libellé contient').fill('epicerie');
-    await p.getByLabel('Catégorie').selectOption('courses');
-    await p.getByRole('button', { name: 'Enregistrer' }).click();
-    await p.getByRole('button', { name: /^epicerie/ }).waitFor();
-    // Le rôle d'un compte est un réglage : mettre le livret dans le cash quotidien, puis l'en retirer.
-    const livret = p.getByRole('button', { name: /^Livret/ });
-    await livret.click();
-    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
-    await p.getByRole('button', { name: 'Terminé' }).click();
-    await shows('Comptes du quotidien', /4\s200\s€/);
-    await livret.click();
-    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
-    await p.getByRole('button', { name: 'Terminé' }).click();
-    await shows('Comptes du quotidien', /1\s200\s€/);
     // Un virement interne arrive par la banque, en deux opérations non classées : il est apparié tout seul, et
     // comme il va vers l'épargne, c'est une mise de côté (50 €), pas une dépense.
     await p.evaluate(
@@ -753,6 +738,59 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Je ne le reverrai pas' }).click();
     await shows('Déjà dépensé', /42,50\s€/);
     await shot(p, '61-finances-v5-automatismes');
+    // ---- M4. Les réglages : tout ce qui structure le calcul se change ici.
+    await p.getByRole('link', { name: 'Réglages de MyFinances' }).click();
+    await p.getByRole('heading', { name: 'Réglages' }).waitFor();
+    const add = (n: number) => p.locator('button.link', { hasText: 'Ajouter' }).nth(n).click();
+    // Un compte tenu à la main : 40 € d'espèces, comptés dans le cash quotidien par leur rôle.
+    await add(0);
+    await p.getByLabel('Nom').fill('Portefeuille');
+    await p.getByLabel('Solde ou valeur').fill('40');
+    await p.getByRole('button', { name: 'Créer' }).click();
+    await p.getByRole('button', { name: /^Portefeuille.*Espèces · cash quotidien · tenu à la main/ }).waitFor();
+    // Le rôle d'un compte est un réglage : le livret entre dans le cash quotidien, puis en ressort.
+    const livret = p.getByRole('button', { name: /^Livret/ });
+    await livret.click();
+    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    await p.getByRole('button', { name: /^Livret.*cash quotidien/ }).waitFor();
+    await livret.click();
+    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    // Deux niveaux de catégories : « Pain » sous « Courses ».
+    await add(1);
+    await p.getByLabel('Nom').fill('Pain');
+    await p.getByLabel('Sous-catégorie de').selectOption('courses');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('button', { name: /^Pain/ }).waitFor();
+    // Un tag, puis une règle de tri qui le pose.
+    await add(2);
+    await p.getByLabel('Nom').fill('week-end');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByText('#week-end').waitFor();
+    await add(4);
+    await p.getByLabel('Le libellé contient').fill('epicerie');
+    await p.getByLabel('Catégorie').selectOption({ label: 'Courses › Pain' });
+    await p.getByRole('switch', { name: 'week-end' }).click();
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('button', { name: /^epicerie.*Pain · #week-end/ }).waitFor();
+    // Une enveloppe hors quotidien, plafonnée à 100 €, qui contient « Courses » (et donc sa sous-catégorie).
+    await add(3);
+    await p.getByLabel('Nom').fill('Alimentation');
+    await p.getByLabel('Plafond par cycle').fill('100');
+    await p.getByRole('switch', { name: 'Dans le budget quotidien' }).click();
+    await p.getByRole('switch', { name: 'Courses', exact: true }).click();
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('button', { name: /^Alimentation.*hors quotidien · plafond 100/ }).waitFor();
+    await shot(p, '62-finances-v5-reglages');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // Retour au calcul : les espèces sont dans le cash, l'enveloppe est mise à part, et ses dépenses (l'épicerie
+    // classée par la règle, la boulangerie classée par son marchand) ne pèsent plus dans le quotidien.
+    await p.getByRole('link', { name: 'Retour' }).click();
+    await shows('Comptes du quotidien', /1\s240\s€/);
+    await shows('Enveloppes hors quotidien', /100\s€/);
+    await shows('Déjà dépensé', /\n0\s€/);
+    await p.getByRole('button', { name: /^Alimentation.*42,50\s€ sur 100\s€/ }).waitFor();
     await ctx.close();
   });
 

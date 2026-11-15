@@ -5,7 +5,7 @@ import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/mod
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
-import { acceptSuggestion, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
+import { acceptSuggestion, addAccount, archiveCategory, mergeCategories, patchSettings, removeTag, saveCategory, saveTag, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
 import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Rule, type Transaction } from '../app/src/modules/finances/engine/schema';
 
 /** Le moteur financier de MyFinances V5 (étape M1) : scénario de référence, cas limites, invariants. */
@@ -874,5 +874,106 @@ describe('moteur M3 : invariants des automatismes (200 jeux de données)', () =>
       // opérations du jeu, de même montant sur deux comptes, peuvent s'apparier aussi : jamais l'inverse).
       expect(b.envelopes.reduce((x, y) => x + y.spent, 0), `graine ${seed}`).toBeLessThanOrEqual(a.envelopes.reduce((x, y) => x + y.spent, 0) - 6100);
     }
+  });
+});
+
+describe('moteur M4 : catégories sur deux niveaux, fusion, tags, comptes, cycle', () => {
+  function shop(): Db {
+    const db = blank({ accounts: [account('k', 'CHECKING', 100000)], categories: [category('alim'), category('courses', 'alim'), category('restos'), category('bar'), category('revenu')] });
+    db.categories.find((c) => c.id === 'revenu')!.scope = 'INCOME';
+    db.envelopes.push(envelope('env:sorties', { cap: 10000, order: 1, categoryIds: ['restos'] }), envelope('env:bar', { cap: 3000, order: 2, categoryIds: ['bar'] }));
+    op(db, 'a', 'k', '2026-11-03', -4000, 'SUPERMARCHE', 'EXPENSE', { categoryId: 'courses' });
+    op(db, 'b', 'k', '2026-11-05', -2500, 'BISTROT', 'EXPENSE', { categoryId: 'restos' });
+    op(db, 'c', 'k', '2026-11-07', -1500, 'COMPTOIR', 'EXPENSE', { categoryId: 'bar' });
+    return db;
+  }
+  const spentIn = (db: Db, id: string) => compute(db, '2026-11-15').envelopes.find((x) => x.envelope.id === id)!.spent;
+
+  it('deux niveaux au plus : une sous-catégorie a une parente de premier niveau, du même type', () => {
+    const base = shop();
+    let s = initState(base);
+    const all = () => applyState(base, s).categories;
+    s = saveCategory(s, { ...category('bio', 'courses'), name: '  Bio ' }, all());
+    expect(all().find((c) => c.id === 'bio')).toMatchObject({ name: 'Bio', parentId: null });
+    s = saveCategory(s, category('bio', 'alim'), all());
+    expect(all().find((c) => c.id === 'bio')?.parentId).toBe('alim');
+    // « alim » a des sous-catégories : elle ne peut pas en devenir une. Un revenu ne va pas sous une dépense.
+    s = saveCategory(s, { ...all().find((c) => c.id === 'alim')!, parentId: 'restos' }, all());
+    expect(all().find((c) => c.id === 'alim')?.parentId).toBeNull();
+    s = saveCategory(s, { ...all().find((c) => c.id === 'revenu')!, parentId: 'alim' }, all());
+    expect(all().find((c) => c.id === 'revenu')?.parentId).toBeNull();
+    expect(checkIntegrity(applyState(base, s)).errors).toEqual([]);
+  });
+
+  it('une sous-catégorie suit l’enveloppe de sa parente ; la renommer ou la déplacer ne change aucun total', () => {
+    const base = shop();
+    let s = saveEnvelope(initState(base), envelope('env:alim', { cap: 20000, order: 3, categoryIds: ['alim'] }));
+    expect(spentIn(applyState(base, s), 'env:alim')).toBe(4000);
+    const total = compute(applyState(base, s), '2026-11-15').spent;
+    s = saveCategory(s, { ...category('courses', 'alim'), name: 'Supermarché' }, applyState(base, s).categories);
+    expect(compute(applyState(base, s), '2026-11-15').spent).toBe(total);
+    // Sortie de sa parente : elle retombe dans l'enveloppe par défaut ; la somme ne bouge pas.
+    s = saveCategory(s, category('courses'), applyState(base, s).categories);
+    const e = compute(applyState(base, s), '2026-11-15');
+    expect([spentIn(applyState(base, s), 'env:alim'), spentIn(applyState(base, s), 'env:default'), e.spent]).toEqual([0, 4000, total]);
+  });
+
+  it('fusionner : l’historique se lit comme celui de la cible, sans réécrire une seule opération', () => {
+    const base = shop();
+    let s = saveRule(initState(base), rule('r', { keywords: ['zinc'], categoryId: 'bar' }));
+    s = mergeCategories(s, 'bar', 'restos', applyState(base, s).categories, 5);
+    const db = applyState(base, s);
+    expect(db.categories.find((c) => c.id === 'bar')).toMatchObject({ mergedIntoId: 'restos', archivedAt: 5 });
+    // L'opération garde sa catégorie d'origine ; elle compte maintenant dans l'enveloppe de la cible.
+    expect(lineOf(db, 'c').categoryId).toBe('bar');
+    expect([spentIn(db, 'env:sorties'), spentIn(db, 'env:bar')]).toEqual([4000, 0]);
+    expect(db.envelopes.find((e) => e.id === 'env:bar')?.categoryIds).toEqual([]);
+    expect(db.rules[0]?.categoryId).toBe('restos');
+    expect(compute(db, '2026-11-15').spent).toBe(compute(base, '2026-11-15').spent);
+    expect(checkIntegrity(db).errors).toEqual([]);
+    // Fusionner dans une catégorie elle-même fusionnée vise sa cible ; les sous-catégories suivent.
+    s = mergeCategories(s, 'alim', 'bar', applyState(base, s).categories, 6);
+    const after = applyState(base, s);
+    expect(after.categories.find((c) => c.id === 'alim')?.mergedIntoId).toBe('restos');
+    expect(after.categories.find((c) => c.id === 'courses')?.parentId).toBe('restos');
+    expect(checkIntegrity(after).errors).toEqual([]);
+    expect(mergeCategories(s, 'restos', 'revenu', after.categories, 7)).toBe(s);
+  });
+
+  it('archiver cache la catégorie et ses sous-catégories sans toucher aux totaux ; restaurer les ramène', () => {
+    const base = shop();
+    let s = archiveCategory(initState(base), 'alim', base.categories, 9);
+    const db = applyState(base, s);
+    expect(db.categories.filter((c) => c.archivedAt).map((c) => c.id)).toEqual(['alim', 'courses']);
+    expect(compute(db, '2026-11-15').spent).toBe(8000);
+    s = archiveCategory(s, 'alim', db.categories, null);
+    expect(applyState(base, s).categories.filter((c) => c.archivedAt)).toEqual([]);
+  });
+
+  it('les tags n’entrent dans aucun calcul ; supprimer un tag le retire des règles et des lignes', () => {
+    const base = shop();
+    let s = saveTag(initState(base), { id: 't:pro', name: 'Pro', archivedAt: null });
+    s = patchAllocation(s, 'a#0', { tagIds: ['t:pro'] });
+    s = saveRule(s, rule('r', { keywords: ['bistrot'], categoryId: 'restos', tagIds: ['t:pro'] }));
+    const db = applyState(base, s);
+    expect([lineOf(db, 'a').tagIds, lineOf(db, 'b').tagIds]).toEqual([['t:pro'], ['t:pro']]);
+    expect(compute(db, '2026-11-15')).toMatchObject({ spent: 8000 });
+    s = removeTag(s, 't:pro');
+    const gone = applyState(base, s);
+    expect([gone.tags, lineOf(gone, 'a').tagIds, gone.rules[0]?.tagIds]).toEqual([[], [], []]);
+  });
+
+  it('un compte créé à la main compte selon ses réglages ; le cycle, le mode et les tolérances sont des réglages', () => {
+    const base = reference();
+    let s = addAccount(initState(base), account('especes', 'CASH', 4000, { source: 'manual' }));
+    expect(compute(applyState(base, s), TODAY).cash).toBe(51100 + 4000);
+    s = addAccount(s, account('pret', 'LIABILITY', 300000, { source: 'manual' }));
+    expect(netWorth(applyState(base, s), TODAY).debts).toBe(300000);
+    // Jour de paie au 1er : le cycle change, donc ce qui y tombe aussi.
+    s = patchSettings(s, { payday: 1, openingCommitmentId: null });
+    expect(compute(applyState(base, s), TODAY).cycle).toEqual({ start: '2026-11-01', end: '2026-11-30' });
+    s = patchSettings(s, { payday: 26, mode: 'CASH' });
+    const e = compute(applyState(base, s), TODAY);
+    expect([e.mode, e.limitedBy]).toEqual(['CASH', 'cash']);
   });
 });

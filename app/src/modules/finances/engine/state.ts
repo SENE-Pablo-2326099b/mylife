@@ -2,7 +2,7 @@ import { addDays, cycleFor, daysInMonth, parseISO, toISO, type ISODate } from '.
 import { automate, type RecurringSuggestion } from './automation';
 import { compute } from './engine';
 import { buildOccurrences, currentCycle, isProvisioned, nextDue } from './occurrences';
-import type { Account, Allocation, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule } from './schema';
+import type { Account, Allocation, Category, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule, Tag } from './schema';
 
 /**
  * Ce que l'utilisateur règle et ce que le moteur retient d'un cycle à l'autre (étape M2). Les faits (comptes,
@@ -14,7 +14,7 @@ import type { Account, Allocation, Commitment, Db, EngineSettings, Envelope, Flo
 /** Les leviers posés sur une ligne. */
 export type AllocationPatch = Partial<Pick<Allocation, 'smoothed' | 'fundedBySavings' | 'incomeUse' | 'flow' | 'categoryId' | 'tagIds' | 'linkedTransactionId' | 'settlesReceivableId'>>;
 /** Ce que l'utilisateur change à un compte : son rôle et ses drapeaux. */
-export type AccountPatch = Partial<Pick<Account, 'role' | 'includeInDailyCash' | 'includeInNetWorth' | 'deferredDebit' | 'ownershipRatio'>>;
+export type AccountPatch = Partial<Pick<Account, 'name' | 'role' | 'includeInDailyCash' | 'includeInNetWorth' | 'deferredDebit' | 'ownershipRatio' | 'alertThreshold' | 'balance' | 'archivedAt'>>;
 
 export interface ClosedCycle {
   start: ISODate;
@@ -46,6 +46,11 @@ export interface EngineState {
   receivables?: Receivable[];
   /** Récurrents détectés que l'utilisateur ne veut pas au plan. */
   ignoredSuggestions?: string[];
+  /** Les catégories créées ou modifiées par l'utilisateur (elles l'emportent sur celles de la reprise). */
+  categories?: Category[];
+  tags?: Tag[];
+  /** Les comptes créés à la main (espèces, bien, dette, compte de provision…). */
+  accounts?: Account[];
   settings: EngineSettings;
   carryIn: Db['carryIn'];
   /** Début du cycle en cours la dernière fois que le moteur a tourné : sert à détecter qu'un cycle s'est terminé. */
@@ -65,17 +70,20 @@ export function initState(base: Db): EngineState {
  * toujours le dernier mot.
  */
 export function applyState(base: Db, s: EngineState): Db {
-  const cats = new Set(base.categories.map((c) => c.id));
+  const mine = new Map((s.categories ?? []).map((c) => [c.id, c]));
+  const categories = [...base.categories.map((c) => mine.get(c.id) ?? c), ...(s.categories ?? []).filter((c) => !base.categories.some((b) => b.id === c.id))].sort((a, b) => a.order - b.order);
+  const cats = new Set(categories.map((c) => c.id));
   const envelopes = s.envelopes.map((e) => ({ ...e, categoryIds: e.categoryIds.filter((id) => cats.has(id)) }));
   if (!envelopes.some((e) => e.isDefault)) envelopes.unshift(...base.envelopes.filter((e) => e.isDefault));
-  const accounts = base.accounts.map((a) => (s.accountPatches?.[a.id] ? { ...a, ...s.accountPatches[a.id] } : a));
+  const known = new Set(base.accounts.map((a) => a.id));
+  const accounts = [...base.accounts, ...(s.accounts ?? []).filter((a) => !known.has(a.id))].map((a) => (s.accountPatches?.[a.id] ? { ...a, ...s.accountPatches[a.id] } : a));
   const accountIds = new Set(accounts.map((a) => a.id));
   const defaults = s.merchantDefaults ?? {};
   const merchants = base.merchants.map((m) => (defaults[m.id] ? { ...m, ...defaults[m.id] } : m));
   // Ce qui est décidé à la main (nature, catégorie, lien) est marqué avant tout : les automatismes n'y touchent pas.
   const decided = (p: AllocationPatch | undefined) => !!p && ('flow' in p || 'categoryId' in p || 'linkedTransactionId' in p || 'settlesReceivableId' in p);
   const patched = base.allocations.map((a) => (decided(s.allocationPatches[a.id]) ? { ...a, origin: 'manual' as const } : a));
-  const automated = automate({ ...base, accounts, merchants, rules: s.rules ?? [], allocations: patched, settings: { ...base.settings, ...s.settings } }, new Set(Object.keys(defaults)));
+  const automated = automate({ ...base, accounts, categories, tags: s.tags ?? [], merchants, rules: s.rules ?? [], allocations: patched, settings: { ...base.settings, ...s.settings } }, new Set(Object.keys(defaults)));
   const receivables = (s.receivables ?? []).filter((r) => base.allocations.some((a) => a.id === r.allocationId));
   const advanced = new Map<string, number>();
   for (const r of receivables) advanced.set(r.allocationId, (advanced.get(r.allocationId) ?? 0) + r.amount);
@@ -286,4 +294,65 @@ export function roll(s: EngineState, base: Db, today: ISODate, now: number = Dat
     provisions = upsert(provisions, p);
   }
   return provisions === state.provisions ? state : { ...state, provisions };
+}
+
+// ---------------------------------------------------------------- comptes, catégories, tags (M4)
+
+/** Un compte créé à la main : espèces, bien, dette, compte de provision… Son solde se saisit. */
+export const addAccount = (s: EngineState, a: Account): EngineState => ({ ...s, accounts: upsert(s.accounts ?? [], a) });
+export const patchSettings = (s: EngineState, patch: Partial<EngineSettings>): EngineState => ({ ...s, settings: { ...s.settings, ...patch } });
+
+export const saveTag = (s: EngineState, t: Tag): EngineState => ({ ...s, tags: upsert(s.tags ?? [], t) });
+export const removeTag = (s: EngineState, id: string): EngineState => ({
+  ...s,
+  tags: (s.tags ?? []).filter((t) => t.id !== id),
+  rules: (s.rules ?? []).map((r) => ({ ...r, tagIds: r.tagIds.filter((x) => x !== id) })),
+  allocationPatches: Object.fromEntries(Object.entries(s.allocationPatches).map(([k, p]) => [k, p.tagIds ? { ...p, tagIds: p.tagIds.filter((x) => x !== id) } : p])),
+});
+
+/**
+ * Enregistre une catégorie. Deux niveaux au plus : une sous-catégorie a une parente de premier niveau, du même
+ * type ; une catégorie qui a des sous-catégories ne peut pas en devenir une. Sinon elle reste au premier niveau.
+ * `all` : toutes les catégories telles qu'elles sont aujourd'hui.
+ */
+export function saveCategory(s: EngineState, c: Category, all: readonly Category[]): EngineState {
+  const parent = c.parentId ? all.find((x) => x.id === c.parentId) : undefined;
+  const hasChildren = all.some((x) => x.parentId === c.id && !x.mergedIntoId);
+  const valid = parent && !parent.parentId && parent.id !== c.id && parent.scope === c.scope && !parent.mergedIntoId && !hasChildren;
+  return { ...s, categories: upsert(s.categories ?? [], { ...c, name: c.name.trim(), parentId: valid ? parent.id : null }) };
+}
+
+/** Archiver : elle ne se propose plus, son historique reste. Ses sous-catégories suivent. Restaurer fait l'inverse. */
+export function archiveCategory(s: EngineState, id: string, all: readonly Category[], at: number | null): EngineState {
+  let categories = s.categories ?? [];
+  for (const c of all) if (c.id === id || c.parentId === id) categories = upsert(categories, { ...c, archivedAt: at });
+  return { ...s, categories };
+}
+
+/**
+ * Fusionner une catégorie dans une autre : tout son historique se lit désormais comme celui de la cible, sans
+ * réécrire aucune opération. Ses sous-catégories passent sous la cible (ou sa parente), ses règles et marchands
+ * pointent vers la cible, et elle sort des enveloppes.
+ */
+export function mergeCategories(s: EngineState, fromId: string, intoId: string, all: readonly Category[], at: number): EngineState {
+  const from = all.find((c) => c.id === fromId);
+  const pointed = all.find((c) => c.id === intoId);
+  const into = pointed?.mergedIntoId ? all.find((c) => c.id === pointed.mergedIntoId) : pointed;
+  if (!from || !into || from.id === into.id || from.scope !== into.scope || into.parentId === from.id) return s;
+  let categories = upsert(s.categories ?? [], { ...from, mergedIntoId: into.id, archivedAt: at, parentId: null });
+  const home = into.parentId ?? into.id;
+  for (const c of all) {
+    if (c.id === from.id) continue;
+    // Ce qui avait déjà été fusionné dans elle suit ; ses sous-catégories changent de parente.
+    if (c.mergedIntoId === from.id) categories = upsert(categories, { ...c, mergedIntoId: into.id });
+    else if (c.parentId === from.id) categories = upsert(categories, { ...c, parentId: c.id === home ? null : home });
+  }
+  const swap = (id: string | null) => (id === from.id ? into.id : id);
+  return {
+    ...s,
+    categories,
+    envelopes: s.envelopes.map((e) => ({ ...e, categoryIds: e.categoryIds.filter((x) => x !== from.id) })),
+    rules: (s.rules ?? []).map((r) => ({ ...r, categoryId: swap(r.categoryId) })),
+    merchantDefaults: Object.fromEntries(Object.entries(s.merchantDefaults ?? {}).map(([k, v]) => [k, { ...v, categoryId: swap(v.categoryId) }])),
+  };
 }

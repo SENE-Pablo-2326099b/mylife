@@ -1,16 +1,16 @@
 import { useState, type ReactNode } from 'react';
-import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle, Segmented } from '@mylife/kit';
+import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle } from '@mylife/kit';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { detectRecurring, toClassify, type ToClassify } from '../engine/automation';
 import { envelopeOf, netWorth, weight } from '../engine/engine';
 import { checkIntegrity } from '../engine/integrity';
 import { isProvisioned } from '../engine/occurrences';
-import type { Commitment, Envelope, Provision, Rule } from '../engine/schema';
-import { acceptSuggestion, addInstallmentPlan, addReceivable, classifyAllocation, classifyMerchant, decideOccurrence, ignoreSuggestion, patchAccount, patchAllocation, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, removeReceivable, removeRule, resetCarry, saveCommitment, saveEnvelope, saveProvision, saveRule, settleReceivable, writeOffReceivable } from '../engine/state';
+import type { Commitment, Envelope, Provision } from '../engine/schema';
+import { acceptSuggestion, addInstallmentPlan, addReceivable, classifyAllocation, classifyMerchant, decideOccurrence, ignoreSuggestion, patchAllocation, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, removeReceivable, resetCarry, saveCommitment, saveEnvelope, saveProvision, settleReceivable, writeOffReceivable } from '../engine/state';
 import { useGlance } from '../../../legacy/glance';
-import { day, END, FLOW, KIND, RHYTHM, ROLE } from './labels';
-import { AccountSheet, ClassifySheet, CommitmentSheet, EnvelopeSheet, ExpenseSheet, InstallmentSheet, OccurrenceSheet, ProvisionSheet, ReceivableSheet, RuleSheet, type ExpenseLine } from './sheets';
+import { day, END, KIND, RHYTHM, ROLE } from './labels';
+import { ClassifySheet, CommitmentSheet, EnvelopeSheet, ExpenseSheet, InstallmentSheet, OccurrenceSheet, ProvisionSheet, ReceivableSheet, type ExpenseLine } from './sheets';
 
 /**
  * Étapes M1 et M2 : « pourquoi ce chiffre », et de quoi régler le plan. Les trois blocs de la formule avec tes
@@ -20,12 +20,6 @@ import { AccountSheet, ClassifySheet, CommitmentSheet, EnvelopeSheet, ExpenseShe
  */
 const STATUS = { PAID: 'ok', PARTIAL: 'warn', DUE: 'warn', SKIPPED: 'neutral' } as const;
 const STATUS_LABEL = { PAID: 'réglée', PARTIAL: 'en partie', DUE: 'à venir', SKIPPED: 'sautée' } as const;
-const END_OPTIONS = [
-  { id: 'RESET', label: 'Remis à zéro' },
-  { id: 'ROLLOVER', label: 'Reporté' },
-  { id: 'AUTO_SAVE', label: 'Épargné' },
-] as const;
-
 /** Une ligne de formule : le signe, le terme, sa valeur ; la ligne de résultat est en gras. */
 function Term({ sign, label, detail, value, total }: { sign?: '−' | '+' | '=' | '÷'; label: string; detail?: ReactNode; value: string; total?: boolean }) {
   return (
@@ -63,9 +57,7 @@ export function ReprisePage() {
   const [expense, setExpense] = useState<string | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
   const [group, setGroup] = useState<ToClassify | null>(null);
-  const [rule, setRule] = useState<Rule | 'new' | null>(null);
   const [receivable, setReceivable] = useState<string | null>(null);
-  const [account, setAccount] = useState<string | null>(null);
 
   const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" />;
   if (engine.status === 'error')
@@ -99,7 +91,7 @@ export function ReprisePage() {
       const t = txById.get(a.transactionId);
       if (!t || t.date < e.cycle.start || t.date > today || !envelopeOf(db, a.categoryId).inDailyBudget) return [];
       const pesante = weight({ ...a, fundedBySavings: false }, settled) > 0;
-      return pesante ? [{ allocationId: a.id, label: t.rawLabel, date: t.date, amount: a.amount, smoothed: a.smoothed === true, fundedBySavings: a.fundedBySavings === true, advanced: a.receivableAmount ?? 0 }] : [];
+      return pesante ? [{ allocationId: a.id, label: t.rawLabel, date: t.date, amount: a.amount, smoothed: a.smoothed === true, fundedBySavings: a.fundedBySavings === true, advanced: a.receivableAmount ?? 0, tagIds: a.tagIds }] : [];
     })
     .sort((a, b) => b.date.localeCompare(a.date) || a.amount - b.amount);
   const groups = toClassify(db);
@@ -302,18 +294,8 @@ export function ReprisePage() {
         ))}
       </List>
 
-      <Head action="Ajouter" onAction={() => setRule('new')}>Règles de tri : {db.rules.length}</Head>
-      <List>
-        {db.rules.length === 0 && <ListRow title="Aucune règle" detail="Par exemple : le libellé contient « boulangerie » → Courses" />}
-        {db.rules.map((r) => (
-          <ListRow key={r.id} title={r.name} detail={[FLOW[r.flow], categories.find((c) => c.id === r.categoryId)?.name, r.enabled ? null : 'désactivée'].filter(Boolean).join(' · ')} onClick={() => setRule(r)} />
-        ))}
-      </List>
-
       <SectionTitle>Fin de cycle · le {day(e.cycle.end)}</SectionTitle>
-      <span className="t-small muted">Que devient ce qu’il reste du budget du quotidien ?</span>
-      <Segmented label="Excédent en fin de cycle" value={db.settings.endPolicy} options={END_OPTIONS} onChange={(endPolicy) => update((s) => ({ ...s, settings: { ...s.settings, endPolicy } }))} />
-      <span className="t-small muted">{END.find(([id]) => id === db.settings.endPolicy)?.[1]}. Un dépassement est déduit du cycle suivant.</span>
+      <span className="t-small muted">{END.find(([id]) => id === db.settings.endPolicy)?.[1]}. Se règle dans les réglages.</span>
       {(carried || lastClosed) && (
         <List>
           {lastClosed && <ListRow title={`Cycle clos le ${day(lastClosed.end)}`} detail={lastClosed.result >= 0 ? `Excédent de ${euros(lastClosed.result)}${lastClosed.toSave > 0 ? ` · ${euros(lastClosed.toSave)} à envoyer vers l’épargne ?` : ''}` : `Dépassement de ${euros(-lastClosed.result)}`} value={euros(lastClosed.spent)} />}
@@ -326,13 +308,17 @@ export function ReprisePage() {
         {db.accounts
           .filter((a) => !a.archivedAt)
           .map((a) => (
-            <ListRow key={a.id} title={a.name} detail={[ROLE[a.role], a.includeInDailyCash ? 'dans le cash quotidien' : null, a.deferredDebit ? `débit différé le ${a.deferredDebit.debitDay}` : null].filter(Boolean).join(' · ')} value={a.balance === null ? '?' : euros(a.role === 'LIABILITY' ? -a.balance : a.balance, { round: true })} onClick={() => setAccount(a.id)} />
+            <ListRow key={a.id} title={a.name} detail={[ROLE[a.role], a.includeInDailyCash ? 'dans le cash quotidien' : null, a.deferredDebit ? `débit différé le ${a.deferredDebit.debitDay}` : null].filter(Boolean).join(' · ')} value={a.balance === null ? '?' : euros(a.role === 'LIABILITY' ? -a.balance : a.balance, { round: true })} />
           ))}
         {worth.installments > 0 && <ListRow title="Paiements fractionnés restants" detail="Déduits du patrimoine" value={euros(-worth.installments, { round: true })} />}
         {worth.receivables > 0 && <ListRow title="Avances à récupérer" detail="Comptées dans le patrimoine" value={euros(worth.receivables, { round: true })} />}
         {paired > 0 && <ListRow title="Virements internes appariés" detail="Ce cycle : ils ne pèsent ni dans le budget, ni dans les revenus" value={paired} />}
       </List>
 
+      <Button block href="/argent/reglages">
+        Réglages de MyFinances
+      </Button>
+      <span className="t-small muted" style={{ textAlign: 'center' }}>Cycle, comptes, catégories, tags, enveloppes, règles de tri.</span>
       <Button block disabled={engine.busy} onClick={engine.reload}>
         {engine.busy ? 'Lecture en cours…' : 'Relire mes données'}
       </Button>
@@ -393,6 +379,7 @@ export function ReprisePage() {
       />
       <ExpenseSheet
         line={expenses.find((x) => x.allocationId === expense) ?? null}
+        tags={db.tags.filter((t) => !t.archivedAt)}
         onClose={() => setExpense(null)}
         onPatch={(id, patch) => update((s) => patchAllocation(s, id, patch))}
         onAdvance={(allocationId, person, amount) => update((s) => addReceivable(s, { id: `avance:${crypto.randomUUID().slice(0, 8)}`, person, amount, allocationId }))}
@@ -424,21 +411,6 @@ export function ReprisePage() {
           setGroup(null);
         }}
       />
-      <RuleSheet
-        value={rule}
-        categories={categories}
-        count={db.rules.length}
-        onClose={() => setRule(null)}
-        onSave={(r) => {
-          update((s) => saveRule(s, r));
-          setRule(null);
-        }}
-        onRemove={(id) => {
-          update((s) => removeRule(s, id));
-          setRule(null);
-        }}
-      />
-      <AccountSheet value={db.accounts.find((a) => a.id === account) ?? null} onClose={() => setAccount(null)} onPatch={(id, patch) => update((s) => patchAccount(s, id, patch))} />
       <EnvelopeSheet
         value={envelope}
         categories={db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId)}

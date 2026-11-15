@@ -24,6 +24,7 @@ import { useHomeAgenda } from '@legacy/agendaHome';
 // MyFinances V5 embarque sa base locale : chargé seulement quand on l'ouvre. `/argent` est son adresse provisoire, le
 // temps que l'ancienne app garde `/finances/` (bascule à l'étape 3.7).
 const FinancesReprise = lazy(() => import('./modules/finances/pages/Reprise').then((m) => ({ default: m.ReprisePage })));
+const FinancesReglages = lazy(() => import('./modules/finances/pages/Reglages').then((m) => ({ default: m.ReglagesPage })));
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -183,6 +184,14 @@ function Shell({ login }: { login: string }) {
               <Route path="/confidentialite" element={<PrivacyPage />} />
               <Route path="/installer" element={<InstallPage />} />
               <Route path="/kit" element={<KitPage />} />
+              <Route
+                path="/argent/reglages"
+                element={
+                  <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
+                    <FinancesReglages />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/argent"
                 element={

@@ -1,11 +1,12 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Button, Field, Notice, Sheet, Switch } from '@mylife/kit';
+import { useEffect, useState } from 'react';
+import { Button, Field, Notice } from '@mylife/kit';
 import { euros } from '../core/format';
 import type { Occurrence } from '../engine/occurrences';
 import type { ToClassify } from '../engine/automation';
-import type { Account, Category, Commitment, Db, Envelope, Flow, OccurrenceOverride, Provision, Receivable, Rhythm, Role, Rule } from '../engine/schema';
+import { roleDefaults, type Account, type Category, type Commitment, type Db, type Envelope, type Flow, type OccurrenceOverride, type Provision, type Receivable, type Rhythm, type Role, type Rule, type Tag } from '../engine/schema';
 import type { AccountPatch, AllocationPatch } from '../engine/state';
-import { cents, day, END, FLOWS, KIND, ROLES } from './labels';
+import { Form, Select, Toggle } from './controls';
+import { categoryOptions, cents, day, END, FLOWS, KIND, ROLES, SCOPES } from './labels';
 
 /**
  * Les feuilles de réglage de l'étape M2 : une échéance, un engagement, un paiement en plusieurs fois, une poche, une
@@ -14,40 +15,6 @@ import { cents, day, END, FLOWS, KIND, ROLES } from './labels';
 
 const text = (c: number | null | undefined) => (c === null || c === undefined ? '' : String(c / 100).replace('.', ','));
 const newId = (prefix: string) => `${prefix}:${crypto.randomUUID().slice(0, 8)}`;
-
-function Toggle({ label, detail, checked, onChange }: { label: string; detail?: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="row" style={{ minHeight: 48 }}>
-      <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-        <span className="t-body" style={{ fontWeight: 500 }}>{label}</span>
-        {detail && <span className="t-small muted">{detail}</span>}
-      </span>
-      <Switch checked={checked} onChange={onChange} label={label} />
-    </div>
-  );
-}
-
-function Select<T extends string>({ id, label, value, options, onChange, hint }: { id: string; label: string; value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; hint?: string }) {
-  return (
-    <Field id={id} label={label} hint={hint}>
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value as T)}>
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
-    </Field>
-  );
-}
-
-function Form({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
-  return (
-    <Sheet open={open} title={title} onClose={onClose}>
-      <div className="stack" style={{ maxHeight: '70dvh', overflowY: 'auto', paddingBottom: 4 }}>{children}</div>
-    </Sheet>
-  );
-}
 
 // ---------------------------------------------------------------- une échéance
 
@@ -280,9 +247,10 @@ export interface ExpenseLine {
   fundedBySavings: boolean;
   /** Déjà avancé pour d'autres sur cette dépense. */
   advanced: number;
+  tagIds: string[];
 }
 
-export function ExpenseSheet({ line, onClose, onPatch, onAdvance }: { line: ExpenseLine | null; onClose: () => void; onPatch: (id: string, patch: AllocationPatch) => void; onAdvance: (allocationId: string, person: string, amount: number) => void }) {
+export function ExpenseSheet({ line, tags, onClose, onPatch, onAdvance }: { line: ExpenseLine | null; tags: Tag[]; onClose: () => void; onPatch: (id: string, patch: AllocationPatch) => void; onAdvance: (allocationId: string, person: string, amount: number) => void }) {
   const [person, setPerson] = useState('');
   const [amount, setAmount] = useState('');
   const id = line?.allocationId;
@@ -301,6 +269,10 @@ export function ExpenseSheet({ line, onClose, onPatch, onAdvance }: { line: Expe
       </span>
       <Toggle label="Lisser sur le reste du cycle" detail="Elle réduit un peu le budget de chaque jour restant, au lieu de peser sur la seule journée." checked={line.smoothed} onChange={(v) => onPatch(line.allocationId, { smoothed: v })} />
       <Toggle label="Financée par l’épargne" detail="Payée avec de l’argent venu d’un compte d’épargne : elle ne pèse pas dans le budget du cycle." checked={line.fundedBySavings} onChange={(v) => onPatch(line.allocationId, { fundedBySavings: v })} />
+      {tags.length > 0 && <span className="t-label muted" style={{ paddingTop: 6 }}>Tags</span>}
+      {tags.map((t) => (
+        <Toggle key={t.id} label={t.name} checked={line.tagIds.includes(t.id)} onChange={(v) => onPatch(line.allocationId, { tagIds: v ? [...line.tagIds, t.id] : line.tagIds.filter((x) => x !== t.id) })} />
+      ))}
       <span className="t-label muted" style={{ paddingTop: 6 }}>Avancé pour quelqu’un</span>
       <span className="t-small muted">La part avancée sort du budget et te reste due, jusqu’à ce que la personne te rembourse.</span>
       <div className="grid-2">
@@ -374,7 +346,7 @@ export function ClassifySheet({ group, categories, onClose, onSave }: { group: T
         {group.count} opération{group.count > 1 ? 's' : ''}, {euros(group.total)}. D’abord ce que c’est, puis sa catégorie si c’est une dépense.
       </span>
       <Select id="cls-flow" label="C’est" value={flow} options={FLOWS} onChange={setFlow} />
-      {needsCategory && <Select id="cls-cat" label="Catégorie" value={categoryId} options={[['', 'Choisir…'], ...categories.map((c) => [c.id, c.name] as const)]} onChange={setCategoryId} />}
+      {needsCategory && <Select id="cls-cat" label="Catégorie" value={categoryId} options={[['', 'Choisir…'], ...categoryOptions(categories)]} onChange={setCategoryId} />}
       {group.merchantId && <Toggle label="Pour tout ce marchand" detail="Ses opérations passées et à venir seront classées de la même façon." checked={whole} onChange={setWhole} />}
       <Button variant="action" block disabled={needsCategory && !categoryId} onClick={() => onSave(group, flow, needsCategory ? categoryId : null, whole && !!group.merchantId)}>
         Classer
@@ -388,7 +360,7 @@ export function ClassifySheet({ group, categories, onClose, onSave }: { group: T
 const DIRECTIONS = [['any', 'Entrées et sorties'], ['debit', 'Sorties seulement'], ['credit', 'Entrées seulement']] as const;
 const blankRule = (priority: number): Rule => ({ id: newId('regle'), name: '', priority, enabled: true, merchantId: null, keywords: [], accountIds: [], amountMin: null, amountMax: null, direction: 'any', flow: 'EXPENSE', categoryId: null, tagIds: [] });
 
-export function RuleSheet({ value, categories, count, onClose, onSave, onRemove }: { value: Rule | 'new' | null; categories: Category[]; count: number; onClose: () => void; onSave: (r: Rule) => void; onRemove: (id: string) => void }) {
+export function RuleSheet({ value, categories, tags, count, onClose, onSave, onRemove }: { value: Rule | 'new' | null; categories: Category[]; tags: Tag[]; count: number; onClose: () => void; onSave: (r: Rule) => void; onRemove: (id: string) => void }) {
   const [r, setR] = useState<Rule>(() => blankRule(0));
   const [words, setWords] = useState('');
   const [min, setMin] = useState('');
@@ -424,7 +396,11 @@ export function RuleSheet({ value, categories, count, onClose, onSave, onRemove 
         </Field>
       </div>
       <Select id="rule-flow" label="Alors c’est" value={r.flow} options={FLOWS} onChange={(flow) => set({ flow })} />
-      {r.flow === 'EXPENSE' && <Select id="rule-cat" label="Catégorie" value={r.categoryId ?? ''} options={[['', 'Choisir…'], ...categories.map((c) => [c.id, c.name] as const)]} onChange={(id) => set({ categoryId: id || null })} />}
+      {r.flow === 'EXPENSE' && <Select id="rule-cat" label="Catégorie" value={r.categoryId ?? ''} options={[['', 'Choisir…'], ...categoryOptions(categories)]} onChange={(id) => set({ categoryId: id || null })} />}
+      {tags.length > 0 && <span className="t-label muted">Et porte les tags</span>}
+      {tags.map((t) => (
+        <Toggle key={t.id} label={t.name} checked={r.tagIds.includes(t.id)} onChange={(v) => set({ tagIds: v ? [...r.tagIds, t.id] : r.tagIds.filter((x) => x !== t.id) })} />
+      ))}
       <Toggle label="Active" checked={r.enabled} onChange={(v) => set({ enabled: v })} />
       <Button variant="action" block disabled={!ready} onClick={() => onSave({ ...r, name: r.name || keywords.join(', ') || 'Par montant', keywords, amountMin, amountMax, categoryId: r.flow === 'EXPENSE' ? r.categoryId : null })}>
         Enregistrer
@@ -440,37 +416,156 @@ export function RuleSheet({ value, categories, count, onClose, onSave, onRemove 
 
 // ---------------------------------------------------------------- un compte
 
-export function AccountSheet({ value, onClose, onPatch }: { value: Account | null; onClose: () => void; onPatch: (id: string, patch: AccountPatch) => void }) {
-  const [closing, setClosing] = useState('');
-  const [debit, setDebit] = useState('');
-  const id = value?.id;
+const SHARES = [['1', 'À moi seul'], ['0.5', 'Partagé à deux (50 %)']] as const;
+
+/** Régler un compte, ou en créer un à la main (espèces, bien, dette, compte de provision). */
+export function AccountSheet({ value, onClose, onPatch, onCreate }: { value: Account | 'new' | null; onClose: () => void; onPatch: (id: string, patch: AccountPatch) => void; onCreate: (a: Account) => void }) {
+  const existing = value && value !== 'new' ? value : null;
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<Role>('CASH');
+  const [balance, setBalance] = useState('');
+  const [closing, setClosing] = useState('25');
+  const [debit, setDebit] = useState('5');
+  const id = existing?.id ?? (value === 'new' ? 'new' : null);
   useEffect(() => {
-    setClosing(value?.deferredDebit ? String(value.deferredDebit.closingDay) : '25');
-    setDebit(value?.deferredDebit ? String(value.deferredDebit.debitDay) : '5');
+    setName(existing?.name ?? '');
+    setRole(existing?.role ?? 'CASH');
+    setBalance(text(existing?.balance));
+    setClosing(existing?.deferredDebit ? String(existing.deferredDebit.closingDay) : '25');
+    setDebit(existing?.deferredDebit ? String(existing.deferredDebit.debitDay) : '5');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
   if (!value) return null;
+  const amount = cents(balance);
+  if (!existing)
+    return (
+      <Form open title="Nouveau compte" onClose={onClose}>
+        <span className="t-small muted">Un compte tenu à la main : des espèces, un bien, une dette, un compte de provision. Son solde se saisit.</span>
+        <Field id="acc-name" label="Nom">
+          <input id="acc-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Portefeuille, voiture, prêt…" />
+        </Field>
+        <Select id="acc-role" label="Rôle" value={role} options={ROLES} onChange={setRole} />
+        <Field id="acc-balance" label={role === 'LIABILITY' ? 'Reste à rembourser' : 'Solde ou valeur'}>
+          <input id="acc-balance" inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} placeholder="0" />
+        </Field>
+        <Button
+          variant="action"
+          block
+          disabled={!name.trim() || amount === null}
+          onClick={() => onCreate({ id: newId('compte'), name: name.trim(), provider: '', role, ...roleDefaults(role), currency: 'EUR', ownershipRatio: 1, alertThreshold: null, deferredDebit: null, source: 'manual', balance: amount ?? 0, balanceAt: Date.now(), archivedAt: null })}
+        >
+          Créer
+        </Button>
+      </Form>
+    );
   const dayOf = (v: string) => Math.max(1, Math.min(31, Math.trunc(Number(v)) || 1));
-  const deferred = value.deferredDebit !== null;
+  const deferred = existing.deferredDebit !== null;
+  const manual = existing.source === 'manual';
   return (
-    <Form open title={value.name} onClose={onClose}>
-      <Select id="acc-role" label="Rôle" value={value.role} options={ROLES} onChange={(role: Role) => onPatch(value.id, { role })} hint="Le rôle décrit le compte ; ce sont les réglages ci-dessous qui comptent dans les calculs." />
-      <Toggle label="Dans le cash quotidien" detail="Son solde fait partie de l’argent du quotidien." checked={value.includeInDailyCash} onChange={(v) => onPatch(value.id, { includeInDailyCash: v })} />
-      <Toggle label="Dans le patrimoine" checked={value.includeInNetWorth} onChange={(v) => onPatch(value.id, { includeInNetWorth: v })} />
-      <Toggle label="Carte à débit différé" detail="Ses achats sont prélevés en une fois : d’ici là, leur total est retiré du cash libre." checked={deferred} onChange={(v) => onPatch(value.id, { deferredDebit: v ? { closingDay: dayOf(closing), debitDay: dayOf(debit) } : null })} />
+    <Form open title={existing.name} onClose={onClose}>
+      <Field id="acc-name" label="Nom">
+        <input id="acc-name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => name.trim() && name.trim() !== existing.name && onPatch(existing.id, { name: name.trim() })} />
+      </Field>
+      {manual && (
+        <Field id="acc-balance" label={existing.role === 'LIABILITY' ? 'Reste à rembourser' : 'Solde ou valeur'}>
+          <input id="acc-balance" inputMode="decimal" value={balance} onChange={(e) => setBalance(e.target.value)} onBlur={() => amount !== null && amount !== existing.balance && onPatch(existing.id, { balance: amount })} />
+        </Field>
+      )}
+      <Select id="acc-role" label="Rôle" value={existing.role} options={ROLES} onChange={(r: Role) => onPatch(existing.id, { role: r })} hint="Le rôle décrit le compte ; ce sont les réglages ci-dessous qui comptent dans les calculs." />
+      <Toggle label="Dans le cash quotidien" detail="Son solde fait partie de l’argent du quotidien." checked={existing.includeInDailyCash} onChange={(v) => onPatch(existing.id, { includeInDailyCash: v })} />
+      <Toggle label="Dans le patrimoine" checked={existing.includeInNetWorth} onChange={(v) => onPatch(existing.id, { includeInNetWorth: v })} />
+      <Select id="acc-share" label="Ce compte est" value={existing.ownershipRatio === 0.5 ? '0.5' : '1'} options={SHARES} onChange={(v) => onPatch(existing.id, { ownershipRatio: Number(v) })} />
+      <Toggle label="Carte à débit différé" detail="Ses achats sont prélevés en une fois : d’ici là, leur total est retiré du cash libre." checked={deferred} onChange={(v) => onPatch(existing.id, { deferredDebit: v ? { closingDay: dayOf(closing), debitDay: dayOf(debit) } : null })} />
       {deferred && (
         <div className="grid-2">
           <Field id="acc-closing" label="Jour d’arrêté">
-            <input id="acc-closing" inputMode="numeric" value={closing} onChange={(e) => { setClosing(e.target.value); onPatch(value.id, { deferredDebit: { closingDay: dayOf(e.target.value), debitDay: dayOf(debit) } }); }} />
+            <input id="acc-closing" inputMode="numeric" value={closing} onChange={(e) => { setClosing(e.target.value); onPatch(existing.id, { deferredDebit: { closingDay: dayOf(e.target.value), debitDay: dayOf(debit) } }); }} />
           </Field>
           <Field id="acc-debit" label="Jour de prélèvement">
-            <input id="acc-debit" inputMode="numeric" value={debit} onChange={(e) => { setDebit(e.target.value); onPatch(value.id, { deferredDebit: { closingDay: dayOf(closing), debitDay: dayOf(e.target.value) } }); }} />
+            <input id="acc-debit" inputMode="numeric" value={debit} onChange={(e) => { setDebit(e.target.value); onPatch(existing.id, { deferredDebit: { closingDay: dayOf(closing), debitDay: dayOf(e.target.value) } }); }} />
           </Field>
         </div>
       )}
-      <Button block onClick={onClose}>
+      <Button variant="action" block onClick={onClose}>
         Terminé
       </Button>
+      {manual && (
+        <Button variant="danger" block onClick={() => { onPatch(existing.id, { archivedAt: Date.now() }); onClose(); }}>
+          Retirer ce compte
+        </Button>
+      )}
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- une catégorie
+
+const COLORS = ['#2dd4bf', '#fbbf24', '#60a5fa', '#a3e635', '#fb923c', '#c084fc', '#f472b6', '#6fe0a0', '#5ccbe6', '#94a3b8'];
+const blankCategory = (order: number): Category => ({ id: newId('cat'), parentId: null, scope: 'EXPENSE', name: '', color: COLORS[order % COLORS.length]!, order, archivedAt: null, mergedIntoId: null });
+
+export function CategorySheet({ value, all, onClose, onSave, onArchive, onMerge }: { value: Category | 'new' | null; all: Category[]; onClose: () => void; onSave: (c: Category) => void; onArchive: (id: string, at: number | null) => void; onMerge: (from: string, into: string) => void }) {
+  const [c, setC] = useState<Category>(() => blankCategory(0));
+  const [into, setInto] = useState('');
+  useEffect(() => {
+    setC(value && value !== 'new' ? value : blankCategory(all.length));
+    setInto('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  if (!value) return null;
+  const isNew = value === 'new';
+  const set = (patch: Partial<Category>) => setC((x) => ({ ...x, ...patch }));
+  const live = all.filter((x) => !x.archivedAt && !x.mergedIntoId && x.scope === c.scope && x.id !== c.id);
+  const hasChildren = all.some((x) => x.parentId === c.id && !x.mergedIntoId);
+  const parents = live.filter((x) => !x.parentId);
+  return (
+    <Form open title={isNew ? 'Nouvelle catégorie' : c.name || 'Catégorie'} onClose={onClose}>
+      <Field id="cat-name" label="Nom">
+        <input id="cat-name" value={c.name} onChange={(e) => set({ name: e.target.value })} placeholder="Courses, sorties, salaire…" />
+      </Field>
+      {isNew && <Select id="cat-scope" label="Elle range" value={c.scope} options={SCOPES} onChange={(scope) => set({ scope, parentId: null })} />}
+      <Select id="cat-parent" label="Sous-catégorie de" value={c.parentId ?? ''} options={[['', 'Aucune : catégorie de premier niveau'], ...parents.map((p) => [p.id, p.name] as const)]} onChange={(id) => set({ parentId: id || null })} hint={hasChildren ? 'Elle a des sous-catégories : elle reste au premier niveau (deux niveaux au plus).' : 'Deux niveaux au plus.'} />
+      <Field id="cat-color" label="Couleur">
+        <input id="cat-color" type="color" value={c.color} onChange={(e) => set({ color: e.target.value })} style={{ padding: 4 }} />
+      </Field>
+      <Button variant="action" block disabled={!c.name.trim()} onClick={() => onSave(hasChildren ? { ...c, parentId: null } : c)}>
+        Enregistrer
+      </Button>
+      {!isNew && (
+        <>
+          <Select id="cat-merge" label="Fusionner dans" value={into} options={[['', 'Choisir une catégorie…'], ...categoryOptions(live)]} onChange={setInto} hint="Tout son historique se lira comme celui de l’autre. Aucune opération n’est réécrite." />
+          <Button block disabled={!into} onClick={() => onMerge(c.id, into)}>
+            Fusionner
+          </Button>
+          <Button variant="danger" block onClick={() => onArchive(c.id, c.archivedAt ? null : Date.now())}>
+            {c.archivedAt ? 'Restaurer' : 'Archiver'}
+          </Button>
+        </>
+      )}
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- un tag
+
+export function TagSheet({ value, onClose, onSave, onRemove }: { value: Tag | 'new' | null; onClose: () => void; onSave: (t: Tag) => void; onRemove: (id: string) => void }) {
+  const [name, setName] = useState('');
+  useEffect(() => setName(value && value !== 'new' ? value.name : ''), [value]);
+  if (!value) return null;
+  const existing = value === 'new' ? null : value;
+  return (
+    <Form open title={existing ? `#${existing.name}` : 'Nouveau tag'} onClose={onClose}>
+      <span className="t-small muted">Une étiquette libre, en plus de la catégorie, pour retrouver des dépenses transverses. Elle n’entre dans aucun calcul.</span>
+      <Field id="tag-name" label="Nom">
+        <input id="tag-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Imprévu, week-end, pro…" />
+      </Field>
+      <Button variant="action" block disabled={!name.trim()} onClick={() => onSave({ id: existing?.id ?? newId('tag'), name: name.trim().replace(/^#/, ''), archivedAt: null })}>
+        Enregistrer
+      </Button>
+      {existing && (
+        <Button variant="danger" block onClick={() => onRemove(existing.id)}>
+          Supprimer
+        </Button>
+      )}
     </Form>
   );
 }
@@ -511,7 +606,7 @@ export function EnvelopeSheet({ value, categories, envelopes, onClose, onSave, o
           <span className="t-label muted" style={{ padding: '4px 0' }}>Ses catégories</span>
           {categories.length === 0 && <span className="t-small muted">Aucune catégorie de dépense.</span>}
           {categories.map((c) => (
-            <Toggle key={c.id} label={c.name} detail={owner(c.id) ? `aujourd’hui dans « ${owner(c.id)} »` : undefined} checked={e.categoryIds.includes(c.id)} onChange={(v) => set({ categoryIds: v ? [...e.categoryIds, c.id] : e.categoryIds.filter((x) => x !== c.id) })} />
+            <Toggle key={c.id} label={c.parentId ? `${categories.find((p) => p.id === c.parentId)?.name ?? ''} › ${c.name}` : c.name} detail={owner(c.id) ? `aujourd’hui dans « ${owner(c.id)} »` : undefined} checked={e.categoryIds.includes(c.id)} onChange={(v) => set({ categoryIds: v ? [...e.categoryIds, c.id] : e.categoryIds.filter((x) => x !== c.id) })} />
           ))}
         </div>
       )}

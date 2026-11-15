@@ -1,4 +1,4 @@
-import type { EndPolicy } from '../engine/schema';
+import type { Category, EndPolicy } from '../engine/schema';
 
 /** « 300 » ou « 300,50 » → centimes ; null si ce n'est pas un montant. */
 export const cents = (text: string): number | null => {
@@ -17,3 +17,11 @@ export const FLOW = { EXPENSE: 'Dépense', INCOME: 'Revenu', TRANSFER: 'Virement
 export const FLOWS = Object.entries(FLOW) as [keyof typeof FLOW, string][];
 export const ROLE = { CHECKING: 'Courant', PROVISION: 'Provision', SAVINGS: 'Épargne', INVESTMENT: 'Placement', CASH: 'Espèces', ASSET: 'Bien', LIABILITY: 'Dette' } as const;
 export const ROLES = Object.entries(ROLE) as [keyof typeof ROLE, string][];
+export const SCOPES = [['EXPENSE', 'Des dépenses'], ['INCOME', 'Des revenus'], ['SAVING', 'Des mises de côté']] as const;
+
+/** Les catégories utilisables, parentes puis leurs sous-catégories (« Parente › Enfant »), pour une liste déroulante. */
+export function categoryOptions(categories: readonly Category[]): (readonly [string, string])[] {
+  const live = categories.filter((c) => !c.archivedAt && !c.mergedIntoId);
+  const top = live.filter((c) => !c.parentId || !live.some((p) => p.id === c.parentId)).sort((a, b) => a.order - b.order);
+  return top.flatMap((p) => [[p.id, p.name] as const, ...live.filter((c) => c.parentId === p.id).sort((a, b) => a.order - b.order).map((c) => [c.id, `${p.name} › ${c.name}`] as const)]);
+}
