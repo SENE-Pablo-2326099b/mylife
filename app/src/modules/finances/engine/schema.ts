@@ -152,12 +152,19 @@ export interface Commitment {
   paused: boolean;
 }
 
-/** Une échéance décidée à la main (sautée, ou réglée par telle opération). Le reste est calculé. */
+/**
+ * Une échéance décidée à la main. Le reste est calculé.
+ * - `SKIPPED` : sautée ce cycle ;
+ * - `PAID` : réglée (par telle opération, ou sans en désigner) ;
+ * - `PARTIAL` : `paid` déjà versés ; il reste la différence à payer.
+ */
 export interface OccurrenceOverride {
   /** `<engagement>@<date>`. */
   id: string;
-  status: 'SKIPPED' | 'PAID';
+  status: 'SKIPPED' | 'PAID' | 'PARTIAL';
   transactionId: string | null;
+  /** PARTIAL : ce qui est déjà sorti du compte pour cette échéance, positif. */
+  paid?: number;
 }
 
 export interface InstallmentPlan {

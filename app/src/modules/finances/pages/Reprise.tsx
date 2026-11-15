@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle } from '@mylife/kit';
+import { Badge, Button, EmptyState, Field, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle, Sheet } from '@mylife/kit';
 import { localToday } from '@mylife/lumen';
 import { euros } from '../core/format';
 import type { FinanceData } from '../core/model';
-import { loadAll } from '../data/db';
+import { loadAll, loadOverrides, saveOverrides } from '../data/db';
 import { importOld, lastImport } from '../data/importOld';
 import { compute, netWorth } from '../engine/engine';
 import { fromV3 } from '../engine/fromV3';
 import { checkIntegrity } from '../engine/integrity';
-import type { Role } from '../engine/schema';
+import type { Occurrence } from '../engine/occurrences';
+import type { OccurrenceOverride, Role } from '../engine/schema';
 import { useGlance } from '../../../legacy/glance';
 
 /**
@@ -18,8 +19,13 @@ import { useGlance } from '../../../legacy/glance';
  */
 const ROLE: Record<Role, string> = { CHECKING: 'Courant', PROVISION: 'Provision', SAVINGS: 'Épargne', INVESTMENT: 'Placement', CASH: 'Espèces', ASSET: 'Bien', LIABILITY: 'Dette' };
 const KIND = { INCOME: 'Revenu', CHARGE: 'Charge', SAVING: 'Épargne', INSTALLMENT: 'Échéance' } as const;
-const STATUS = { PAID: 'ok', DUE: 'warn', SKIPPED: 'neutral' } as const;
-const STATUS_LABEL = { PAID: 'réglée', DUE: 'à venir', SKIPPED: 'sautée' } as const;
+const STATUS = { PAID: 'ok', PARTIAL: 'warn', DUE: 'warn', SKIPPED: 'neutral' } as const;
+const STATUS_LABEL = { PAID: 'réglée', PARTIAL: 'en partie', DUE: 'à venir', SKIPPED: 'sautée' } as const;
+/** « 300 » ou « 300,50 » → centimes ; null si ce n'est pas un montant. */
+const cents = (text: string) => {
+  const n = Number(text.replace(/\s/g, '').replace(',', '.'));
+  return text.trim() && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+};
 const day = (iso: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(`${iso}T12:00:00`));
 
 /** Une ligne de formule : le signe, le terme, sa valeur ; la ligne de résultat est en gras. */
@@ -36,12 +42,45 @@ function Term({ sign, label, detail, value, total }: { sign?: '−' | '+' | '=' 
   );
 }
 
+/** Décider d'une échéance : déjà versé en partie, réglée, sautée, ou laisser le moteur chercher. */
+function OccurrenceSheet({ o, onClose, onDecide }: { o: Occurrence | null; onClose: () => void; onDecide: (id: string, decision: OccurrenceOverride | null) => void }) {
+  const [paid, setPaid] = useState('');
+  useEffect(() => setPaid(o && o.status === 'PARTIAL' ? String(o.paid / 100).replace('.', ',') : ''), [o]);
+  if (!o) return null;
+  const amount = cents(paid);
+  const tooMuch = amount !== null && amount > o.expected;
+  return (
+    <Sheet open title={o.commitment.label} onClose={onClose}>
+      <div className="stack">
+        <span className="t-small muted">
+          {KIND[o.commitment.kind]} de {euros(o.expected)}, le {day(o.dueDate)}. {o.status === 'PARTIAL' ? `${euros(o.paid)} déjà versés, reste ${euros(o.remaining)}.` : ''}
+        </span>
+        <Field id="occ-paid" label="Déjà versé" hint="Ce qui est déjà sorti de ton compte pour cette échéance : seul le reste sera compté à payer." error={tooMuch ? 'Plus que l’échéance : marque-la plutôt réglée.' : null}>
+          <input id="occ-paid" inputMode="decimal" value={paid} onChange={(e) => setPaid(e.target.value)} placeholder="0" />
+        </Field>
+        <Button variant="action" block disabled={amount === null || amount === 0 || tooMuch} onClick={() => onDecide(o.id, { id: o.id, status: 'PARTIAL', transactionId: null, paid: amount ?? 0 })}>
+          Enregistrer
+        </Button>
+        <div className="grid-2">
+          <Button onClick={() => onDecide(o.id, { id: o.id, status: 'PAID', transactionId: null })}>Déjà réglée</Button>
+          <Button onClick={() => onDecide(o.id, { id: o.id, status: 'SKIPPED', transactionId: null })}>Sauter ce cycle</Button>
+        </div>
+        <Button variant="quiet" onClick={() => onDecide(o.id, null)}>
+          Laisser le calcul décider
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
 export function ReprisePage() {
   const [data, setData] = useState<FinanceData | null>(null);
   const [empty, setEmpty] = useState(false);
   const [at, setAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [overrides, setOverrides] = useState<OccurrenceOverride[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
   const old = useGlance('finances');
 
   const run = useCallback(async () => {
@@ -61,6 +100,7 @@ export function ReprisePage() {
 
   useEffect(() => {
     void (async () => {
+      setOverrides(await loadOverrides());
       const when = await lastImport();
       if (when === null) return run();
       setAt(when);
@@ -86,13 +126,18 @@ export function ReprisePage() {
       </>
     );
 
-  const db = fromV3(data);
+  const db = { ...fromV3(data), occurrenceOverrides: overrides };
+  const decide = (id: string, decision: OccurrenceOverride | null) => {
+    const next = [...overrides.filter((x) => x.id !== id), ...(decision ? [decision] : [])];
+    setOverrides(next);
+    setEditing(null);
+    void saveOverrides(next);
+  };
   const e = compute(db, localToday());
   const worth = netWorth(db);
   const integrity = checkIntegrity(db);
   const daily = db.accounts.filter((a) => a.includeInDailyCash && !a.archivedAt);
-  const offPlan = e.envelopes.filter((x) => !x.envelope.inDailyBudget && x.budget === null && x.spent > 0);
-  const dueCount = e.occurrences.filter((o) => o.status === 'DUE' && o.commitment.kind !== 'INCOME').length;
+  const dueCount = e.occurrences.filter((o) => (o.status === 'DUE' || o.status === 'PARTIAL') && o.commitment.kind !== 'INCOME').length;
 
   return (
     <>
@@ -119,11 +164,6 @@ export function ReprisePage() {
       )}
       {e.incomeFallback && <Notice tone="warn">Aucun revenu prévu : les revenus reçus dans le cycle servent de base.</Notice>}
       {e.unknownBalances.length > 0 && <Notice tone="warn">Solde inconnu pour {e.unknownBalances.join(', ')} : la trésorerie est sous-estimée.</Notice>}
-      {offPlan.length > 0 && (
-        <Notice>
-          {euros(offPlan.reduce((s, x) => s + x.spent, 0))} de charges fixes payées ce cycle sans être au plan : elles ne comptent pas dans le budget théorique, seulement dans la trésorerie.
-        </Notice>
-      )}
 
       <SectionTitle>1 · Budget théorique</SectionTitle>
       <List>
@@ -132,6 +172,7 @@ export function ReprisePage() {
         <Term sign="−" label="Épargne" detail="le plus grand du prévu et du déjà mis de côté" value={euros(e.epargne)} />
         {e.report !== 0 && <Term sign="+" label="Report du cycle précédent" value={euros(e.report)} />}
         <Term sign="=" label="Reste à vivre" value={euros(e.rav)} total />
+        {e.offPlanPaid > 0 && <Term sign="−" label="Charges fixes réglées" detail="payées ce cycle sans être au plan" value={euros(e.offPlanPaid)} />}
         {e.reserve > 0 && <Term sign="−" label="Enveloppes hors quotidien" value={euros(e.reserve)} />}
         <Term sign="−" label="Déjà dépensé" detail={`du ${day(e.cycle.start)} à aujourd’hui`} value={euros(e.spent)} />
         <Term sign="=" label="Reste dans le budget" value={euros(e.resteEnveloppe)} total />
@@ -156,13 +197,21 @@ export function ReprisePage() {
         <Term label="Demain, à ce rythme" value={`${euros(e.demain)} par jour`} />
       </List>
 
-      <SectionTitle>Échéances du cycle : {e.occurrences.length}</SectionTitle>
+      <SectionTitle>Échéances du cycle : {e.occurrences.length} · touche une charge pour la corriger</SectionTitle>
       <List>
         {e.occurrences.length === 0 && <ListRow title="Aucune échéance prévue" detail="Ni revenu, ni charge, ni épargne dans l’ancienne app" />}
         {e.occurrences.map((o) => (
-          <ListRow key={o.id} title={o.commitment.label} detail={`${KIND[o.commitment.kind]} · ${day(o.dueDate)}`} value={<span className="row" style={{ gap: 8 }}><Badge tone={STATUS[o.status]}>{STATUS_LABEL[o.status]}</Badge>{euros(o.actual ?? o.expected)}</span>} />
+          <ListRow
+            key={o.id}
+            title={o.commitment.label}
+            detail={`${KIND[o.commitment.kind]} · ${day(o.dueDate)}${o.status === 'PARTIAL' ? ` · ${euros(o.paid)} versés, reste ${euros(o.remaining)}` : ''}`}
+            value={<span className="row" style={{ gap: 8 }}><Badge tone={STATUS[o.status]}>{STATUS_LABEL[o.status]}</Badge>{euros(o.actual ?? o.expected)}</span>}
+            onClick={o.commitment.kind === 'INCOME' ? undefined : () => setEditing(o.id)}
+          />
         ))}
       </List>
+
+      <OccurrenceSheet o={e.occurrences.find((o) => o.id === editing) ?? null} onClose={() => setEditing(null)} onDecide={decide} />
 
       <SectionTitle>Enveloppes</SectionTitle>
       <List>

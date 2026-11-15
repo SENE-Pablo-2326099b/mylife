@@ -650,6 +650,19 @@ describe('MyLife, une seule app', () => {
     // Le plus petit des deux : la trésorerie (500 + 42,50 dépensés depuis minuit), pas le budget (1 300).
     await p.getByText(/Limité par ta trésorerie/).waitFor();
     expect(await term('Disponible à minuit').innerText()).toMatch(/542,50\s€/);
+    // Une échéance en partie versée : 300 € déjà sortis sur les 700 du loyer, il n'en reste que 400 à payer.
+    await p.getByRole('button', { name: /Loyer/ }).click();
+    await p.getByLabel('Déjà versé').fill('300');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await expect.poll(() => term('À payer avant la paie').innerText()).toMatch(/400\s€/);
+    expect(await term('Cash libre').innerText()).toMatch(/800\s€/);
+    await p.getByText(/300\s€ versés, reste 400\s€/).waitFor();
+    // La décision tient après rechargement ; « laisser le calcul décider » la retire.
+    await p.reload();
+    await expect.poll(() => term('Cash libre').innerText()).toMatch(/800\s€/);
+    await p.getByRole('button', { name: /Loyer/ }).click();
+    await p.getByRole('button', { name: 'Laisser le calcul décider' }).click();
+    await expect.poll(() => term('Cash libre').innerText()).toMatch(/500\s€/);
     await shot(p, '60-finances-v5-moteur');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     // Rejouable : même résultat.

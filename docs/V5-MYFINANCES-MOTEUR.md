@@ -387,3 +387,21 @@ Chaque étape : codée, testée, journalisée, commitée, puis arrêt pour que t
 Le moteur est du code pur, sans écran ni base : il se teste par scénarios (ton cas de référence : deux comptes du
 quotidien, une poche de 161 €, un achat de 600 € en quatre fois) et par propriétés (les invariants ci-dessus, vérifiés
 sur des données tirées au hasard).
+
+## E. Deux règles ajoutées après le test de M1 (15/11/2026)
+
+Sur des données réelles, deux écarts : −93,19 € de cash libre au lieu de 206,81 €, et 554,35 € de budget au lieu de
+206,86 €. Le calcul était cohérent ; il lui manquait deux notions.
+
+**Échéance en partie versée.** Une échéance a un prévu, un déjà versé et un reste : `reste = prévu − versé`. Seul le
+reste entre dans « à payer avant la paie », puisque le versé est déjà sorti du solde. Dans le budget théorique,
+l'échéance compte une seule fois pour son montant prévu, et les opérations qui la règlent, même en partie, ne pèsent
+pas dans les dépenses. Le versé se reconnaît de trois façons : des dépenses du cycle dont le libellé cite la charge,
+plus petites qu'elle, qui s'additionnent sans la dépasser ; une déclaration à la main (« déjà versé ») ; et dès que le
+versé atteint le prévu à la tolérance près, l'échéance est réglée.
+
+**Charges réglées sans être au plan.** Une enveloppe hors budget quotidien sans plafond met à part ce qui y a été
+payé : `Pot = RAV − budgets des enveloppes plafonnées hors quotidien − payé dans les enveloppes hors quotidien sans
+plafond`. Une charge fixe payée, même absente du plan, réduit donc le budget théorique de son montant ; côté
+trésorerie, elle est déjà sortie du solde. C'est la règle générique ; le nom « Charges fixes » n'est qu'un réglage de
+départ issu de l'ancienne app.

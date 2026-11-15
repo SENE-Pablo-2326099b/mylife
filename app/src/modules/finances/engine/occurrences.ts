@@ -85,10 +85,18 @@ export interface Occurrence {
   dueDate: ISODate;
   /** Montant prévu, positif. */
   expected: number;
-  status: 'DUE' | 'PAID' | 'SKIPPED';
+  /** `PARTIAL` : une partie est déjà versée ; `remaining` reste à payer. */
+  status: 'DUE' | 'PARTIAL' | 'PAID' | 'SKIPPED';
+  /** L'opération qui la règle (la première, s'il y en a plusieurs). */
   transactionId: string | null;
+  /** Toutes les opérations qui la règlent, en tout ou en partie : elles ne pèsent pas une seconde fois dans le budget. */
+  transactionIds: string[];
   /** Montant réel une fois réglée, positif. */
   actual: number | null;
+  /** Déjà versé, positif. */
+  paid: number;
+  /** Ce qu'il reste à sortir du compte : 0 si réglée ou sautée. */
+  remaining: number;
 }
 
 const words = (s: string) => new Set(normalizeText(s).split(' ').filter((w) => w.length >= 3));
@@ -128,18 +136,38 @@ export function buildOccurrences(db: Db, cycle: Cycle): Occurrence[] {
   const candidates = db.transactions.filter((t) => inRange(t.date, from, cycle.end));
   const used = new Set<string>([...explicit.values(), ...db.occurrenceOverrides.flatMap((o) => (o.transactionId ? [o.transactionId] : []))]);
 
-  const out: Occurrence[] = db.commitments.flatMap((c) => dueDates(c, cycle).map((dueDate) => ({ id: `${c.id}@${dueDate}`, commitment: c, dueDate, expected: c.amount, status: 'DUE' as const, transactionId: null, actual: null })));
+  const out: Occurrence[] = db.commitments.flatMap((c) => dueDates(c, cycle).map((dueDate) => ({ id: `${c.id}@${dueDate}`, commitment: c, dueDate, expected: c.amount, status: 'DUE' as const, transactionId: null, transactionIds: [], actual: null, paid: 0, remaining: c.amount })));
   const settle = (o: Occurrence, transactionId: string | null) => {
     o.status = 'PAID';
     o.transactionId = transactionId;
+    o.transactionIds = transactionId ? [transactionId] : [];
     const t = transactionId ? txById.get(transactionId) : undefined;
     o.actual = t ? Math.abs(t.amount) : o.expected;
+    o.paid = o.actual;
+    o.remaining = 0;
+  };
+  /** Une partie est versée : il reste la différence. Tout est versé (à la tolérance près) : l'échéance est réglée. */
+  const part = (o: Occurrence, paid: number, transactionIds: string[]) => {
+    o.paid = paid;
+    o.transactionIds = transactionIds;
+    o.transactionId = transactionIds[0] ?? null;
+    if (paid >= o.expected * (1 - o.commitment.tolerance)) {
+      o.status = 'PAID';
+      o.actual = paid;
+      o.remaining = 0;
+    } else {
+      o.status = 'PARTIAL';
+      o.remaining = o.expected - paid;
+    }
   };
   // 1. Ce qui a été décidé à la main, et les revenus versés à un tiers (jamais sur le compte : réputés reçus).
   for (const o of out) {
     const ov = overrides.get(o.id);
-    if (ov?.status === 'SKIPPED') o.status = 'SKIPPED';
-    else if (ov?.status === 'PAID') settle(o, ov.transactionId);
+    if (ov?.status === 'SKIPPED') {
+      o.status = 'SKIPPED';
+      o.remaining = 0;
+    } else if (ov?.status === 'PAID') settle(o, ov.transactionId);
+    else if (ov?.status === 'PARTIAL') part(o, Math.max(0, Math.min(ov.paid ?? 0, o.expected)), ov.transactionId ? [ov.transactionId] : []);
     else if (explicit.has(o.id)) settle(o, explicit.get(o.id)!);
     else if (o.commitment.direct) settle(o, null);
   }
@@ -154,5 +182,23 @@ export function buildOccurrences(db: Db, cycle: Cycle): Occurrence[] {
         settle(o, best.id);
       }
     }
+  // 3. Versements partiels : des dépenses du cycle dont le libellé cite la charge, plus petites qu'elle (un acompte,
+  // un paiement en deux fois). Elles s'additionnent tant qu'elles ne dépassent pas l'échéance.
+  for (const o of out.filter((x) => x.status === 'DUE' && (x.commitment.kind === 'CHARGE' || x.commitment.kind === 'INSTALLMENT'))) {
+    const mine = words(o.commitment.label);
+    const parts = candidates
+      .filter((t) => !used.has(t.id) && t.date >= cycle.start && t.amount < 0 && (!o.commitment.accountId || t.accountId === o.commitment.accountId))
+      .filter((t) => !(lines.get(t.id) ?? []).some((l) => l.flow !== null && l.flow !== 'EXPENSE') && [...words(t.rawLabel)].some((w) => mine.has(w)))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    let paid = 0;
+    const ids: string[] = [];
+    for (const t of parts) {
+      if (paid - t.amount > o.expected * (1 + o.commitment.tolerance)) continue;
+      paid -= t.amount;
+      ids.push(t.id);
+      used.add(t.id);
+    }
+    if (ids.length) part(o, paid, ids);
+  }
   return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.id.localeCompare(b.id));
 }

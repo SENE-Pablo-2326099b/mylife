@@ -72,8 +72,10 @@ export interface Explanation {
   epargne: number;
   report: number;
   rav: number;
-  /** Budgets des enveloppes hors quotidien, retirés du pot. */
+  /** Budgets des enveloppes hors quotidien plafonnées, retirés du pot. */
   reserve: number;
+  /** Payé dans les enveloppes hors quotidien sans plafond (charges réglées sans être au plan), retiré du pot. */
+  offPlanPaid: number;
   pot: number;
   /** Dépensé dans les enveloppes du quotidien, aujourd'hui compris. */
   spent: number;
@@ -116,7 +118,7 @@ export interface Explanation {
 export function compute(db: Db, today: ISODate): Explanation {
   const cycle = currentCycle(db, today);
   const occurrences = buildOccurrences(db, cycle);
-  const settled = new Set(occurrences.flatMap((o) => (o.status === 'PAID' && o.transactionId ? [o.transactionId] : [])));
+  const settled = new Set(occurrences.flatMap((o) => o.transactionIds));
   const accounts = new Map(db.accounts.map((a) => [a.id, a]));
   const txById = new Map(db.transactions.map((t) => [t.id, t]));
   const live = (t: Transaction | undefined): t is Transaction => !!t && !accounts.get(t.accountId)?.archivedAt;
@@ -126,7 +128,8 @@ export function compute(db: Db, today: ISODate): Explanation {
   });
 
   // ---- budget théorique
-  const amountOf = (o: Occurrence) => (o.status === 'SKIPPED' ? 0 : o.status === 'PAID' ? (o.actual ?? o.expected) : o.expected);
+  // Réglée : le montant réel. Due ou en partie versée : le prévu (ou le versé, s'il le dépasse). Sautée : rien.
+  const amountOf = (o: Occurrence) => (o.status === 'SKIPPED' ? 0 : o.status === 'PAID' ? (o.actual ?? o.expected) : Math.max(o.expected, o.paid));
   const sum = (kinds: string[]) => occurrences.filter((o) => kinds.includes(o.commitment.kind)).reduce((s, o) => s + amountOf(o), 0);
   const hasIncomePlan = db.commitments.some((c) => c.kind === 'INCOME' && !c.paused);
   const extraIncomes = inCycle.filter(({ a, t }) => a.flow === 'INCOME' && !settled.has(t.id));
@@ -165,9 +168,12 @@ export function compute(db: Db, today: ISODate): Explanation {
       const used = spentBy.get(envelope.id) ?? 0;
       return { envelope, budget, spent: used, remaining: budget === null ? 0 : Math.max(0, budget - used) };
     });
+  // Hors quotidien : une enveloppe plafonnée met son budget à part ; une enveloppe sans plafond (des charges fixes
+  // payées sans être au plan) met à part ce qui y a été payé. Dans les deux cas, cet argent n'est pas pour le quotidien.
   const offDailyEnvelopes = envelopes.filter((e) => !e.envelope.inDailyBudget && e.budget !== null);
+  const offPlanPaid = envelopes.filter((e) => !e.envelope.inDailyBudget && e.budget === null).reduce((s, e) => s + Math.max(0, e.spent), 0);
   const reserve = offDailyEnvelopes.reduce((s, e) => s + Math.max(0, e.budget!), 0);
-  const pot = rav - reserve;
+  const pot = rav - reserve - offPlanPaid;
   const resteEnveloppe = pot - spent;
 
   // ---- trésorerie réelle
@@ -181,12 +187,13 @@ export function compute(db: Db, today: ISODate): Explanation {
   const locked = daily.filter((a) => wholeLocked.has(a.id)).reduce((s, a) => s + own(db, a, a.balance ?? 0), 0) + pockets.filter((p) => !wholeLocked.has(p.accountId)).reduce((s, p) => s + own(db, accounts.get(p.accountId)!, p.amount), 0);
   // Ce qu'il reste à payer depuis le quotidien d'ici la fin du cycle. Une poche liée couvre ses échéances, dans
   // l'ordre des dates : cette part est déjà dans « verrouillé », elle n'est pas retirée une seconde fois.
-  const due = occurrences.filter((o) => o.status === 'DUE' && o.commitment.kind !== 'INCOME' && (!o.commitment.accountId || dailyIds.has(o.commitment.accountId)));
+  const due = occurrences.filter((o) => (o.status === 'DUE' || o.status === 'PARTIAL') && o.commitment.kind !== 'INCOME' && (!o.commitment.accountId || dailyIds.has(o.commitment.accountId)));
   const left = new Map(pockets.map((p) => [p.id, own(db, accounts.get(p.accountId)!, p.amount)]));
   let toPay = 0;
   let covered = 0;
   for (const o of due) {
-    let need = o.expected;
+    // Ce qui est déjà versé est déjà sorti du solde : seul le reste est encore à payer.
+    let need = o.remaining;
     for (const p of pockets) {
       const linked = (p.commitmentId && p.commitmentId === o.commitment.id) || (p.installmentPlanId && p.installmentPlanId === o.commitment.installmentPlanId);
       if (!linked || need === 0) continue;
@@ -221,6 +228,7 @@ export function compute(db: Db, today: ISODate): Explanation {
     report,
     rav,
     reserve,
+    offPlanPaid,
     pot,
     spent,
     spentToday,

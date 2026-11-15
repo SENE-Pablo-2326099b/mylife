@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable, type Table } from 'dexie';
+import type { OccurrenceOverride } from '../engine/schema';
 import type { Account, Category, FinanceData, FinanceSettings, Goal, GoalMove, Holding, InvestmentOp, Merchant, Movement, Planned, Snapshot } from '../core/model';
 
 /**
@@ -78,4 +79,14 @@ export async function saveAll(data: FinanceData): Promise<void> {
       db.meta.put({ key: 'settings', value: data.settings }),
     ]);
   });
+}
+
+/** Les échéances décidées à la main (sautée, réglée, en partie versée). Gardées d'une reprise à l'autre. */
+export async function loadOverrides(): Promise<OccurrenceOverride[]> {
+  const v = (await db.meta.get('occurrenceOverrides'))?.value;
+  return Array.isArray(v) ? (v as OccurrenceOverride[]) : [];
+}
+
+export async function saveOverrides(list: OccurrenceOverride[]): Promise<void> {
+  await db.meta.put({ key: 'occurrenceOverrides', value: list });
 }

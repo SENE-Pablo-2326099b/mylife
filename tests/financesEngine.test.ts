@@ -230,6 +230,75 @@ describe('moteur : cas limites', () => {
   });
 });
 
+/**
+ * Le cas relevé le 15/11 sur des données réelles (montants repris tels quels, libellés fictifs) : un solde de 367,81 €,
+ * une échéance de 461 € au 25 novembre dont 300 € sont déjà versés, et 347,49 € de charges fixes payées sans être au
+ * plan. Avant correction : −93,19 € de cash libre (les 300 € comptés deux fois) et 554,35 € de budget. Attendu :
+ * 206,81 € de cash libre et 206,86 € de budget, les deux côtés se rejoignant.
+ */
+function partialCase(label: string): Db {
+  const db = blank({
+    accounts: [account('k', 'CHECKING', 36781)],
+    categories: [category('fixes')],
+    commitments: [commitment('salaire', 'INCOME', 'Salaire', 140000, 26), commitment('mens', 'CHARGE', 'Mensualité crédit', 46100, null)],
+    settings: { ...DEFAULT_SETTINGS, payday: 26, openingCommitmentId: 'salaire' },
+  });
+  db.envelopes.push(envelope('env:fixed', { inDailyBudget: false, order: 1, categoryIds: ['fixes'] }));
+  op(db, 'paie', 'k', '2026-10-26', 140000, 'VIR EMPLOYEUR', 'INCOME');
+  op(db, 'f1', 'k', '2026-10-28', -30000, 'PRLV ASSURANCE', 'EXPENSE', { categoryId: 'fixes' });
+  op(db, 'f2', 'k', '2026-11-02', -4749, 'PRLV ABONNEMENTS', 'EXPENSE', { categoryId: 'fixes' });
+  op(db, 'v1', 'k', '2026-11-04', -30000, 'SUPERMARCHE', 'EXPENSE');
+  op(db, 'v2', 'k', '2026-11-09', -8465, 'RESTAURANT', 'EXPENSE');
+  op(db, 'acompte', 'k', '2026-11-12', -30000, label, 'EXPENSE');
+  return db;
+}
+
+describe('moteur : échéance en partie versée, charges fixes payées hors plan', () => {
+  it('un versement dont le libellé cite la charge est un acompte : seul le reste est à payer, et il ne pèse pas deux fois', () => {
+    const e = compute(partialCase('VIR MENSUALITE ACOMPTE'), TODAY);
+    const o = e.occurrences.find((x) => x.commitment.id === 'mens')!;
+    expect(o).toMatchObject({ dueDate: '2026-11-25', status: 'PARTIAL', paid: 30000, remaining: 16100, transactionIds: ['acompte'] });
+    // Trésorerie : 367,81 − 161 (et non − 461).
+    expect([e.cash, e.toPay, e.cashLibre]).toEqual([36781, 16100, 20681]);
+    // Budget : l'échéance compte pour son montant prévu, une seule fois ; l'acompte ne s'ajoute pas aux dépenses.
+    expect([e.revenus, e.charges, e.rav]).toEqual([140000, 46100, 93900]);
+    expect(e.spent).toBe(30000 + 8465);
+    // Les 347,49 € de charges fixes payées sont retirés du budget théorique : 554,35 − 347,49.
+    expect(e.offPlanPaid).toBe(34749);
+    expect(e.resteEnveloppe).toBe(20686);
+    // Les deux côtés se rejoignent à cinq centimes près ; le plus petit l'emporte.
+    expect([e.limitedBy, e.disponible]).toEqual(['cash', 20681]);
+  });
+
+  it('sans mot en commun, l’acompte se déclare à la main ; sans déclaration, l’échéance entière reste due', () => {
+    const db = partialCase('VIR DIVERS');
+    const raw = compute(db, TODAY);
+    expect(raw.occurrences.find((x) => x.commitment.id === 'mens')).toMatchObject({ status: 'DUE', remaining: 46100 });
+    expect(raw.cashLibre).toBe(36781 - 46100);
+    db.occurrenceOverrides = [{ id: 'mens@2026-11-25', status: 'PARTIAL', transactionId: 'acompte', paid: 30000 }];
+    const fixed = compute(db, TODAY);
+    expect(fixed.occurrences.find((x) => x.commitment.id === 'mens')).toMatchObject({ status: 'PARTIAL', paid: 30000, remaining: 16100 });
+    expect([fixed.toPay, fixed.cashLibre, fixed.spent, fixed.resteEnveloppe]).toEqual([16100, 20681, 38465, 20686]);
+  });
+
+  it('un acompte qui atteint le montant (à la tolérance près) règle l’échéance ; déclaré sans opération, il réduit seulement le reste à payer', () => {
+    const db = partialCase('VIR MENSUALITE ACOMPTE');
+    op(db, 'solde', 'k', '2026-11-14', -16100, 'VIR MENSUALITE SOLDE', 'EXPENSE');
+    const paid = compute(db, TODAY);
+    expect(paid.occurrences.find((x) => x.commitment.id === 'mens')).toMatchObject({ status: 'PAID', actual: 46100, remaining: 0, transactionIds: ['acompte', 'solde'] });
+    expect(paid.toPay).toBe(0);
+    const declared = partialCase('VIR DIVERS');
+    declared.occurrenceOverrides = [{ id: 'mens@2026-11-25', status: 'PARTIAL', transactionId: null, paid: 30000 }];
+    expect(compute(declared, TODAY)).toMatchObject({ toPay: 16100, cashLibre: 20681 });
+  });
+
+  it('une poche liée couvre le reste à payer d’une échéance en partie versée, une seule fois', () => {
+    const db = partialCase('VIR MENSUALITE ACOMPTE');
+    db.provisions = [{ id: 'poche', accountId: 'k', label: 'Reste de la mensualité', amount: 16100, commitmentId: 'mens', installmentPlanId: null, goalId: null, status: 'ACTIVE' }];
+    expect(compute(db, TODAY)).toMatchObject({ locked: 16100, covered: 16100, toPay: 0, cashLibre: 20681 });
+  });
+});
+
 /** Générateur déterministe : mêmes graines, mêmes données. */
 function rng(seed: number): () => number {
   let s = seed >>> 0;
@@ -380,6 +449,7 @@ describe('moteur : reprise depuis l’étape 3.3', () => {
     expect([e.revenus, e.charges, e.epargne, e.rav]).toEqual([200000, 70000, 10000, 120000]);
     expect(e.spent).toBe(1250);
     expect(e.envelopes.find((x) => x.envelope.id === 'env:fixed')?.spent).toBe(2500);
+    expect([e.offPlanPaid, e.pot]).toEqual([2500, 117500]);
     expect([e.cash, e.cashLibre]).toEqual([120000, 120000]);
     expect(e.limitedBy).toBe('budget');
   });
