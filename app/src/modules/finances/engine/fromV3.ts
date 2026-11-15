@@ -84,6 +84,8 @@ export function fromV3(data: FinanceData): Db {
     allocations,
     categories,
     tags: [],
+    merchants: data.merchants.map((m) => ({ id: m.id, name: m.name, flow: m.nature === 'depense' ? 'EXPENSE' : m.nature === 'revenu' ? 'INCOME' : m.nature === 'virement' ? 'TRANSFER' : m.nature === 'remboursement' ? 'REFUND' : null, categoryId: m.nature === 'depense' ? m.categoryId : null, tagIds: [] })),
+    rules: [],
     envelopes,
     commitments,
     occurrenceOverrides: [],

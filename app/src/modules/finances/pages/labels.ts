@@ -13,3 +13,7 @@ export const END: readonly (readonly [EndPolicy, string])[] = [
 ];
 export const RHYTHM = { MONTHLY: 'par mois', WEEKLY: 'par semaine', BIWEEKLY: 'toutes les 2 semaines', YEARLY: 'par an', ONCE: 'une fois' } as const;
 export const day = (iso: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(`${iso}T12:00:00`));
+export const FLOW = { EXPENSE: 'Dépense', INCOME: 'Revenu', TRANSFER: 'Virement entre mes comptes', SAVING: 'Mise de côté', REFUND: 'Remboursement' } as const;
+export const FLOWS = Object.entries(FLOW) as [keyof typeof FLOW, string][];
+export const ROLE = { CHECKING: 'Courant', PROVISION: 'Provision', SAVINGS: 'Épargne', INVESTMENT: 'Placement', CASH: 'Espèces', ASSET: 'Bien', LIABILITY: 'Dette' } as const;
+export const ROLES = Object.entries(ROLE) as [keyof typeof ROLE, string][];

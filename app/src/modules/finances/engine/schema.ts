@@ -27,7 +27,10 @@ export interface Account {
   /** Part qui t'appartient (1 ; 0,5 pour un compte partagé à deux). */
   ownershipRatio: number;
   alertThreshold: number | null;
-  /** Carte à débit différé : jour d'arrêté et jour de prélèvement. null : débit immédiat. */
+  /**
+   * Carte à débit différé : les achats s'accumulent jusqu'au jour d'arrêté, puis sont prélevés en une fois le jour de
+   * prélèvement. Tant qu'ils ne le sont pas, leur total (l'encours) est retiré du cash libre. null : débit immédiat.
+   */
   deferredDebit: { closingDay: number; debitDay: number } | null;
   source: 'bank' | 'manual';
   /** Solde connu, positif (une dette : ce qu'il reste à rembourser). null : inconnu. */
@@ -94,6 +97,35 @@ export interface Category {
   archivedAt: number | null;
   /** Fusionnée dans une autre : son historique est lu comme celui de la cible. */
   mergedIntoId: string | null;
+}
+
+/** Un marchand : le libellé bancaire devenu un nom propre, avec ce que sont ses opérations par défaut. */
+export interface Merchant {
+  id: string;
+  name: string;
+  /** null : pas encore classé. */
+  flow: Flow | null;
+  categoryId: string | null;
+  tagIds: string[];
+}
+
+/** Une règle de tri : des conditions (toutes doivent être vraies), des actions. La plus prioritaire l'emporte. */
+export interface Rule {
+  id: string;
+  name: string;
+  priority: number;
+  enabled: boolean;
+  merchantId: string | null;
+  /** Mots cherchés dans le libellé (sans accents ni casse) : l'un d'eux suffit. Vide : pas de condition. */
+  keywords: string[];
+  accountIds: string[];
+  /** Montant en valeur absolue. */
+  amountMin: number | null;
+  amountMax: number | null;
+  direction: 'any' | 'debit' | 'credit';
+  flow: Flow;
+  categoryId: string | null;
+  tagIds: string[];
 }
 
 export interface Tag {
@@ -208,6 +240,9 @@ export interface Receivable {
   amount: number;
   allocationId: string;
   status: 'OPEN' | 'SETTLED' | 'WRITTEN_OFF';
+  createdAt: number;
+  /** Abandonnée : la part redevient une dépense, à cette date (dans le cycle ouvert, pas dans celui d'origine). */
+  writtenOffAt?: ISODate | null;
 }
 
 export interface EngineSettings {
@@ -235,6 +270,8 @@ export interface Db {
   allocations: Allocation[];
   categories: Category[];
   tags: Tag[];
+  merchants: Merchant[];
+  rules: Rule[];
   envelopes: Envelope[];
   commitments: Commitment[];
   occurrenceOverrides: OccurrenceOverride[];
@@ -268,6 +305,8 @@ export const EMPTY_DB: Db = {
   allocations: [],
   categories: [],
   tags: [],
+  merchants: [],
+  rules: [],
   envelopes: [{ id: 'env:default', name: 'Quotidien', cap: null, inDailyBudget: true, endPolicy: 'RESET', overspendPolicy: 'DEDUCT_NEXT', isDefault: true, order: 0, categoryIds: [] }],
   commitments: [],
   occurrenceOverrides: [],

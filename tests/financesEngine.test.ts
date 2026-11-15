@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { migrate } from '../app/src/modules/finances/core/migrate';
-import { compute, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
+import { automate, classify, detectRecurring, pairTransfers, ruleMatches, toClassify } from '../app/src/modules/finances/engine/automation';
+import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
-import { addInstallmentPlan, applyState, closeCycle, initState, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, type EngineState } from '../app/src/modules/finances/engine/state';
-import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Transaction } from '../app/src/modules/finances/engine/schema';
+import { acceptSuggestion, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
+import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Rule, type Transaction } from '../app/src/modules/finances/engine/schema';
 
 /** Le moteur financier de MyFinances V5 (étape M1) : scénario de référence, cas limites, invariants. */
 
@@ -625,5 +626,253 @@ describe('moteur M2 : les réglages de l’utilisateur tiennent quand les donné
     expect(s.envelopes.map((e) => [e.id, e.categoryIds])).toEqual([['env:default', []], ['e1', ['a']], ['e2', ['b']]]);
     expect(checkIntegrity(applyState(base, s)).errors).toEqual([]);
     expect(applyState(base, { ...s, envelopes: s.envelopes.filter((e) => !e.isDefault) }).envelopes.filter((e) => e.isDefault)).toHaveLength(1);
+  });
+});
+
+const rule = (id: string, over: Partial<Rule>): Rule => ({ id, name: id, priority: 0, enabled: true, merchantId: null, keywords: [], accountIds: [], amountMin: null, amountMax: null, direction: 'any', flow: 'EXPENSE', categoryId: null, tagIds: [], ...over });
+const lineOf = (db: Db, tx: string) => db.allocations.find((a) => a.transactionId === tx)!;
+
+describe('moteur M3 : appariement automatique des virements internes', () => {
+  /** Deux comptes du quotidien et un livret ; rien n'est encore classé. */
+  function raw(): Db {
+    const db = blank({ accounts: [account('paie', 'CHECKING', 100000), account('carte', 'CHECKING', 20000), account('livret', 'SAVINGS', 300000)] });
+    op(db, 'a1', 'paie', '2026-11-03', -30000, 'VIR SEPA VERS COMPTE CARTE', null);
+    op(db, 'a2', 'carte', '2026-11-04', 30000, 'TOP UP', null);
+    op(db, 'b1', 'paie', '2026-11-05', -15000, 'VIREMENT LIVRET', null);
+    op(db, 'b2', 'livret', '2026-11-08', 15000, 'VERSEMENT', null);
+    op(db, 'c1', 'paie', '2026-11-06', -4000, 'SUPERMARCHE', 'EXPENSE');
+    return db;
+  }
+
+  it('deux opérations opposées sur deux comptes, à trois jours près, deviennent un virement ; vers l’épargne, une mise de côté', () => {
+    const db = pairTransfers(raw());
+    expect(lineOf(db, 'a1')).toMatchObject({ flow: 'TRANSFER', linkedTransactionId: 'a2' });
+    expect(lineOf(db, 'a2')).toMatchObject({ flow: 'TRANSFER', linkedTransactionId: 'a1' });
+    expect(lineOf(db, 'b1')).toMatchObject({ flow: 'SAVING', linkedTransactionId: 'b2' });
+    expect(lineOf(db, 'b2')).toMatchObject({ flow: 'TRANSFER', linkedTransactionId: 'b1' });
+    expect(lineOf(db, 'c1').flow).toBe('EXPENSE');
+    expect(checkIntegrity(db).errors).toEqual([]);
+    // Le virement pèse zéro ; la mise de côté compte dans l'épargne, pas dans les dépenses.
+    const e = compute(db, '2026-11-15');
+    expect([e.spent, e.epargne]).toEqual([4000, 15000]);
+  });
+
+  it('pas d’appariement au-delà de la tolérance, sur un même compte, à montants différents, ou contre une décision prise à la main', () => {
+    const far = raw();
+    far.transactions.find((t) => t.id === 'b2')!.date = '2026-11-09';
+    expect(lineOf(pairTransfers(far), 'b1').linkedTransactionId).toBeUndefined();
+    expect(lineOf(pairTransfers({ ...far, settings: { ...far.settings, transferToleranceDays: 4 } }), 'b1').linkedTransactionId).toBe('b2');
+    const same = raw();
+    same.transactions.find((t) => t.id === 'a2')!.accountId = 'paie';
+    expect(lineOf(pairTransfers(same), 'a1').flow).toBeNull();
+    const diff = raw();
+    diff.transactions.find((t) => t.id === 'a2')!.amount = 29900;
+    lineOf(diff, 'a2').amount = 29900;
+    expect(lineOf(pairTransfers(diff), 'a1').flow).toBeNull();
+    const manual = raw();
+    Object.assign(lineOf(manual, 'a1'), { flow: 'EXPENSE', origin: 'manual' });
+    const paired = pairTransfers(manual);
+    expect([lineOf(paired, 'a1').flow, lineOf(paired, 'a2').flow]).toEqual(['EXPENSE', null]);
+  });
+
+  it('chaque opération ne sert qu’une fois : deux virements identiques le même jour s’apparient deux à deux', () => {
+    const db = raw();
+    op(db, 'a3', 'paie', '2026-11-03', -30000, 'VIR SEPA VERS COMPTE CARTE', null);
+    op(db, 'a4', 'carte', '2026-11-03', 30000, 'TOP UP', null);
+    const paired = pairTransfers(db);
+    const links = ['a1', 'a3'].map((id) => lineOf(paired, id).linkedTransactionId).sort();
+    expect(links).toEqual(['a2', 'a4']);
+    expect(checkIntegrity(paired).errors).toEqual([]);
+  });
+});
+
+describe('moteur M3 : marchands et règles de tri', () => {
+  function shop(): Db {
+    const db = blank({ accounts: [account('k', 'CHECKING', 100000)], categories: [category('courses'), category('restos'), category('pro')] });
+    db.merchants = [
+      { id: 'm:epicerie', name: 'Épicerie', flow: 'EXPENSE', categoryId: 'courses', tagIds: [] },
+      { id: 'm:bistrot', name: 'Bistrot', flow: null, categoryId: null, tagIds: [] },
+    ];
+    op(db, 'e1', 'k', '2026-11-02', -2000, 'CB EPICERIE', null);
+    op(db, 'e2', 'k', '2026-11-05', 500, 'AVOIR EPICERIE', null);
+    op(db, 'r1', 'k', '2026-11-06', -4500, 'CB BISTROT DU PORT', null);
+    op(db, 'r2', 'k', '2026-11-09', -15000, 'CB BISTROT DU PORT', null);
+    op(db, 'x1', 'k', '2026-11-10', -900, 'KIOSQUE', null);
+    for (const [tx, m] of [['e1', 'm:epicerie'], ['e2', 'm:epicerie'], ['r1', 'm:bistrot'], ['r2', 'm:bistrot']] as const) db.transactions.find((t) => t.id === tx)!.merchantId = m;
+    return db;
+  }
+
+  it('le marchand classe ses opérations ; une rentrée chez un marchand de dépense est un remboursement', () => {
+    const db = classify(shop());
+    expect(lineOf(db, 'e1')).toMatchObject({ flow: 'EXPENSE', categoryId: 'courses', origin: 'merchant' });
+    expect(lineOf(db, 'e2')).toMatchObject({ flow: 'REFUND', categoryId: 'courses' });
+    expect(lineOf(db, 'r1').flow).toBeNull();
+    expect(toClassify(db).map((g) => [g.name, g.count, g.total])).toEqual([['Bistrot', 2, -19500], ['KIOSQUE', 1, -900]]);
+  });
+
+  it('une règle l’emporte sur le marchand, la plus prioritaire d’abord ; toutes ses conditions doivent être vraies', () => {
+    const db = shop();
+    db.rules = [
+      rule('gros', { priority: 2, keywords: ['bistrot'], amountMin: 10000, categoryId: 'pro', tagIds: ['#pro'] }),
+      rule('resto', { priority: 1, keywords: ['Bistrôt'], categoryId: 'restos' }),
+      rule('vide', { priority: 9, categoryId: 'pro' }),
+    ];
+    const out = classify(db);
+    expect(lineOf(out, 'r1')).toMatchObject({ flow: 'EXPENSE', categoryId: 'restos', origin: 'rule' });
+    expect(lineOf(out, 'r2')).toMatchObject({ categoryId: 'pro', tagIds: ['#pro'] });
+    // Une règle sans condition ne classe rien.
+    expect(lineOf(out, 'x1').flow).toBeNull();
+    const t = db.transactions.find((x) => x.id === 'r1')!;
+    expect(ruleMatches(rule('a', { keywords: ['port'], direction: 'credit' }), t)).toBe(false);
+    expect(ruleMatches(rule('a', { keywords: ['por'] }), t)).toBe(false);
+    expect(ruleMatches(rule('a', { accountIds: ['autre'] }), t)).toBe(false);
+    expect(ruleMatches(rule('a', { merchantId: 'm:bistrot', enabled: false }), t)).toBe(false);
+  });
+
+  it('classer un marchand, une ligne, écrire une règle : tout tient, et la décision à la main a le dernier mot', () => {
+    const base = shop();
+    let s = initState(base);
+    s = classifyMerchant(s, 'm:bistrot', 'EXPENSE', 'restos');
+    let db = applyState(base, s);
+    expect([lineOf(db, 'r1').categoryId, lineOf(db, 'r2').categoryId]).toEqual(['restos', 'restos']);
+    s = classifyAllocation(s, 'r2#0', 'EXPENSE', 'pro');
+    s = saveRule(s, rule('kiosque', { keywords: ['kiosque'], categoryId: 'courses' }));
+    // Un marchand reclassé s'impose aussi à ses opérations déjà classées par la reprise.
+    s = classifyMerchant(s, 'm:epicerie', 'EXPENSE', 'restos');
+    db = applyState(base, s);
+    expect(lineOf(db, 'r1')).toMatchObject({ categoryId: 'restos', origin: 'merchant' });
+    expect(lineOf(db, 'r2')).toMatchObject({ categoryId: 'pro', origin: 'manual' });
+    expect(lineOf(db, 'x1')).toMatchObject({ categoryId: 'courses', origin: 'rule' });
+    expect(lineOf(db, 'e1').categoryId).toBe('restos');
+    expect(toClassify(db)).toEqual([]);
+    expect(checkIntegrity(db).errors).toEqual([]);
+  });
+});
+
+describe('moteur M3 : détection des récurrents', () => {
+  function history(): Db {
+    const db = blank({ accounts: [account('k', 'CHECKING', 100000)] });
+    for (const [i, date] of ['2026-07-05', '2026-08-05', '2026-09-06', '2026-10-05', '2026-11-05'].entries()) op(db, `s${i}`, 'k', date, -1099, 'PRLV MUSIQUE EN LIGNE 4412', 'EXPENSE');
+    for (const [i, date] of ['2026-08-26', '2026-09-25', '2026-10-26'].entries()) op(db, `p${i}`, 'k', date, 140000 + i * 300, 'VIR EMPLOYEUR SA', 'INCOME');
+    for (const [i, date] of ['2026-09-01', '2026-09-20', '2026-11-11'].entries()) op(db, `c${i}`, 'k', date, -2000 - i * 4000, 'SUPERMARCHE', 'EXPENSE');
+    for (const [i, date] of ['2026-03-01', '2026-04-01', '2026-05-01'].entries()) op(db, `o${i}`, 'k', date, -3000, 'ANCIEN ABONNEMENT', 'EXPENSE');
+    return db;
+  }
+  const NOW = '2026-11-15';
+
+  it('ce qui revient à rythme et montant réguliers est proposé ; l’irrégulier et l’arrêté ne le sont pas', () => {
+    const found = detectRecurring(history(), NOW);
+    expect(found.map((x) => [x.kind, x.label, x.amount, x.rhythm, x.anchorDay, x.count])).toEqual([
+      ['INCOME', 'Vir Employeur Sa', 140300, 'MONTHLY', 26, 3],
+      ['CHARGE', 'Prlv Musique En Ligne', 1099, 'MONTHLY', 5, 5],
+    ]);
+  });
+
+  it('accepté, il entre au plan et n’est plus proposé ; ignoré, il ne revient pas', () => {
+    const base = history();
+    let s = initState(base);
+    const [salary, music] = detectRecurring(base, NOW);
+    s = acceptSuggestion(s, music!);
+    expect(s.commitments[0]).toMatchObject({ kind: 'CHARGE', amount: 1099, rhythm: 'MONTHLY', anchorDay: 5, accountId: 'k', reserveInCash: null });
+    s = ignoreSuggestion(s, salary!.key);
+    expect(detectRecurring(applyState(base, s), NOW, s.ignoredSuggestions)).toEqual([]);
+    // L'engagement accepté se rapproche de l'opération du cycle : il ne pèse pas deux fois.
+    const e = compute(applyState(base, s), NOW);
+    expect(e.occurrences.map((o) => [o.commitment.label, o.status])).toEqual([['Prlv Musique En Ligne', 'PAID']]);
+  });
+});
+
+describe('moteur M3 : carte à débit différé', () => {
+  const card = { closingDay: 25, debitDay: 5 };
+  it('un achat est prélevé au premier jour de prélèvement qui suit son arrêté', () => {
+    expect(debitDate('2026-11-10', card)).toBe('2026-12-05');
+    expect(debitDate('2026-11-25', card)).toBe('2026-12-05');
+    expect(debitDate('2026-11-26', card)).toBe('2027-01-05');
+    expect(debitDate('2026-11-10', { closingDay: 31, debitDay: 31 })).toBe('2026-11-30');
+  });
+
+  it('l’encours pas encore prélevé est retiré du cash libre, s’il est prélevé avant la fin du cycle ; l’achat pèse dans le budget à sa date', () => {
+    // Cycle du 26 octobre au 25 novembre ; carte arrêtée le 28, prélevée le 5.
+    const db = reference();
+    db.accounts.push(account('differe', 'CHECKING', 0, { includeInDailyCash: false, deferredDebit: { closingDay: 28, debitDay: 5 } }));
+    const before = compute(db, TODAY);
+    // Acheté le 27 octobre : arrêté le 28 octobre, prélevé le 5 novembre. Déjà sorti du solde.
+    op(db, 'd0', 'differe', '2026-10-27', -5000, 'ACHAT A', 'EXPENSE');
+    // Acheté le 30 octobre : arrêté le 28 novembre, prélevé le 5 décembre, après la fin du cycle.
+    op(db, 'd5', 'differe', '2026-10-30', -7000, 'ACHAT B', 'EXPENSE');
+    const e = compute(db, TODAY);
+    expect(e.spent).toBe(before.spent + 12000);
+    expect([e.deferred, e.cashLibre]).toEqual([0, before.cashLibre]);
+    // Avec un prélèvement le 20 : l'achat du 27 octobre (arrêté le 28) est prélevé le 20 novembre, dans le cycle.
+    db.accounts.find((a) => a.id === 'differe')!.deferredDebit = { closingDay: 28, debitDay: 20 };
+    const soon = compute(db, TODAY);
+    expect([soon.deferred, soon.cashLibre]).toEqual([5000, before.cashLibre - 5000]);
+    // Une fois le prélèvement passé, l'encours ne compte plus : le solde du compte débité le porte.
+    expect(compute(db, '2026-11-21').deferred).toBe(0);
+  });
+
+  it('un achat différé d’aujourd’hui ne change pas le budget du jour ; régler un compte en différé tient dans les réglages', () => {
+    const base = reference();
+    base.accounts.push(account('differe', 'CHECKING', 0, { includeInDailyCash: false }));
+    const s = patchAccount(initState(base), 'differe', { deferredDebit: { closingDay: 16, debitDay: 20 } });
+    const before = compute(applyState(base, s), TODAY);
+    op(base, 'now', 'differe', TODAY, -3000, 'ACHAT DU JOUR', 'EXPENSE');
+    const after = compute(applyState(base, s), TODAY);
+    expect(after.deferred).toBe(3000);
+    expect(after.budgetJour).toBe(before.budgetJour);
+    expect(after.resteAujourdhui).toBe(before.resteAujourdhui - 3000);
+  });
+});
+
+describe('moteur M3 : avance entre amis', () => {
+  const base = plain();
+  // Le restaurant du 10 novembre : 120 € payés, dont 90 € avancés pour trois amis.
+  let s = addReceivable(initState(base), { id: 'r1', person: 'Camille', amount: 6000, allocationId: 'd2#0' }, 1);
+  s = addReceivable(s, { id: 'r2', person: 'Sacha', amount: 3000, allocationId: 'd2#0' }, 2);
+
+  it('la part avancée sort du budget et devient une créance, comptée dans le patrimoine', () => {
+    const db = applyState(base, s);
+    expect(lineOf(db, 'd2').receivableAmount).toBe(9000);
+    expect(compute(db, TODAY).spent).toBe(18000 + 3000 + 1200);
+    expect(netWorth(db, TODAY)).toMatchObject({ receivables: 9000 });
+    expect(checkIntegrity(db).errors).toEqual([]);
+  });
+
+  it('le virement de retour solde la créance et ne pèse rien ; il n’attend plus de décision', () => {
+    const paid = structuredClone(base);
+    op(paid, 'retour', 'carte', '2026-11-13', 6000, 'VIR INST CAMILLE', 'INCOME');
+    expect(compute(applyState(paid, s), TODAY).pendingIncomes).toEqual([{ transactionId: 'retour', amount: 6000 }]);
+    const settled = settleReceivable(s, 'r1', 'retour#0');
+    const db = applyState(paid, settled);
+    expect(lineOf(db, 'retour')).toMatchObject({ flow: 'REFUND', settlesReceivableId: 'r1', origin: 'manual' });
+    const e = compute(db, TODAY);
+    expect([e.spent, e.pendingIncomes, e.revenus]).toEqual([18000 + 3000 + 1200, [], 140000]);
+    expect(netWorth(db, TODAY).receivables).toBe(3000);
+  });
+
+  it('abandonnée : la part redevient une dépense, le jour de l’abandon, pas à la date du restaurant', () => {
+    const off = writeOffReceivable(s, 'r2', TODAY);
+    const e = compute(applyState(base, off), TODAY);
+    expect(e.spent).toBe(18000 + 3000 + 1200 + 3000);
+    expect(e.spentToday).toBe(1200 + 3000);
+    expect(netWorth(applyState(base, off), TODAY).receivables).toBe(6000);
+  });
+});
+
+describe('moteur M3 : invariants des automatismes (200 jeux de données)', () => {
+  it('l’appariement automatique ne change jamais la trésorerie ni le reste à vivre, et laisse le schéma intègre', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      const db = randomDb(seed);
+      op(db, 'ta', 'k1', '2026-11-08', -6100, 'VIR INTERNE', null);
+      op(db, 'tb', 'k2', '2026-11-10', 6100, 'VIR RECU', null);
+      const out = automate(db);
+      expect(checkIntegrity(out).errors, `graine ${seed}`).toEqual([]);
+      expect(lineOf(out, 'ta'), `graine ${seed}`).toMatchObject({ flow: 'TRANSFER', linkedTransactionId: 'tb' });
+      const [a, b] = [compute(db, '2026-11-15'), compute(out, '2026-11-15')];
+      expect([b.cash, b.rav], `graine ${seed}`).toEqual([a.cash, a.rav]);
+      // Non appariée, la sortie non classée pesait comme une dépense : appariée, elle ne pèse plus (d'autres
+      // opérations du jeu, de même montant sur deux comptes, peuvent s'apparier aussi : jamais l'inverse).
+      expect(b.envelopes.reduce((x, y) => x + y.spent, 0), `graine ${seed}`).toBeLessThanOrEqual(a.envelopes.reduce((x, y) => x + y.spent, 0) - 6100);
+    }
   });
 });

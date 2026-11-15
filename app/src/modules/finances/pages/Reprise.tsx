@@ -2,14 +2,15 @@ import { useState, type ReactNode } from 'react';
 import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle, Segmented } from '@mylife/kit';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
+import { detectRecurring, toClassify, type ToClassify } from '../engine/automation';
 import { envelopeOf, netWorth, weight } from '../engine/engine';
 import { checkIntegrity } from '../engine/integrity';
 import { isProvisioned } from '../engine/occurrences';
-import type { Commitment, Envelope, Provision, Role } from '../engine/schema';
-import { addInstallmentPlan, decideOccurrence, patchAllocation, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, resetCarry, saveCommitment, saveEnvelope, saveProvision } from '../engine/state';
+import type { Commitment, Envelope, Provision, Rule } from '../engine/schema';
+import { acceptSuggestion, addInstallmentPlan, addReceivable, classifyAllocation, classifyMerchant, decideOccurrence, ignoreSuggestion, patchAccount, patchAllocation, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, removeReceivable, removeRule, resetCarry, saveCommitment, saveEnvelope, saveProvision, saveRule, settleReceivable, writeOffReceivable } from '../engine/state';
 import { useGlance } from '../../../legacy/glance';
-import { day, END, KIND, RHYTHM } from './labels';
-import { CommitmentSheet, EnvelopeSheet, ExpenseSheet, InstallmentSheet, OccurrenceSheet, ProvisionSheet, type ExpenseLine } from './sheets';
+import { day, END, FLOW, KIND, RHYTHM, ROLE } from './labels';
+import { AccountSheet, ClassifySheet, CommitmentSheet, EnvelopeSheet, ExpenseSheet, InstallmentSheet, OccurrenceSheet, ProvisionSheet, ReceivableSheet, RuleSheet, type ExpenseLine } from './sheets';
 
 /**
  * Étapes M1 et M2 : « pourquoi ce chiffre », et de quoi régler le plan. Les trois blocs de la formule avec tes
@@ -17,7 +18,6 @@ import { CommitmentSheet, EnvelopeSheet, ExpenseSheet, InstallmentSheet, Occurre
  * enveloppes et la fin de cycle, tous modifiables. Écran de travail, provisoire : les écrans définitifs viennent en M5.
  * Les opérations viennent de l'ancienne app, qui n'est jamais modifiée ; tes réglages sont gardés sur l'appareil.
  */
-const ROLE: Record<Role, string> = { CHECKING: 'Courant', PROVISION: 'Provision', SAVINGS: 'Épargne', INVESTMENT: 'Placement', CASH: 'Espèces', ASSET: 'Bien', LIABILITY: 'Dette' };
 const STATUS = { PAID: 'ok', PARTIAL: 'warn', DUE: 'warn', SKIPPED: 'neutral' } as const;
 const STATUS_LABEL = { PAID: 'réglée', PARTIAL: 'en partie', DUE: 'à venir', SKIPPED: 'sautée' } as const;
 const END_OPTIONS = [
@@ -62,6 +62,10 @@ export function ReprisePage() {
   const [provision, setProvision] = useState<Provision | 'new' | null>(null);
   const [expense, setExpense] = useState<string | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
+  const [group, setGroup] = useState<ToClassify | null>(null);
+  const [rule, setRule] = useState<Rule | 'new' | null>(null);
+  const [receivable, setReceivable] = useState<string | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
 
   const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" />;
   if (engine.status === 'error')
@@ -95,9 +99,22 @@ export function ReprisePage() {
       const t = txById.get(a.transactionId);
       if (!t || t.date < e.cycle.start || t.date > today || !envelopeOf(db, a.categoryId).inDailyBudget) return [];
       const pesante = weight({ ...a, fundedBySavings: false }, settled) > 0;
-      return pesante ? [{ allocationId: a.id, label: t.rawLabel, date: t.date, amount: a.amount, smoothed: a.smoothed === true, fundedBySavings: a.fundedBySavings === true }] : [];
+      return pesante ? [{ allocationId: a.id, label: t.rawLabel, date: t.date, amount: a.amount, smoothed: a.smoothed === true, fundedBySavings: a.fundedBySavings === true, advanced: a.receivableAmount ?? 0 }] : [];
     })
     .sort((a, b) => b.date.localeCompare(a.date) || a.amount - b.amount);
+  const groups = toClassify(db);
+  const suggestions = detectRecurring(db, today, state.ignoredSuggestions);
+  const owed = db.receivables.filter((r) => r.status === 'OPEN');
+  const allocationLabel = (id: string) => txById.get(db.allocations.find((a) => a.id === id)?.transactionId ?? '')?.rawLabel ?? 'une dépense';
+  // Les rentrées d'argent récentes qui peuvent solder une avance : ni virement apparié, ni déjà liées.
+  const incomes = db.allocations
+    .flatMap((a) => {
+      const t = txById.get(a.transactionId);
+      return t && a.amount > 0 && !a.linkedTransactionId && !a.settlesReceivableId && !settled.has(t.id) && t.date >= e.cycle.start ? [{ allocationId: a.id, label: t.rawLabel, date: t.date, amount: a.amount }] : [];
+    })
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const paired = db.allocations.filter((a) => a.linkedTransactionId && (a.flow === 'TRANSFER' || a.flow === 'SAVING') && a.amount < 0 && (txById.get(a.transactionId)?.date ?? '') >= e.cycle.start).length;
+  const categories = db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId && c.scope === 'EXPENSE');
   const lastClosed = state.closedCycles[0];
   const carried = state.carryIn.global !== 0 || Object.keys(state.carryIn.envelopes).length > 0;
 
@@ -145,6 +162,48 @@ export function ReprisePage() {
         </>
       )}
 
+      {groups.length > 0 && (
+        <>
+          <Head>À classer : {groups.length} marchand{groups.length > 1 ? 's' : ''}, {groups.reduce((n, g) => n + g.count, 0)} opération{groups.reduce((n, g) => n + g.count, 0) > 1 ? 's' : ''}</Head>
+          <List>
+            {groups.slice(0, 8).map((g) => (
+              <ListRow key={g.key} title={g.name} detail={`${g.count} opération${g.count > 1 ? 's' : ''}`} value={euros(g.total)} onClick={() => setGroup(g)} />
+            ))}
+          </List>
+        </>
+      )}
+
+      {suggestions.length > 0 && (
+        <>
+          <Head>Récurrents détectés : {suggestions.length}</Head>
+          <List>
+            {suggestions.slice(0, 6).map((x) => (
+              <div key={x.key} className="list-row" style={{ flexWrap: 'wrap' }}>
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span className="t-body" style={{ fontWeight: 500 }}>{x.label}</span>
+                  <span className="t-small muted">{KIND[x.kind]} · {euros(x.amount)} {RHYTHM[x.rhythm]} · vu {x.count} fois</span>
+                </span>
+                <span className="row" style={{ gap: 6 }}>
+                  <Button onClick={() => update((s) => acceptSuggestion(s, x))}>Au plan</Button>
+                  <Button variant="quiet" onClick={() => update((s) => ignoreSuggestion(s, x.key))}>Ignorer</Button>
+                </span>
+              </div>
+            ))}
+          </List>
+        </>
+      )}
+
+      {owed.length > 0 && (
+        <>
+          <Head>À récupérer : {euros(owed.reduce((n, r) => n + r.amount, 0))}</Head>
+          <List>
+            {owed.map((r) => (
+              <ListRow key={r.id} title={r.person} detail={`avancé sur « ${allocationLabel(r.allocationId)} »`} value={euros(r.amount)} onClick={() => setReceivable(r.id)} />
+            ))}
+          </List>
+        </>
+      )}
+
       <SectionTitle>1 · Budget théorique</SectionTitle>
       <List>
         <Term label="Revenus du cycle" value={euros(e.revenus)} />
@@ -163,6 +222,7 @@ export function ReprisePage() {
         <Term label="Comptes du quotidien" detail={daily.map((a) => a.name).join(', ') || 'aucun'} value={euros(e.cash)} />
         <Term sign="−" label="Poches verrouillées" value={euros(e.locked)} />
         <Term sign="−" label="Échéances réservées" detail={`${dueReserved} à venir${e.covered > 0 ? ` · ${euros(e.covered)} déjà en poche` : ''}`} value={euros(e.toPay)} />
+        {e.deferred > 0 && <Term sign="−" label="Encours de carte à débit différé" detail="prélevé avant la fin du cycle" value={euros(e.deferred)} />}
         {e.offDaily > 0 && <Term sign="−" label="Reste des enveloppes hors quotidien" value={euros(e.offDaily)} />}
         <Term sign="=" label="Cash libre" value={euros(e.cashLibre)} total />
       </List>
@@ -221,11 +281,11 @@ export function ReprisePage() {
         ))}
       </List>
 
-      <Head>Dépenses du cycle · touche-en une pour la lisser</Head>
+      <Head>Dépenses du cycle · lisser, avancer pour quelqu’un</Head>
       <List>
         {expenses.length === 0 && <ListRow title="Aucune dépense ce cycle" />}
         {expenses.slice(0, 12).map((x) => (
-          <ListRow key={x.allocationId} title={x.label} detail={[day(x.date), x.smoothed ? 'lissée' : null, x.fundedBySavings ? 'financée par l’épargne' : null].filter(Boolean).join(' · ')} value={euros(x.amount)} onClick={() => setExpense(x.allocationId)} />
+          <ListRow key={x.allocationId} title={x.label} detail={[day(x.date), x.smoothed ? 'lissée' : null, x.fundedBySavings ? 'financée par l’épargne' : null, x.advanced > 0 ? `${euros(x.advanced)} avancés` : null].filter(Boolean).join(' · ')} value={euros(x.amount)} onClick={() => setExpense(x.allocationId)} />
         ))}
       </List>
 
@@ -239,6 +299,14 @@ export function ReprisePage() {
             value={x.budget !== null ? euros(x.budget - x.spent) : euros(x.spent)}
             onClick={() => setEnvelope(x.envelope)}
           />
+        ))}
+      </List>
+
+      <Head action="Ajouter" onAction={() => setRule('new')}>Règles de tri : {db.rules.length}</Head>
+      <List>
+        {db.rules.length === 0 && <ListRow title="Aucune règle" detail="Par exemple : le libellé contient « boulangerie » → Courses" />}
+        {db.rules.map((r) => (
+          <ListRow key={r.id} title={r.name} detail={[FLOW[r.flow], categories.find((c) => c.id === r.categoryId)?.name, r.enabled ? null : 'désactivée'].filter(Boolean).join(' · ')} onClick={() => setRule(r)} />
         ))}
       </List>
 
@@ -258,9 +326,11 @@ export function ReprisePage() {
         {db.accounts
           .filter((a) => !a.archivedAt)
           .map((a) => (
-            <ListRow key={a.id} title={a.name} detail={`${ROLE[a.role]}${a.includeInDailyCash ? ' · dans le cash quotidien' : ''}`} value={a.balance === null ? '?' : euros(a.role === 'LIABILITY' ? -a.balance : a.balance, { round: true })} />
+            <ListRow key={a.id} title={a.name} detail={[ROLE[a.role], a.includeInDailyCash ? 'dans le cash quotidien' : null, a.deferredDebit ? `débit différé le ${a.deferredDebit.debitDay}` : null].filter(Boolean).join(' · ')} value={a.balance === null ? '?' : euros(a.role === 'LIABILITY' ? -a.balance : a.balance, { round: true })} onClick={() => setAccount(a.id)} />
           ))}
         {worth.installments > 0 && <ListRow title="Paiements fractionnés restants" detail="Déduits du patrimoine" value={euros(-worth.installments, { round: true })} />}
+        {worth.receivables > 0 && <ListRow title="Avances à récupérer" detail="Comptées dans le patrimoine" value={euros(worth.receivables, { round: true })} />}
+        {paired > 0 && <ListRow title="Virements internes appariés" detail="Ce cycle : ils ne pèsent ni dans le budget, ni dans les revenus" value={paired} />}
       </List>
 
       <Button block disabled={engine.busy} onClick={engine.reload}>
@@ -321,7 +391,54 @@ export function ReprisePage() {
           setProvision(null);
         }}
       />
-      <ExpenseSheet line={expenses.find((x) => x.allocationId === expense) ?? null} onClose={() => setExpense(null)} onPatch={(id, patch) => update((s) => patchAllocation(s, id, patch))} />
+      <ExpenseSheet
+        line={expenses.find((x) => x.allocationId === expense) ?? null}
+        onClose={() => setExpense(null)}
+        onPatch={(id, patch) => update((s) => patchAllocation(s, id, patch))}
+        onAdvance={(allocationId, person, amount) => update((s) => addReceivable(s, { id: `avance:${crypto.randomUUID().slice(0, 8)}`, person, amount, allocationId }))}
+      />
+      <ReceivableSheet
+        value={owed.find((r) => r.id === receivable) ?? null}
+        origin={receivable ? allocationLabel(owed.find((r) => r.id === receivable)?.allocationId ?? '') : ''}
+        incomes={incomes}
+        onClose={() => setReceivable(null)}
+        onSettle={(id, allocationId) => {
+          update((s) => settleReceivable(s, id, allocationId));
+          setReceivable(null);
+        }}
+        onWriteOff={(id) => {
+          update((s) => writeOffReceivable(s, id, today));
+          setReceivable(null);
+        }}
+        onRemove={(id) => {
+          update((s) => removeReceivable(s, id));
+          setReceivable(null);
+        }}
+      />
+      <ClassifySheet
+        group={group}
+        categories={categories}
+        onClose={() => setGroup(null)}
+        onSave={(g, flow, categoryId, whole) => {
+          update((s) => (whole && g.merchantId ? classifyMerchant(s, g.merchantId, flow, categoryId) : g.allocationIds.reduce((x, id) => classifyAllocation(x, id, flow, categoryId), s)));
+          setGroup(null);
+        }}
+      />
+      <RuleSheet
+        value={rule}
+        categories={categories}
+        count={db.rules.length}
+        onClose={() => setRule(null)}
+        onSave={(r) => {
+          update((s) => saveRule(s, r));
+          setRule(null);
+        }}
+        onRemove={(id) => {
+          update((s) => removeRule(s, id));
+          setRule(null);
+        }}
+      />
+      <AccountSheet value={db.accounts.find((a) => a.id === account) ?? null} onClose={() => setAccount(null)} onPatch={(id, patch) => update((s) => patchAccount(s, id, patch))} />
       <EnvelopeSheet
         value={envelope}
         categories={db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId)}

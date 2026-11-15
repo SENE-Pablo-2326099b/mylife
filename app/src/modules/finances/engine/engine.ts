@@ -165,6 +165,16 @@ export function compute(db: Db, today: ISODate): Explanation {
       if (account.includeInDailyCash) cashOutToday += w;
     }
   }
+  // Une créance abandonnée : la part avancée redevient une dépense, à la date de l'abandon (cycle ouvert).
+  const allocationById = new Map(db.allocations.map((a) => [a.id, a]));
+  for (const r of db.receivables) {
+    if (r.status !== 'WRITTEN_OFF' || !r.writtenOffAt || !inRange(r.writtenOffAt, cycle.start, today)) continue;
+    const env = envelopeOf(db, allocationById.get(r.allocationId)?.categoryId ?? null);
+    spentBy.set(env.id, (spentBy.get(env.id) ?? 0) + r.amount);
+    if (!env.inDailyBudget) continue;
+    spent += r.amount;
+    if (r.writtenOffAt === today) spentToday += r.amount;
+  }
   const envelopes: EnvelopeState[] = [...db.envelopes]
     .sort((a, b) => a.order - b.order)
     .map((envelope) => {
@@ -210,14 +220,29 @@ export function compute(db: Db, today: ISODate): Explanation {
     }
     toPay += need;
   }
-  const deferred = 0; // Carte à débit différé : étape M3.
+  // Carte à débit différé : les achats pas encore prélevés, dont le prélèvement tombe avant la fin du cycle.
+  let deferred = 0;
+  let deferredToday = 0;
+  for (const account of db.accounts) {
+    if (!account.deferredDebit || account.archivedAt) continue;
+    for (const t of db.transactions) {
+      if (t.accountId !== account.id || t.date > today) continue;
+      const debit = debitDate(t.date, account.deferredDebit);
+      if (debit <= today || debit > cycle.end) continue;
+      const lines = db.allocations.filter((a) => a.transactionId === t.id && a.flow !== 'TRANSFER' && a.flow !== 'SAVING');
+      const amount = own(db, account, -lines.reduce((s, a) => s + a.amount, 0));
+      deferred += amount;
+      if (t.date === today && !lines.some((a) => a.smoothed)) deferredToday += amount;
+    }
+  }
+  deferred = Math.max(0, deferred);
   const offDaily = offDailyEnvelopes.reduce((s, e) => s + e.remaining, 0);
   const cashLibre = cash - locked - toPay - deferred - offDaily;
 
   // ---- disponible et budget du jour (à minuit : les dépenses ordinaires d'aujourd'hui ne sont pas encore comptées)
   const mode = db.settings.mode;
   const budgetMinuit = resteEnveloppe + spentToday;
-  const cashMinuit = cashLibre + cashOutToday;
+  const cashMinuit = cashLibre + cashOutToday + Math.max(0, deferredToday);
   const limitedBy = mode === 'CASH' || cashMinuit < budgetMinuit ? 'cash' : 'budget';
   const disponible = limitedBy === 'cash' ? cashMinuit : budgetMinuit;
   const daysLeft = Math.max(1, daysRemaining(today, cycle));
@@ -261,6 +286,19 @@ export function compute(db: Db, today: ISODate): Explanation {
     unknownBalances,
     incomeFallback: !hasIncomePlan,
   };
+}
+
+/** Le jour `day` du mois (borné à sa longueur), le premier à partir de `from` compris. */
+function nextDay(from: ISODate, day: number): ISODate {
+  const { y, m } = parseISO(from);
+  const at = (yy: number, mm: number) => toISO(yy, mm, Math.min(day, daysInMonth(yy, mm)));
+  const same = at(y, m);
+  return same >= from ? same : m === 12 ? at(y + 1, 1) : at(y, m + 1);
+}
+
+/** Quand un achat par carte à débit différé est prélevé : au premier jour de prélèvement après son arrêté. */
+export function debitDate(purchase: ISODate, card: { closingDay: number; debitDay: number }): ISODate {
+  return nextDay(nextDay(purchase, card.closingDay), card.debitDay);
 }
 
 /** Échéances d'un paiement fractionné qui restent à tomber à partir d'une date. */

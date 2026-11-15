@@ -421,3 +421,27 @@ Règle, configurable et non figée :
 
 Conséquence à connaître : avec des charges non réservées, le cash libre peut dépasser ce qui restera vraiment après
 leurs débits. Le mode prudent protège quand même, puisque le budget théorique, lui, les compte.
+
+## G. Automatisations (M3, 15/11/2026)
+
+Principe : un automatisme ne touche jamais une ligne décidée à la main. Ordre d'application : réglages de comptes,
+règles et marchands ; classement ; appariement des virements ; puis les décisions manuelles, qui ont le dernier mot.
+
+- **Classement** : une règle qui correspond l'emporte toujours (la plus prioritaire d'abord ; toutes ses conditions
+  doivent être vraies ; une règle sans condition ne classe rien). Sinon le marchand, pour une ligne pas encore classée.
+  Un marchand classé par l'utilisateur s'impose à toutes ses opérations non décidées une à une. Une rentrée chez un
+  marchand de dépense est un remboursement.
+- **Virements internes** : deux opérations opposées, de même devise, sur deux comptes différents, à
+  `transfer_tolerance_days` près (3 par défaut), parmi les lignes non classées, déjà virement, ou dont le libellé est
+  celui d'un virement. Les deux jambes se référencent ; chaque opération ne sert qu'une fois ; la plus proche en date
+  l'emporte. Du quotidien vers un compte d'épargne ou de placement, la sortie devient une mise de côté.
+- **Récurrents détectés** : même marchand ou même libellé sur le même compte, au moins trois fois en 200 jours, à
+  intervalle régulier (semaine, quinzaine, mois) et montant stable (deux tiers à 15 % de la médiane), encore actif.
+  Proposés, jamais ajoutés d'office ; ce qui est déjà au plan ou ignoré n'est pas proposé.
+- **Carte à débit différé** (réglage du compte : jour d'arrêté, jour de prélèvement) : un achat est prélevé au
+  premier jour de prélèvement qui suit son arrêté. `Différé = Σ achats pas encore prélevés dont le prélèvement tombe
+  avant la fin du cycle`. L'achat pèse dans le budget à sa date ; un achat différé d'aujourd'hui ne change pas le
+  budget du jour.
+- **Avances** : une part de dépense avancée pour quelqu'un sort du budget et ouvre une créance, comptée dans le
+  patrimoine. La rentrée d'argent qui la rembourse lui est liée et pèse zéro (ni revenu, ni budget). Abandonnée, la
+  part redevient une dépense à la date de l'abandon.

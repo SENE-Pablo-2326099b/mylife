@@ -2,9 +2,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Button, Field, Notice, Sheet, Switch } from '@mylife/kit';
 import { euros } from '../core/format';
 import type { Occurrence } from '../engine/occurrences';
-import type { Account, Category, Commitment, Db, Envelope, OccurrenceOverride, Provision, Rhythm } from '../engine/schema';
-import type { AllocationPatch } from '../engine/state';
-import { cents, day, END, KIND } from './labels';
+import type { ToClassify } from '../engine/automation';
+import type { Account, Category, Commitment, Db, Envelope, Flow, OccurrenceOverride, Provision, Receivable, Rhythm, Role, Rule } from '../engine/schema';
+import type { AccountPatch, AllocationPatch } from '../engine/state';
+import { cents, day, END, FLOWS, KIND, ROLES } from './labels';
 
 /**
  * Les feuilles de réglage de l'étape M2 : une échéance, un engagement, un paiement en plusieurs fois, une poche, une
@@ -277,19 +278,198 @@ export interface ExpenseLine {
   amount: number;
   smoothed: boolean;
   fundedBySavings: boolean;
+  /** Déjà avancé pour d'autres sur cette dépense. */
+  advanced: number;
 }
 
-export function ExpenseSheet({ line, onClose, onPatch }: { line: ExpenseLine | null; onClose: () => void; onPatch: (id: string, patch: AllocationPatch) => void }) {
+export function ExpenseSheet({ line, onClose, onPatch, onAdvance }: { line: ExpenseLine | null; onClose: () => void; onPatch: (id: string, patch: AllocationPatch) => void; onAdvance: (allocationId: string, person: string, amount: number) => void }) {
+  const [person, setPerson] = useState('');
+  const [amount, setAmount] = useState('');
+  const id = line?.allocationId;
+  useEffect(() => {
+    setPerson('');
+    setAmount('');
+  }, [id]);
   if (!line) return null;
+  const a = cents(amount);
+  const room = -line.amount - line.advanced;
+  const tooMuch = a !== null && a > room;
   return (
     <Form open title={line.label} onClose={onClose}>
       <span className="t-small muted">
-        {euros(line.amount)} le {day(line.date)}.
+        {euros(line.amount)} le {day(line.date)}.{line.advanced > 0 ? ` Dont ${euros(line.advanced)} avancés pour d’autres.` : ''}
       </span>
       <Toggle label="Lisser sur le reste du cycle" detail="Elle réduit un peu le budget de chaque jour restant, au lieu de peser sur la seule journée." checked={line.smoothed} onChange={(v) => onPatch(line.allocationId, { smoothed: v })} />
       <Toggle label="Financée par l’épargne" detail="Payée avec de l’argent venu d’un compte d’épargne : elle ne pèse pas dans le budget du cycle." checked={line.fundedBySavings} onChange={(v) => onPatch(line.allocationId, { fundedBySavings: v })} />
+      <span className="t-label muted" style={{ paddingTop: 6 }}>Avancé pour quelqu’un</span>
+      <span className="t-small muted">La part avancée sort du budget et te reste due, jusqu’à ce que la personne te rembourse.</span>
+      <div className="grid-2">
+        <Field id="adv-person" label="Pour qui">
+          <input id="adv-person" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Prénom" />
+        </Field>
+        <Field id="adv-amount" label="Sa part" error={tooMuch ? `Au plus ${euros(room)}.` : null}>
+          <input id="adv-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
+        </Field>
+      </div>
+      <Button
+        block
+        disabled={!person.trim() || a === null || a === 0 || tooMuch}
+        onClick={() => {
+          onAdvance(line.allocationId, person.trim(), a ?? 0);
+          setPerson('');
+          setAmount('');
+        }}
+      >
+        Ajouter cette avance
+      </Button>
+      <Button variant="quiet" onClick={onClose}>
+        Terminé
+      </Button>
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- une avance à récupérer
+
+export function ReceivableSheet({ value, origin, incomes, onClose, onSettle, onWriteOff, onRemove }: { value: Receivable | null; origin: string; incomes: { allocationId: string; label: string; date: string; amount: number }[]; onClose: () => void; onSettle: (id: string, allocationId: string | null) => void; onWriteOff: (id: string) => void; onRemove: (id: string) => void }) {
+  const [income, setIncome] = useState('');
+  const id = value?.id;
+  const guess = value ? (incomes.find((i) => i.amount === value.amount)?.allocationId ?? '') : '';
+  useEffect(() => setIncome(guess), [id, guess]);
+  if (!value) return null;
+  return (
+    <Form open title={`${value.person} te doit ${euros(value.amount)}`} onClose={onClose}>
+      <span className="t-small muted">Avancé sur « {origin} ».</span>
+      <Select id="rec-income" label="Remboursé par" value={income} options={[['', 'Autrement (espèces, pas encore visible…)'], ...incomes.map((i) => [i.allocationId, `${i.label} · ${euros(i.amount)} · ${day(i.date)}`] as const)]} onChange={setIncome} hint="La rentrée d’argent choisie solde l’avance : elle ne compte ni comme revenu, ni dans le budget." />
+      <Button variant="action" block onClick={() => onSettle(value.id, income || null)}>
+        C’est remboursé
+      </Button>
+      <div className="grid-2">
+        <Button onClick={() => onWriteOff(value.id)}>Je ne le reverrai pas</Button>
+        <Button onClick={() => onRemove(value.id)}>Annuler l’avance</Button>
+      </div>
+      <span className="t-small muted">« Je ne le reverrai pas » : la part redevient une dépense, aujourd’hui.</span>
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- classer
+
+export function ClassifySheet({ group, categories, onClose, onSave }: { group: ToClassify | null; categories: Category[]; onClose: () => void; onSave: (g: ToClassify, flow: Flow, categoryId: string | null, wholeMerchant: boolean) => void }) {
+  const key = group?.key;
+  const incoming = (group?.total ?? 0) > 0;
+  const [flow, setFlow] = useState<Flow>('EXPENSE');
+  const [categoryId, setCategoryId] = useState('');
+  const [whole, setWhole] = useState(true);
+  useEffect(() => {
+    setFlow(incoming ? 'INCOME' : 'EXPENSE');
+    setCategoryId('');
+    setWhole(true);
+  }, [key, incoming]);
+  if (!group) return null;
+  const needsCategory = flow === 'EXPENSE';
+  return (
+    <Form open title={group.name} onClose={onClose}>
+      <span className="t-small muted">
+        {group.count} opération{group.count > 1 ? 's' : ''}, {euros(group.total)}. D’abord ce que c’est, puis sa catégorie si c’est une dépense.
+      </span>
+      <Select id="cls-flow" label="C’est" value={flow} options={FLOWS} onChange={setFlow} />
+      {needsCategory && <Select id="cls-cat" label="Catégorie" value={categoryId} options={[['', 'Choisir…'], ...categories.map((c) => [c.id, c.name] as const)]} onChange={setCategoryId} />}
+      {group.merchantId && <Toggle label="Pour tout ce marchand" detail="Ses opérations passées et à venir seront classées de la même façon." checked={whole} onChange={setWhole} />}
+      <Button variant="action" block disabled={needsCategory && !categoryId} onClick={() => onSave(group, flow, needsCategory ? categoryId : null, whole && !!group.merchantId)}>
+        Classer
+      </Button>
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- une règle de tri
+
+const DIRECTIONS = [['any', 'Entrées et sorties'], ['debit', 'Sorties seulement'], ['credit', 'Entrées seulement']] as const;
+const blankRule = (priority: number): Rule => ({ id: newId('regle'), name: '', priority, enabled: true, merchantId: null, keywords: [], accountIds: [], amountMin: null, amountMax: null, direction: 'any', flow: 'EXPENSE', categoryId: null, tagIds: [] });
+
+export function RuleSheet({ value, categories, count, onClose, onSave, onRemove }: { value: Rule | 'new' | null; categories: Category[]; count: number; onClose: () => void; onSave: (r: Rule) => void; onRemove: (id: string) => void }) {
+  const [r, setR] = useState<Rule>(() => blankRule(0));
+  const [words, setWords] = useState('');
+  const [min, setMin] = useState('');
+  const [max, setMax] = useState('');
+  useEffect(() => {
+    const next = value && value !== 'new' ? value : blankRule(count + 1);
+    setR(next);
+    setWords(next.keywords.join(', '));
+    setMin(text(next.amountMin));
+    setMax(text(next.amountMax));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  if (!value) return null;
+  const isNew = value === 'new';
+  const set = (patch: Partial<Rule>) => setR((x) => ({ ...x, ...patch }));
+  const keywords = words.split(',').map((w) => w.trim()).filter(Boolean);
+  const amountMin = min.trim() ? cents(min) : null;
+  const amountMax = max.trim() ? cents(max) : null;
+  const badAmount = (min.trim() && amountMin === null) || (max.trim() && amountMax === null);
+  const ready = (keywords.length > 0 || amountMin !== null || amountMax !== null) && !badAmount && (r.flow !== 'EXPENSE' || !!r.categoryId);
+  return (
+    <Form open title={isNew ? 'Nouvelle règle de tri' : r.name || 'Règle de tri'} onClose={onClose}>
+      <Field id="rule-words" label="Le libellé contient" hint="Des mots entiers, séparés par des virgules : l’un d’eux suffit.">
+        <input id="rule-words" value={words} onChange={(e) => setWords(e.target.value)} placeholder="boulangerie, fournil" />
+      </Field>
+      <Select id="rule-dir" label="Sens" value={r.direction} options={DIRECTIONS} onChange={(direction) => set({ direction })} />
+      <div className="grid-2">
+        <Field id="rule-min" label="Montant minimal">
+          <input id="rule-min" inputMode="decimal" value={min} onChange={(e) => setMin(e.target.value)} placeholder="aucun" />
+        </Field>
+        <Field id="rule-max" label="Montant maximal">
+          <input id="rule-max" inputMode="decimal" value={max} onChange={(e) => setMax(e.target.value)} placeholder="aucun" />
+        </Field>
+      </div>
+      <Select id="rule-flow" label="Alors c’est" value={r.flow} options={FLOWS} onChange={(flow) => set({ flow })} />
+      {r.flow === 'EXPENSE' && <Select id="rule-cat" label="Catégorie" value={r.categoryId ?? ''} options={[['', 'Choisir…'], ...categories.map((c) => [c.id, c.name] as const)]} onChange={(id) => set({ categoryId: id || null })} />}
+      <Toggle label="Active" checked={r.enabled} onChange={(v) => set({ enabled: v })} />
+      <Button variant="action" block disabled={!ready} onClick={() => onSave({ ...r, name: r.name || keywords.join(', ') || 'Par montant', keywords, amountMin, amountMax, categoryId: r.flow === 'EXPENSE' ? r.categoryId : null })}>
+        Enregistrer
+      </Button>
+      {!isNew && (
+        <Button variant="danger" block onClick={() => onRemove(r.id)}>
+          Supprimer
+        </Button>
+      )}
+    </Form>
+  );
+}
+
+// ---------------------------------------------------------------- un compte
+
+export function AccountSheet({ value, onClose, onPatch }: { value: Account | null; onClose: () => void; onPatch: (id: string, patch: AccountPatch) => void }) {
+  const [closing, setClosing] = useState('');
+  const [debit, setDebit] = useState('');
+  const id = value?.id;
+  useEffect(() => {
+    setClosing(value?.deferredDebit ? String(value.deferredDebit.closingDay) : '25');
+    setDebit(value?.deferredDebit ? String(value.deferredDebit.debitDay) : '5');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  if (!value) return null;
+  const dayOf = (v: string) => Math.max(1, Math.min(31, Math.trunc(Number(v)) || 1));
+  const deferred = value.deferredDebit !== null;
+  return (
+    <Form open title={value.name} onClose={onClose}>
+      <Select id="acc-role" label="Rôle" value={value.role} options={ROLES} onChange={(role: Role) => onPatch(value.id, { role })} hint="Le rôle décrit le compte ; ce sont les réglages ci-dessous qui comptent dans les calculs." />
+      <Toggle label="Dans le cash quotidien" detail="Son solde fait partie de l’argent du quotidien." checked={value.includeInDailyCash} onChange={(v) => onPatch(value.id, { includeInDailyCash: v })} />
+      <Toggle label="Dans le patrimoine" checked={value.includeInNetWorth} onChange={(v) => onPatch(value.id, { includeInNetWorth: v })} />
+      <Toggle label="Carte à débit différé" detail="Ses achats sont prélevés en une fois : d’ici là, leur total est retiré du cash libre." checked={deferred} onChange={(v) => onPatch(value.id, { deferredDebit: v ? { closingDay: dayOf(closing), debitDay: dayOf(debit) } : null })} />
+      {deferred && (
+        <div className="grid-2">
+          <Field id="acc-closing" label="Jour d’arrêté">
+            <input id="acc-closing" inputMode="numeric" value={closing} onChange={(e) => { setClosing(e.target.value); onPatch(value.id, { deferredDebit: { closingDay: dayOf(e.target.value), debitDay: dayOf(debit) } }); }} />
+          </Field>
+          <Field id="acc-debit" label="Jour de prélèvement">
+            <input id="acc-debit" inputMode="numeric" value={debit} onChange={(e) => { setDebit(e.target.value); onPatch(value.id, { deferredDebit: { closingDay: dayOf(closing), debitDay: dayOf(e.target.value) } }); }} />
+          </Field>
+        </div>
+      )}
       <Button block onClick={onClose}>
-        Fermer
+        Terminé
       </Button>
     </Form>
   );

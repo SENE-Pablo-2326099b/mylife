@@ -1,7 +1,8 @@
 import { addDays, cycleFor, daysInMonth, parseISO, toISO, type ISODate } from '../core/dates';
+import { automate, type RecurringSuggestion } from './automation';
 import { compute } from './engine';
 import { buildOccurrences, currentCycle, isProvisioned, nextDue } from './occurrences';
-import type { Allocation, Commitment, Db, EngineSettings, Envelope, InstallmentPlan, OccurrenceOverride, Provision } from './schema';
+import type { Account, Allocation, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule } from './schema';
 
 /**
  * Ce que l'utilisateur règle et ce que le moteur retient d'un cycle à l'autre (étape M2). Les faits (comptes,
@@ -11,7 +12,9 @@ import type { Allocation, Commitment, Db, EngineSettings, Envelope, InstallmentP
  */
 
 /** Les leviers posés sur une ligne. */
-export type AllocationPatch = Partial<Pick<Allocation, 'smoothed' | 'fundedBySavings' | 'incomeUse' | 'receivableAmount'>>;
+export type AllocationPatch = Partial<Pick<Allocation, 'smoothed' | 'fundedBySavings' | 'incomeUse' | 'flow' | 'categoryId' | 'tagIds' | 'linkedTransactionId' | 'settlesReceivableId'>>;
+/** Ce que l'utilisateur change à un compte : son rôle et ses drapeaux. */
+export type AccountPatch = Partial<Pick<Account, 'role' | 'includeInDailyCash' | 'includeInNetWorth' | 'deferredDebit' | 'ownershipRatio'>>;
 
 export interface ClosedCycle {
   start: ISODate;
@@ -36,6 +39,13 @@ export interface EngineState {
   installmentPlans: InstallmentPlan[];
   occurrenceOverrides: OccurrenceOverride[];
   allocationPatches: Record<string, AllocationPatch>;
+  accountPatches?: Record<string, AccountPatch>;
+  rules?: Rule[];
+  /** Les marchands classés par l'utilisateur : ils s'imposent à toutes leurs opérations non décidées à la main. */
+  merchantDefaults?: Record<string, { flow: Flow; categoryId: string | null }>;
+  receivables?: Receivable[];
+  /** Récurrents détectés que l'utilisateur ne veut pas au plan. */
+  ignoredSuggestions?: string[];
   settings: EngineSettings;
   carryIn: Db['carryIn'];
   /** Début du cycle en cours la dernière fois que le moteur a tourné : sert à détecter qu'un cycle s'est terminé. */
@@ -49,21 +59,41 @@ export function initState(base: Db): EngineState {
   return { version: 1, commitments: base.commitments, envelopes: base.envelopes, provisions: [], installmentPlans: [], occurrenceOverrides: [], allocationPatches: {}, settings: base.settings, carryIn: { global: 0, envelopes: {} }, lastCycleStart: null, closedCycles: [] };
 }
 
-/** Les faits de la reprise, vus à travers les réglages de l'utilisateur. */
+/**
+ * Les faits de la reprise, vus à travers les réglages de l'utilisateur. Dans l'ordre : ses comptes, ses règles et
+ * ses marchands ; le classement automatique et l'appariement des virements ; puis ce qu'il a décidé à la main, qui a
+ * toujours le dernier mot.
+ */
 export function applyState(base: Db, s: EngineState): Db {
   const cats = new Set(base.categories.map((c) => c.id));
-  const accounts = new Set(base.accounts.map((a) => a.id));
   const envelopes = s.envelopes.map((e) => ({ ...e, categoryIds: e.categoryIds.filter((id) => cats.has(id)) }));
   if (!envelopes.some((e) => e.isDefault)) envelopes.unshift(...base.envelopes.filter((e) => e.isDefault));
+  const accounts = base.accounts.map((a) => (s.accountPatches?.[a.id] ? { ...a, ...s.accountPatches[a.id] } : a));
+  const accountIds = new Set(accounts.map((a) => a.id));
+  const defaults = s.merchantDefaults ?? {};
+  const merchants = base.merchants.map((m) => (defaults[m.id] ? { ...m, ...defaults[m.id] } : m));
+  // Ce qui est décidé à la main (nature, catégorie, lien) est marqué avant tout : les automatismes n'y touchent pas.
+  const decided = (p: AllocationPatch | undefined) => !!p && ('flow' in p || 'categoryId' in p || 'linkedTransactionId' in p || 'settlesReceivableId' in p);
+  const patched = base.allocations.map((a) => (decided(s.allocationPatches[a.id]) ? { ...a, origin: 'manual' as const } : a));
+  const automated = automate({ ...base, accounts, merchants, rules: s.rules ?? [], allocations: patched, settings: { ...base.settings, ...s.settings } }, new Set(Object.keys(defaults)));
+  const receivables = (s.receivables ?? []).filter((r) => base.allocations.some((a) => a.id === r.allocationId));
+  const advanced = new Map<string, number>();
+  for (const r of receivables) advanced.set(r.allocationId, (advanced.get(r.allocationId) ?? 0) + r.amount);
   return {
-    ...base,
+    ...automated,
     commitments: s.commitments,
     envelopes,
-    provisions: s.provisions.filter((p) => accounts.has(p.accountId)),
+    provisions: s.provisions.filter((p) => accountIds.has(p.accountId)),
     installmentPlans: s.installmentPlans,
     occurrenceOverrides: s.occurrenceOverrides,
-    allocations: base.allocations.map((a) => (s.allocationPatches[a.id] ? { ...a, ...s.allocationPatches[a.id] } : a)),
-    settings: { ...base.settings, ...s.settings },
+    receivables,
+    allocations: automated.allocations.map((a) => {
+      const p = s.allocationPatches[a.id];
+      const part = advanced.get(a.id);
+      if (!p && part === undefined) return a;
+      // La part avancée ne dépasse jamais la dépense.
+      return { ...a, ...p, ...(part !== undefined ? { receivableAmount: Math.min(part, Math.max(0, -a.amount)) } : {}) };
+    }),
     carryIn: s.carryIn,
   };
 }
@@ -85,6 +115,36 @@ export const removeProvision = (s: EngineState, id: string): EngineState => ({ .
 export const patchAllocation = (s: EngineState, id: string, patch: AllocationPatch): EngineState => ({ ...s, allocationPatches: { ...s.allocationPatches, [id]: { ...s.allocationPatches[id], ...patch } } });
 export const decideOccurrence = (s: EngineState, id: string, decision: OccurrenceOverride | null): EngineState => ({ ...s, occurrenceOverrides: [...s.occurrenceOverrides.filter((o) => o.id !== id), ...(decision ? [decision] : [])] });
 export const resetCarry = (s: EngineState): EngineState => ({ ...s, carryIn: { global: 0, envelopes: {} } });
+export const patchAccount = (s: EngineState, id: string, patch: AccountPatch): EngineState => ({ ...s, accountPatches: { ...s.accountPatches, [id]: { ...s.accountPatches?.[id], ...patch } } });
+export const saveRule = (s: EngineState, r: Rule): EngineState => ({ ...s, rules: upsert(s.rules ?? [], r) });
+export const removeRule = (s: EngineState, id: string): EngineState => ({ ...s, rules: (s.rules ?? []).filter((r) => r.id !== id) });
+/** Classer un marchand : toutes ses opérations suivent, sauf celles décidées une à une. */
+export const classifyMerchant = (s: EngineState, merchantId: string, flow: Flow, categoryId: string | null): EngineState => ({ ...s, merchantDefaults: { ...s.merchantDefaults, [merchantId]: { flow, categoryId: flow === 'EXPENSE' ? categoryId : null } } });
+/** Classer une seule ligne, à la main. */
+export const classifyAllocation = (s: EngineState, id: string, flow: Flow, categoryId: string | null): EngineState => patchAllocation(s, id, { flow, categoryId: flow === 'EXPENSE' || flow === 'REFUND' ? categoryId : null });
+export const ignoreSuggestion = (s: EngineState, key: string): EngineState => ({ ...s, ignoredSuggestions: [...new Set([...(s.ignoredSuggestions ?? []), key])] });
+
+/** Un récurrent détecté devient un engagement du plan. */
+export function acceptSuggestion(s: EngineState, x: RecurringSuggestion): EngineState {
+  const c: Commitment = { id: `rec:${x.key}`, kind: x.kind, label: x.label, amount: x.amount, tolerance: 0.2, rhythm: x.rhythm, anchorDay: x.anchorDay, anchorDate: x.rhythm === 'BIWEEKLY' ? x.anchorDate : null, accountId: x.accountId, counterAccountId: null, categoryId: null, startDate: null, endDate: null, remainingOccurrences: null, installmentPlanId: null, direct: false, paused: false, reserveInCash: null, provisionMonthly: false };
+  return saveCommitment(s, c);
+}
+
+// ---- créances : une part de dépense avancée pour quelqu'un
+
+/** Avancer une part : elle sort du budget et devient une créance à récupérer. */
+export const addReceivable = (s: EngineState, r: { id: string; person: string; amount: number; allocationId: string }, now: number = Date.now()): EngineState => ({ ...s, receivables: [...(s.receivables ?? []), { ...r, status: 'OPEN', createdAt: now, writtenOffAt: null }] });
+
+/** Récupérée : la créance est soldée. Si une rentrée d'argent la rembourse, celle-ci lui est liée et pèse zéro. */
+export function settleReceivable(s: EngineState, id: string, allocationId: string | null): EngineState {
+  const next = { ...s, receivables: (s.receivables ?? []).map((r) => (r.id === id ? { ...r, status: 'SETTLED' as const } : r)) };
+  return allocationId ? patchAllocation(next, allocationId, { flow: 'REFUND', categoryId: null, settlesReceivableId: id }) : next;
+}
+
+/** Abandonnée : la part redevient une dépense, à la date de l'abandon. */
+export const writeOffReceivable = (s: EngineState, id: string, today: ISODate): EngineState => ({ ...s, receivables: (s.receivables ?? []).map((r) => (r.id === id ? { ...r, status: 'WRITTEN_OFF' as const, writtenOffAt: today } : r)) });
+/** Supprimée (saisie par erreur) : la dépense pèse de nouveau en entier, à sa date. */
+export const removeReceivable = (s: EngineState, id: string): EngineState => ({ ...s, receivables: (s.receivables ?? []).filter((r) => r.id !== id) });
 
 /** Une catégorie n'appartient qu'à une enveloppe : l'enregistrer dans l'une la retire des autres. L'enveloppe par défaut ne se supprime pas. */
 export function saveEnvelope(s: EngineState, e: Envelope): EngineState {

@@ -698,6 +698,61 @@ describe('MyLife, une seule app', () => {
     await shows('Cash libre', /700\s€/);
     await shows('Dépensé aujourd’hui', /12,50\s€/);
     await p.getByRole('button', { name: /Réserve loyer/ }).waitFor();
+    // ---- M3. À classer, par marchand : la nature d'abord, puis la catégorie ; tout le marchand suit.
+    await p.getByRole('button', { name: /Boulangerie Des Halles/ }).click();
+    await p.getByLabel('Catégorie').selectOption('courses');
+    await p.getByRole('button', { name: 'Classer' }).click();
+    await p.getByText(/À classer :/).waitFor({ state: 'detached' });
+    // Une avance : 5 € des 12,50 € de l'épicerie payés pour quelqu'un. Ils sortent du budget et restent dus.
+    await p.getByRole('button', { name: /CB EPICERIE DU COIN/ }).click();
+    await p.getByLabel('Pour qui').fill('Camille');
+    await p.getByLabel('Sa part').fill('5');
+    await p.getByRole('button', { name: 'Ajouter cette avance' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    await shows('Déjà dépensé', /37,50\s€/);
+    await p.getByText(/À récupérer : 5\s€/).waitFor();
+    // Une règle de tri.
+    await p.locator('button.link', { hasText: 'Ajouter' }).nth(3).click();
+    await p.getByLabel('Le libellé contient').fill('epicerie');
+    await p.getByLabel('Catégorie').selectOption('courses');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('button', { name: /^epicerie/ }).waitFor();
+    // Le rôle d'un compte est un réglage : mettre le livret dans le cash quotidien, puis l'en retirer.
+    const livret = p.getByRole('button', { name: /^Livret/ });
+    await livret.click();
+    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    await shows('Comptes du quotidien', /4\s200\s€/);
+    await livret.click();
+    await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    await shows('Comptes du quotidien', /1\s200\s€/);
+    // Un virement interne arrive par la banque, en deux opérations non classées : il est apparié tout seul, et
+    // comme il va vers l'épargne, c'est une mise de côté (50 €), pas une dépense.
+    await p.evaluate(
+      (date) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open('myfinances');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['transactions'], 'readwrite');
+            tx.objectStore('transactions').put({ id: 'ta', accountId: 'acc', date, amount: -5000, label: 'VIR SEPA INTERNE', categoryId: null });
+            tx.objectStore('transactions').put({ id: 'tb', accountId: 'liv', date, amount: 5000, label: 'VERSEMENT', categoryId: null });
+            tx.oncomplete = () => (open.result.close(), resolve());
+            tx.onerror = () => reject(tx.error);
+          };
+        }),
+      today,
+    );
+    await p.getByRole('button', { name: 'Relire mes données' }).click();
+    await p.getByText('Virements internes appariés').waitFor();
+    await shows('Épargne', /50\s€/);
+    await shows('Déjà dépensé', /37,50\s€/);
+    // L'avance ne sera pas remboursée : la part redevient une dépense.
+    await p.getByRole('button', { name: /^Camille/ }).click();
+    await p.getByRole('button', { name: 'Je ne le reverrai pas' }).click();
+    await shows('Déjà dépensé', /42,50\s€/);
+    await shot(p, '61-finances-v5-automatismes');
     await ctx.close();
   });
 
