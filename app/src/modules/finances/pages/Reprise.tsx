@@ -1,21 +1,40 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, Panel, ScreenHeader, SectionTitle } from '@mylife/kit';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle } from '@mylife/kit';
 import { localToday } from '@mylife/lumen';
-import { dayBudget, netWorth, perCycle } from '../core/budget';
 import { euros } from '../core/format';
-import { toClassify } from '../core/merchants';
-import { FAMILIES, NATURES, type FinanceData } from '../core/model';
+import type { FinanceData } from '../core/model';
 import { loadAll } from '../data/db';
 import { importOld, lastImport } from '../data/importOld';
+import { compute, netWorth } from '../engine/engine';
+import { fromV3 } from '../engine/fromV3';
+import { checkIntegrity } from '../engine/integrity';
+import type { Role } from '../engine/schema';
 import { useGlance } from '../../../legacy/glance';
 
 /**
- * Étape 3.3 : tes données de l'ancienne app, relues dans le nouveau modèle (comptes, mouvements, marchands, prévu).
- * Écran de vérification, pas un écran définitif : les vrais écrans (Jour, Opérations, Plan, Patrimoine) le remplacent
- * aux étapes suivantes. Rien n'est modifié dans l'ancienne app.
+ * Étape M1 : « pourquoi ce chiffre ». Tes données de l'ancienne app, passées dans le moteur, avec chaque terme des
+ * formules (docs/V5-MYFINANCES-MOTEUR.md). Écran de vérification, provisoire : les écrans définitifs viennent en M5.
+ * Rien n'est modifié dans l'ancienne app ; rien n'est encore réglable ici (M2 à M4).
  */
-const KIND = { revenu: 'Revenu', charge: 'Charge', epargne: 'Épargne' } as const;
-const RHYTHM = { weekly: 'par semaine', biweekly: 'toutes les 2 semaines', monthly: 'par mois' } as const;
+const ROLE: Record<Role, string> = { CHECKING: 'Courant', PROVISION: 'Provision', SAVINGS: 'Épargne', INVESTMENT: 'Placement', CASH: 'Espèces', ASSET: 'Bien', LIABILITY: 'Dette' };
+const KIND = { INCOME: 'Revenu', CHARGE: 'Charge', SAVING: 'Épargne', INSTALLMENT: 'Échéance' } as const;
+const STATUS = { PAID: 'ok', DUE: 'warn', SKIPPED: 'neutral' } as const;
+const STATUS_LABEL = { PAID: 'réglée', DUE: 'à venir', SKIPPED: 'sautée' } as const;
+const day = (iso: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(new Date(`${iso}T12:00:00`));
+
+/** Une ligne de formule : le signe, le terme, sa valeur ; la ligne de résultat est en gras. */
+function Term({ sign, label, detail, value, total }: { sign?: '−' | '+' | '=' | '÷'; label: string; detail?: ReactNode; value: string; total?: boolean }) {
+  return (
+    <div className="list-row">
+      <span className="muted" style={{ width: 14, textAlign: 'center', fontWeight: 700 }}>{sign ?? ''}</span>
+      <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
+        <span className="t-body" style={{ fontWeight: total ? 700 : 500 }}>{label}</span>
+        {detail && <span className="t-small muted">{detail}</span>}
+      </span>
+      <span className={total ? 't-card' : 't-strong'}>{value}</span>
+    </div>
+  );
+}
 
 export function ReprisePage() {
   const [data, setData] = useState<FinanceData | null>(null);
@@ -49,12 +68,12 @@ export function ReprisePage() {
     })().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, [run]);
 
-  const header = <ScreenHeader kicker="MyFinances V5 · vérification" title="Tes données" />;
+  const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" />;
   if (error)
     return (
       <>
         {header}
-        <Notice tone="bad">La reprise a échoué : {error}</Notice>
+        <Notice tone="bad">La lecture de tes données a échoué : {error}</Notice>
         <Button onClick={() => void run()}>Réessayer</Button>
       </>
     );
@@ -67,75 +86,104 @@ export function ReprisePage() {
       </>
     );
 
-  const today = localToday();
-  const b = dayBudget(data, today);
-  const worth = netWorth(data);
-  const groups = toClassify(data);
-  const pending = groups.reduce((n, g) => n + g.movements.length, 0);
-  const count = (nature: string | null) => data.movements.filter((m) => m.nature === nature).length;
-  const classified = data.merchants.filter((m) => m.nature !== null).length;
+  const db = fromV3(data);
+  const e = compute(db, localToday());
+  const worth = netWorth(db);
+  const integrity = checkIntegrity(db);
+  const daily = db.accounts.filter((a) => a.includeInDailyCash && !a.archivedAt);
+  const offPlan = e.envelopes.filter((x) => !x.envelope.inDailyBudget && x.budget === null && x.spent > 0);
+  const dueCount = e.occurrences.filter((o) => o.status === 'DUE' && o.commitment.kind !== 'INCOME').length;
 
   return (
     <>
       {header}
       <ModuleCard tone="finances">
         <div className="pad stack" style={{ gap: 8 }}>
-          <ModuleLabel tone="finances">À dépenser aujourd’hui, nouveau calcul</ModuleLabel>
-          <span className="t-hero">{euros(b.leftToday)}</span>
+          <ModuleLabel tone="finances">Reste aujourd’hui</ModuleLabel>
+          <span className="t-hero">{euros(e.resteAujourdhui)}</span>
           <span className="t-small muted">
-            {euros(b.spent)} dépensés sur {euros(b.plan.resteAVivre)} · {b.daysLeft} jour{b.daysLeft > 1 ? 's' : ''} avant la paie
+            Budget du jour {euros(e.budgetJour)} · {euros(e.spentToday)} dépensés aujourd’hui · {e.daysLeft} jour{e.daysLeft > 1 ? 's' : ''} avant la paie
+          </span>
+          <span className="t-small" style={{ fontWeight: 600 }}>
+            {e.deficit > 0 ? `Plus rien de disponible : il manque ${euros(e.deficit)}.` : e.limitedBy === 'cash' ? `Limité par ta trésorerie : ${euros(-e.marge)} de moins que ton budget.` : `Dans ton budget. Marge de trésorerie : ${euros(e.marge)}.`}
           </span>
           {old && <span className="t-small muted">L’app actuelle affiche : {old.title}</span>}
         </div>
       </ModuleCard>
 
-      <SectionTitle>Plan du cycle</SectionTitle>
-      <List>
-        <ListRow title="Revenus prévus" value={euros(b.plan.revenus)} />
-        <ListRow title="Charges prévues" value={euros(-b.plan.charges)} />
-        <ListRow title="Épargne prévue" value={euros(-b.plan.epargne)} />
-        <ListRow title="Reste à vivre" value={euros(b.plan.resteAVivre)} />
-      </List>
-      <Panel title={`Prévu : ${data.planned.length} ligne${data.planned.length > 1 ? 's' : ''}`}>
-        {data.planned.length === 0 && <span className="t-small muted">Aucune ligne de revenu, de charge ou d’épargne dans l’ancienne app.</span>}
-        <div className="stack-0">
-          {data.planned.map((p) => (
-            <ListRow key={p.id} title={p.label} detail={`${KIND[p.kind]} · ${euros(p.amount)} ${RHYTHM[p.rhythm]}${p.active ? '' : ' · en pause'}`} value={euros(perCycle(p))} />
-          ))}
-        </div>
-      </Panel>
+      {integrity.errors.length > 0 && <Notice tone="bad">Données incohérentes après reprise : {integrity.errors.slice(0, 3).join(' ; ')}</Notice>}
+      {e.pendingIncomes.length > 0 && (
+        <Notice tone="warn">
+          {e.pendingIncomes.length} revenu{e.pendingIncomes.length > 1 ? 's' : ''} non prévu{e.pendingIncomes.length > 1 ? 's' : ''} ({euros(e.pendingIncomes.reduce((s, p) => s + p.amount, 0))}) : hors budget tant que tu n’as pas choisi entre budget et épargne.
+        </Notice>
+      )}
+      {e.incomeFallback && <Notice tone="warn">Aucun revenu prévu : les revenus reçus dans le cycle servent de base.</Notice>}
+      {e.unknownBalances.length > 0 && <Notice tone="warn">Solde inconnu pour {e.unknownBalances.join(', ')} : la trésorerie est sous-estimée.</Notice>}
+      {offPlan.length > 0 && (
+        <Notice>
+          {euros(offPlan.reduce((s, x) => s + x.spent, 0))} de charges fixes payées ce cycle sans être au plan : elles ne comptent pas dans le budget théorique, seulement dans la trésorerie.
+        </Notice>
+      )}
 
-      <SectionTitle>Patrimoine : {euros(worth.net, { round: true })} net</SectionTitle>
+      <SectionTitle>1 · Budget théorique</SectionTitle>
       <List>
-        {FAMILIES.map((f) => {
-          const n = data.accounts.filter((a) => a.family === f.id).length;
-          return <ListRow key={f.id} title={f.name} detail={`${n} compte${n > 1 ? 's' : ''}`} value={euros(f.id === 'dettes' ? -worth.byFamily[f.id] : worth.byFamily[f.id], { round: true })} />;
-        })}
+        <Term label="Revenus du cycle" value={euros(e.revenus)} />
+        <Term sign="−" label="Charges prévues" value={euros(e.charges)} />
+        <Term sign="−" label="Épargne" detail="le plus grand du prévu et du déjà mis de côté" value={euros(e.epargne)} />
+        {e.report !== 0 && <Term sign="+" label="Report du cycle précédent" value={euros(e.report)} />}
+        <Term sign="=" label="Reste à vivre" value={euros(e.rav)} total />
+        {e.reserve > 0 && <Term sign="−" label="Enveloppes hors quotidien" value={euros(e.reserve)} />}
+        <Term sign="−" label="Déjà dépensé" detail={`du ${day(e.cycle.start)} à aujourd’hui`} value={euros(e.spent)} />
+        <Term sign="=" label="Reste dans le budget" value={euros(e.resteEnveloppe)} total />
       </List>
 
-      <SectionTitle>Mouvements : {data.movements.length}</SectionTitle>
+      <SectionTitle>2 · Trésorerie réelle</SectionTitle>
       <List>
-        {NATURES.map((n) => (
-          <ListRow key={n.id} title={`${n.name}s`} value={count(n.id)} />
+        <Term label="Comptes du quotidien" detail={daily.map((a) => a.name).join(', ') || 'aucun'} value={euros(e.cash)} />
+        <Term sign="−" label="Poches verrouillées" value={euros(e.locked)} />
+        <Term sign="−" label="À payer avant la paie" detail={`${dueCount} échéance${dueCount > 1 ? 's' : ''}${e.covered > 0 ? ` · ${euros(e.covered)} déjà en poche` : ''}`} value={euros(e.toPay)} />
+        {e.offDaily > 0 && <Term sign="−" label="Reste des enveloppes hors quotidien" value={euros(e.offDaily)} />}
+        <Term sign="=" label="Cash libre" value={euros(e.cashLibre)} total />
+      </List>
+
+      <SectionTitle>3 · Budget du jour</SectionTitle>
+      <List>
+        <Term label="Disponible à minuit" detail={e.mode === 'CASH' ? 'mode trésorerie : le cash libre' : `le plus petit des deux : ${e.limitedBy === 'cash' ? 'la trésorerie' : 'le budget'}`} value={euros(e.disponible)} />
+        <Term sign="÷" label="Jours restants" value={String(e.daysLeft)} />
+        <Term sign="=" label="Budget du jour" detail="gelé jusqu’à minuit" value={euros(e.budgetJour)} total />
+        <Term sign="−" label="Dépensé aujourd’hui" value={euros(e.spentToday)} />
+        <Term sign="=" label="Reste aujourd’hui" value={euros(e.resteAujourdhui)} total />
+        <Term label="Demain, à ce rythme" value={`${euros(e.demain)} par jour`} />
+      </List>
+
+      <SectionTitle>Échéances du cycle : {e.occurrences.length}</SectionTitle>
+      <List>
+        {e.occurrences.length === 0 && <ListRow title="Aucune échéance prévue" detail="Ni revenu, ni charge, ni épargne dans l’ancienne app" />}
+        {e.occurrences.map((o) => (
+          <ListRow key={o.id} title={o.commitment.label} detail={`${KIND[o.commitment.kind]} · ${day(o.dueDate)}`} value={<span className="row" style={{ gap: 8 }}><Badge tone={STATUS[o.status]}>{STATUS_LABEL[o.status]}</Badge>{euros(o.actual ?? o.expected)}</span>} />
         ))}
-        <ListRow title="Nature inconnue" detail="rentrées d’argent pas encore classées" value={count(null)} />
       </List>
 
-      <Panel title={`À classer : ${groups.length} marchand${groups.length > 1 ? 's' : ''}, ${pending} mouvement${pending > 1 ? 's' : ''}`}>
-        <span className="t-small muted">
-          {data.merchants.length} marchands reconnus, dont {classified} déjà classés d’après tes opérations passées.
-        </span>
-        <div className="stack-0">
-          {groups.slice(0, 8).map((g) => (
-            <ListRow key={g.merchantId ?? g.movements[0]!.id} title={g.name} detail={`${g.movements.length} mouvement${g.movements.length > 1 ? 's' : ''}`} value={euros(g.total)} />
+      <SectionTitle>Enveloppes</SectionTitle>
+      <List>
+        {e.envelopes.map((x) => (
+          <ListRow key={x.envelope.id} title={x.envelope.name} detail={`${x.envelope.inDailyBudget ? 'dans le quotidien' : 'hors quotidien'}${x.budget !== null ? ` · plafond ${euros(x.budget)}` : ''}`} value={euros(x.spent)} />
+        ))}
+      </List>
+
+      <SectionTitle>Comptes · patrimoine net {euros(worth.net, { round: true })}</SectionTitle>
+      <List>
+        {db.accounts
+          .filter((a) => !a.archivedAt)
+          .map((a) => (
+            <ListRow key={a.id} title={a.name} detail={`${ROLE[a.role]}${a.includeInDailyCash ? ' · dans le cash quotidien' : ''}`} value={a.balance === null ? '?' : euros(a.role === 'LIABILITY' ? -a.balance : a.balance, { round: true })} />
           ))}
-        </div>
-      </Panel>
+      </List>
 
       <Button block disabled={busy} onClick={() => void run()}>
-        {busy ? 'Reprise en cours…' : 'Reprendre à nouveau'}
+        {busy ? 'Lecture en cours…' : 'Relire mes données'}
       </Button>
-      {at && <span className="t-small muted" style={{ textAlign: 'center' }}>Dernière reprise : {new Date(at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}. L’ancienne app n’est pas modifiée.</span>}
+      {at && <span className="t-small muted" style={{ textAlign: 'center' }}>Dernière lecture : {new Date(at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })}. L’ancienne app n’est pas modifiée.</span>}
     </>
   );
 }

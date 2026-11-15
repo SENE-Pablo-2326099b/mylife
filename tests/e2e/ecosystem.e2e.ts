@@ -595,7 +595,7 @@ describe('MyLife, une seule app', () => {
     await ctx.close();
   });
 
-  it('MyFinances V5 : les données de l’ancienne app relues dans le nouveau modèle (comptes, natures, marchands, prévu)', async () => {
+  it('MyFinances V5 : « pourquoi ce chiffre », les données de l’ancienne app passées dans le moteur', async () => {
     const [ctx, p] = await device();
     await p.goto(`${server.url}/`);
     await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
@@ -637,17 +637,24 @@ describe('MyLife, une seule app', () => {
       today,
     );
     await p.reload();
-    await p.getByText('Mouvements : 4').waitFor();
-    await p.getByText('Patrimoine : 4 200 € net').waitFor();
-    // Reste à vivre : 2 000 − 700 ; dépensé aujourd'hui : 12,50 + 30,00 (à classer, compté) ; le virement et le salaire n'y entrent pas.
-    await p.getByText(/42,50\s€ dépensés sur 1\s300\s€/).waitFor();
-    await p.getByText('À classer : 1 marchand, 1 mouvement').waitFor();
-    await p.getByText('Boulangerie Des Halles').waitFor();
-    await shot(p, '60-finances-v5-reprise');
+    await p.getByRole('heading', { name: 'Pourquoi ce chiffre' }).waitFor();
+    // Budget théorique : 2 000 − 700 = 1 300 de reste à vivre ; 42,50 dépensés (dont 30 à classer, comptés) ; le
+    // virement vers le livret (sans jambe jumelle connue) ne pèse rien, le salaire règle son échéance.
+    const term = (label: string) => p.locator('.list-row', { hasText: label }).first();
+    await expect.poll(() => term('Reste à vivre').innerText()).toMatch(/1\s300\s€/);
+    expect(await term('Déjà dépensé').innerText()).toMatch(/42,50\s€/);
+    // Trésorerie : 1 200 sur le compte du quotidien (le livret n'en est pas), moins le loyer encore à payer.
+    expect(await term('Comptes du quotidien').innerText()).toMatch(/1\s200\s€/);
+    expect(await term('À payer avant la paie').innerText()).toMatch(/700\s€/);
+    expect(await term('Cash libre').innerText()).toMatch(/500\s€/);
+    // Le plus petit des deux : la trésorerie (500 + 42,50 dépensés depuis minuit), pas le budget (1 300).
+    await p.getByText(/Limité par ta trésorerie/).waitFor();
+    expect(await term('Disponible à minuit').innerText()).toMatch(/542,50\s€/);
+    await shot(p, '60-finances-v5-moteur');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     // Rejouable : même résultat.
-    await p.getByRole('button', { name: 'Reprendre à nouveau' }).click();
-    await p.getByText('Mouvements : 4').waitFor();
+    await p.getByRole('button', { name: 'Relire mes données' }).click();
+    expect(await term('Cash libre').innerText()).toMatch(/500\s€/);
     await ctx.close();
   });
 
