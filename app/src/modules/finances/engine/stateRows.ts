@@ -25,7 +25,7 @@ const LISTS = {
   ignoredSuggestions: (x: string) => x,
 } as const;
 /** Les dictionnaires : une ligne par clé. */
-const MAPS = ['allocationPatches', 'accountPatches', 'merchantDefaults', 'splits'] as const;
+const MAPS = ['allocationPatches', 'accountPatches', 'merchantDefaults', 'splits', 'simulations'] as const;
 /** Les valeurs seules. */
 const SINGLES = ['settings', 'carryIn', 'lastCycleStart', 'projectionRateBp', 'projectionMonthly'] as const;
 /** Ce qui doit exister même vide. */

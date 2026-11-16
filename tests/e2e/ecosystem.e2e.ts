@@ -925,8 +925,43 @@ describe('MyLife, une seule app', () => {
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await tabs.getByRole('link', { name: 'Patrimoine' }).click();
     await p.getByRole('img', { name: /Projection du patrimoine/ }).waitFor();
-    await p.getByRole('button', { name: /^Portefeuille.*36\s€/ }).waitFor();
     await p.getByRole('img', { name: /Répartition :/ }).waitFor();
+    // Du général au détail : les familles d'abord ; une famille se déplie sur ses comptes ; un compte ouvre sa fiche.
+    const quotidien = p.getByRole('button', { name: /^Quotidien/ });
+    expect(await quotidien.getAttribute('aria-expanded')).toBe('false');
+    await quotidien.click();
+    expect(await quotidien.getAttribute('aria-expanded')).toBe('true');
+    await p.getByRole('link', { name: /^Portefeuille.*36\s€/ }).waitFor();
+    await p.getByRole('button', { name: /^Épargne/ }).click();
+    expect(await quotidien.getAttribute('aria-expanded')).toBe('false');
+    await p.getByRole('link', { name: /^Livret/ }).click();
+    await p.getByRole('heading', { name: 'Livret' }).waitFor();
+    // La simulation du compte : versement, rendement, horizon, frais ; les frais font baisser la valeur nette.
+    const simulated = () => p.getByRole('img', { name: /Simulation sur/ }).getAttribute('aria-label');
+    await p.getByLabel('Versement mensuel (€)').fill('100');
+    await p.getByLabel('Rendement annuel (%)').fill('4');
+    await p.getByLabel('Horizon (ans)').fill('20');
+    await expect.poll(simulated).toMatch(/Simulation sur 20 ans/);
+    const noFees = await simulated();
+    await p.getByLabel('Frais de gestion (%/an)').fill('1');
+    await expect.poll(simulated).not.toBe(noFees);
+    expect(await simulated()).not.toMatch(/les frais coûtent 0\s€/);
+    await shot(p, '70-finances-v5-compte');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.getByRole('link', { name: 'Retour', exact: true }).click();
+    await p.getByRole('heading', { name: 'Patrimoine' }).waitFor();
+    // La projection du patrimoine suit désormais la simulation des comptes.
+    await p.getByText(/selon tes placements/).waitFor();
+    await p.goto(`${server.url}/argent/patrimoine/compte/${'x'}`);
+    await p.getByRole('heading', { name: 'Patrimoine' }).waitFor();
+    await p.getByRole('button', { name: /^Épargne/ }).click();
+    await p.getByRole('link', { name: /^Livret/ }).click();
+    await p.getByRole('button', { name: 'Revenir aux valeurs par défaut' }).click();
+    await p.getByRole('link', { name: 'Retour', exact: true }).click();
+    // Le « + » suit l'écran : ici, un compte.
+    await tabs.getByRole('link', { name: 'Ajouter : un compte' }).click();
+    await p.getByRole('dialog').getByLabel('Nom').waitFor();
+    await p.getByRole('button', { name: 'Fermer' }).click();
     // La projection se règle : un montant placé chaque mois et un rendement, saisis ; « revenir au plan » l'annule.
     const projected = () => p.getByRole('img', { name: /Projection du patrimoine/ }).getAttribute('aria-label');
     const before = await projected();
@@ -940,6 +975,38 @@ describe('MyLife, une seule app', () => {
     await shot(p, '67b-finances-v5-patrimoine-prononce');
     await p.evaluate(() => (document.documentElement.dataset.glass = 'subtil'));
     expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // Sur ordinateur : la barre latérale à trois étages (MyLife, modules, écrans du module ouvert), son bouton
+    // d'ajout qui suit l'écran, et une seule lampe pour tout l'écran ; sur tablette, un rail d'icônes.
+    await p.setViewportSize({ width: 1280, height: 860 });
+    const side = p.getByRole('navigation', { name: 'Navigation principale' });
+    await side.getByRole('link', { name: 'Un compte' }).waitFor();
+    await side.getByRole('link', { name: 'Patrimoine' }).waitFor();
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
+    await p.mouse.move(500, 300);
+    await p.waitForTimeout(500);
+    expect(await p.evaluate(() => document.documentElement.dataset.lamp)).toBe('ecran');
+    await shot(p, '71-ordinateur-patrimoine');
+    await side.getByRole('link', { name: 'Plan' }).click();
+    await side.getByRole('link', { name: 'Un engagement' }).waitFor();
+    await p.evaluate(() => (document.documentElement.dataset.theme = 'sombre'));
+    await p.mouse.move(700, 420);
+    await p.waitForTimeout(500);
+    await shot(p, '72-ordinateur-plan-sombre');
+    await side.getByRole('link', { name: 'Aujourd’hui' }).click();
+    await side.getByRole('button', { name: 'Ajouter' }).waitFor();
+    await p.mouse.move(420, 260);
+    await p.waitForTimeout(500);
+    await shot(p, '73-ordinateur-accueil-sombre');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.setViewportSize({ width: 1000, height: 760 });
+    expect(Math.round((await side.boundingBox())!.width)).toBe(76);
+    await shot(p, '74-tablette-accueil');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.evaluate(() => {
+      document.documentElement.dataset.theme = 'clair';
+      document.documentElement.dataset.glass = 'subtil';
+    });
+    await p.setViewportSize({ width: 390, height: 844 });
     await p.goto(`${server.url}/argent/classer`);
     await p.getByRole('heading', { name: 'À classer' }).waitFor();
     expect(await overflow(p)).toBeLessThanOrEqual(0);

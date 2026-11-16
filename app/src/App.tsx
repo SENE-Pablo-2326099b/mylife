@@ -68,70 +68,96 @@ function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
+/** Le module dans lequel on se trouve, s'il a sa propre navigation, et ce que le « + » y ajoute sur cet écran. */
+function useActiveModule() {
+  const { pathname } = useLocation();
+  const module = MODULES.find((m) => m.nav && (pathname === m.nav.base || pathname.startsWith(`${m.nav.base}/`)));
+  const tab = module?.nav?.tabs.find((t) => (t.end ? pathname === t.to : pathname === t.to || pathname.startsWith(`${t.to}/`)));
+  return { module, add: module?.nav ? (tab?.add ?? module.nav.add) : undefined };
+}
+
+/**
+ * La barre latérale (ordinateur, et en rail d'icônes sur tablette). Trois étages : MyLife (Aujourd'hui, Modules,
+ * Copilot), les modules, et sous le module ouvert ses propres écrans, en retrait et à sa couleur. Le bouton du haut
+ * ajoute ce qui a du sens là où l'on est.
+ */
 function Sidebar({ onAdd }: { onAdd: () => void }) {
   const prefs = usePrefs();
-  const module = useActiveModule();
+  const { module: active, add } = useActiveModule();
   return (
     <nav className="glass sidebar" aria-label="Navigation principale">
       <span className="auth-brand">
         <img src="/favicon.svg" alt="" />
-        <span>MyLife</span>
+        <span className="nav-text">MyLife</span>
       </span>
-      <button type="button" className="btn btn-action btn-block" onClick={onAdd}>
-        <Icon name="plus" size={18} strong />
-        Ajouter
-      </button>
-      <div className="stack" style={{ gap: 4 }}>
+      {add ? (
+        <NavLink to={add.to} className="btn btn-action btn-block" title={`Ajouter : ${add.label.toLowerCase()}`}>
+          <Icon name="plus" size={18} strong />
+          <span className="nav-text">{add.label}</span>
+        </NavLink>
+      ) : (
+        <button type="button" className="btn btn-action btn-block" onClick={onAdd} title="Ajouter">
+          <Icon name="plus" size={18} strong />
+          <span className="nav-text">Ajouter</span>
+        </button>
+      )}
+      <div className="nav-group">
         {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end} className="navlink">
+          <NavLink key={n.to} to={n.to} end={n.end} className="navlink" title={n.label}>
             <Icon name={n.icon} size={19} />
-            {n.label}
+            <span className="nav-text">{n.label}</span>
           </NavLink>
         ))}
-        <NavLink to={COPILOT} className="navlink">
+        <NavLink to={COPILOT} className="navlink" title="Copilot">
           <Icon name="copilot" size={19} />
-          Copilot
+          <span className="nav-text">Copilot</span>
         </NavLink>
       </div>
-      {module?.nav && (
-        <div className={`stack tone-${module.tone}`} style={{ gap: 4 }}>
-          <span className="t-label c-tone" style={{ padding: '0 14px 4px' }}>{module.name}</span>
-          {module.nav.tabs.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className="navlink">
-              <Icon name={n.icon} size={19} />
-              {n.label}
-            </NavLink>
-          ))}
-        </div>
-      )}
-      <div className="stack" style={{ gap: 4 }}>
-        <span className="t-label muted" style={{ padding: '0 14px 4px' }}>Modules</span>
-        {enabledModules(MODULES, prefs).map((m) => (
-          <a key={m.id} href={m.entry.href} className={`navlink tone-${m.tone}`}>
-            <span className="navdot" />
-            {m.name}
-          </a>
-        ))}
+      <div className="nav-group">
+        <span className="nav-title nav-text">Modules</span>
+        {enabledModules(MODULES, prefs).map((m) => {
+          const open = active?.id === m.id;
+          const inside = (
+            <>
+              <span className="nav-chip"><Icon name={m.icon} size={16} /></span>
+              <span className="nav-text">{m.name}</span>
+            </>
+          );
+          return (
+            <div key={m.id} className={`nav-module tone-${m.tone}`} data-open={open}>
+              {/* Une app d'avant la V5 est servie à part : un vrai lien. Un module de la coquille : une navigation. */}
+              {m.entry.legacy ? (
+                <a href={m.entry.href} className="navlink" title={m.name}>{inside}</a>
+              ) : (
+                <NavLink to={m.entry.href} end className="navlink" data-open={open} title={m.name}>{inside}</NavLink>
+              )}
+              {open && m.nav && (
+                <div className="nav-sub" aria-label={`Écrans de ${m.name}`}>
+                  {m.nav.tabs.map((n) => (
+                    <NavLink key={n.to} to={n.to} end={n.end} className="navlink" title={n.label}>
+                      <Icon name={n.icon} size={17} />
+                      <span className="nav-text">{n.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
       <span className="grow" />
-      <NavLink to="/reglages" className="navlink">
+      <NavLink to="/reglages" className="navlink" title="Réglages et compte">
         <Icon name="settings" size={19} />
-        Réglages et compte
+        <span className="nav-text">Réglages et compte</span>
       </NavLink>
     </nav>
   );
 }
 
-/** Le module dans lequel on se trouve, s'il a sa propre navigation. */
-function useActiveModule() {
-  const { pathname } = useLocation();
-  return MODULES.find((m) => m.nav && (pathname === m.nav.base || pathname.startsWith(`${m.nav.base}/`)));
-}
-
 function TabBar({ onAdd }: { onAdd: () => void }) {
-  const module = useActiveModule();
-  // Dans un module : ses onglets, et son « + » ouvre sa saisie. On en sort par le retour de l'en-tête.
-  if (module?.nav)
+  const { module, add } = useActiveModule();
+  // Dans un module : ses onglets, et son « + » ouvre la saisie de l'écran où l'on est. On en sort par le retour de l'en-tête.
+  if (module?.nav && add)
     return (
       <nav className={`glass tabbar tone-${module.tone}`} aria-label={`Navigation de ${module.name}`}>
         {module.nav.tabs.slice(0, 2).map((n) => (
@@ -140,7 +166,7 @@ function TabBar({ onAdd }: { onAdd: () => void }) {
             {n.label}
           </NavLink>
         ))}
-        <NavLink to={module.nav.add} className="tab-plus" aria-label="Ajouter">
+        <NavLink to={add.to} className="tab-plus" aria-label={`Ajouter : ${add.label.toLowerCase()}`}>
           <Icon name="plus" size={24} strong />
         </NavLink>
         {module.nav.tabs.slice(2, 4).map((n) => (

@@ -378,6 +378,49 @@ export function WorthChart({ points, label, format, dayLabel, tickLabel }: { poi
   );
 }
 
+/**
+ * La simulation d'un placement, année après année, en trois couches empilées : ce qui a été versé, les plus-values,
+ * et au-dessus ce que les frais ont coûté (hachuré : c'est la valeur qu'il aurait eue sans eux).
+ */
+export function SimChart({ points, label, format }: { points: { year: number; paid: number; value: number; fees: number }[]; label: string; format: (cents: number) => string }) {
+  const id = useId();
+  if (points.length < 2) return null;
+  const last = points[points.length - 1]!;
+  const top = Math.max(...points.map((p) => Math.max(p.value + p.fees, p.paid)), 1);
+  const [X0, X1, Y0, Y1] = [52, 346, 150, 16];
+  const x = (year: number) => X0 + (year / last.year) * (X1 - X0);
+  const y = (v: number) => Y0 - (Math.max(0, v) / top) * (Y0 - Y1);
+  const area = (upper: (p: (typeof points)[number]) => number, lower: (p: (typeof points)[number]) => number) =>
+    `${points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.year).toFixed(1)} ${y(upper(p)).toFixed(1)}`).join(' ')} ${[...points].reverse().map((p) => `L${x(p.year).toFixed(1)} ${y(lower(p)).toFixed(1)}`).join(' ')} Z`;
+  const line = (f: (p: (typeof points)[number]) => number) => points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.year).toFixed(1)} ${y(f(p)).toFixed(1)}`).join(' ');
+  const years = [...new Set([0, Math.round(last.year / 2), last.year])];
+  return (
+    <svg role="img" aria-label={label} viewBox="0 0 354 178" style={{ width: '100%', height: 'auto' }}>
+      <defs>
+        <pattern id={`${id}h`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="6" height="6" fill="#f472b6" opacity="0.16" />
+          <line x1="0" y1="0" x2="0" y2="6" stroke="#f472b6" strokeWidth="2" opacity="0.6" />
+        </pattern>
+      </defs>
+      {[top, top / 2, 0].map((t) => (
+        <g key={t}>
+          <line x1={X0} y1={y(t)} x2={X1} y2={y(t)} stroke="var(--line)" strokeWidth="1" />
+          <text x={X0 - 6} y={y(t) + 4} textAnchor="end" className="fin-axis">{format(t)}</text>
+        </g>
+      ))}
+      <path d={area((p) => p.value + p.fees, (p) => p.value)} fill={`url(#${id}h)`} />
+      <path d={area((p) => Math.max(p.value, p.paid), (p) => Math.min(p.value, p.paid))} fill="#6fe0a0" opacity="0.45" />
+      <path d={area((p) => Math.min(p.value, p.paid), () => 0)} fill="#5ccbe6" opacity="0.4" />
+      <path d={line((p) => p.paid)} fill="none" stroke="#5ccbe6" strokeWidth="2" strokeLinejoin="round" />
+      <path d={line((p) => p.value)} fill="none" stroke="#6fe0a0" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={X1} cy={y(last.value)} r="5.5" fill="var(--ink)" />
+      {years.map((yr) => (
+        <text key={yr} x={x(yr)} y="172" textAnchor={yr === 0 ? 'start' : yr === last.year ? 'end' : 'middle'} className="fin-axis">{yr === 0 ? 'auj.' : `${yr} an${yr > 1 ? 's' : ''}`}</text>
+      ))}
+    </svg>
+  );
+}
+
 /** La projection : aujourd'hui, puis un cône qui s'élargit jusqu'à 10 ans, avec trois jalons. */
 export function ConeChart({ now, marks, low, high, format }: { now: number; marks: { years: number; value: number }[]; low: number; high: number; format: (cents: number) => string }) {
   const top = Math.max(high, now, 1);

@@ -2,6 +2,7 @@ import { addDays, cycleFor, daysInMonth, diffDays, parseISO, toISO, type ISODate
 import { automate, type RecurringSuggestion } from './automation';
 import { compute } from './engine';
 import { buildOccurrences, currentCycle, isProvisioned, nextDue } from './occurrences';
+import type { Simulation } from './views';
 import type { Account, Allocation, Category, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule, Tag, Transaction } from './schema';
 
 /**
@@ -70,6 +71,8 @@ export interface EngineState {
   splits?: Record<string, SplitPart[]>;
   /** Hypothèse de rendement annuel de la projection du patrimoine, en points de base (500 = 5 %). */
   projectionRateBp?: number;
+  /** Par compte : les réglages de sa simulation (versement, rendement, horizon, frais). Absent : les valeurs par défaut. */
+  simulations?: Record<string, Partial<Simulation>>;
   /** Ce que l'utilisateur compte placer chaque mois, pour la projection (centimes). Absent : ce que prévoit le plan. */
   projectionMonthly?: number | null;
   settings: EngineSettings;

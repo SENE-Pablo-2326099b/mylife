@@ -98,3 +98,16 @@
 .fin-ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: none; color: #0b0e1a; }
 .fin-tile { display: flex; flex-direction: column; gap: 6px; padding: 14px; color: inherit; min-width: 0; }
 a.list-row, a.fin-tile { color: inherit; text-decoration: none; }
+
+/* Patrimoine : une famille se déplie sur ses comptes (la hauteur s'anime par la grille, sans mesure). */
+.fin-family + .fin-family, .fin-family + .list-row, .list-row + .fin-family { border-top: 1px solid var(--line); }
+.fin-family > .list-row { min-height: 60px; }
+.fin-chevron { display: flex; color: var(--ink-2); transition: transform 0.22s ease; }
+.fin-family[data-open='true'] .fin-chevron { transform: rotate(90deg); }
+.fin-fold { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.26s ease; }
+.fin-fold > div { overflow: hidden; min-height: 0; }
+.fin-family[data-open='true'] .fin-fold { grid-template-rows: 1fr; }
+.fin-family:not([data-open='true']) .fin-fold > div { visibility: hidden; transition: visibility 0s 0.26s; }
+.fin-account { min-height: 52px; padding-left: 24px; color: inherit; border-top: 1px solid var(--line); }
+.fin-key { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; }
+@media (prefers-reduced-motion: reduce) { .fin-fold, .fin-chevron { transition: none; } }

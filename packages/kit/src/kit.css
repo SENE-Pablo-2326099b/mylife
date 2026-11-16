@@ -305,6 +305,22 @@ input, select, textarea { font: inherit; color: inherit; }
   background-size: auto, auto, 140px 140px;
 }
 :root[data-glass='subtil'] .glass.list::before { content: none; }
+/*
+ * Avec une souris : une seule lampe, posée sur l'écran (`data-lamp='ecran'`). Son halo est attaché à la fenêtre, pas
+ * à chaque plaque : il glisse d'une plaque à l'autre comme une même tache de lumière, et les arêtes qu'il croise
+ * s'allument, les autres restent calmes.
+ */
+:root { --lpx: -400px; --lpy: -400px; --lamp-rim: rgba(255, 255, 255, 0.85); --lamp-spot: rgba(255, 255, 255, 0.07); }
+:root[data-theme='clair'] { --lamp-rim: #ffffff; --lamp-spot: rgba(255, 255, 255, 0.5); }
+:root[data-glass='prononce'] { --lamp-spot: rgba(255, 255, 255, 0.1); }
+:root[data-theme='clair'][data-glass='prononce'] { --lamp-spot: rgba(255, 255, 255, 0.6); }
+:root[data-lamp='ecran'][data-glass='subtil'] .glass::before, :root[data-lamp='ecran'][data-glass='prononce'] .glass::before {
+  background: radial-gradient(520px circle at var(--lpx) var(--lpy), var(--lamp-spot), transparent 72%) fixed, var(--glass-grain);
+  background-size: auto, 140px 140px;
+}
+:root[data-lamp='ecran'][data-glass='subtil'] .glass::after, :root[data-lamp='ecran'][data-glass='prononce'] .glass::after {
+  background: radial-gradient(380px circle at var(--lpx) var(--lpy), var(--lamp-rim), transparent 70%) fixed, var(--glass-rim);
+}
 /* Les cartes de module : leur bord tourne avec la lumière ; en « prononcé », reflet, grain, franges et toucher. */
 :root[data-glass='subtil'] .card-module, :root[data-glass='prononce'] .card-module {
   background:
@@ -322,6 +338,15 @@ input, select, textarea { font: inherit; color: inherit; }
     var(--card-base);
   background-size: auto, auto, 140px 140px, auto, auto, auto;
   box-shadow: var(--glass-fringe);
+}
+:root[data-lamp='ecran'][data-glass='prononce'] .card-module::before {
+  background:
+    radial-gradient(520px circle at var(--lpx) var(--lpy), var(--lamp-spot), transparent 72%) fixed,
+    var(--glass-grain),
+    radial-gradient(120% 95% at 0% 0%, var(--tint), transparent 58%),
+    radial-gradient(90% 70% at 100% 100%, var(--tint-2), transparent 60%),
+    var(--card-base);
+  background-size: auto, 140px 140px, auto, auto, auto;
 }
 .glass.list { background: var(--glass-list); }
 /* L'arête : un dégradé limité au bord. `:where` ne pèse rien : une barre fixe ou collante garde sa position. */
@@ -517,14 +542,36 @@ button.list-row { width: 100%; background: none; border: 0; text-align: left; pa
 .tab-plus { justify-self: center; width: 50px; height: 50px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #8b6cff, #3cc8f0); border: 1px solid var(--action-border); box-shadow: 0 0 26px rgba(124, 92, 255, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
 
 .sidebar { display: none; }
-.navlink { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 14px; font-size: 15px; font-weight: 500; color: var(--ink-2); background: none; border: 0; width: 100%; text-align: left; }
-.navlink[aria-current='page'] { background: var(--tile); color: var(--ink); font-weight: 600; box-shadow: inset 0 1px 0 var(--card-hi); }
-.navdot { width: 10px; height: 10px; border-radius: 999px; background: var(--tone-solid); box-shadow: 0 0 12px var(--tone-solid); flex: none; }
+/* La barre latérale : trois étages (MyLife, les modules, les écrans du module ouvert), un même verre que le reste. */
+.nav-group { display: flex; flex-direction: column; gap: 3px; }
+.nav-title { font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 0 14px 5px; }
+.navlink { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 14px; font-size: 15px; font-weight: 500; color: var(--ink-2); background: none; border: 0; width: 100%; text-align: left; transition: background 0.16s ease, color 0.16s ease; }
+.navlink > svg, .nav-chip { flex: none; }
+@media (hover: hover) { .navlink:hover { background: var(--tile); color: var(--ink); } }
+.navlink[aria-current='page'] { background: var(--tile); color: var(--ink); font-weight: 600; box-shadow: inset 0 1px 0 var(--card-hi), 0 0 0 1px var(--tile-border); }
+/* Un module : sa pastille à sa couleur. Ouvert, son nom s'allume et ses écrans se déplient dessous, en retrait. */
+.nav-chip { width: 26px; height: 26px; margin-left: -3px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: #0b0e1a; background: var(--tone-grad); box-shadow: 0 6px 14px -6px var(--glow); }
+.nav-module[data-open='true'] > .navlink { color: var(--ink); font-weight: 600; }
+.nav-module[data-open='true'] > .navlink[aria-current='page'] { background: none; box-shadow: none; }
+.nav-sub { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 6px 22px; padding-left: 10px; border-left: 1.5px solid color-mix(in srgb, var(--tone-solid) 55%, transparent); }
+.nav-sub .navlink { min-height: 40px; font-size: 14.5px; padding: 0 12px; border-radius: 12px; }
+.nav-sub .navlink[aria-current='page'] { color: var(--tone); background: color-mix(in srgb, var(--tone-solid) 16%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone-solid) 40%, transparent); }
 
 @media (min-width: 900px) {
   .grid-modules { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
   .tabbar { display: none; }
-  .sidebar { display: flex; flex-direction: column; gap: 22px; width: 250px; flex: none; margin: 20px 0 20px 20px; padding: 22px 14px; border-radius: 32px; position: sticky; top: 20px; height: calc(100dvh - 40px); }
+  .sidebar { display: flex; flex-direction: column; gap: 20px; width: 252px; flex: none; margin: 20px 0 20px 20px; padding: 22px 12px 14px; border-radius: var(--r-card); position: sticky; top: 20px; height: calc(100dvh - 40px); overflow-y: auto; scrollbar-width: none; }
+  .sidebar > .btn { min-height: 46px; }
   .shell-main { padding: 40px clamp(20px, 3vw, 44px) 40px; }
   .grid-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+}
+
+/* Tablette : la barre latérale devient un rail d'icônes ; les noms reviennent dès qu'il y a la place. */
+@media (min-width: 900px) and (max-width: 1179px) {
+  .sidebar { width: 76px; padding: 18px 10px 12px; align-items: stretch; }
+  .sidebar .nav-text { display: none; }
+  .sidebar .auth-brand { padding: 0; justify-content: center; }
+  .sidebar .navlink, .sidebar > .btn { justify-content: center; padding: 0; gap: 0; }
+  .sidebar .nav-chip { margin-left: 0; }
+  .sidebar .nav-sub { margin: 2px 0 6px; padding-left: 0; border-left: 0; }
 }

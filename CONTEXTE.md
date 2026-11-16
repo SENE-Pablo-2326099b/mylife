@@ -11,9 +11,15 @@
 
 ## 1. Où on en est
 
-- **V5** : phases 0 et 1 faites ; **phase 2 en cours** : la nouvelle coquille (`app/`, kit `packages/kit`, contrat de
-  module) est servie à `/v5/` à côté de l'ancien accueil (`docs/V5.md`, étape 2.2). Étape 2.3 faite : la coquille a son
-  compte, ses données, sa confidentialité, Copilot. Prochaine étape : 2.4, la bascule de `/` (manifeste, hors ligne).
+- **V5** (suivi détaillé : tableau en tête de `docs/V5.md`) : phases 0, 1 et 2 faites : la coquille (`app/`, kit
+  `packages/kit`, contrat de module `app/src/contract.ts`) sert `/`. **Phase 3 en cours, à l'essai en usage réel** :
+  MyFinances est reconstruit comme module de la coquille à `/argent` (moteur, écrans Jour, Opérations, Plan,
+  Patrimoine, réglages en rubriques, banques, synchro) ; l'ancienne app reste à `/finances/` et partage la même base
+  de faits. Reste en phase 3 : porter la gestion des placements, retirer l'ancienne app, Copilot (conversations
+  synchronisées, domaines), classement assisté. Phases 4 (MyPerf) et 5 (MyRave, Sorties) : à faire.
+- **Interface** : l'effet de verre se règle (Réglages → Apparence : sobre, subtil, prononcé ; `data-glass`), avec une
+  seule source de lumière pour tout l'écran (`packages/kit/src/glassLight.ts`). Navigation : barre du bas sur
+  téléphone, rail d'icônes sur tablette, barre latérale à trois étages sur ordinateur ; le « + » suit l'écran.
 - **Production** : https://mylife-liart.vercel.app ; elle n'a pas encore la phase 1 (à déployer).
 - **Dépôt** : `~/PersoDev/MyLife`, GitHub privé `SENE-Pablo-2326099b/mylife`, branche `master`. Il contient le
   programme et l'historique d'entraînement de l'utilisateur (build privé de MyPerf) : il reste privé.

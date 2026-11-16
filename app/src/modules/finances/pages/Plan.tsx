@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button, Glass, Icon, List, ListRow } from '@mylife/kit';
 import { addDays, daysInMonth, parseISO, toISO, weekday } from '../core/dates';
 import { euros } from '../core/format';
@@ -38,12 +39,20 @@ export function PlanPage() {
   const engine = useEngine();
   const [occurrence, setOccurrence] = useState<string | null>(null);
   const [month, setMonth] = useState(0);
+  // Le « + » de la navigation, sur cet écran, ajoute un engagement.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    if (params.get('ajouter') !== '1') return;
+    setCommitment('new');
+    params.delete('ajouter');
+    setParams(params, { replace: true });
+  }, [params, setParams]);
   const [commitment, setCommitment] = useState<Commitment | 'new' | null>(null);
   const [installment, setInstallment] = useState(false);
   const [provision, setProvision] = useState<Provision | 'new' | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
   return (
-    <Screen engine={engine} tone="plan" title="Plan" kicker={engine.explanation ? `Cycle du ${day(engine.explanation.cycle.start)} au ${day(engine.explanation.cycle.end)}` : undefined} right={<Button onClick={() => setCommitment('new')}>Ajouter</Button>}>
+    <Screen engine={engine} tone="plan" title="Plan" kicker={engine.explanation ? `Cycle du ${day(engine.explanation.cycle.start)} au ${day(engine.explanation.cycle.end)}` : undefined}>
       {({ db, state, e, today, update }) => {
         const { points, low } = forecast(db, e);
         const suggestions = detectRecurring(db, today, state.ignoredSuggestions);
@@ -164,6 +173,8 @@ export function PlanPage() {
               <Button onClick={() => setCommitment('new')}>Ajouter au plan</Button>
               <Button onClick={() => setInstallment(true)}>Payer en plusieurs fois</Button>
             </div>
+
+            <Button block icon="plus" onClick={() => setCommitment('new')}>Ajouter un engagement</Button>
 
             <Sec action="Ajouter" onAction={() => setEnvelope('new')}>Budgets par enveloppe</Sec>
             {capped.length === 0 ? (

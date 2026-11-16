@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { migrate } from '../app/src/modules/finances/core/migrate';
 import { automate, classify, detectRecurring, pairTransfers, ruleMatches, toClassify } from '../app/src/modules/finances/engine/automation';
 import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
-import { byCategory, cashflow, forecast, lastCycles, pace, project, settledIn, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
+import { byCategory, cashflow, forecast, lastCycles, pace, project, projectAccounts, settledIn, simulate, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
@@ -1093,6 +1093,27 @@ describe('moteur M5 : ce que montrent les écrans', () => {
     // Sans cycle précédent connu : pas de courbe de comparaison.
     const alone = pace({ ...db, transactions: db.transactions.filter((t) => t.date >= e.cycle.start) }, e, TODAY);
     expect([alone.previous, alone.previousSameDay]).toEqual([[], null]);
+  });
+
+  it('simulateur d’un placement : intérêts composés, nets de frais d’entrée et de gestion', () => {
+    const base = { monthly: 10000, rateBp: 500, years: 10, entryFeeBp: 0, annualFeeBp: 0 };
+    // Sans rendement ni frais : la valeur est exactement ce qui a été versé.
+    const flat = simulate(100000, { ...base, rateBp: 0 });
+    expect(flat.map((p) => p.year)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(flat[10]).toEqual({ year: 10, paid: 1300000, value: 1300000, gains: 0, fees: 0 });
+    // 1 000 € placés à 5 % par an, composés chaque mois, sans versement : 1 000 × (1 + 0,05/12)^120.
+    expect(simulate(100000, { ...base, monthly: 0 })[10]!.value).toBe(Math.round(100000 * (1 + 0.05 / 12) ** 120));
+    // Les frais : versé + plus-values + coût des frais = la valeur sans aucun frais.
+    const free = simulate(100000, base)[10]!;
+    const charged = simulate(100000, { ...base, entryFeeBp: 200, annualFeeBp: 100 })[10]!;
+    expect(charged.value).toBeLessThan(free.value);
+    expect(charged.paid + charged.gains + charged.fees).toBe(free.value);
+    expect(charged.paid).toBe(free.paid);
+    // Frais d'entrée seuls, sans rendement : 2 % de chaque versement sont perdus, le capital de départ est intact.
+    expect(simulate(100000, { ...base, rateBp: 0, entryFeeBp: 200 })[10]).toMatchObject({ value: 1276000, fees: 24000, gains: -24000 });
+    // Le patrimoine : chaque placement suit sa simulation, le reste ne bouge pas.
+    expect(projectAccounts(500000, [{ value: 100000, sim: { ...base, rateBp: 0 } }], 10)).toBe(500000 + 1200000);
+    expect(projectAccounts(500000, [{ value: 100000, sim: base }], 10, 200)).toBeGreaterThan(projectAccounts(500000, [{ value: 100000, sim: base }], 10));
   });
 
   it('revenus et dépenses par cycle ; ni l’épargne ni les virements n’y entrent', () => {

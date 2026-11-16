@@ -222,3 +222,58 @@ export function pace(db: Db, e: Pick<Explanation, 'cycle' | 'pot'>, today: ISODa
     previousTotal: hasPrevious ? previous[previous.length - 1]! : null,
   };
 }
+
+/**
+ * Le simulateur d'un placement : intérêts composés mois par mois, nets de frais. Les frais d'entrée sont pris sur
+ * chaque versement, les frais de gestion sur l'encours. Pour chaque année : ce qui a été versé (capital de départ
+ * compris), ce que vaut le placement, ses plus-values, et ce que les frais ont coûté (l'écart avec le même placement
+ * sans aucun frais, rendement perdu compris). Donc : versé + plus-values + frais = valeur sans frais.
+ */
+export interface Simulation {
+  /** Versement programmé, en centimes par mois. */
+  monthly: number;
+  /** Rendement annuel estimé, en points de base (500 = 5 %). */
+  rateBp: number;
+  /** Horizon, en années. */
+  years: number;
+  /** Frais d'entrée, en points de base de chaque versement. */
+  entryFeeBp: number;
+  /** Frais de gestion annuels, en points de base de l'encours. */
+  annualFeeBp: number;
+}
+export interface SimPoint {
+  year: number;
+  paid: number;
+  value: number;
+  gains: number;
+  fees: number;
+}
+
+export function simulate(start: number, p: Simulation): SimPoint[] {
+  const r = p.rateBp / 10000 / 12;
+  const keep = 1 - Math.min(1, Math.max(0, p.annualFeeBp) / 10000 / 12);
+  const entry = 1 - Math.min(1, Math.max(0, p.entryFeeBp) / 10000);
+  let net = Math.max(0, start);
+  let gross = net;
+  const point = (year: number): SimPoint => {
+    const paid = Math.max(0, start) + p.monthly * year * 12;
+    return { year, paid, value: Math.round(net), gains: Math.round(net) - paid, fees: Math.round(gross) - Math.round(net) };
+  };
+  const out = [point(0)];
+  for (let y = 1; y <= Math.max(0, Math.trunc(p.years)); y++) {
+    for (let m = 0; m < 12; m++) {
+      net = net * (1 + r) * keep + p.monthly * entry;
+      gross = gross * (1 + r) + p.monthly;
+    }
+    out.push(point(y));
+  }
+  return out;
+}
+
+/** Le patrimoine dans `years` ans, quand chaque placement suit sa propre simulation ; le reste ne bouge pas. */
+export function projectAccounts(net: number, placements: readonly { value: number; sim: Simulation }[], years: number, shiftBp = 0): number {
+  return placements.reduce((total, a) => {
+    const end = simulate(a.value, { ...a.sim, years, rateBp: Math.max(0, a.sim.rateBp + shiftBp) });
+    return total - Math.max(0, a.value) + end[end.length - 1]!.value;
+  }, net);
+}

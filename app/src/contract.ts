@@ -25,6 +25,12 @@ export interface QuickAdd {
   href: string;
 }
 
+/** Ce qu'ouvre le « + » : où il mène, et comment il se nomme (« Une opération », « Un compte »…). */
+export interface ModuleAdd {
+  to: string;
+  label: string;
+}
+
 /** Une chose à faire que le module signale à la boîte « À faire ». */
 export interface TodoItem {
   id: string;
@@ -52,9 +58,10 @@ export interface ModuleManifest {
   quickAdds: readonly QuickAdd[];
   /**
    * La navigation propre au module, quand il vit dans la coquille : `base` est le préfixe de ses adresses, `tabs`
-   * ses onglets (quatre au plus, le « + » se glisse au milieu) et `add` ce qu'ouvre le « + » quand on y est.
+   * ses onglets (quatre au plus, le « + » se glisse au milieu) et `add` ce qu'ouvre le « + » quand on y est. Le « + »
+   * suit l'écran : un onglet peut donner sa propre saisie (`tabs[].add`), sinon c'est celle du module.
    */
-  nav?: { base: string; add: string; tabs: readonly { to: string; label: string; icon: IconName; end?: boolean }[] };
+  nav?: { base: string; add: ModuleAdd; tabs: readonly { to: string; label: string; icon: IconName; end?: boolean; add?: ModuleAdd }[] };
   /** Lu sur l'appareil, à chaque affichage. */
   todos?: () => TodoItem[];
 }
