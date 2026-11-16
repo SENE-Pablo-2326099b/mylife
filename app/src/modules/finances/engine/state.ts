@@ -70,6 +70,8 @@ export interface EngineState {
   splits?: Record<string, SplitPart[]>;
   /** Hypothèse de rendement annuel de la projection du patrimoine, en points de base (500 = 5 %). */
   projectionRateBp?: number;
+  /** Ce que l'utilisateur compte placer chaque mois, pour la projection (centimes). Absent : ce que prévoit le plan. */
+  projectionMonthly?: number | null;
   settings: EngineSettings;
   carryIn: Db['carryIn'];
   /** Début du cycle en cours la dernière fois que le moteur a tourné : sert à détecter qu'un cycle s'est terminé. */

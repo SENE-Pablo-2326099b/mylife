@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type PointerEvent, type ReactNode } from 'react';
 
 /**
  * Les graphiques de MyFinances V5, en SVG pur : chaque écran a le sien (maquettes validées). Ils prennent des
@@ -37,6 +37,51 @@ export function Ring({ fraction, label, tone = 'ok', children }: { fraction: num
       </svg>
       <div className="fin-ring-in">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Les dépenses cumulées du cycle : ce cycle (trait plein, jusqu'à aujourd'hui), le rythme idéal (pointillés, de zéro
+ * au budget du cycle) et le cycle précédent (trait fin). Une seule échelle pour les trois.
+ */
+export function PaceChart({ current, previous, pot, length, label, format, labels }: { current: number[]; previous: number[]; pot: number; length: number; label: string; format: (cents: number) => string; labels: [string, string] }) {
+  const id = useId();
+  const top = Math.max(pot, ...current, ...previous, 1);
+  const [X0, X1, Y0, Y1] = [54, 318, 128, 16];
+  const x = (i: number) => X0 + (Math.min(i, length) / length) * (X1 - X0);
+  const y = (v: number) => Y0 - (Math.max(0, v) / top) * (Y0 - Y1);
+  const path = (values: number[]) => values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const day = current.length - 1;
+  const line = path(current);
+  const ticks = [top, top / 2, 0];
+  return (
+    <svg role="img" aria-label={label} viewBox="0 0 326 156" style={{ width: '100%', height: 'auto', maxHeight: 190 }}>
+      <defs>
+        <linearGradient id={`${id}l`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor={GRAD_A} />
+          <stop offset="1" stopColor={GRAD_B} />
+        </linearGradient>
+        <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={GRAD_B} stopOpacity="0.34" />
+          <stop offset="1" stopColor={GRAD_B} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line x1={X0} y1={y(t)} x2={X1} y2={y(t)} stroke="var(--line)" strokeWidth="1" />
+          <text x={X0 - 6} y={y(t) + 4} textAnchor="end" className="fin-axis">{format(t)}</text>
+        </g>
+      ))}
+      {previous.length > 1 && <path d={path(previous)} fill="none" stroke="var(--ink-2)" strokeOpacity="0.6" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />}
+      {pot > 0 && <line x1={x(0)} y1={y(0)} x2={x(length)} y2={y(pot)} stroke="var(--warn)" strokeWidth="2" strokeDasharray="2 6" strokeLinecap="round" />}
+      <path d={`${line} L${x(day).toFixed(1)} ${Y0} L${X0} ${Y0} Z`} fill={`url(#${id}f)`} />
+      <path d={line} fill="none" stroke={`url(#${id}l)`} strokeWidth="3.2" strokeLinejoin="round" strokeLinecap="round" />
+      <line x1={x(day)} y1={Y1 - 4} x2={x(day)} y2={Y0} stroke="var(--ink-2)" strokeOpacity="0.5" strokeWidth="1" strokeDasharray="2 4" />
+      <circle cx={x(day)} cy={y(current[day] ?? 0)} r="6" fill="var(--ink)" />
+      <text x={X0} y="150" className="fin-axis">{labels[0]}</text>
+      {day > 3 && day < length - 3 && <text x={x(day)} y="150" textAnchor="middle" className="fin-axis" style={{ fill: 'var(--ink)' }}>auj.</text>}
+      <text x={X1} y="150" textAnchor="end" className="fin-axis">{labels[1]}</text>
+    </svg>
   );
 }
 
@@ -264,30 +309,71 @@ export function MiniRing({ fraction, color, label, size = 72 }: { fraction: numb
   );
 }
 
-/** La courbe du patrimoine : une aire lissée, le dernier point marqué. */
-export function AreaChart({ values, label }: { values: number[]; label: string }) {
+/**
+ * L'évolution du patrimoine : une courbe à l'échelle du temps, avec ses montants (trois repères) et ses dates. Un
+ * doigt ou la souris sur la courbe lit la valeur d'un jour ; sans geste, c'est celle d'aujourd'hui.
+ */
+export function WorthChart({ points, label, format, dayLabel, tickLabel }: { points: { date: string; value: number }[]; label: string; format: (cents: number) => string; dayLabel: (date: string) => string; tickLabel: (date: string) => string }) {
   const id = useId();
-  if (values.length < 2) return null;
+  const [picked, setPicked] = useState<number | null>(null);
+  if (points.length < 2) return null;
+  const time = (d: string) => Date.parse(`${d}T12:00:00Z`);
+  const [t0, t1] = [time(points[0]!.date), time(points[points.length - 1]!.date)];
+  const values = points.map((p) => p.value);
   const [min, max] = [Math.min(...values), Math.max(...values)];
-  const pad = (max - min) * 0.15 || 1;
-  const x = (i: number) => (i / (values.length - 1)) * 344;
-  const y = (v: number) => 12 + (1 - (v - (min - pad)) / (max - min + 2 * pad)) * 120;
-  const line = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const pad = (max - min) * 0.12 || Math.max(1, Math.abs(max) * 0.05);
+  const [lo, hi] = [min - pad, max + pad];
+  const [X0, X1, Y0, Y1] = [50, 346, 150, 30];
+  const x = (d: string) => X0 + ((time(d) - t0) / (t1 - t0 || 1)) * (X1 - X0);
+  const y = (v: number) => Y0 - ((v - lo) / (hi - lo || 1)) * (Y0 - Y1);
+  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.date).toFixed(1)} ${y(p.value).toFixed(1)}`).join(' ');
+  const pick = (e: PointerEvent<SVGSVGElement>) => {
+    const box = e.currentTarget.getBoundingClientRect();
+    const at = ((e.clientX - box.left) / box.width) * 354;
+    let best = 0;
+    points.forEach((p, i) => {
+      if (Math.abs(x(p.date) - at) < Math.abs(x(points[best]!.date) - at)) best = i;
+    });
+    setPicked(best);
+  };
+  const shown = picked !== null && picked < points.length ? points[picked]! : null;
+  const ticks = [hi - pad, (lo + hi) / 2, lo + pad];
+  const dates = [0, 0.5, 1].map((f) => new Date(t0 + f * (t1 - t0)).toISOString().slice(0, 10));
+  const text = shown ? `${dayLabel(shown.date)} · ${format(shown.value)}` : '';
+  const w = Math.max(96, text.length * 6.6 + 18);
   return (
-    <svg role="img" aria-label={label} viewBox="0 0 354 150" style={{ width: '100%', height: 150 }}>
+    <svg role="img" aria-label={label} viewBox="0 0 354 178" style={{ width: '100%', height: 'auto', touchAction: 'pan-y', cursor: 'crosshair' }} onPointerDown={pick} onPointerMove={pick} onPointerLeave={() => setPicked(null)}>
       <defs>
         <linearGradient id={`${id}l`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor="#6fe0a0" />
           <stop offset="1" stopColor={GRAD_B} />
         </linearGradient>
         <linearGradient id={`${id}f`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#6fe0a0" stopOpacity="0.4" />
+          <stop offset="0" stopColor="#6fe0a0" stopOpacity="0.36" />
           <stop offset="1" stopColor="#6fe0a0" stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={`${line} L344 150 L0 150 Z`} fill={`url(#${id}f)`} />
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={X0} y1={y(t)} x2={X1 + 4} y2={y(t)} stroke="var(--line)" strokeWidth="1" />
+          <text x={X0 - 6} y={y(t) + 4} textAnchor="end" className="fin-axis">{format(t)}</text>
+        </g>
+      ))}
+      <path d={`${line} L${X1} ${Y0} L${X0} ${Y0} Z`} fill={`url(#${id}f)`} />
       <path d={line} fill="none" stroke={`url(#${id}l)`} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="344" cy={y(values[values.length - 1]!)} r="6" fill="var(--ink)" />
+      {dates.map((d, i) => (
+        <text key={i} x={i === 0 ? X0 : i === 1 ? (X0 + X1) / 2 : X1} y="172" textAnchor={i === 0 ? 'start' : i === 1 ? 'middle' : 'end'} className="fin-axis">{tickLabel(d)}</text>
+      ))}
+      {shown ? (
+        <>
+          <line x1={x(shown.date)} y1="22" x2={x(shown.date)} y2={Y0} stroke="var(--ink-2)" strokeWidth="1" strokeDasharray="2 4" />
+          <circle cx={x(shown.date)} cy={y(shown.value)} r="6" fill="var(--bg)" stroke="var(--ink)" strokeWidth="2.5" />
+          <rect x={Math.max(2, Math.min(352 - w, x(shown.date) - w / 2))} y="0" width={w} height="24" rx="9" fill="var(--ink)" />
+          <text x={Math.max(2, Math.min(352 - w, x(shown.date) - w / 2)) + w / 2} y="16.5" textAnchor="middle" style={{ font: '700 12px var(--font-text)', fill: 'var(--on-ink)' }}>{text}</text>
+        </>
+      ) : (
+        <circle cx={X1} cy={y(values[values.length - 1]!)} r="5.5" fill="var(--ink)" />
+      )}
     </svg>
   );
 }

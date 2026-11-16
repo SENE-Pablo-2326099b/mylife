@@ -489,6 +489,9 @@ describe('MyLife, une seule app', () => {
     // La carte MyPerf s'ouvre d'un toucher n'importe où, comme les autres.
     await p.getByRole('link', { name: 'Ouvrir MyPerf' }).waitFor();
     await shot(p, '40-v5-aujourdhui');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
+    await shot(p, '40b-v5-aujourdhui-prononce');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'subtil'));
     // Ajout rapide : une saisie par module allumé.
     await p.getByRole('button', { name: 'Ajouter' }).click();
     await p.getByRole('dialog', { name: 'Ajouter' }).getByText('Une dépense').waitFor();
@@ -510,6 +513,15 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Clair', exact: true }).click();
     expect(await p.evaluate(() => document.documentElement.dataset.theme)).toBe('clair');
     await shot(p, '43-v5-reglages-clair');
+    // L'effet de verre se règle : subtil par défaut, prononcé ou sobre au choix, gardé sur l'appareil.
+    expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('subtil');
+    await p.getByRole('button', { name: 'Prononcé', exact: true }).click();
+    expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('prononce');
+    await shot(p, '43b-v5-reglages-clair-prononce');
+    await p.reload();
+    expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('prononce');
+    await p.getByRole('button', { name: 'Subtil', exact: true }).click();
+    expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('subtil');
     await p.goto(`${server.url}/kit`);
     await p.getByRole('heading', { name: 'Le kit' }).waitFor();
     await shot(p, '44-v5-kit-clair');
@@ -745,9 +757,23 @@ describe('MyLife, une seule app', () => {
     // ---- M4. Les réglages : tout ce qui structure le calcul se change ici.
     await p.getByRole('link', { name: 'Réglages de MyFinances' }).click();
     await p.getByRole('heading', { name: 'Réglages' }).waitFor();
-    const add = (n: number) => p.locator('button.link', { hasText: 'Ajouter' }).nth(n).click();
+    // Un sommaire en rubriques ; chaque rubrique ouvre un écran court, et son retour ramène au sommaire.
+    const section = async (name: RegExp, title: string) => {
+      await p.getByRole('link', { name }).click();
+      await p.getByRole('heading', { name: title }).waitFor();
+    };
+    const home = async () => {
+      await p.getByRole('link', { name: 'Retour', exact: true }).click();
+      await p.getByRole('heading', { name: 'Réglages' }).waitFor();
+    };
+    const add = () => p.getByRole('button', { name: 'Ajouter' }).click();
+    await section(/^Cycle et calcul/, 'Cycle et calcul');
+    await p.getByLabel('Jour de paie').waitFor();
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await home();
     // Un compte tenu à la main : 40 € d'espèces, comptés dans le cash quotidien par leur rôle.
-    await add(0);
+    await section(/^Comptes/, 'Comptes');
+    await add();
     await p.getByLabel('Nom').fill('Portefeuille');
     await p.getByLabel('Solde ou valeur').fill('40');
     await p.getByRole('button', { name: 'Créer' }).click();
@@ -761,8 +787,9 @@ describe('MyLife, une seule app', () => {
     await livret.click();
     await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
     await p.getByRole('button', { name: 'Terminé' }).click();
-    // Les catégories ont leur écran. Deux niveaux : « Pain » sous « Courses ».
-    await p.getByRole('link', { name: /Gérer les catégories/ }).click();
+    await home();
+    // Les catégories ont leur écran, en tête du sommaire. Deux niveaux : « Pain » sous « Courses ».
+    await p.getByRole('link', { name: /^Catégories/ }).click();
     await p.getByRole('heading', { name: 'Catégories' }).waitFor();
     await p.getByRole('button', { name: 'Ajouter' }).click();
     await p.getByLabel('Nom').fill('Pain');
@@ -785,24 +812,31 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('link', { name: 'Retour' }).click();
     await p.getByRole('heading', { name: 'Réglages' }).waitFor();
     // Un tag, puis une règle de tri qui le pose.
-    await add(1);
+    await section(/^Tags/, 'Tags');
+    await add();
     await p.getByLabel('Nom').fill('week-end');
     await p.getByRole('button', { name: 'Enregistrer' }).click();
     await p.getByText('#week-end').waitFor();
-    await add(3);
+    await home();
+    await section(/^Règles de tri/, 'Règles de tri');
+    await add();
     await p.getByLabel('Le libellé contient').fill('epicerie');
     await p.getByLabel('Catégorie').selectOption({ label: 'Courses › Pain' });
     await p.getByRole('switch', { name: 'week-end' }).click();
     await p.getByRole('button', { name: 'Enregistrer' }).click();
     await p.getByRole('button', { name: /^epicerie.*Pain · #week-end/ }).waitFor();
     // Une enveloppe hors quotidien, plafonnée à 100 €, qui contient « Courses » (et donc sa sous-catégorie).
-    await add(2);
+    await home();
+    await section(/^Enveloppes/, 'Enveloppes');
+    await add();
     await p.getByLabel('Nom').fill('Alimentation');
     await p.getByLabel('Plafond par cycle').fill('100');
     await p.getByRole('switch', { name: 'Dans le budget quotidien' }).click();
     await p.getByRole('switch', { name: 'Courses', exact: true }).click();
     await p.getByRole('button', { name: 'Enregistrer' }).click();
     await p.getByRole('button', { name: /^Alimentation.*hors quotidien · plafond 100/ }).waitFor();
+    await home();
+    await p.getByRole('link', { name: /^Enveloppes.*dont 1 plafonnée/ }).waitFor();
     await shot(p, '62-finances-v5-reglages');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     // Retour au calcul : les espèces sont dans le cash, l'enveloppe est mise à part, et ses dépenses (l'épicerie
@@ -817,6 +851,15 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('heading', { name: 'Jour' }).waitFor();
     await p.getByText('Tes 7 derniers jours').waitFor();
     await p.getByRole('img', { name: /du budget du cycle déjà dépensé/ }).waitFor();
+    // Les dépenses cumulées du cycle, face au rythme idéal.
+    await p.getByRole('img', { name: /Dépenses cumulées du cycle/ }).waitFor();
+    await p.getByText('sur le rythme idéal').waitFor();
+    await p.getByRole('img', { name: /Dépenses cumulées du cycle/ }).scrollIntoViewIfNeeded();
+    await shot(p, '63b-finances-v5-jour-cumul');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
+    await shot(p, '63c-finances-v5-jour-prononce');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'subtil'));
+    await p.evaluate(() => window.scrollTo(0, 0));
     await shot(p, '63-finances-v5-jour');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     // La barre du bas est celle du module ; son « + » ouvre la saisie d'une dépense.
@@ -870,7 +913,19 @@ describe('MyLife, une seule app', () => {
     await tabs.getByRole('link', { name: 'Patrimoine' }).click();
     await p.getByRole('img', { name: /Projection du patrimoine/ }).waitFor();
     await p.getByRole('button', { name: /^Portefeuille.*36\s€/ }).waitFor();
+    await p.getByRole('img', { name: /Répartition :/ }).waitFor();
+    // La projection se règle : un montant placé chaque mois et un rendement, saisis ; « revenir au plan » l'annule.
+    const projected = () => p.getByRole('img', { name: /Projection du patrimoine/ }).getAttribute('aria-label');
+    const before = await projected();
+    await p.getByLabel('Je place chaque mois (€)').fill('300');
+    await expect.poll(projected).not.toBe(before);
+    await p.getByLabel('Rendement annuel (%)').fill('7,5');
+    await p.getByRole('button', { name: /Revenir au plan/ }).click();
+    await expect.poll(() => p.getByRole('button', { name: /Revenir au plan/ }).count()).toBe(0);
     await shot(p, '67-finances-v5-patrimoine');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
+    await shot(p, '67b-finances-v5-patrimoine-prononce');
+    await p.evaluate(() => (document.documentElement.dataset.glass = 'subtil'));
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await p.goto(`${server.url}/argent/classer`);
     await p.getByRole('heading', { name: 'À classer' }).waitFor();

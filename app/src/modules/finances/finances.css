@@ -79,3 +79,22 @@
 /* À classer. */
 .fin-choices { display: flex; flex-wrap: wrap; gap: 8px; }
 .fin-choice { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid var(--control-border); background: var(--tile); color: var(--ink); }
+
+/* Jour : les dépenses cumulées. */
+.fin-gap { display: flex; flex-direction: column; align-items: flex-end; padding: 8px 12px; border-radius: 14px; background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok); text-align: right; }
+.fin-gap[data-late='true'] { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+.fin-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.fin-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.fin-legend i { width: 16px; border-radius: 2px; display: block; }
+
+/* Patrimoine : la répartition en une barre, détaillée ligne par ligne. */
+.fin-split { display: flex; gap: 3px; height: 22px; }
+.fin-split > span { min-width: 6px; border-radius: 4px; }
+.fin-split > span:first-child { border-top-left-radius: 9px; border-bottom-left-radius: 9px; }
+.fin-split > span:last-child { border-top-right-radius: 9px; border-bottom-right-radius: 9px; }
+.segmented > button:disabled { opacity: 0.4; }
+
+/* Réglages : le sommaire. */
+.fin-ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex: none; color: #0b0e1a; }
+.fin-tile { display: flex; flex-direction: column; gap: 6px; padding: 14px; color: inherit; min-width: 0; }
+a.list-row, a.fin-tile { color: inherit; text-decoration: none; }

@@ -9,6 +9,34 @@ export const THEME_CHOICES: readonly { id: ThemeChoice; label: string }[] = [
   { id: 'clair', label: 'Clair' },
 ];
 
+/** L'intensité du verre : sobre (plat), subtil (par défaut), prononcé (« Liquid Glass »). Gardée sur l'appareil. */
+export type GlassChoice = 'sobre' | 'subtil' | 'prononce';
+export const GLASS_CHOICES: readonly { id: GlassChoice; label: string }[] = [
+  { id: 'sobre', label: 'Sobre' },
+  { id: 'subtil', label: 'Subtil' },
+  { id: 'prononce', label: 'Prononcé' },
+];
+const GLASS_KEY = 'mylife:v5:glass';
+export const isGlassChoice = (v: unknown): v is GlassChoice => v === 'sobre' || v === 'subtil' || v === 'prononce';
+
+export function readGlassChoice(): GlassChoice {
+  try {
+    const v = globalThis.localStorage?.getItem(GLASS_KEY);
+    return isGlassChoice(v) ? v : 'subtil';
+  } catch {
+    return 'subtil';
+  }
+}
+
+export function setGlassChoice(choice: GlassChoice): void {
+  try {
+    localStorage.setItem(GLASS_KEY, choice);
+  } catch {
+    /* stockage indisponible : le choix vaut pour cette visite */
+  }
+  document.documentElement.dataset.glass = choice;
+}
+
 const KEY = 'mylife:v5:theme';
 const isChoice = (v: unknown): v is ThemeChoice => v === 'auto' || v === 'sombre' || v === 'clair';
 
@@ -37,6 +65,7 @@ export function applyTheme(choice: ThemeChoice = readThemeChoice()): void {
   const root = document.documentElement;
   const shown = resolveTheme(choice, prefersLight());
   root.dataset.theme = shown;
+  root.dataset.glass = readGlassChoice();
   root.classList.toggle('no-blur', isSlowDevice());
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', shown === 'clair' ? '#EEF0FA' : '#05060D');
 }

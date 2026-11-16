@@ -1,4 +1,4 @@
-import { addDays, cycleFor, inRange, type Cycle, type ISODate } from '../core/dates';
+import { addDays, cycleFor, diffDays, inRange, type Cycle, type ISODate } from '../core/dates';
 import { envelopeOf, resolveCategory, weight, type Explanation } from './engine';
 import { buildOccurrences, currentCycle } from './occurrences';
 import type { Db } from './schema';
@@ -169,4 +169,56 @@ export function project(net: number, invested: number, monthly: number, rateBp: 
   const rest = net - placed;
   for (let i = 0; i < years * 12; i++) placed = placed * (1 + r) + monthly;
   return Math.round(rest + placed);
+}
+
+/**
+ * Le rythme du cycle : les dépenses du quotidien cumulées jour après jour, face au rythme idéal (le budget du cycle
+ * réparti également sur ses jours) et au cycle précédent. `gap` > 0 : de l'avance (moins dépensé que le rythme) ;
+ * < 0 : du retard. `current[i]` et `previous[i]` : le cumul au soir du jour i (0 : avant le premier jour).
+ */
+export interface Pace {
+  length: number;
+  /** Le rang d'aujourd'hui dans le cycle, à partir de 1. */
+  day: number;
+  current: number[];
+  previous: number[];
+  pot: number;
+  spent: number;
+  ideal: number;
+  gap: number;
+  /** Où mène le rythme actuel à la fin du cycle. */
+  projected: number;
+  previousSameDay: number | null;
+  previousTotal: number | null;
+}
+
+export function pace(db: Db, e: Pick<Explanation, 'cycle' | 'pot'>, today: ISODate): Pace {
+  const cycles = lastCycles(db, today, 2);
+  const settled = settledIn(db, cycles);
+  const cumulate = (c: Cycle, until: ISODate): number[] => {
+    const days = spendByDay(db, settled, c.start, until);
+    const out = [0];
+    for (let d = c.start; d <= until; d = addDays(d, 1)) out.push(out[out.length - 1]! + (days.get(d) ?? 0));
+    return out;
+  };
+  const length = diffDays(e.cycle.start, e.cycle.end) + 1;
+  const day = Math.max(1, Math.min(length, diffDays(e.cycle.start, today) + 1));
+  const current = cumulate(e.cycle, today);
+  const previous = cumulate(cycles[0]!, cycles[0]!.end);
+  const hasPrevious = previous[previous.length - 1] !== 0;
+  const spent = current[current.length - 1]!;
+  const ideal = Math.round((Math.max(0, e.pot) * day) / length);
+  return {
+    length,
+    day,
+    current,
+    previous: hasPrevious ? previous : [],
+    pot: e.pot,
+    spent,
+    ideal,
+    gap: ideal - spent,
+    projected: Math.round((spent * length) / day),
+    previousSameDay: hasPrevious ? previous[Math.min(day, previous.length - 1)]! : null,
+    previousTotal: hasPrevious ? previous[previous.length - 1]! : null,
+  };
 }

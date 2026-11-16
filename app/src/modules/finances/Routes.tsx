@@ -23,6 +23,7 @@ export function FinancesRoutes() {
       <Route path="plan" element={<PlanPage />} />
       <Route path="patrimoine" element={<PatrimoinePage />} />
       <Route path="reglages" element={<ReglagesPage />} />
+      <Route path="reglages/:section" element={<ReglagesPage />} />
       <Route path="categories" element={<CategoriesPage />} />
       <Route path="banques" element={<BanquesPage />} />
       <Route path="moteur" element={<ReprisePage />} />

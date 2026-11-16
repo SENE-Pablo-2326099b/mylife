@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button, Glass, List, ListRow, Segmented } from '@mylife/kit';
+import { useEffect, useState } from 'react';
+import { Button, Field, Glass, List, ListRow } from '@mylife/kit';
 import { position } from '../core/budget';
 import { addDays } from '../core/dates';
 import { euros } from '../core/format';
@@ -8,7 +8,7 @@ import { netWorth } from '../engine/engine';
 import type { Account } from '../engine/schema';
 import { addAccount, patchAccount } from '../engine/state';
 import { project } from '../engine/views';
-import { AreaChart, ConeChart, MiniRing } from './charts';
+import { ConeChart, MiniRing, WorthChart } from './charts';
 import { Screen, Sec } from './common';
 import { AccountSheet } from './sheets';
 
@@ -23,11 +23,30 @@ const RANGES = [
   { id: '1825', label: '5 ans' },
   { id: '0', label: 'Tout' },
 ] as const;
-const RATES = [
-  { id: '300', label: '3 %' },
-  { id: '500', label: '5 %' },
-  { id: '700', label: '7 %' },
-] as const;
+const dated = (iso: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(`${iso}T12:00:00`));
+
+/** Un nombre saisi au clavier (virgule ou point), enregistré dès qu'il est valide ; il suit la valeur venue d'ailleurs. */
+function Amount({ id, label, value, unit, max, onChange }: { id: string; label: string; value: number; unit: string; max: number; onChange: (v: number) => void }) {
+  const show = (v: number) => String(v).replace('.', ',');
+  const [text, setText] = useState(show(value));
+  useEffect(() => {
+    setText((t) => (Number(t.replace(',', '.')) === value ? t : show(value)));
+  }, [value]);
+  return (
+    <Field id={id} label={`${label} (${unit})`}>
+      <input
+        id={id}
+        inputMode="decimal"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const n = Number(e.target.value.replace(/\s/g, '').replace(',', '.'));
+          if (e.target.value.trim() && Number.isFinite(n) && n >= 0 && n <= max) onChange(n);
+        }}
+      />
+    </Field>
+  );
+}
 const FAMILIES = [
   { id: 'placements', name: 'Placements', color: 'linear-gradient(135deg,#9bf0b7,#2fb36a)', dot: '#6fe0a0' },
   { id: 'epargne', name: 'Épargne', color: 'linear-gradient(135deg,#7fe6f7,#1da6cc)', dot: '#5ccbe6' },
@@ -41,7 +60,7 @@ const kilo = (v: number) => (Math.abs(v) >= 1000000 ? `${Math.round(v / 100000)}
 
 export function PatrimoinePage() {
   const engine = useEngine();
-  const [range, setRange] = useState<(typeof RANGES)[number]['id']>('365');
+  const [range, setRange] = useState<(typeof RANGES)[number]['id'] | null>(null);
   const [account, setAccount] = useState<string | 'new' | null>(null);
   return (
     <Screen engine={engine} tone="worth" title="Patrimoine" kicker="Tous tes comptes, moins tes dettes" right={<Button onClick={() => setAccount('new')}>Ajouter</Button>}>
@@ -53,14 +72,19 @@ export function PatrimoinePage() {
         const gross = sums.placements + sums.epargne + sums.biens + sums.quotidien;
         // L'historique : une photo par jour, prise par l'ancienne app ; aujourd'hui s'y ajoute.
         const history = [...data.snapshots].sort((a, b) => a.date.localeCompare(b.date)).map((s) => ({ date: s.date, net: s.cash + s.investments + s.other - s.debts }));
-        const since = range === '0' ? '0000-00-00' : addDays(today, -Number(range));
+        // Une période n'a de sens que si l'historique remonte plus loin que la période plus courte.
+        const oldest = history[0]?.date ?? today;
+        const useful = (id: string) => id === '90' || id === '0' || oldest < addDays(today, id === '365' ? -90 : -365);
+        const chosen = range && useful(range) ? range : useful('365') ? '365' : '90';
+        const since = chosen === '0' ? '0000-00-00' : addDays(today, -Number(chosen));
         const series = [...history.filter((h) => h.date >= since && h.date < today), { date: today, net: worth.net }];
+        const first = series[0]!;
+        const change = worth.net - first.net;
         const delta = (days: number) => {
           const ref = [...history].reverse().find((h) => h.date <= addDays(today, -days));
           return ref ? worth.net - ref.net : null;
         };
         const month = delta(30);
-        const year = delta(365);
         const blocks = FAMILIES.map((f) => ({ ...f, value: sums[f.id] })).filter((b) => b.value > 0).sort((a, b) => b.value - a.value);
         const pct = (v: number) => Math.round((v / (gross || 1)) * 100);
         // Les placements : la valeur de leurs lignes, et ce qu'elles ont rapporté.
@@ -79,7 +103,8 @@ export function PatrimoinePage() {
         });
         // « À ce rythme » : ce que le plan met de côté par cycle, au rendement choisi sur ce qui est placé.
         const rate = state.projectionRateBp ?? 500;
-        const monthly = e.occurrences.filter((o) => o.commitment.kind === 'SAVING').reduce((s, o) => s + (o.status === 'SKIPPED' ? 0 : o.expected), 0);
+        const planned = e.occurrences.filter((o) => o.commitment.kind === 'SAVING').reduce((s, o) => s + (o.status === 'SKIPPED' ? 0 : o.expected), 0);
+        const monthly = state.projectionMonthly ?? planned;
         const at = (years: number, bp = rate) => project(worth.net, sums.placements, monthly, bp, years);
         const edited: Account | 'new' | null = account === 'new' ? 'new' : (db.accounts.find((a) => a.id === account) ?? null);
         return (
@@ -88,50 +113,57 @@ export function PatrimoinePage() {
               <span className="fin-num" style={{ fontSize: 48, lineHeight: 1.05 }}>{short(worth.net)}</span>
               <span className="t-small">
                 {month !== null ? <span className={month >= 0 ? 'c-ok' : ''} style={{ fontWeight: 600, color: month < 0 ? 'var(--warn)' : undefined }}>{euros(month, { round: true, sign: true })} en 30 jours</span> : <span className="muted">Net, dettes déduites</span>}
-                {year !== null && <span className="muted"> · {euros(year, { round: true, sign: true })} sur un an</span>}
               </span>
             </div>
             {series.length >= 2 ? (
-              <>
-                <AreaChart values={series.map((s) => s.net)} label={`Évolution du patrimoine net, de ${short(series[0]!.net)} à ${short(worth.net)}`} />
-                <Segmented label="Période" value={range} options={RANGES} onChange={setRange} />
-              </>
+              <Glass style={{ padding: '12px 12px 10px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="segmented" role="group" aria-label="Période">
+                  {RANGES.map((r) => (
+                    <button key={r.id} type="button" aria-pressed={chosen === r.id} disabled={!useful(r.id)} title={useful(r.id) ? undefined : 'Ton historique ne remonte pas encore aussi loin'} onClick={() => setRange(r.id)}>
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="row" style={{ justifyContent: 'space-between', padding: '0 4px', flexWrap: 'wrap', gap: 4 }}>
+                  <span className="t-small muted">{dated(first.date, { day: 'numeric', month: 'short', year: 'numeric' })} → aujourd’hui</span>
+                  <span className={`t-small ${change >= 0 ? 'c-ok' : ''}`} style={{ fontWeight: 700, color: change < 0 ? 'var(--warn)' : undefined }}>
+                    {euros(change, { round: true, sign: true })}
+                    {first.net > 0 ? ` · ${((change / first.net) * 100).toFixed(1).replace('.', ',')} %` : ''}
+                  </span>
+                </div>
+                <WorthChart
+                  points={series.map((x) => ({ date: x.date, value: x.net }))}
+                  format={kilo}
+                  dayLabel={(d) => dated(d, { day: 'numeric', month: 'short', year: d.slice(0, 4) === today.slice(0, 4) ? undefined : '2-digit' })}
+                  tickLabel={(d) => dated(d, chosen === '90' ? { day: 'numeric', month: 'short' } : { month: 'short', year: '2-digit' })}
+                  label={`Évolution du patrimoine net, de ${short(first.net)} le ${dated(first.date, { day: 'numeric', month: 'long', year: 'numeric' })} à ${short(worth.net)} aujourd’hui`}
+                />
+                <span className="t-small muted" style={{ padding: '0 4px' }}>Glisse le doigt sur la courbe pour lire une date.</span>
+              </Glass>
             ) : (
               <span className="t-small muted">La courbe se dessinera au fil des jours : il faut au moins deux relevés.</span>
             )}
 
             {blocks.length > 0 && (
               <>
-                <Sec action={sums.dettes > 0 ? <span style={{ color: 'var(--bad)' }}>Dettes {short(-sums.dettes)}</span> : undefined}>Répartition</Sec>
-                <div className="fin-tree" role="img" aria-label={`Répartition : ${blocks.map((b) => `${b.name} ${pct(b.value)} %`).join(', ')}`}>
-                  <div className="fin-tm" style={{ flex: blocks[0]!.value, background: blocks[0]!.color }}>
-                    <span>{blocks[0]!.name} · {pct(blocks[0]!.value)} %</span>
-                    <b>{kilo(blocks[0]!.value)}</b>
+                <Sec action={`${short(gross)} d’avoirs${sums.dettes > 0 ? ` · dettes ${short(-sums.dettes)}` : ''}`}>Répartition</Sec>
+                <Glass className="list" style={{ padding: '16px 16px 4px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div className="fin-split" role="img" aria-label={`Répartition : ${blocks.map((b) => `${b.name} ${pct(b.value)} %`).join(', ')}`}>
+                    {blocks.map((b) => (
+                      <span key={b.id} style={{ flex: b.value, background: b.color }} />
+                    ))}
                   </div>
-                  {blocks.length > 1 && (
-                    <div className="fin-tree-col" style={{ flex: gross - blocks[0]!.value }}>
-                      <div className="fin-tm" style={{ flex: blocks[1]!.value, background: blocks[1]!.color }}>
-                        <span>{blocks[1]!.name} · {pct(blocks[1]!.value)} %</span>
-                        <b>{kilo(blocks[1]!.value)}</b>
+                  <div>
+                    {blocks.map((b) => (
+                      <div key={b.id} className="list-row">
+                        <span className="fin-dot" style={{ background: b.dot, width: 12, height: 12 }} />
+                        <span className="grow t-strong">{b.name}</span>
+                        <span className="t-small muted">{pct(b.value)} %</span>
+                        <span className="t-strong" style={{ minWidth: 84, textAlign: 'right' }}>{short(b.value)}</span>
                       </div>
-                      {blocks.length > 2 && (
-                        <div className="fin-tree-row" style={{ flex: blocks.slice(2).reduce((s, b) => s + b.value, 0) }}>
-                          {blocks.slice(2).map((b) => (
-                            <div key={b.id} className="fin-tm" style={{ flex: b.value, background: b.color, padding: 8 }} title={`${b.name} : ${short(b.value)}`}>
-                              {/* Un bloc trop étroit garde sa couleur ; son montant est dans la liste des comptes. */}
-                              {pct(b.value) >= 7 && (
-                                <>
-                                  <span>{b.name}</span>
-                                  <b style={{ fontSize: 13 }}>{kilo(b.value)}</b>
-                                </>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                </Glass>
               </>
             )}
 
@@ -190,16 +222,24 @@ export function PatrimoinePage() {
               </>
             )}
 
-            <Sec action={`${short(monthly)} mis de côté par cycle`}>À ce rythme</Sec>
-            <Glass style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <ConeChart now={worth.net} marks={[1, 5, 10].map((years) => ({ years, value: at(years) }))} low={at(10, Math.max(0, rate - 200))} high={at(10, rate + 200)} format={kilo} />
-              <div className="row" style={{ flexWrap: 'wrap', gap: 10 }}>
-                <span className="t-small muted grow">Rendement annuel supposé de ce qui est placé</span>
-                <div style={{ minWidth: 190 }}>
-                  <Segmented label="Rendement annuel supposé" value={String(rate) as (typeof RATES)[number]['id']} options={RATES} onChange={(v) => update((s) => ({ ...s, projectionRateBp: Number(v) }))} />
-                </div>
+            <Sec action={state.projectionMonthly != null && state.projectionMonthly !== planned ? `Revenir au plan (${short(planned)})` : `ton plan prévoit ${short(planned)} par mois`} onAction={state.projectionMonthly != null && state.projectionMonthly !== planned ? () => update((s) => ({ ...s, projectionMonthly: null })) : undefined}>À ce rythme</Sec>
+            <Glass style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="grid-2">
+                <Amount id="proj-monthly" label="Je place chaque mois" unit="€" max={1000000} value={monthly / 100} onChange={(v) => update((s) => ({ ...s, projectionMonthly: Math.round(v * 100) }))} />
+                <Amount id="proj-rate" label="Rendement annuel" unit="%" max={30} value={rate / 100} onChange={(v) => update((s) => ({ ...s, projectionRateBp: Math.round(v * 100) }))} />
               </div>
-              <span className="t-small muted">Une hypothèse, pas une promesse : le cône montre deux points de rendement en plus ou en moins.</span>
+              <ConeChart now={worth.net} marks={[1, 5, 10].map((years) => ({ years, value: at(years) }))} low={at(10, Math.max(0, rate - 200))} high={at(10, rate + 200)} format={kilo} />
+              <div className="fin-proj">
+                <span>
+                  <span className="t-small muted">Versé en 10 ans</span>
+                  <span className="fin-num" style={{ fontSize: 17 }}>{short(monthly * 120)}</span>
+                </span>
+                <span>
+                  <span className="t-small muted">Gagné par le rendement</span>
+                  <span className="fin-num c-ok" style={{ fontSize: 17 }}>{short(Math.max(0, at(10) - worth.net - monthly * 120))}</span>
+                </span>
+              </div>
+              <span className="t-small muted">Une hypothèse, pas une promesse : le rendement s’applique à ce qui est placé, et le cône montre deux points en plus ou en moins.</span>
             </Glass>
 
             <AccountSheet

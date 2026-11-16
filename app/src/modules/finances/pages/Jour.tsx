@@ -4,8 +4,8 @@ import { addDays } from '../core/dates';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { toClassify } from '../engine/automation';
-import { lastCycles, settledIn, spendByDay } from '../engine/views';
-import { DayBars, Ring } from './charts';
+import { lastCycles, pace, settledIn, spendByDay } from '../engine/views';
+import { DayBars, PaceChart, Ring } from './charts';
 import { Avatar, Screen, Sec } from './common';
 import { opViews } from './opViews';
 import { day, KIND } from './labels';
@@ -32,6 +32,7 @@ export function JourPage() {
         const upcoming = e.occurrences.filter((o) => o.status === 'DUE' || o.status === 'PARTIAL').slice(0, 8);
         const todays = opViews(db).filter((o) => o.tx.date === today);
         const left = Math.max(0, e.disponible - e.spentToday);
+        const rhythm = pace(db, e, today);
         return (
           <>
             <Ring fraction={e.pot > 0 ? e.spent / e.pot : e.spent > 0 ? 1 : 0} tone={over || e.deficit > 0 ? 'warn' : 'ok'} label={`${Math.round((e.pot > 0 ? e.spent / e.pot : 0) * 100)} % du budget du cycle déjà dépensé`}>
@@ -60,6 +61,42 @@ export function JourPage() {
             <Link to="/argent/moteur" className="link link-quiet t-small" style={{ alignSelf: 'center' }}>
               Pourquoi ce chiffre
             </Link>
+
+            {e.pot > 0 && (
+              <>
+                <Sec action={`sur ${euros(e.pot, { round: true })} de budget`}>Tes dépenses du cycle, cumulées</Sec>
+                <Glass className="list" style={{ padding: '16px 14px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span className="fin-num" style={{ fontSize: 26, lineHeight: 1.1 }}>{euros(rhythm.spent, { round: true })}</span>
+                      <span className="t-small muted">dépensés en {rhythm.day} jour{rhythm.day > 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="fin-gap" data-late={rhythm.gap < 0}>
+                      <span className="fin-num" style={{ fontSize: 18, lineHeight: 1.15 }}>{euros(Math.abs(rhythm.gap), { round: true })} {rhythm.gap < 0 ? 'de retard' : 'd’avance'}</span>
+                      <span className="t-small">sur le rythme idéal</span>
+                    </span>
+                  </div>
+                  <PaceChart
+                    current={rhythm.current}
+                    previous={rhythm.previous}
+                    pot={rhythm.pot}
+                    length={rhythm.length}
+                    format={(v) => euros(v, { round: true })}
+                    labels={[day(e.cycle.start), day(e.cycle.end)]}
+                    label={`Dépenses cumulées du cycle : ${euros(rhythm.spent, { round: true })} au jour ${rhythm.day} sur ${rhythm.length}, pour un rythme idéal de ${euros(rhythm.ideal, { round: true })}${rhythm.previousSameDay !== null ? ` ; ${euros(rhythm.previousSameDay, { round: true })} au même jour du cycle précédent` : ''}`}
+                  />
+                  <div className="fin-legend">
+                    <span><i style={{ background: 'linear-gradient(90deg,#7b5cff,#38c6f4)', height: 4 }} />ce cycle</span>
+                    <span><i style={{ borderTop: '2px dashed var(--warn)', height: 0 }} />rythme idéal</span>
+                    {rhythm.previous.length > 1 && <span><i style={{ background: 'var(--ink-2)', height: 2 }} />cycle précédent</span>}
+                  </div>
+                  <span className="t-small muted">
+                    {rhythm.previousSameDay !== null ? `Au même jour, le cycle dernier : ${euros(rhythm.previousSameDay, { round: true })}. ` : ''}
+                    À ce rythme, tu finis le cycle autour de {euros(rhythm.projected, { round: true })}.
+                  </span>
+                </Glass>
+              </>
+            )}
 
             <Sec action={overDays > 0 ? `${overDays} jour${overDays > 1 ? 's' : ''} au-dessus` : 'budget du jour en pointillés'}>Tes 7 derniers jours</Sec>
             <Glass style={{ padding: '16px 16px 10px' }}>

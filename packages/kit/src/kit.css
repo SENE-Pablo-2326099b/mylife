@@ -179,8 +179,8 @@ input, select, textarea { font: inherit; color: inherit; }
 /* Verre : panneaux neutres, barre, feuilles. */
 .glass {
   background: var(--glass);
-  -webkit-backdrop-filter: blur(26px) saturate(170%);
-  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
   border-radius: var(--r-panel);
@@ -217,6 +217,75 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .card-module > * { position: relative; }
 .tile { background: var(--tile); border: 1px solid var(--tile-border); box-shadow: inset 0 1px 0 var(--card-hi); border-radius: var(--r-control); }
+
+/*
+ * L'intensité du verre, réglable (Réglages → Apparence) : `data-glass` sur la racine.
+ * - sobre : le verre fumé d'origine, plat ;
+ * - subtil (par défaut) : ce qui flotte devient translucide, avec une arête de lumière ; les listes restent pleines ;
+ * - prononce : tout est translucide, reflet dans le coin, arête irisée, ombre colorée (l'identité « Liquid Glass »).
+ * Seules des variables changent : `.glass`, les boutons et les cartes suivent d'eux-mêmes.
+ */
+:root { --glass-list: var(--glass); --glass-rim: none; --glass-rim-w: 1px; --glass-blur: blur(26px) saturate(170%); }
+:root[data-glass='subtil'] {
+  --glass-list: linear-gradient(180deg, rgba(26, 28, 46, 0.7), rgba(10, 11, 22, 0.78));
+  --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.07)), linear-gradient(rgba(10, 11, 22, 0.22), rgba(10, 11, 22, 0.22));
+  --glass-hi: rgba(255, 255, 255, 0.34);
+  --glass-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+  --glass-rim: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.1) 30%, rgba(255, 255, 255, 0.04) 58%, rgba(170, 150, 255, 0.42));
+  --glass-blur: blur(22px) saturate(170%);
+  --card-under: rgba(10, 11, 22, 0.4);
+  --card-base: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.06));
+  --card-hi: rgba(255, 255, 255, 0.3);
+}
+:root[data-glass='prononce'] {
+  --glass: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.26), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 48%, rgba(255, 255, 255, 0.12)), linear-gradient(rgba(10, 11, 22, 0.14), rgba(10, 11, 22, 0.14));
+  --glass-list: var(--glass);
+  --glass-hi: rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 22px 44px rgba(40, 20, 120, 0.5);
+  --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(140, 220, 255, 0.5) 22%, rgba(255, 255, 255, 0.06) 52%, rgba(255, 150, 220, 0.5) 82%, rgba(255, 255, 255, 0.7));
+  --glass-rim-w: 1.5px;
+  --glass-blur: blur(30px) saturate(200%);
+  --card-under: rgba(10, 11, 22, 0.24);
+  --card-base: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.22), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.04) 48%, rgba(255, 255, 255, 0.1));
+  --card-hi: rgba(255, 255, 255, 0.55);
+  --bg-1: rgba(70, 100, 255, 0.62);
+  --bg-2: rgba(224, 70, 170, 0.6);
+  --bg-3: rgba(40, 190, 230, 0.42);
+}
+:root[data-theme='clair'][data-glass='subtil'] {
+  --glass-list: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.56));
+  --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.56));
+  --glass-hi: #ffffff;
+  --glass-shadow: 0 16px 36px rgba(70, 80, 140, 0.2);
+  --glass-rim: linear-gradient(150deg, #ffffff, rgba(255, 255, 255, 0.5) 30%, rgba(255, 255, 255, 0.2) 58%, rgba(150, 130, 255, 0.5));
+  --card-under: rgba(255, 255, 255, 0.42);
+  --card-base: linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0.56));
+  --card-hi: #ffffff;
+}
+:root[data-theme='clair'][data-glass='prononce'] {
+  --glass: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.7), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.26) 48%, rgba(255, 255, 255, 0.46));
+  --glass-list: var(--glass);
+  --glass-hi: #ffffff;
+  --glass-shadow: 0 22px 44px rgba(90, 80, 200, 0.28);
+  --glass-rim: linear-gradient(145deg, #ffffff, rgba(120, 200, 255, 0.75) 22%, rgba(255, 255, 255, 0.3) 52%, rgba(255, 140, 210, 0.65) 82%, #ffffff);
+  --card-under: rgba(255, 255, 255, 0.28);
+  --card-base: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.7), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0.44));
+  --card-hi: #ffffff;
+  --bg-1: rgba(120, 140, 255, 0.6);
+  --bg-2: rgba(240, 130, 200, 0.55);
+  --bg-3: rgba(110, 215, 245, 0.5);
+}
+:root[data-glass='subtil'] .glass, :root[data-glass='prononce'] .glass { border-color: transparent; }
+:root[data-glass='prononce'] .glass { box-shadow: inset 0 1.5px 0 var(--glass-hi), inset 0 -10px 22px rgba(255, 255, 255, 0.05), var(--glass-shadow); }
+.glass.list { background: var(--glass-list); }
+/* L'arête : un dégradé limité au bord. `:where` ne pèse rien : une barre fixe ou collante garde sa position. */
+:where(.glass) { position: relative; }
+:root[data-glass='subtil'] .glass::after, :root[data-glass='prononce'] .glass::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: var(--glass-rim-w); background: var(--glass-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+:root[data-glass='subtil'] .glass.list { border-color: var(--glass-border); }
+:root[data-glass='subtil'] .glass.list::after { content: none; }
 
 /* Appareil lent, ou transparence réduite demandée : le verre devient une surface pleine, rien d'autre ne change. */
 .no-blur .glass, .no-blur .card-module::before { -webkit-backdrop-filter: none; backdrop-filter: none; background-color: var(--glass-solid); }

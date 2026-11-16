@@ -27,7 +27,7 @@ const LISTS = {
 /** Les dictionnaires : une ligne par clé. */
 const MAPS = ['allocationPatches', 'accountPatches', 'merchantDefaults', 'splits'] as const;
 /** Les valeurs seules. */
-const SINGLES = ['settings', 'carryIn', 'lastCycleStart', 'projectionRateBp'] as const;
+const SINGLES = ['settings', 'carryIn', 'lastCycleStart', 'projectionRateBp', 'projectionMonthly'] as const;
 /** Ce qui doit exister même vide. */
 const REQUIRED_LISTS = new Set(['commitments', 'envelopes', 'provisions', 'installmentPlans', 'occurrenceOverrides', 'closedCycles']);
 

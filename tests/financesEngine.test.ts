@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { migrate } from '../app/src/modules/finances/core/migrate';
 import { automate, classify, detectRecurring, pairTransfers, ruleMatches, toClassify } from '../app/src/modules/finances/engine/automation';
 import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
-import { byCategory, cashflow, forecast, lastCycles, project, settledIn, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
+import { byCategory, cashflow, forecast, lastCycles, pace, project, settledIn, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
@@ -1077,6 +1077,22 @@ describe('moteur M5 : ce que montrent les écrans', () => {
     // « Courses » compte pour sa parente ; le remboursement réduit « Restos » ; le loyer payé est une dépense aussi.
     expect(byCategory(db, '2026-10-26', TODAY).map((x) => [x.name, x.amount])).toEqual([['À classer', 41200], ['alim', 18000], ['restos', 10000]]);
     expect(topMerchants(db, '2026-10-26', TODAY, 1)).toMatchObject([{ name: 'PRLV LOYER AGENCE', amount: 40000 }]);
+  });
+
+  it('rythme du cycle : cumul jour après jour, écart au rythme idéal, projection, cycle précédent', () => {
+    const db = shown();
+    const e = compute(db, TODAY);
+    const r = pace(db, e, TODAY);
+    // Le cumul d'aujourd'hui est ce que le moteur compte comme dépensé ; un remboursement le fait redescendre.
+    expect([r.length, r.day, r.spent, r.pot]).toEqual([31, 21, e.spent, e.pot]);
+    expect(r.current.slice(8, 10)).toEqual([0, 18000]);
+    expect(r.current.slice(16, 19)).toEqual([30000, 30000, 28000]);
+    // Rythme idéal au 21e jour sur 31 : 880 € × 21 / 31 ; 292 € dépensés : de l'avance.
+    expect([r.ideal, r.gap, r.projected]).toEqual([59613, 30413, 43105]);
+    expect([r.previousSameDay, r.previousTotal, r.previous.length]).toEqual([9000, 9000, 31]);
+    // Sans cycle précédent connu : pas de courbe de comparaison.
+    const alone = pace({ ...db, transactions: db.transactions.filter((t) => t.date >= e.cycle.start) }, e, TODAY);
+    expect([alone.previous, alone.previousSameDay]).toEqual([[], null]);
   });
 
   it('revenus et dépenses par cycle ; ni l’épargne ni les virements n’y entrent', () => {
