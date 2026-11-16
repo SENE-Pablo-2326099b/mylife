@@ -8,7 +8,7 @@ import '@mylife/kit/kit.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { startTheme } from '@mylife/kit';
+import { startGlassLight, startTheme } from '@mylife/kit';
 import { App } from './App';
 import { listenForInstall } from './install';
 import { startPrefsSync } from '@legacy/ui/prefsSync';
@@ -16,6 +16,7 @@ import { installErrorLog } from '@legacy/ui/errorLog';
 import { followSharedAppearance } from './appearance';
 
 startTheme();
+startGlassLight();
 listenForInstall();
 // Plantages gardés sur l'appareil (jamais envoyés), et apparence des apps d'avant synchronisée entre appareils :
 // deux morceaux de l'ancien kit encore utiles, importés tels quels jusqu'à la fin des anciennes apps.

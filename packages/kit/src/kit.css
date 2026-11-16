@@ -225,7 +225,9 @@ input, select, textarea { font: inherit; color: inherit; }
  * - prononce : tout est translucide, reflet dans le coin, arête irisée, ombre colorée (l'identité « Liquid Glass »).
  * Seules des variables changent : `.glass`, les boutons et les cartes suivent d'eux-mêmes.
  */
-:root { --glass-list: var(--glass); --glass-rim: none; --glass-rim-w: 1px; --glass-blur: blur(26px) saturate(170%); }
+:root { --glass-list: var(--glass); --glass-rim: none; --glass-rim-w: 1px; --glass-blur: blur(26px) saturate(170%); --la: 135deg; --lx: 22%; --ly: 0%; --sx: -1.1px; --sy: -1.1px; --glass-spec: transparent; --glass-grain: linear-gradient(transparent, transparent); --glass-touch: rgba(255, 255, 255, 0.2); --glass-fringe: none; }
+/* La lumière au toucher : 1 sous le doigt, puis 0 en fondu (voir `glassLight.ts`). Héritée par les reflets. */
+@property --gl { syntax: '<number>'; inherits: true; initial-value: 0; }
 :root[data-glass='subtil'] {
   --glass-list: linear-gradient(180deg, rgba(26, 28, 46, 0.7), rgba(10, 11, 22, 0.78));
   --glass: linear-gradient(160deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.07)), linear-gradient(rgba(10, 11, 22, 0.22), rgba(10, 11, 22, 0.22));
@@ -233,6 +235,8 @@ input, select, textarea { font: inherit; color: inherit; }
   --glass-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
   --glass-rim: linear-gradient(150deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.1) 30%, rgba(255, 255, 255, 0.04) 58%, rgba(170, 150, 255, 0.42));
   --glass-blur: blur(22px) saturate(170%);
+  --glass-spec: rgba(255, 255, 255, 0.09);
+  --glass-rim: linear-gradient(calc(var(--la) + 15deg), rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.1) 30%, rgba(255, 255, 255, 0.04) 58%, rgba(170, 150, 255, 0.42));
   --card-under: rgba(10, 11, 22, 0.4);
   --card-base: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03) 45%, rgba(255, 255, 255, 0.06));
   --card-hi: rgba(255, 255, 255, 0.3);
@@ -242,8 +246,14 @@ input, select, textarea { font: inherit; color: inherit; }
   --glass-list: var(--glass);
   --glass-hi: rgba(255, 255, 255, 0.6);
   --glass-shadow: 0 22px 44px rgba(40, 20, 120, 0.5);
-  --glass-rim: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(140, 220, 255, 0.5) 22%, rgba(255, 255, 255, 0.06) 52%, rgba(255, 150, 220, 0.5) 82%, rgba(255, 255, 255, 0.7));
+  /* L'arête : la lumière blanche du côté de la source, puis le spectre qui se disperse en faisant le tour. */
+  --glass-rim: conic-gradient(from calc(var(--la) - 135deg), rgba(255, 255, 255, 0.95), rgba(150, 228, 255, 0.85) 9%, rgba(190, 160, 255, 0.55) 17%, rgba(255, 255, 255, 0.08) 30%, rgba(255, 150, 215, 0.6) 46%, rgba(255, 210, 150, 0.45) 54%, rgba(255, 255, 255, 0.06) 66%, rgba(160, 255, 210, 0.5) 82%, rgba(255, 255, 255, 0.95));
   --glass-rim-w: 1.5px;
+  --glass-spec: rgba(255, 255, 255, 0.22);
+  --glass-touch: rgba(255, 255, 255, 0.3);
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  /* L'épaisseur : un liseré clair du côté de la lumière, des franges rose et bleue qui s'écartent sur les bords. */
+  --glass-fringe: inset var(--sx) var(--sy) 1.5px -0.5px rgba(255, 255, 255, 0.5), inset calc(var(--sx) * -2) calc(var(--sy) * -2) 3px -1px rgba(255, 110, 200, 0.4), inset calc(var(--sx) * 2.5) calc(var(--sy) * 2.5) 4px -2px rgba(100, 210, 255, 0.4), inset 0 0 22px rgba(255, 255, 255, 0.05);
   --glass-blur: blur(30px) saturate(200%);
   --card-under: rgba(10, 11, 22, 0.24);
   --card-base: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.22), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.04) 48%, rgba(255, 255, 255, 0.1));
@@ -267,7 +277,11 @@ input, select, textarea { font: inherit; color: inherit; }
   --glass-list: var(--glass);
   --glass-hi: #ffffff;
   --glass-shadow: 0 22px 44px rgba(90, 80, 200, 0.28);
-  --glass-rim: linear-gradient(145deg, #ffffff, rgba(120, 200, 255, 0.75) 22%, rgba(255, 255, 255, 0.3) 52%, rgba(255, 140, 210, 0.65) 82%, #ffffff);
+  --glass-rim: conic-gradient(from calc(var(--la) - 135deg), #ffffff, rgba(110, 195, 255, 0.9) 9%, rgba(160, 130, 255, 0.7) 17%, rgba(255, 255, 255, 0.4) 30%, rgba(255, 120, 200, 0.75) 46%, rgba(255, 190, 120, 0.6) 54%, rgba(255, 255, 255, 0.4) 66%, rgba(100, 225, 170, 0.65) 82%, #ffffff);
+  --glass-spec: rgba(255, 255, 255, 0.7);
+  --glass-touch: rgba(255, 255, 255, 0.75);
+  --glass-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .1 0 0 0 0 .2 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --glass-fringe: inset var(--sx) var(--sy) 1.5px -0.5px #ffffff, inset calc(var(--sx) * -2) calc(var(--sy) * -2) 3px -1px rgba(255, 90, 190, 0.35), inset calc(var(--sx) * 2.5) calc(var(--sy) * 2.5) 4px -2px rgba(60, 170, 255, 0.35);
   --card-under: rgba(255, 255, 255, 0.28);
   --card-base: radial-gradient(70% 55% at 16% 0%, rgba(255, 255, 255, 0.7), transparent 62%), linear-gradient(160deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.24) 48%, rgba(255, 255, 255, 0.44));
   --card-hi: #ffffff;
@@ -276,7 +290,39 @@ input, select, textarea { font: inherit; color: inherit; }
   --bg-3: rgba(110, 215, 245, 0.5);
 }
 :root[data-glass='subtil'] .glass, :root[data-glass='prononce'] .glass { border-color: transparent; }
-:root[data-glass='prononce'] .glass { box-shadow: inset 0 1.5px 0 var(--glass-hi), inset 0 -10px 22px rgba(255, 255, 255, 0.05), var(--glass-shadow); }
+:root[data-glass='prononce'] .glass { box-shadow: var(--glass-fringe), var(--glass-shadow); }
+/*
+ * Le reflet et la lumière au toucher, sous le contenu et au-dessus du verre : le reflet tombe là où est la lumière
+ * (la même pour toutes les plaques), la lumière du toucher sous le doigt. « Prononcé » ajoute un grain de texture.
+ */
+:root[data-glass='subtil'] .glass, :root[data-glass='prononce'] .glass { isolation: isolate; transition: --gl 0.45s ease-out; }
+:root[data-glass='subtil'] .glass::before, :root[data-glass='prononce'] .glass::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(200px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--glass-touch) calc(var(--gl) * 100%), transparent), transparent 70%),
+    radial-gradient(75% 65% at var(--lx) var(--ly), var(--glass-spec), transparent 62%),
+    var(--glass-grain);
+  background-size: auto, auto, 140px 140px;
+}
+:root[data-glass='subtil'] .glass.list::before { content: none; }
+/* Les cartes de module : leur bord tourne avec la lumière ; en « prononcé », reflet, grain, franges et toucher. */
+:root[data-glass='subtil'] .card-module, :root[data-glass='prononce'] .card-module {
+  background:
+    linear-gradient(var(--card-under), var(--card-under)) padding-box,
+    linear-gradient(var(--la), var(--edge) 0%, var(--edge-mid-1) 32%, var(--edge-mid-2) 62%, var(--edge-2) 100%) border-box;
+  transition: --gl 0.45s ease-out;
+}
+:root[data-glass='prononce'] .card-module::before {
+  background:
+    radial-gradient(220px circle at var(--mx, 50%) var(--my, -300px), color-mix(in srgb, var(--glass-touch) calc(var(--gl) * 100%), transparent), transparent 70%),
+    radial-gradient(75% 65% at var(--lx) var(--ly), var(--glass-spec), transparent 62%),
+    var(--glass-grain),
+    radial-gradient(120% 95% at 0% 0%, var(--tint), transparent 58%),
+    radial-gradient(90% 70% at 100% 100%, var(--tint-2), transparent 60%),
+    var(--card-base);
+  background-size: auto, auto, 140px 140px, auto, auto, auto;
+  box-shadow: var(--glass-fringe);
+}
 .glass.list { background: var(--glass-list); }
 /* L'arête : un dégradé limité au bord. `:where` ne pèse rien : une barre fixe ou collante garde sa position. */
 :where(.glass) { position: relative; }
@@ -456,18 +502,19 @@ button.list-row { width: 100%; background: none; border: 0; text-align: left; pa
 /* ---------------------------------------------------------------- coquille : barre du bas, barre latérale */
 
 .shell { min-height: 100dvh; display: flex; }
-.shell-main { flex: 1; min-width: 0; padding: calc(var(--safe-top) + 26px) var(--pad) calc(var(--safe-bottom) + 108px); }
+.shell-main { flex: 1; min-width: 0; padding: calc(var(--safe-top) + 26px) var(--pad) calc(var(--safe-bottom) + 92px); }
 .shell-content { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 13px; }
 /* Pages de lecture et de formulaires : une colonne lisible sur ordinateur. */
 .shell-content.is-narrow { max-width: 680px; }
 
 .tabbar {
-  position: fixed; left: 12px; right: 12px; bottom: calc(var(--safe-bottom) + 14px); z-index: 30;
-  height: 72px; padding: 0 6px; border-radius: 26px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: center;
+  /* Posée bas, comme sur iOS : dans la marge du geste d'accueil, sans la recouvrir. */
+  position: fixed; left: 12px; right: 12px; bottom: max(10px, calc(var(--safe-bottom) - 10px)); z-index: 30;
+  height: 64px; padding: 0 6px; border-radius: 26px; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; align-items: center;
 }
 .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 48px; font-size: 10.5px; font-weight: 500; color: var(--ink-2); background: none; border: 0; }
 .tab[aria-current='page'] { color: var(--tab-on); font-weight: 700; }
-.tab-plus { justify-self: center; width: 54px; height: 54px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #8b6cff, #3cc8f0); border: 1px solid var(--action-border); box-shadow: 0 0 26px rgba(124, 92, 255, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
+.tab-plus { justify-self: center; width: 50px; height: 50px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, #8b6cff, #3cc8f0); border: 1px solid var(--action-border); box-shadow: 0 0 26px rgba(124, 92, 255, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.7); }
 
 .sidebar { display: none; }
 .navlink { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 14px; border-radius: 14px; font-size: 15px; font-weight: 500; color: var(--ink-2); background: none; border: 0; width: 100%; text-align: left; }

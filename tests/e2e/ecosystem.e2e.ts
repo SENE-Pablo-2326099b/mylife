@@ -518,6 +518,16 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Prononcé', exact: true }).click();
     expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('prononce');
     await shot(p, '43b-v5-reglages-clair-prononce');
+    // Une seule lumière pour tout l'écran : elle suit la souris (ou l'inclinaison du téléphone), et les arêtes avec.
+    const angle = () => p.evaluate(() => document.documentElement.style.getPropertyValue('--la'));
+    await p.mouse.move(20, 300);
+    await p.waitForTimeout(400);
+    const left = await angle();
+    await p.mouse.move(370, 300);
+    await expect.poll(angle).not.toBe(left);
+    // La barre du bas, posée bas : à 10 px du bord sans marge système, et pas plus haute que 64 px.
+    const bar = await p.locator('nav.tabbar').boundingBox();
+    expect(bar && [Math.round(844 - bar.y - bar.height), Math.round(bar.height)]).toEqual([10, 64]);
     await p.reload();
     expect(await p.evaluate(() => document.documentElement.dataset.glass)).toBe('prononce');
     await p.getByRole('button', { name: 'Subtil', exact: true }).click();
@@ -858,6 +868,9 @@ describe('MyLife, une seule app', () => {
     await shot(p, '63b-finances-v5-jour-cumul');
     await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
     await shot(p, '63c-finances-v5-jour-prononce');
+    await p.evaluate(() => (document.documentElement.dataset.theme = 'sombre'));
+    await shot(p, '63d-finances-v5-jour-prononce-sombre');
+    await p.evaluate(() => (document.documentElement.dataset.theme = 'clair'));
     await p.evaluate(() => (document.documentElement.dataset.glass = 'subtil'));
     await p.evaluate(() => window.scrollTo(0, 0));
     await shot(p, '63-finances-v5-jour');

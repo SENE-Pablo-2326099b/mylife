@@ -38,7 +38,7 @@
 .fin-search { position: relative; }
 .fin-search > svg { position: absolute; left: 14px; top: 15px; color: var(--ink-2); pointer-events: none; }
 .fin-search > input { padding-left: 42px !important; }
-.fin-selectbar { position: sticky; bottom: calc(var(--safe-bottom) + 96px); z-index: 20; padding: 10px 12px; border-radius: 18px; display: flex; align-items: center; gap: 10px; }
+.fin-selectbar { position: sticky; bottom: calc(max(10px, calc(var(--safe-bottom) - 10px)) + 74px); z-index: 20; padding: 10px 12px; border-radius: 18px; display: flex; align-items: center; gap: 10px; }
 .fin-check { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--field-border-hover); flex: none; display: flex; align-items: center; justify-content: center; }
 .fin-check[data-on='true'] { background: var(--action); border-color: transparent; color: #fff; }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Icon, List, ListRow, ScreenHeader, SectionTitle, Segmented, GLASS_CHOICES, THEME_CHOICES, readGlassChoice, readThemeChoice, setGlassChoice, setThemeChoice, type GlassChoice, type IconName, type ThemeChoice } from '@mylife/kit';
+import { Icon, List, ListRow, ScreenHeader, SectionTitle, Segmented, askTiltPermission, GLASS_CHOICES, THEME_CHOICES, readGlassChoice, readThemeChoice, setGlassChoice, setThemeChoice, type GlassChoice, type IconName, type ThemeChoice } from '@mylife/kit';
 import { shareTheme } from '../appearance';
 import { useLogin } from '../store';
 
@@ -38,6 +38,8 @@ export function SettingsPage() {
           onChange={(next) => {
             setGlass(next);
             setGlassChoice(next);
+            // Sur iPhone, la lumière qui suit l'inclinaison demande un accord, donné lors de ce geste.
+            if (next !== 'sobre') void askTiltPermission();
           }}
         />
       </section>
