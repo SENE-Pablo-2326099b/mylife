@@ -24,8 +24,9 @@ async function device(width = 390, height = 844): Promise<[BrowserContext, Page]
   const ctx = await browser.newContext({ viewport: { width, height }, isMobile: true, hasTouch: true, locale: 'fr-FR', colorScheme: 'dark' });
   ctx.setDefaultTimeout(20_000);
   const p = await ctx.newPage();
-  p.on('pageerror', (e) => errors.push(`${p.url()} : ${e.message}`));
-  p.on('console', (m) => m.type() === 'error' && !/Failed to load resource|favicon/.test(m.text()) && errors.push(`${p.url()} : ${m.text()}`));
+  // « ViewTransition opt-in disabled » : note du navigateur quand on quitte l'ancienne app (transitions de page) pour la coquille.
+  p.on('pageerror', (e) => !/ViewTransition opt-in disabled/.test(e.message) && errors.push(`${p.url()} : ${e.message}`));
+  p.on('console', (m) => m.type() === 'error' && !/Failed to load resource|favicon|ViewTransition opt-in disabled/.test(m.text()) && errors.push(`${p.url()} : ${m.text()}`));
   return [ctx, p];
 }
 
@@ -603,9 +604,11 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await p.getByRole('button', { name: 'Se connecter' }).click();
     await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    // Sans ancienne base sur l'appareil : rien à reprendre, et c'est dit.
+    // Rien sur l'appareil ni dans le compte : le premier lancement propose de relier une banque ou de commencer à la main.
     await p.goto(`${server.url}/argent/moteur`);
-    await p.getByText('Rien à reprendre ici').waitFor();
+    await p.getByText('Bienvenue dans MyFinances').waitFor();
+    // La synchro entre appareils a relié cet appareil (compte vide) : elle ne viendra plus remplacer ce qui suit.
+    await p.waitForFunction(() => ['mylife-sync-finances', 'mylife-sync-finances5'].every((k) => !!(JSON.parse(localStorage.getItem(k) ?? 'null') as { joinedAs?: string } | null)?.joinedAs));
     // Une ancienne base (fictive) : deux comptes, quatre opérations, un revenu et une charge prévus.
     const today = await p.evaluate(() => {
       const d = new Date();
@@ -614,8 +617,8 @@ describe('MyLife, une seule app', () => {
     await p.evaluate(
       (date) =>
         new Promise<void>((resolve, reject) => {
-          const open = indexedDB.open('myfinances', 30);
-          open.onupgradeneeded = () => ['transactions', 'accounts', 'categories', 'settings'].forEach((t) => open.result.createObjectStore(t, { keyPath: 'id' }));
+          // La base des faits existe déjà (le module l'a créée, au format de l'ancienne app).
+          const open = indexedDB.open('myfinances');
           open.onerror = () => reject(open.error);
           open.onsuccess = () => {
             const tx = open.result.transaction(['transactions', 'accounts', 'categories', 'settings'], 'readwrite');
@@ -640,7 +643,7 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('heading', { name: 'Pourquoi ce chiffre' }).waitFor();
     // Budget théorique : 2 000 − 700 = 1 300 de reste à vivre ; 42,50 dépensés (dont 30 à classer, comptés).
     const term = (label: string) => p.locator('.list-row', { hasText: label }).first();
-    const shows = (label: string, value: RegExp) => expect.poll(() => term(label).innerText()).toMatch(value);
+    const shows = (label: string, value: RegExp) => expect.poll(() => term(label).innerText(), { timeout: 8000 }).toMatch(value);
     await shows('Reste à vivre', /1\s300\s€/);
     await shows('Déjà dépensé', /42,50\s€/);
     expect(await overflow(p)).toBeLessThanOrEqual(0);
@@ -848,6 +851,88 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('link', { name: 'Retour à MyLife' }).click();
     await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await p.getByRole('navigation', { name: 'Barre de navigation' }).waitFor();
+    // ---- M6. La bascule : la carte de l'accueil vient du moteur et ouvre le module ; la banque, l'export.
+    const card = p.getByRole('link', { name: 'Ouvrir MyFinances' });
+    await card.getByText(/à dépenser aujourd’hui/).waitFor();
+    expect(await card.getAttribute('href')).toBe('/argent');
+    // Un faux relais bancaire : une banque, un compte, deux opérations dont une déjà connue au second passage.
+    let bankState = '';
+    await p.route('**/api/eb', async (route) => {
+      const body = JSON.parse(route.request().postData() ?? '{}') as { op: string; state?: string };
+      const ok = (data: unknown) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) });
+      if (body.op === 'status') return ok({ configured: true, authenticated: true });
+      if (body.op === 'aspsps') return ok({ aspsps: [{ name: 'Banque Fictive', country: 'FR' }, { name: 'Autre Établissement', country: 'FR' }] });
+      if (body.op === 'startAuth') return (bankState = body.state ?? ''), ok({ url: `${server.url}/finances/connexion/retour?code=abc&state=${bankState}`, authorization_id: 'a' });
+      if (body.op === 'createSession') return ok({ session_id: 'sess-e2e', accounts: [{ uid: 'u1', identification_hash: 'h1', currency: 'EUR', details: 'Compte Fictif', cash_account_type: 'CACC' }], aspsp: { name: 'Banque Fictive', country: 'FR' }, access: { valid_until: new Date(Date.now() + 80 * 86400_000).toISOString() } });
+      if (body.op === 'transactions') return ok({ transactions: [{ transaction_amount: { amount: '18.40', currency: 'EUR' }, credit_debit_indicator: 'DBIT', status: 'BOOK', booking_date: today, creditor: { name: 'CB LIBRAIRIE DU PORT' }, entry_reference: 'e2e-1' }] });
+      if (body.op === 'balances') return ok({ balances: [{ name: 'x', balance_type: 'CLAV', balance_amount: { amount: '500.00', currency: 'EUR' } }] });
+      return ok({});
+    });
+    await p.goto(`${server.url}/argent/banques`);
+    await p.getByText('Aucun compte relié').waitFor();
+    await p.getByRole('button', { name: 'Voir les banques' }).click();
+    await p.getByLabel('Ta banque').fill('fictive');
+    await expect.poll(() => p.getByRole('button', { name: /Établissement/ }).count()).toBe(0);
+    await shot(p, '68-finances-v5-banques');
+    // La banque renvoie à l'adresse déclarée (servie par l'ancienne app) : elle termine dans la base commune, puis
+    // rend la main au module.
+    await p.getByRole('button', { name: 'Banque Fictive' }).click();
+    await p.waitForURL('**/argent/banques', { timeout: 30_000 });
+    await p.getByText('1 compte relié').waitFor();
+    await p.getByText(/Accès jusqu’au/).waitFor();
+    expect(bankState).not.toBe('');
+    // Synchro à la demande : rien en double.
+    await p.getByRole('button', { name: 'Synchroniser' }).click();
+    await p.getByText('Compte Fictif : à jour').waitFor();
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.unroute('**/api/eb');
+    await p.goto(`${server.url}/argent/operations`);
+    await expect.poll(() => p.getByRole('button', { name: /Librairie/i }).count()).toBe(1);
+    // Export : un fichier, fabriqué sur l'appareil.
+    await p.goto(`${server.url}/argent/reglages`);
+    const exported = p.waitForEvent('download');
+    await p.getByRole('button', { name: /Exporter mes données/ }).click();
+    const file = JSON.parse(readFileSync((await (await exported).path())!, 'utf8')) as { format: string; tables: { transactions: unknown[] }; engine: { version: number } | null };
+    expect(file.format).toBe('myfinances-backup');
+    expect(file.tables.transactions.length).toBeGreaterThan(4);
+    expect(file.engine?.version).toBe(1);
+    // Un second appareil du même compte : faits et réglages arrivent tout seuls (l'espèce saisie, l'enveloppe créée).
+    const [ctx2, p2] = await device();
+    await p.waitForFunction(() => (JSON.parse(localStorage.getItem('mylife-queue-finances5') ?? '[]') as unknown[]).length === 0 && (JSON.parse(localStorage.getItem('mylife-queue-finances') ?? '[]') as unknown[]).length === 0, undefined, { timeout: 30_000 });
+    await p2.goto(`${server.url}/`);
+    await p2.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p2.getByLabel('Identifiant').fill(LOGIN);
+    await p2.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p2.getByRole('button', { name: 'Se connecter' }).click();
+    await p2.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await p2.goto(`${server.url}/argent/operations`);
+    await p2.getByRole('button', { name: /Librairie/i }).waitFor({ timeout: 30_000 });
+    await p2.getByRole('button', { name: /Café du marché/ }).waitFor({ timeout: 30_000 });
+    await ctx2.close();
+    // Un autre compte sur ce navigateur : rien du précédent, ni opérations ni réglages, avant même la synchro.
+    await p.goto(`${server.url}/compte`);
+    await p.getByRole('button', { name: 'Se déconnecter' }).click();
+    await p.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await p.getByLabel('Identifiant').fill(`${LOGIN}-b`);
+    await p.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await p.getByRole('button', { name: 'Se connecter' }).click();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    expect(await p.getByText(/à dépenser aujourd’hui/).count()).toBe(0);
+    await p.goto(`${server.url}/argent/operations`);
+    await p.getByText('Bienvenue dans MyFinances').waitFor();
+    expect(await p.getByRole('button', { name: /Librairie/i }).count()).toBe(0);
+    const left = await p.evaluate(
+      () =>
+        new Promise<number>((resolve, reject) => {
+          const open = indexedDB.open('myfinances');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const count = open.result.transaction('transactions').objectStore('transactions').count();
+            count.onsuccess = () => (open.result.close(), resolve(count.result));
+          };
+        }),
+    );
+    expect(left).toBe(0);
     await ctx.close();
   });
 

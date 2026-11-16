@@ -34,7 +34,8 @@ export function fromV3(data: FinanceData): Db {
   for (const m of data.movements) if (m.pairId) byPair.set(m.pairId, [...(byPair.get(m.pairId) ?? []), m]);
 
   const allocations: Allocation[] = [];
-  const transactions = data.movements.map((m) => {
+  // Une opération dont le compte n'est pas (encore) là, entre deux passages de synchro : elle attend son compte.
+  const transactions = data.movements.filter((m) => account.has(m.accountId)).map((m) => {
     const flow = flowOf(m);
     const other = m.pairId ? byPair.get(m.pairId)?.find((x) => x.id !== m.id && x.accountId !== m.accountId && x.amount === -m.amount) : undefined;
     const base = { transactionId: m.id, flow, tagIds: [], origin: m.edited ? ('manual' as const) : ('import' as const), note: m.note };

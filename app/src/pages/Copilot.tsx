@@ -16,7 +16,7 @@ const HISTORY_KEY = 'mylife:copilot:history';
 const PROPOSALS_KEY = 'mylife:copilot:proposals';
 const SUGGESTIONS = ['Je peux me payer un billet à 80 € ce mois-ci ?', 'Résume ma semaine.', 'Quelle semaine alléger avant ma prochaine sortie ?', 'Qu’est-ce qui m’attend cette semaine ?'];
 const READ_LABEL: Record<string, string> = { get_overview: 'tes modules', get_finances: 'ton budget', get_training: 'ton entraînement', list_sorties: 'tes sorties', get_agenda: 'ton agenda', propose_action: 'une action à valider' };
-const APP_PATH = { finances: '/finances/', perf: '/perf/' } as const;
+const APP_PATH = { finances: '/argent', perf: '/perf/' } as const;
 
 interface Proposal {
   id: string;

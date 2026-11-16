@@ -19,7 +19,7 @@ function download(name: string, data: unknown) {
 }
 
 const LINKS: { href: string; icon: IconName; title: string; detail: string }[] = [
-  { href: '/finances/reglages/donnees', icon: 'card', title: 'MyFinances', detail: 'Réglages → Sauvegarde et données → Exporter' },
+  { href: '/argent/reglages', icon: 'card', title: 'MyFinances', detail: 'Réglages → Banques et données → Exporter mes données' },
   { href: '/perf/settings', icon: 'barbell', title: 'MyPerf', detail: 'Réglages → Exporter mes données' },
 ];
 

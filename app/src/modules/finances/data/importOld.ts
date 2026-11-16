@@ -1,29 +1,20 @@
-import Dexie from 'dexie';
 import { mergeImport, migrate, type OldDump } from '../core/migrate';
 import type { FinanceData } from '../core/model';
 import { db, loadAll, saveAll } from './db';
+import { facts } from './facts';
 
 /**
- * Reprend les données de l'ancienne app MyFinances (base locale `myfinances`, sur le même appareil) dans la base V5.
- * L'ancienne base est seulement lue. Rejouable : ce qui a été fait dans le nouveau module est gardé (`mergeImport`).
+ * Passe les faits (base `myfinances`, partagée avec l'ancienne app le temps de la bascule : `facts.ts`) dans le modèle
+ * de l'étape 3.3, d'où le moteur les lit. Rejouable à chaque ouverture et après chaque synchro.
  */
-const OLD_DB = 'myfinances';
 const TABLES = ['transactions', 'accounts', 'categories', 'portfolios', 'holdings', 'investmentOps', 'plans', 'goals', 'goalMoves', 'manualAssets', 'snapshots'] as const;
 
-/** Le contenu de l'ancienne base, ou null si elle n'existe pas sur cet appareil. */
+/** Le contenu de la base des faits. */
 export async function readOld(): Promise<OldDump | null> {
-  if (!(await Dexie.exists(OLD_DB))) return null;
-  const old = new Dexie(OLD_DB);
-  try {
-    await old.open();
-    const names = new Set(old.tables.map((t) => t.name));
-    const dump: Record<string, unknown> = {};
-    for (const t of TABLES) dump[t] = names.has(t) ? await old.table(t).toArray() : [];
-    dump.settings = names.has('settings') ? ((await old.table('settings').get('main')) ?? null) : null;
-    return dump as OldDump;
-  } finally {
-    old.close();
-  }
+  const dump: Record<string, unknown> = {};
+  for (const t of TABLES) dump[t] = await facts.table(t).toArray();
+  dump.settings = (await facts.settings.get('main')) ?? null;
+  return dump as OldDump;
 }
 
 export interface ImportResult {

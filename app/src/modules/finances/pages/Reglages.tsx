@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from 'react';
-import { Badge, Button, EmptyState, Field, Glass, List, ListRow, Notice, ScreenHeader, SectionTitle, Segmented } from '@mylife/kit';
+import { Badge, Button, Field, Glass, List, ListRow, Notice, ScreenHeader, SectionTitle, Segmented } from '@mylife/kit';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { checkIntegrity } from '../engine/integrity';
 import type { Account, Category, Envelope, Rule, Tag } from '../engine/schema';
 import { addAccount, archiveCategory, mergeCategories, patchAccount, patchSettings, removeEnvelope, removeRule, removeTag, saveCategory, saveEnvelope, saveRule, saveTag } from '../engine/state';
+import { downloadExport } from '../data/export';
 import { Select, Toggle } from './controls';
+import { Welcome } from './Welcome';
 import { END, FLOW, ROLE, SCOPES } from './labels';
 import { AccountSheet, CategorySheet, EnvelopeSheet, RuleSheet, TagSheet } from './sheets';
 
@@ -66,9 +68,9 @@ export function ReglagesPage() {
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
   const [rule, setRule] = useState<Rule | 'new' | null>(null);
 
-  const header = <ScreenHeader kicker="MyFinances V5" title="Réglages" right={<Button href="/argent">Retour</Button>} />;
+  const header = <ScreenHeader kicker="MyFinances" title="Réglages" right={<Button href="/argent">Retour</Button>} />;
   if (engine.status === 'error') return <>{header}<Notice tone="bad">La lecture de tes données a échoué : {engine.error}</Notice></>;
-  if (engine.status === 'empty') return <>{header}<EmptyState title="Rien à régler pour l’instant" body="MyFinances n’a pas encore de données sur cet appareil." action={<Button href="/finances/">Ouvrir MyFinances</Button>} /></>;
+  if (engine.status === 'empty') return <>{header}<Welcome engine={engine} /></>;
   const { db, state, explanation: e, update } = engine;
   if (!db || !state || !e) return <>{header}<span className="t-small muted">Lecture de tes données…</span></>;
 
@@ -88,6 +90,13 @@ export function ReglagesPage() {
     <>
       {header}
       {integrity.errors.length > 0 && <Notice tone="bad">Réglages incohérents : {integrity.errors.slice(0, 3).join(' ; ')}</Notice>}
+
+      <SectionTitle>Banques et données</SectionTitle>
+      <List>
+        <ListRow href="/argent/banques" title="Banques" detail="Comptes reliés, synchro, relier une banque" />
+        <ListRow title="Exporter mes données" detail="Un fichier avec tes opérations, tes comptes et tes réglages" onClick={() => void downloadExport()} />
+        <ListRow href="/finances/patrimoine" title="Gérer mes placements" detail="Dans l’ancienne app, le temps de la bascule : lignes, achats, biens, objectifs" />
+      </List>
 
       <SectionTitle>Cycle</SectionTitle>
       <Glass className="pad stack">

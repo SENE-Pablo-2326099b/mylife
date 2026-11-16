@@ -1,5 +1,6 @@
+import { Welcome } from './Welcome';
 import { useState, type ReactNode } from 'react';
-import { Badge, Button, EmptyState, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle } from '@mylife/kit';
+import { Badge, Button, List, ListRow, ModuleCard, ModuleLabel, Notice, ScreenHeader, SectionTitle } from '@mylife/kit';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { detectRecurring, toClassify, type ToClassify } from '../engine/automation';
@@ -59,7 +60,7 @@ export function ReprisePage() {
   const [group, setGroup] = useState<ToClassify | null>(null);
   const [receivable, setReceivable] = useState<string | null>(null);
 
-  const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" right={<Button href="/argent">Retour</Button>} />;
+  const header = <ScreenHeader kicker="MyFinances" title="Pourquoi ce chiffre" right={<Button href="/argent">Retour</Button>} />;
   if (engine.status === 'error')
     return (
       <>
@@ -72,7 +73,7 @@ export function ReprisePage() {
     return (
       <>
         {header}
-        <EmptyState title="Rien à reprendre ici" body="MyFinances n’a pas encore de données sur cet appareil. Ouvre-la une fois, puis reviens." action={<Button href="/finances/">Ouvrir MyFinances</Button>} />
+        <Welcome engine={engine} />
       </>
     );
   const { db, state, explanation: e, update, today } = engine;

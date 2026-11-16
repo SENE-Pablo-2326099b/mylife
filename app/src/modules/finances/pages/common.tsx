@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, EmptyState, IconButton, Notice } from '@mylife/kit';
+import { Button, IconButton, Notice } from '@mylife/kit';
 import type { FinanceData } from '../core/model';
 import type { Engine } from '../data/engineStore';
 import type { Explanation } from '../engine/engine';
 import type { Db } from '../engine/schema';
 import type { EngineState } from '../engine/state';
+import { CloudNotice } from './Banques';
 import type { OpView } from './opViews';
+import { Welcome } from './Welcome';
 import '../finances.css';
 
 /** Ce que reçoit un écran une fois les données prêtes. */
@@ -38,13 +40,14 @@ export function Screen({ engine, tone, kicker, title, right, children }: { engin
         </div>
         {right}
       </header>
+      <CloudNotice />
       {engine.status === 'error' ? (
         <>
           <Notice tone="bad">La lecture de tes données a échoué : {engine.error}</Notice>
           <Button onClick={engine.reload}>Réessayer</Button>
         </>
       ) : engine.status === 'empty' ? (
-        <EmptyState title="Rien à montrer pour l’instant" body="MyFinances n’a pas encore de données sur cet appareil. Ouvre-la une fois, puis reviens." action={<Button href="/finances/">Ouvrir MyFinances</Button>} />
+        <Welcome engine={engine} />
       ) : !db || !state || !e || !data ? (
         <span className="t-small muted">Lecture de tes données…</span>
       ) : (

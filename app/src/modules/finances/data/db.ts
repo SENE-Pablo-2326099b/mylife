@@ -3,9 +3,9 @@ import type { OccurrenceOverride } from '../engine/schema';
 import type { Account, Category, FinanceData, FinanceSettings, Goal, GoalMove, Holding, InvestmentOp, Merchant, Movement, Planned, Snapshot } from '../core/model';
 
 /**
- * La base locale de MyFinances V5. Elle vit sur l'appareil ; elle est effacée quand un autre compte se connecte
- * (`claimDevice`, packages/sync-client). La synchro entre appareils viendra avec la bascule (étape 3.7) : d'ici là,
- * elle se remplit en reprenant les données de l'ancienne app (`importOld.ts`).
+ * La base du module sur l'appareil : les réglages du moteur (`meta`, voir `stateStore.ts`) et la vue des faits dans
+ * le modèle de l'étape 3.3, refaite à chaque lecture de la base des faits (`facts.ts`, `importOld.ts`). Effacée quand
+ * un autre compte se connecte (`claimDevice`, packages/sync-client).
  */
 export const DB_NAME = 'mylife-finances';
 

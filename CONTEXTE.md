@@ -87,7 +87,8 @@ nécessaire (chemins absolus en cache).
   session : `password`, `renewRecovery`, `deleteAccount` (efface compte, lignes, groupes, espaces, messages au support,
   abonnements aux notifications).
 - `/api/sync` (`server/sync.ts`) : `status`, `sync`. Registre des apps de synchro et de leurs quotas : `SYNC_APPS`
-  (`server/core.ts`) + `AppId` (sync-client) : `finances`, `perf`, `mylife` (réglages communs) ; et `miniapps`,
+  (`server/core.ts`) + `AppId` (sync-client) : `finances` (les faits de MyFinances, partagés par l'ancienne app et le
+  module V5), `finances5` (les réglages du moteur du module V5), `perf`, `mylife` (réglages communs) ; et `miniapps`,
   `objectifs`, `chef`, `calendrier`, plus lues par aucun écran depuis la phase 1 (gardées jusqu'à la purge, § 8). Seules les lignes vivantes comptent dans le quota ; une ligne trop grosse est écartée
   seule (`tooBig`). Traces de suppression purgées après 90 jours (cron du dimanche) ; un appareil plus ancien reçoit
   `resync`.

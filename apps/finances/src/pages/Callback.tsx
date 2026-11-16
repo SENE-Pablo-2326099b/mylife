@@ -24,10 +24,13 @@ export default function CallbackPage() {
     const settings = await getSettings();
     if (!canUseRelay(settings)) return setPhase({ kind: 'foreign' });
     try {
+      // Connexion lancée depuis MyFinances V5 (même base) : on y retourne une fois terminée.
+      const returnTo = ((await getPendingAuth()) as { returnTo?: unknown } | undefined)?.returnTo;
       const accounts = await completeBankConnection(ebClientFor(settings), code, state);
       window.history.replaceState(null, '', `${BASE_PATH}/connexion/retour`);
       setPhase({ kind: 'done', count: accounts.length });
       await runSync();
+      if (typeof returnTo === 'string' && /^\/[a-z]/.test(returnTo)) return window.location.assign(returnTo);
       navigate('/synchro', { replace: true });
     } catch (e) {
       setPhase({ kind: 'error', message: (e as Error).message });

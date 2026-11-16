@@ -8,10 +8,10 @@ export const finances: ModuleManifest = {
   icon: 'card',
   tone: 'finances',
   status: 'active',
-  entry: { href: '/finances/', legacy: true },
+  entry: { href: '/argent' },
   cards: [{ id: 'finances.budget', title: 'Budget du jour', Component: BudgetCard }],
-  // Le module repensé vit à `/argent` (adresse provisoire) tant que l'ancienne app garde `/finances/` et la synchro
-  // bancaire (bascule à l'étape M6) : l'entrée du module y mène encore.
+  // Le module vit à `/argent`. L'ancienne app reste servie à `/finances/` le temps de la bascule (étape M6) : les deux
+  // partagent la même base de faits.
   nav: {
     base: '/argent',
     add: '/argent/operations?ajouter=1',
@@ -22,5 +22,5 @@ export const finances: ModuleManifest = {
       { to: '/argent/patrimoine', label: 'Patrimoine', icon: 'chart' },
     ],
   },
-  quickAdds: [{ id: 'finances.depense', label: 'Une dépense', detail: 'MyFinances · montant, catégorie', icon: 'card', href: '/finances/operations' }],
+  quickAdds: [{ id: 'finances.depense', label: 'Une dépense', detail: 'MyFinances · montant, catégorie', icon: 'card', href: '/argent/operations?ajouter=1' }],
 };
