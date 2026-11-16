@@ -486,7 +486,8 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await p.getByText('25,35 €', { exact: true }).waitFor();
     await p.getByText('Jambes', { exact: true }).waitFor();
-    await p.getByRole('link', { name: 'Démarrer' }).waitFor();
+    // La carte MyPerf s'ouvre d'un toucher n'importe où, comme les autres.
+    await p.getByRole('link', { name: 'Ouvrir MyPerf' }).waitFor();
     await shot(p, '40-v5-aujourdhui');
     // Ajout rapide : une saisie par module allumé.
     await p.getByRole('button', { name: 'Ajouter' }).click();
@@ -760,25 +761,42 @@ describe('MyLife, une seule app', () => {
     await livret.click();
     await p.getByRole('switch', { name: 'Dans le cash quotidien' }).click();
     await p.getByRole('button', { name: 'Terminé' }).click();
-    // Deux niveaux de catégories : « Pain » sous « Courses ».
-    await add(1);
+    // Les catégories ont leur écran. Deux niveaux : « Pain » sous « Courses ».
+    await p.getByRole('link', { name: /Gérer les catégories/ }).click();
+    await p.getByRole('heading', { name: 'Catégories' }).waitFor();
+    await p.getByRole('button', { name: 'Ajouter' }).click();
     await p.getByLabel('Nom').fill('Pain');
     await p.getByLabel('Sous-catégorie de').selectOption('courses');
     await p.getByRole('button', { name: 'Enregistrer' }).click();
-    await p.getByRole('button', { name: /^Pain/ }).waitFor();
+    await p.getByRole('button', { name: /^Pain.*jamais utilisée/ }).waitFor();
+    // Une catégorie qui ne sert à rien se supprime ; une catégorie qui sert, non (fusionner ou archiver).
+    await p.getByRole('button', { name: 'Ajouter' }).click();
+    await p.getByLabel('Nom').fill('Éphémère');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('button', { name: /^Éphémère/ }).click();
+    await p.getByRole('button', { name: 'Supprimer' }).click();
+    await expect.poll(() => p.getByRole('button', { name: /^Éphémère/ }).count()).toBe(0);
+    await p.getByRole('button', { name: /^Courses/ }).first().click();
+    await p.getByText(/Elle sert encore/).waitFor();
+    expect(await p.getByRole('button', { name: 'Supprimer' }).count()).toBe(0);
+    await p.getByRole('button', { name: 'Fermer' }).click();
+    await shot(p, '69-finances-v5-categories');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.getByRole('link', { name: 'Retour' }).click();
+    await p.getByRole('heading', { name: 'Réglages' }).waitFor();
     // Un tag, puis une règle de tri qui le pose.
-    await add(2);
+    await add(1);
     await p.getByLabel('Nom').fill('week-end');
     await p.getByRole('button', { name: 'Enregistrer' }).click();
     await p.getByText('#week-end').waitFor();
-    await add(4);
+    await add(3);
     await p.getByLabel('Le libellé contient').fill('epicerie');
     await p.getByLabel('Catégorie').selectOption({ label: 'Courses › Pain' });
     await p.getByRole('switch', { name: 'week-end' }).click();
     await p.getByRole('button', { name: 'Enregistrer' }).click();
     await p.getByRole('button', { name: /^epicerie.*Pain · #week-end/ }).waitFor();
     // Une enveloppe hors quotidien, plafonnée à 100 €, qui contient « Courses » (et donc sa sous-catégorie).
-    await add(3);
+    await add(2);
     await p.getByLabel('Nom').fill('Alimentation');
     await p.getByLabel('Plafond par cycle').fill('100');
     await p.getByRole('switch', { name: 'Dans le budget quotidien' }).click();
@@ -837,6 +855,16 @@ describe('MyLife, une seule app', () => {
     await tabs.getByRole('link', { name: 'Plan' }).click();
     await p.getByRole('img', { name: /Où vont tes revenus du cycle/ }).waitFor();
     await p.getByRole('img', { name: /Solde prévu jusqu'à la paie/ }).waitFor();
+    // Le calendrier : un mois entier (au moins quatre semaines), et on passe d'un mois à l'autre.
+    expect(await p.locator('.fin-cal > span').count()).toBeGreaterThanOrEqual(28);
+    const monthLabel = () => p.locator('.fin-cal-month').innerText();
+    const thisMonth = await monthLabel();
+    await p.getByRole('button', { name: 'Mois suivant' }).click();
+    expect(await monthLabel()).not.toBe(thisMonth);
+    expect(await p.locator('.fin-cal > span[data-today="true"]').count()).toBe(0);
+    await p.locator('.fin-cal-month').click();
+    expect(await monthLabel()).toBe(thisMonth);
+    await p.locator('.fin-cal > span[data-today="true"]').waitFor();
     await shot(p, '66-finances-v5-plan');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await tabs.getByRole('link', { name: 'Patrimoine' }).click();

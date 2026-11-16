@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Button, Glass, Icon, List, ListRow } from '@mylife/kit';
-import { addDays, weekday } from '../core/dates';
+import { addDays, daysInMonth, parseISO, toISO, weekday } from '../core/dates';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { detectRecurring } from '../engine/automation';
-import type { Occurrence } from '../engine/occurrences';
+import { dueDates, type Occurrence } from '../engine/occurrences';
 import type { Commitment, Envelope, Provision } from '../engine/schema';
 import { acceptSuggestion, addInstallmentPlan, decideOccurrence, ignoreSuggestion, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, saveCommitment, saveEnvelope, saveProvision } from '../engine/state';
 import { forecast } from '../engine/views';
@@ -37,6 +37,7 @@ function Status({ o }: { o: Occurrence }) {
 export function PlanPage() {
   const engine = useEngine();
   const [occurrence, setOccurrence] = useState<string | null>(null);
+  const [month, setMonth] = useState(0);
   const [commitment, setCommitment] = useState<Commitment | 'new' | null>(null);
   const [installment, setInstallment] = useState(false);
   const [provision, setProvision] = useState<Provision | 'new' | null>(null);
@@ -47,13 +48,23 @@ export function PlanPage() {
         const { points, low } = forecast(db, e);
         const suggestions = detectRecurring(db, today, state.ignoredSuggestions);
         const capped = e.envelopes.filter((x) => x.budget !== null && x.budget > 0);
-        // Le calendrier : des semaines entières, du lundi de cette semaine à la fin du cycle.
-        const first = addDays(today, -((weekday(today) + 6) % 7));
-        const lastDay = addDays(e.cycle.end, (7 - weekday(e.cycle.end)) % 7);
+        // Le calendrier : un mois entier, en semaines complètes. Dans le cycle en cours, ce qui reste dû ; hors du
+        // cycle, les échéances prévues par le plan.
+        const base = parseISO(today);
+        const idx = base.y * 12 + (base.m - 1) + month;
+        const [my, mm] = [Math.floor(idx / 12), (idx % 12) + 1];
+        const monthStart = toISO(my, mm, 1);
+        const monthEnd = toISO(my, mm, daysInMonth(my, mm));
+        const first = addDays(monthStart, -((weekday(monthStart) + 6) % 7));
+        const lastDay = addDays(monthEnd, (7 - weekday(monthEnd)) % 7);
         const cells: string[] = [];
-        for (let d = first; d <= lastDay && cells.length < 42; d = addDays(d, 1)) cells.push(d);
+        for (let d = first; d <= lastDay; d = addDays(d, 1)) cells.push(d);
         const dots = new Map<string, string[]>();
-        for (const o of e.occurrences) if (o.status === 'DUE' || o.status === 'PARTIAL') dots.set(o.dueDate < today ? today : o.dueDate, [...(dots.get(o.dueDate < today ? today : o.dueDate) ?? []), KIND_COLOR[o.commitment.kind]]);
+        const dot = (date: string, color: string) => dots.set(date, [...(dots.get(date) ?? []), color]);
+        for (const o of e.occurrences) if (o.status === 'DUE' || o.status === 'PARTIAL') dot(o.dueDate < today ? today : o.dueDate, KIND_COLOR[o.commitment.kind]);
+        // (un engagement « d'ici la fin du cycle » n'a pas de jour : il n'apparaît que dans le cycle en cours).
+        for (const c of db.commitments.filter((x) => !(x.rhythm === 'MONTHLY' && x.anchorDay === null))) for (const d of dueDates(c, { start: first, end: lastDay })) if (d < e.cycle.start || d > e.cycle.end) dot(d, KIND_COLOR[c.kind]);
+        const monthName = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date(`${monthStart}T12:00:00`));
         const amount = (o: Occurrence) => (o.status === 'PAID' ? (o.actual ?? o.expected) : o.status === 'SKIPPED' ? 0 : o.expected);
         return (
           <>
@@ -90,13 +101,18 @@ export function PlanPage() {
             >
               Ce qui tombe
             </Sec>
-            <Glass style={{ padding: '14px 10px' }}>
+            <Glass style={{ padding: '10px 10px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <button type="button" className="fin-cal-nav" aria-label="Mois précédent" onClick={() => setMonth((m) => m - 1)}><Icon name="back" size={16} /></button>
+                <button type="button" className="fin-cal-month" onClick={() => setMonth(0)} aria-label={`${monthName} : revenir à ce mois-ci`}>{monthName}</button>
+                <button type="button" className="fin-cal-nav" aria-label="Mois suivant" onClick={() => setMonth((m) => m + 1)} style={{ transform: 'scaleX(-1)' }}><Icon name="back" size={16} /></button>
+              </div>
               <div className="fin-cal">
                 {['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'].map((d) => (
                   <b key={d}>{d}</b>
                 ))}
                 {cells.map((d) => (
-                  <span key={d} data-out={d < today || d > e.cycle.end} data-today={d === today}>
+                  <span key={d} data-out={d < monthStart || d > monthEnd} data-past={d < today} data-today={d === today}>
                     {Number(d.slice(8))}
                     <i>
                       {(dots.get(d) ?? []).slice(0, 3).map((c, i) => (

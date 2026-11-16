@@ -6,7 +6,7 @@ import { byCategory, cashflow, forecast, lastCycles, project, settledIn, spendBy
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
-import { addManual, removeManual, setSplit, acceptSuggestion, addAccount, archiveCategory, mergeCategories, patchSettings, removeTag, saveCategory, saveTag, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
+import { addManual, removeManual, setSplit, acceptSuggestion, addAccount, archiveCategory, categoryUse, mergeCategories, removeCategory, patchSettings, removeTag, saveCategory, saveTag, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
 import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Rule, type Transaction } from '../app/src/modules/finances/engine/schema';
 
 /** Le moteur financier de MyFinances V5 (étape M1) : scénario de référence, cas limites, invariants. */
@@ -949,6 +949,22 @@ describe('moteur M4 : catégories sur deux niveaux, fusion, tags, comptes, cycle
     expect(compute(db, '2026-11-15').spent).toBe(8000);
     s = archiveCategory(s, 'alim', db.categories, null);
     expect(applyState(base, s).categories.filter((c) => c.archivedAt)).toEqual([]);
+  });
+
+  it('supprimer : seulement une catégorie qui ne sert à rien ; elle disparaît partout, même si elle vient de la reprise', () => {
+    const base = shop();
+    let s = saveCategory(initState(base), { ...category('vide'), name: 'Vide' }, base.categories);
+    s = saveEnvelope(s, envelope('env:vide', { categoryIds: ['vide'] }));
+    const db = applyState(base, s);
+    // « alim » a une sous-catégorie, « restos » des opérations : elles servent. « vide » ne sert à rien.
+    expect([categoryUse(db, 'alim') > 0, categoryUse(db, 'restos') > 0, categoryUse(db, 'vide')]).toEqual([true, true, 0]);
+    s = removeCategory(s, 'vide', db.categories, 7);
+    const after = applyState(base, s);
+    expect(after.categories.some((c) => c.id === 'vide')).toBe(false);
+    expect(after.envelopes.find((e) => e.id === 'env:vide')?.categoryIds).toEqual([]);
+    expect(compute(after, '2026-11-15').spent).toBe(compute(base, '2026-11-15').spent);
+    expect(checkIntegrity(after).errors).toEqual([]);
+    expect(removeCategory(s, 'inconnue', after.categories, 8)).toBe(s);
   });
 
   it('les tags n’entrent dans aucun calcul ; supprimer un tag le retire des règles et des lignes', () => {

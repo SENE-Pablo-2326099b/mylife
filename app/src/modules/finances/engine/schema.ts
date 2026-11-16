@@ -97,6 +97,8 @@ export interface Category {
   archivedAt: number | null;
   /** Fusionnée dans une autre : son historique est lu comme celui de la cible. */
   mergedIntoId: string | null;
+  /** Supprimée (elle ne servait à rien) : elle n'existe plus nulle part ; la marque reste pour les autres appareils. */
+  deletedAt?: number | null;
 }
 
 /** Un marchand : le libellé bancaire devenu un nom propre, avec ce que sont ses opérations par défaut. */

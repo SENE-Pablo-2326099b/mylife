@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button, EmptyState, Glass } from '@mylife/kit';
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
@@ -37,6 +38,7 @@ export function ClasserPage() {
         return (
           <>
             <span className="t-small muted">{groups.length} marchand{groups.length > 1 ? 's' : ''}, {groups.reduce((n, g) => n + g.count, 0)} opération{groups.reduce((n, g) => n + g.count, 0) > 1 ? 's' : ''}. D’abord ce que c’est, puis la catégorie, seulement pour une dépense.</span>
+            <Link to="/argent/categories" className="link t-small" style={{ alignSelf: 'flex-start' }}>Gérer les catégories</Link>
             {groups.slice(0, 30).map((g, i) => {
               const incoming = g.total > 0;
               const tx = sample(g);

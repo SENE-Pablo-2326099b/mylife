@@ -90,7 +90,7 @@ export function initState(base: Db): EngineState {
  */
 export function applyState(base: Db, s: EngineState): Db {
   const mine = new Map((s.categories ?? []).map((c) => [c.id, c]));
-  const categories = [...base.categories.map((c) => mine.get(c.id) ?? c), ...(s.categories ?? []).filter((c) => !base.categories.some((b) => b.id === c.id))].sort((a, b) => a.order - b.order);
+  const categories = [...base.categories.map((c) => mine.get(c.id) ?? c), ...(s.categories ?? []).filter((c) => !base.categories.some((b) => b.id === c.id))].filter((c) => !c.deletedAt).sort((a, b) => a.order - b.order);
   const cats = new Set(categories.map((c) => c.id));
   const envelopes = s.envelopes.map((e) => ({ ...e, categoryIds: e.categoryIds.filter((id) => cats.has(id)) }));
   if (!envelopes.some((e) => e.isDefault)) envelopes.unshift(...base.envelopes.filter((e) => e.isDefault));
@@ -380,6 +380,27 @@ export function archiveCategory(s: EngineState, id: string, all: readonly Catego
   let categories = s.categories ?? [];
   for (const c of all) if (c.id === id || c.parentId === id) categories = upsert(categories, { ...c, archivedAt: at });
   return { ...s, categories };
+}
+
+/**
+ * Ce qui tient encore à une catégorie : opérations, engagements, règles, marchands, sous-catégories, catégories
+ * fusionnées en elle. Zéro : elle peut être supprimée sans rien laisser d'orphelin.
+ */
+export function categoryUse(db: Db, id: string): number {
+  return (
+    db.allocations.filter((a) => a.categoryId === id).length +
+    db.commitments.filter((c) => c.categoryId === id).length +
+    db.rules.filter((r) => r.categoryId === id).length +
+    db.merchants.filter((m) => m.categoryId === id).length +
+    db.categories.filter((c) => c.parentId === id || c.mergedIntoId === id).length
+  );
+}
+
+/** Supprimer une catégorie qui ne sert à rien (voir `categoryUse`) : elle disparaît, et sort des enveloppes. */
+export function removeCategory(s: EngineState, id: string, all: readonly Category[], at: number): EngineState {
+  const c = all.find((x) => x.id === id);
+  if (!c) return s;
+  return { ...s, categories: upsert(s.categories ?? [], { ...c, deletedAt: at }), envelopes: s.envelopes.map((e) => ({ ...e, categoryIds: e.categoryIds.filter((x) => x !== id) })) };
 }
 
 /**

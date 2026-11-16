@@ -3,13 +3,13 @@ import { Badge, Button, Field, Glass, List, ListRow, Notice, ScreenHeader, Secti
 import { euros } from '../core/format';
 import { useEngine } from '../data/engineStore';
 import { checkIntegrity } from '../engine/integrity';
-import type { Account, Category, Envelope, Rule, Tag } from '../engine/schema';
-import { addAccount, archiveCategory, mergeCategories, patchAccount, patchSettings, removeEnvelope, removeRule, removeTag, saveCategory, saveEnvelope, saveRule, saveTag } from '../engine/state';
+import type { Account, Envelope, Rule, Tag } from '../engine/schema';
+import { addAccount, patchAccount, patchSettings, removeEnvelope, removeRule, removeTag, saveEnvelope, saveRule, saveTag } from '../engine/state';
 import { downloadExport } from '../data/export';
 import { Select, Toggle } from './controls';
 import { Welcome } from './Welcome';
-import { END, FLOW, ROLE, SCOPES } from './labels';
-import { AccountSheet, CategorySheet, EnvelopeSheet, RuleSheet, TagSheet } from './sheets';
+import { END, FLOW, ROLE } from './labels';
+import { AccountSheet, EnvelopeSheet, RuleSheet, TagSheet } from './sheets';
 
 /**
  * Étape M4 : les réglages de MyFinances. Tout ce qui structure le calcul est ici, et rien n'est figé : le cycle, les
@@ -26,7 +26,6 @@ const END_OPTIONS = [
   { id: 'AUTO_SAVE', label: 'Épargné' },
 ] as const;
 const OVER = [['DEDUCT_NEXT', 'Déduit du cycle suivant'], ['FORGIVE', 'Oublié']] as const;
-const SCOPE_NAME = Object.fromEntries(SCOPES) as Record<Category['scope'], string>;
 
 function Head({ children, action, onAction }: { children: ReactNode; action?: string; onAction?: () => void }) {
   return (
@@ -63,7 +62,6 @@ function NumberField({ id, label, hint, value, min, max, onChange }: { id: strin
 export function ReglagesPage() {
   const engine = useEngine();
   const [account, setAccount] = useState<string | 'new' | null>(null);
-  const [category, setCategory] = useState<Category | 'new' | null>(null);
   const [tag, setTag] = useState<Tag | 'new' | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
   const [rule, setRule] = useState<Rule | 'new' | null>(null);
@@ -78,10 +76,6 @@ export function ReglagesPage() {
   const incomes = db.commitments.filter((c) => c.kind === 'INCOME' && !c.direct);
   const accounts = db.accounts.filter((a) => !a.archivedAt);
   const live = db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId);
-  const top = live.filter((c) => !c.parentId || !live.some((p) => p.id === c.parentId));
-  const archived = db.categories.filter((c) => c.archivedAt && !c.mergedIntoId);
-  const merged = db.categories.filter((c) => c.mergedIntoId);
-  const envelopeName = (categoryId: string) => db.envelopes.find((x) => x.categoryIds.includes(categoryId))?.name;
   const expenseCategories = live.filter((c) => c.scope === 'EXPENSE');
   const integrity = checkIntegrity(db);
   const accountValue: Account | 'new' | null = account === 'new' ? 'new' : (db.accounts.find((a) => a.id === account) ?? null);
@@ -136,29 +130,10 @@ export function ReglagesPage() {
         ))}
       </List>
 
-      <Head action="Ajouter" onAction={() => setCategory('new')}>Catégories : {live.length}</Head>
+      <Head>Catégories</Head>
       <List>
-        {top.length === 0 && <ListRow title="Aucune catégorie" />}
-        {top.flatMap((p) => [p, ...live.filter((c) => c.parentId === p.id)]).map((c) => (
-          <ListRow
-            key={c.id}
-            lead={<span style={{ width: 12, height: 12, borderRadius: 4, background: c.color, flex: 'none', marginLeft: c.parentId && live.some((p) => p.id === c.parentId) ? 18 : 0 }} />}
-            title={c.name}
-            detail={[c.scope === 'EXPENSE' ? null : SCOPE_NAME[c.scope], envelopeName(c.id) ? `enveloppe « ${envelopeName(c.id)} »` : null].filter(Boolean).join(' · ') || undefined}
-            onClick={() => setCategory(c)}
-          />
-        ))}
+        <ListRow title="Gérer les catégories" detail={`${live.length} catégorie${live.length > 1 ? 's' : ''} : créer, renommer, fusionner, archiver, supprimer`} href="/argent/categories" />
       </List>
-      {(archived.length > 0 || merged.length > 0) && (
-        <List>
-          {archived.map((c) => (
-            <ListRow key={c.id} title={c.name} detail="archivée : touche pour la restaurer" onClick={() => setCategory(c)} />
-          ))}
-          {merged.map((c) => (
-            <ListRow key={c.id} title={c.name} detail={`fusionnée dans « ${db.categories.find((x) => x.id === c.mergedIntoId)?.name ?? '?'} »`} />
-          ))}
-        </List>
-      )}
 
       <Head action="Ajouter" onAction={() => setTag('new')}>Tags : {db.tags.length}</Head>
       {db.tags.length === 0 ? (
@@ -201,23 +176,6 @@ export function ReglagesPage() {
         onCreate={(a) => {
           update((s) => addAccount(s, a));
           setAccount(null);
-        }}
-      />
-      <CategorySheet
-        value={category}
-        all={db.categories}
-        onClose={() => setCategory(null)}
-        onSave={(c) => {
-          update((s) => saveCategory(s, c, db.categories));
-          setCategory(null);
-        }}
-        onArchive={(id, at) => {
-          update((s) => archiveCategory(s, id, db.categories, at));
-          setCategory(null);
-        }}
-        onMerge={(from, into) => {
-          update((s) => mergeCategories(s, from, into, db.categories, Date.now()));
-          setCategory(null);
         }}
       />
       <TagSheet

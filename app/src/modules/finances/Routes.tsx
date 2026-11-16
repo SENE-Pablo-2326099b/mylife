@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { BanquesPage } from './pages/Banques';
+import { CategoriesPage } from './pages/Categories';
 import { ClasserPage } from './pages/Classer';
 import { JourPage } from './pages/Jour';
 import { OperationsPage } from './pages/Operations';
@@ -22,6 +23,7 @@ export function FinancesRoutes() {
       <Route path="plan" element={<PlanPage />} />
       <Route path="patrimoine" element={<PatrimoinePage />} />
       <Route path="reglages" element={<ReglagesPage />} />
+      <Route path="categories" element={<CategoriesPage />} />
       <Route path="banques" element={<BanquesPage />} />
       <Route path="moteur" element={<ReprisePage />} />
       <Route path="*" element={<Navigate to="/argent" replace />} />

@@ -503,7 +503,7 @@ export function AccountSheet({ value, onClose, onPatch, onCreate }: { value: Acc
 const COLORS = ['#2dd4bf', '#fbbf24', '#60a5fa', '#a3e635', '#fb923c', '#c084fc', '#f472b6', '#6fe0a0', '#5ccbe6', '#94a3b8'];
 const blankCategory = (order: number): Category => ({ id: newId('cat'), parentId: null, scope: 'EXPENSE', name: '', color: COLORS[order % COLORS.length]!, order, archivedAt: null, mergedIntoId: null });
 
-export function CategorySheet({ value, all, onClose, onSave, onArchive, onMerge }: { value: Category | 'new' | null; all: Category[]; onClose: () => void; onSave: (c: Category) => void; onArchive: (id: string, at: number | null) => void; onMerge: (from: string, into: string) => void }) {
+export function CategorySheet({ value, all, uses, onClose, onSave, onArchive, onMerge, onRemove }: { value: Category | 'new' | null; all: Category[]; uses: number; onClose: () => void; onSave: (c: Category) => void; onArchive: (id: string, at: number | null) => void; onMerge: (from: string, into: string) => void; onRemove: (id: string) => void }) {
   const [c, setC] = useState<Category>(() => blankCategory(0));
   const [into, setInto] = useState('');
   useEffect(() => {
@@ -539,6 +539,13 @@ export function CategorySheet({ value, all, onClose, onSave, onArchive, onMerge 
           <Button variant="danger" block onClick={() => onArchive(c.id, c.archivedAt ? null : Date.now())}>
             {c.archivedAt ? 'Restaurer' : 'Archiver'}
           </Button>
+          {uses === 0 ? (
+            <Button variant="danger" block onClick={() => onRemove(c.id)}>
+              Supprimer
+            </Button>
+          ) : (
+            <span className="t-small muted">Elle sert encore (opérations, règles ou sous-catégories) : pour t’en défaire, fusionne-la ou archive-la.</span>
+          )}
         </>
       )}
     </Form>

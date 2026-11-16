@@ -183,6 +183,7 @@ function Liste({ r }: { r: Ready }) {
         <Select id="f-account" label="Compte" value={accountId} options={[['', 'Tous les comptes'], ...accounts.map((a) => [a.id, a.name] as const)]} onChange={setAccountId} />
         <Select id="f-nature" label="Nature" value={nature} options={NATURES} onChange={setNature} />
         <Select id="f-cat" label="Catégorie" value={categoryId} options={[['', 'Toutes'], ...categoryOptions(categories)]} onChange={setCategoryId} />
+        <Link to="/argent/categories" className="link t-small">Gérer les catégories</Link>
         <div className="grid-2">
           <Button onClick={() => { setAccountId(''); setNature(''); setCategoryId(''); setDayOnly(null); }}>Tout retirer</Button>
           <Button variant="action" onClick={() => setFilters(false)}>Voir</Button>
