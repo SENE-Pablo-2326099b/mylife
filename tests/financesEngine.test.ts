@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { migrate } from '../app/src/modules/finances/core/migrate';
 import { automate, classify, detectRecurring, pairTransfers, ruleMatches, toClassify } from '../app/src/modules/finances/engine/automation';
 import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
+import { byCategory, cashflow, forecast, lastCycles, project, settledIn, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
-import { acceptSuggestion, addAccount, archiveCategory, mergeCategories, patchSettings, removeTag, saveCategory, saveTag, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
+import { addManual, removeManual, setSplit, acceptSuggestion, addAccount, archiveCategory, mergeCategories, patchSettings, removeTag, saveCategory, saveTag, addInstallmentPlan, addReceivable, applyState, classifyAllocation, classifyMerchant, closeCycle, ignoreSuggestion, initState, patchAccount, patchAllocation, removeInstallmentPlan, roll, saveCommitment, saveEnvelope, saveRule, settleReceivable, writeOffReceivable, type EngineState } from '../app/src/modules/finances/engine/state';
 import { DEFAULT_SETTINGS, EMPTY_DB, roleDefaults, type Account, type Allocation, type Commitment, type Db, type Envelope, type Flow, type Role, type Rule, type Transaction } from '../app/src/modules/finances/engine/schema';
 
 /** Le moteur financier de MyFinances V5 (étape M1) : scénario de référence, cas limites, invariants. */
@@ -975,5 +976,115 @@ describe('moteur M4 : catégories sur deux niveaux, fusion, tags, comptes, cycle
     s = patchSettings(s, { payday: 26, mode: 'CASH' });
     const e = compute(applyState(base, s), TODAY);
     expect([e.mode, e.limitedBy]).toEqual(['CASH', 'cash']);
+  });
+});
+
+describe('moteur M5 : saisie à la main, ventilation', () => {
+  const manual = (id: string, accountId: string, date: string, amount: number, label: string): Transaction => ({ id, accountId, date, valueDate: null, amount, rawLabel: label, pending: false, source: 'manual', merchantId: null, createdAt: 0 });
+
+  it('en espèces : la dépense pèse dans le budget et sort du portefeuille ; la retirer remet tout en place', () => {
+    const base = plain();
+    base.categories = [category('restos')];
+    let s = addAccount(initState(base), account('especes', 'CASH', 4000, { source: 'manual' }));
+    const wallet = () => applyState(base, s).accounts.find((a) => a.id === 'especes')!;
+    const before = compute(applyState(base, s), TODAY);
+    s = addManual(s, { transaction: manual('m1', 'especes', TODAY, -450, 'Café'), flow: 'EXPENSE', categoryId: 'restos' }, wallet());
+    const db = applyState(base, s);
+    expect(checkIntegrity(db).errors).toEqual([]);
+    expect(lineOf(db, 'm1')).toMatchObject({ flow: 'EXPENSE', categoryId: 'restos', origin: 'manual' });
+    expect(wallet().balance).toBe(3550);
+    const e = compute(db, TODAY);
+    expect([e.spent, e.cash]).toEqual([before.spent + 450, before.cash - 450]);
+    s = removeManual(s, 'm1', wallet());
+    expect([wallet().balance, compute(applyState(base, s), TODAY).spent]).toEqual([4000, before.spent]);
+  });
+
+  it('sur un compte suivi par la banque : la saisie attend l’opération réelle, puis s’efface devant elle sans être comptée deux fois', () => {
+    const base = plain();
+    base.categories = [category('courses')];
+    let s = initState(base);
+    const carte = base.accounts.find((a) => a.id === 'carte')!;
+    s = addManual(s, { transaction: manual('m2', 'carte', TODAY, -2300, 'Marché'), flow: 'EXPENSE', categoryId: 'courses' }, carte);
+    s = patchAllocation(s, 'm2#0', { smoothed: true });
+    // La banque n'a pas encore envoyé l'opération : la saisie compte, le solde bancaire ne bouge pas.
+    const waiting = compute(applyState(base, s), TODAY);
+    expect([waiting.spent, waiting.cash]).toEqual([31200 + 2300, 51100]);
+    // Deux jours plus tard, la banque l'envoie (libellé différent, même montant) : une seule opération reste.
+    const arrived = structuredClone(base);
+    op(arrived, 'b9', 'carte', '2026-11-17', -2300, 'CB MARCHE BIO 1711', null);
+    const db = applyState(arrived, s);
+    expect(db.transactions.some((t) => t.id === 'm2')).toBe(false);
+    expect(lineOf(db, 'b9')).toMatchObject({ flow: 'EXPENSE', categoryId: 'courses', origin: 'manual', smoothed: true });
+    expect(compute(db, '2026-11-17').spent).toBe(31200 + 2300);
+    expect(checkIntegrity(db).errors).toEqual([]);
+    // Un autre montant ou une date trop lointaine : ce n'est pas la même, les deux restent.
+    const other = structuredClone(base);
+    op(other, 'b8', 'carte', '2026-11-25', -2300, 'CB MARCHE', null);
+    expect(applyState(other, s).transactions.filter((t) => t.id === 'm2' || t.id === 'b8')).toHaveLength(2);
+  });
+
+  it('ventiler un ticket : ses parts remplacent sa ligne, somme exacte, chacune dans son enveloppe', () => {
+    const base = plain();
+    base.categories = [category('courses'), category('maison')];
+    let s = saveEnvelope(initState(base), envelope('env:maison', { cap: 20000, inDailyBudget: false, order: 1, categoryIds: ['maison'] }));
+    s = setSplit(s, 'd1', [{ categoryId: 'courses', amount: -12000 }, { categoryId: 'maison', amount: -6000 }]);
+    const db = applyState(base, s);
+    expect(db.allocations.filter((a) => a.transactionId === 'd1').map((a) => [a.id, a.amount, a.categoryId])).toEqual([['d1#0', -12000, 'courses'], ['d1#1', -6000, 'maison']]);
+    expect(checkIntegrity(db).errors).toEqual([]);
+    const e = compute(db, TODAY);
+    expect([e.spent, e.envelopes.find((x) => x.envelope.id === 'env:maison')?.spent]).toEqual([31200 - 6000, 6000]);
+    // Des parts qui ne font pas le montant sont ignorées ; une seule part retire la ventilation.
+    expect(applyState(base, setSplit(s, 'd1', [{ categoryId: 'courses', amount: -1 }, { categoryId: 'maison', amount: -2 }])).allocations.filter((a) => a.transactionId === 'd1')).toHaveLength(1);
+    expect(setSplit(s, 'd1', []).splits).toEqual({});
+  });
+});
+
+describe('moteur M5 : ce que montrent les écrans', () => {
+  function shown(): Db {
+    const db = plain();
+    db.categories = [category('alim'), category('courses', 'alim'), category('restos')];
+    db.merchants = [{ id: 'm:super', name: 'Supermarché', flow: 'EXPENSE', categoryId: 'courses', tagIds: [] }];
+    lineOf(db, 'd1').categoryId = 'courses';
+    db.transactions.find((t) => t.id === 'd1')!.merchantId = 'm:super';
+    lineOf(db, 'd2').categoryId = 'restos';
+    op(db, 'rb', 'carte', '2026-11-12', 2000, 'AVOIR', 'REFUND', { categoryId: 'restos' });
+    op(db, 'old', 'carte', '2026-10-10', -9000, 'SUPERMARCHE', 'EXPENSE', { categoryId: 'courses' });
+    return db;
+  }
+
+  it('dépenses jour par jour (vue budget) et par catégorie de premier niveau (vue analyse)', () => {
+    const db = shown();
+    const cycles = lastCycles(db, TODAY, 2);
+    expect(cycles).toEqual([{ start: '2026-09-26', end: '2026-10-25' }, { start: '2026-10-26', end: '2026-11-25' }]);
+    const days = spendByDay(db, settledIn(db, cycles), '2026-11-01', TODAY);
+    expect([...days]).toEqual([['2026-11-03', 18000], ['2026-11-10', 12000], ['2026-11-15', 1200], ['2026-11-12', -2000]]);
+    // « Courses » compte pour sa parente ; le remboursement réduit « Restos » ; le loyer payé est une dépense aussi.
+    expect(byCategory(db, '2026-10-26', TODAY).map((x) => [x.name, x.amount])).toEqual([['À classer', 41200], ['alim', 18000], ['restos', 10000]]);
+    expect(topMerchants(db, '2026-10-26', TODAY, 1)).toMatchObject([{ name: 'PRLV LOYER AGENCE', amount: 40000 }]);
+  });
+
+  it('revenus et dépenses par cycle ; ni l’épargne ni les virements n’y entrent', () => {
+    const db = shown();
+    expect(cashflow(db, lastCycles(db, TODAY, 2), TODAY).map((x) => [x.income, x.expense])).toEqual([[0, 9000], [140000, 40000 + 18000 + 12000 + 1200 - 2000]]);
+  });
+
+  it('prévision : le solde descend aux échéances et au rythme du budget du jour ; le point bas est repéré', () => {
+    const db = reference();
+    const e = compute(db, TODAY);
+    const { points, low } = forecast(db, e);
+    expect(points).toHaveLength(11);
+    expect(points[0]).toMatchObject({ date: TODAY, balance: 51100 - Math.max(0, e.resteAujourdhui) });
+    // Le 20 : le forfait (20 €) et l'échéance du 4x (161 €) sortent, réservés ou non.
+    expect(points.find((p) => p.date === '2026-11-20')?.events).toEqual([{ label: 'Échéance 4x', amount: -16100 }, { label: 'Forfait mobile', amount: -2000 }]);
+    expect(low.date).toBe('2026-11-25');
+    expect(low.balance).toBe(51100 - Math.max(0, e.resteAujourdhui) - 18100 - e.demain * 10);
+  });
+
+  it('projection du patrimoine : seule la part placée rapporte ; sans rendement, c’est une simple addition', () => {
+    expect(project(1000000, 0, 10000, 0, 1)).toBe(1000000 + 120000);
+    expect(project(1000000, 400000, 0, 0, 5)).toBe(1000000);
+    const grown = project(1000000, 400000, 10000, 500, 10);
+    expect(grown).toBeGreaterThan(1000000 + 1200000);
+    expect(project(1000000, 400000, 10000, 500, 10)).toBe(grown);
   });
 });

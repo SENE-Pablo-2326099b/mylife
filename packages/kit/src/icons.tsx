@@ -76,6 +76,21 @@ const PATHS = {
     </>
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  list: <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />,
+  calendar: (
+    <>
+      <rect x="4" y="5" width="16" height="16" rx="3" />
+      <path d="M4 10h16M9 3v4M15 3v4" />
+    </>
+  ),
+  chart: <path d="M4 19V5M4 19h16M8 15l4-5 3 3 4-6" />,
+  search: (
+    <>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </>
+  ),
+  transfer: <path d="M4 8h14l-3-3M20 16H6l3 3" />,
 } as const satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof PATHS;

@@ -21,10 +21,9 @@ import { useHomeAgenda } from '@legacy/agendaHome';
  */
 
 // Copilot embarque le SDK de l'API Claude : chargé seulement quand on l'ouvre.
-// MyFinances V5 embarque sa base locale : chargé seulement quand on l'ouvre. `/argent` est son adresse provisoire, le
-// temps que l'ancienne app garde `/finances/` (bascule à l'étape 3.7).
-const FinancesReprise = lazy(() => import('./modules/finances/pages/Reprise').then((m) => ({ default: m.ReprisePage })));
-const FinancesReglages = lazy(() => import('./modules/finances/pages/Reglages').then((m) => ({ default: m.ReglagesPage })));
+// MyFinances V5 embarque sa base locale et ses graphiques : chargé seulement quand on l'ouvre. `/argent` est son
+// adresse provisoire, le temps que l'ancienne app garde `/finances/` (bascule à l'étape M6).
+const FinancesRoutes = lazy(() => import('./modules/finances/Routes').then((m) => ({ default: m.FinancesRoutes })));
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -71,6 +70,7 @@ function QuickAdd({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 function Sidebar({ onAdd }: { onAdd: () => void }) {
   const prefs = usePrefs();
+  const module = useActiveModule();
   return (
     <nav className="glass sidebar" aria-label="Navigation principale">
       <span className="auth-brand">
@@ -93,6 +93,17 @@ function Sidebar({ onAdd }: { onAdd: () => void }) {
           Copilot
         </NavLink>
       </div>
+      {module?.nav && (
+        <div className={`stack tone-${module.tone}`} style={{ gap: 4 }}>
+          <span className="t-label c-tone" style={{ padding: '0 14px 4px' }}>{module.name}</span>
+          {module.nav.tabs.map((n) => (
+            <NavLink key={n.to} to={n.to} end={n.end} className="navlink">
+              <Icon name={n.icon} size={19} />
+              {n.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
       <div className="stack" style={{ gap: 4 }}>
         <span className="t-label muted" style={{ padding: '0 14px 4px' }}>Modules</span>
         {enabledModules(MODULES, prefs).map((m) => (
@@ -111,7 +122,35 @@ function Sidebar({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+/** Le module dans lequel on se trouve, s'il a sa propre navigation. */
+function useActiveModule() {
+  const { pathname } = useLocation();
+  return MODULES.find((m) => m.nav && (pathname === m.nav.base || pathname.startsWith(`${m.nav.base}/`)));
+}
+
 function TabBar({ onAdd }: { onAdd: () => void }) {
+  const module = useActiveModule();
+  // Dans un module : ses onglets, et son « + » ouvre sa saisie. On en sort par le retour de l'en-tête.
+  if (module?.nav)
+    return (
+      <nav className={`glass tabbar tone-${module.tone}`} aria-label={`Navigation de ${module.name}`}>
+        {module.nav.tabs.slice(0, 2).map((n) => (
+          <NavLink key={n.to} to={n.to} end={n.end} className="tab">
+            <Icon name={n.icon} />
+            {n.label}
+          </NavLink>
+        ))}
+        <NavLink to={module.nav.add} className="tab-plus" aria-label="Ajouter">
+          <Icon name="plus" size={24} strong />
+        </NavLink>
+        {module.nav.tabs.slice(2, 4).map((n) => (
+          <NavLink key={n.to} to={n.to} end={n.end} className="tab">
+            <Icon name={n.icon} />
+            {n.label}
+          </NavLink>
+        ))}
+      </nav>
+    );
   return (
     <nav className="glass tabbar" aria-label="Barre de navigation">
       {NAV.map((n) => (
@@ -185,18 +224,10 @@ function Shell({ login }: { login: string }) {
               <Route path="/installer" element={<InstallPage />} />
               <Route path="/kit" element={<KitPage />} />
               <Route
-                path="/argent/reglages"
+                path="/argent/*"
                 element={
                   <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
-                    <FinancesReglages />
-                  </Suspense>
-                }
-              />
-              <Route
-                path="/argent"
-                element={
-                  <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
-                    <FinancesReprise />
+                    <FinancesRoutes />
                   </Suspense>
                 }
               />

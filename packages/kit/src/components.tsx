@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useState, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons';
 
 /**
@@ -25,8 +25,12 @@ function Pressable({ href, onClick, className, children, label, disabled }: { hr
 }
 
 /** Panneau de verre neutre. */
-export function Glass({ children, className, as: As = 'div' }: { children: ReactNode; className?: string; as?: 'div' | 'section' | 'nav' }) {
-  return <As className={cx('glass', className)}>{children}</As>;
+export function Glass({ children, className, style, as: As = 'div' }: { children: ReactNode; className?: string; style?: CSSProperties; as?: 'div' | 'section' | 'nav' }) {
+  return (
+    <As className={cx('glass', className)} style={style}>
+      {children}
+    </As>
+  );
 }
 
 /** Carte de module : bord en dégradé et teinte à la couleur du module. */

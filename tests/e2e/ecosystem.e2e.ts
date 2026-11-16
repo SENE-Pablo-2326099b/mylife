@@ -318,7 +318,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -604,7 +604,7 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Se connecter' }).click();
     await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     // Sans ancienne base sur l'appareil : rien à reprendre, et c'est dit.
-    await p.goto(`${server.url}/argent`);
+    await p.goto(`${server.url}/argent/moteur`);
     await p.getByText('Rien à reprendre ici').waitFor();
     // Une ancienne base (fictive) : deux comptes, quatre opérations, un revenu et une charge prévus.
     const today = await p.evaluate(() => {
@@ -786,11 +786,68 @@ describe('MyLife, une seule app', () => {
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     // Retour au calcul : les espèces sont dans le cash, l'enveloppe est mise à part, et ses dépenses (l'épicerie
     // classée par la règle, la boulangerie classée par son marchand) ne pèsent plus dans le quotidien.
-    await p.getByRole('link', { name: 'Retour' }).click();
+    await p.goto(`${server.url}/argent/moteur`);
     await shows('Comptes du quotidien', /1\s240\s€/);
     await shows('Enveloppes hors quotidien', /100\s€/);
     await shows('Déjà dépensé', /\n0\s€/);
     await p.getByRole('button', { name: /^Alimentation.*42,50\s€ sur 100\s€/ }).waitFor();
+    // ---- M5. Les écrans : Jour, Opérations et Analyse, À classer, Plan, Patrimoine, et leur navigation propre.
+    await p.goto(`${server.url}/argent`);
+    await p.getByRole('heading', { name: 'Jour' }).waitFor();
+    await p.getByText('Tes 7 derniers jours').waitFor();
+    await p.getByRole('img', { name: /du budget du cycle déjà dépensé/ }).waitFor();
+    await shot(p, '63-finances-v5-jour');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // La barre du bas est celle du module ; son « + » ouvre la saisie d'une dépense.
+    const tabs = p.getByRole('navigation', { name: 'Navigation de MyFinances' });
+    await tabs.getByRole('link', { name: 'Ajouter' }).click();
+    await p.getByLabel('Montant').fill('4,50');
+    await p.getByLabel('Catégorie').selectOption('courses');
+    await p.getByLabel('Libellé (facultatif)').fill('Café du marché');
+    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    // Saisie en espèces : elle apparaît dans la liste, et sort du portefeuille (40 € → 35,50 €).
+    const cafe = p.getByRole('button', { name: /Café du marché/ });
+    await cafe.waitFor();
+    await shot(p, '64-finances-v5-operations');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // La fiche d'une opération : la ventiler en deux catégories, puis retirer la ventilation.
+    await p.getByRole('button', { name: /Epicerie Coin/ }).click();
+    await p.getByLabel('Montant de la part').fill('2,50');
+    await p.getByLabel('Sa catégorie').selectOption({ label: 'Courses › Pain' });
+    await p.getByRole('button', { name: 'Ventiler', exact: true }).click();
+    await p.getByText('Ventilée en 2 parts').waitFor();
+    await p.getByRole('button', { name: 'Retirer la ventilation' }).click();
+    await p.getByRole('button', { name: 'Terminé' }).click();
+    // Chercher, puis la sélection multiple.
+    await p.getByLabel('Chercher une opération').fill('cafe');
+    await expect.poll(() => p.locator('button.fin-op').count()).toBe(1);
+    await p.getByLabel('Chercher une opération').fill('');
+    await p.getByRole('button', { name: 'Sélectionner' }).click();
+    await cafe.click();
+    await p.getByText('1 sélectionnée').waitFor();
+    await p.getByRole('button', { name: 'Annuler' }).click();
+    // Analyse, À classer, Plan, Patrimoine : chacun son graphique.
+    await p.getByRole('button', { name: 'Analyse' }).click();
+    await p.getByRole('img', { name: /Dépenses du cycle par catégorie/ }).waitFor();
+    await shot(p, '65-finances-v5-analyse');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await tabs.getByRole('link', { name: 'Plan' }).click();
+    await p.getByRole('img', { name: /Où vont tes revenus du cycle/ }).waitFor();
+    await p.getByRole('img', { name: /Solde prévu jusqu'à la paie/ }).waitFor();
+    await shot(p, '66-finances-v5-plan');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await tabs.getByRole('link', { name: 'Patrimoine' }).click();
+    await p.getByRole('img', { name: /Projection du patrimoine/ }).waitFor();
+    await p.getByRole('button', { name: /^Portefeuille.*36\s€/ }).waitFor();
+    await shot(p, '67-finances-v5-patrimoine');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.goto(`${server.url}/argent/classer`);
+    await p.getByRole('heading', { name: 'À classer' }).waitFor();
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    // Le retour de l'en-tête ramène à MyLife, et sa barre du bas revient.
+    await p.getByRole('link', { name: 'Retour à MyLife' }).click();
+    await p.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await p.getByRole('navigation', { name: 'Barre de navigation' }).waitFor();
     await ctx.close();
   });
 

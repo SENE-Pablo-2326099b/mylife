@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { localToday } from '@mylife/lumen';
+import type { FinanceData } from '../core/model';
 import { compute, type Explanation } from '../engine/engine';
 import { fromV3 } from '../engine/fromV3';
 import type { Db } from '../engine/schema';
@@ -18,6 +19,8 @@ export interface Engine {
   status: 'loading' | 'empty' | 'ready' | 'error';
   error: string | null;
   today: string;
+  /** Les données reprises (placements, objectifs, historique du patrimoine). */
+  data: FinanceData | null;
   /** Les faits seuls (sans les réglages). */
   base: Db | null;
   db: Db | null;
@@ -35,6 +38,7 @@ export function useEngine(): Engine {
   const [status, setStatus] = useState<Engine['status']>('loading');
   const [error, setError] = useState<string | null>(null);
   const [base, setBase] = useState<Db | null>(null);
+  const [data, setData] = useState<FinanceData | null>(null);
   const [state, setState] = useState<EngineState | null>(null);
   const [at, setAt] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -46,7 +50,7 @@ export function useEngine(): Engine {
       setError(null);
       try {
         const when = fresh ? null : await lastImport();
-        let data;
+        let data: FinanceData;
         if (when === null) {
           const r = await importOld();
           data = r.data;
@@ -66,6 +70,7 @@ export function useEngine(): Engine {
         const rolled = roll(start, nextBase, today);
         if (rolled !== saved) await store.meta.put({ key: KEY, value: rolled });
         live.current = { base: nextBase, state: rolled };
+        setData(data);
         setBase(nextBase);
         setState(rolled);
         setStatus('ready');
@@ -96,5 +101,5 @@ export function useEngine(): Engine {
   );
 
   const db = base && state ? applyState(base, state) : null;
-  return { status, error, today, base, db, state, explanation: db ? compute(db, today) : null, at, busy, update, reload: () => void load(true) };
+  return { status, error, today, data, base, db, state, explanation: db ? compute(db, today) : null, at, busy, update, reload: () => void load(true) };
 }

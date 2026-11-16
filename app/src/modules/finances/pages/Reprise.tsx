@@ -59,7 +59,7 @@ export function ReprisePage() {
   const [group, setGroup] = useState<ToClassify | null>(null);
   const [receivable, setReceivable] = useState<string | null>(null);
 
-  const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" />;
+  const header = <ScreenHeader kicker="MyFinances V5 · moteur" title="Pourquoi ce chiffre" right={<Button href="/argent">Retour</Button>} />;
   if (engine.status === 'error')
     return (
       <>

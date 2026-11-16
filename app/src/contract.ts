@@ -50,6 +50,11 @@ export interface ModuleManifest {
   entry: { href: string; legacy?: boolean };
   cards: readonly ModuleCardSpec[];
   quickAdds: readonly QuickAdd[];
+  /**
+   * La navigation propre au module, quand il vit dans la coquille : `base` est le préfixe de ses adresses, `tabs`
+   * ses onglets (quatre au plus, le « + » se glisse au milieu) et `add` ce qu'ouvre le « + » quand on y est.
+   */
+  nav?: { base: string; add: string; tabs: readonly { to: string; label: string; icon: IconName; end?: boolean }[] };
   /** Lu sur l'appareil, à chaque affichage. */
   todos?: () => TodoItem[];
 }

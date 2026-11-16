@@ -1,8 +1,8 @@
-import { addDays, cycleFor, daysInMonth, parseISO, toISO, type ISODate } from '../core/dates';
+import { addDays, cycleFor, daysInMonth, diffDays, parseISO, toISO, type ISODate } from '../core/dates';
 import { automate, type RecurringSuggestion } from './automation';
 import { compute } from './engine';
 import { buildOccurrences, currentCycle, isProvisioned, nextDue } from './occurrences';
-import type { Account, Allocation, Category, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule, Tag } from './schema';
+import type { Account, Allocation, Category, Commitment, Db, EngineSettings, Envelope, Flow, InstallmentPlan, OccurrenceOverride, Provision, Receivable, Rule, Tag, Transaction } from './schema';
 
 /**
  * Ce que l'utilisateur règle et ce que le moteur retient d'un cycle à l'autre (étape M2). Les faits (comptes,
@@ -15,6 +15,19 @@ import type { Account, Allocation, Category, Commitment, Db, EngineSettings, Env
 export type AllocationPatch = Partial<Pick<Allocation, 'smoothed' | 'fundedBySavings' | 'incomeUse' | 'flow' | 'categoryId' | 'tagIds' | 'linkedTransactionId' | 'settlesReceivableId'>>;
 /** Ce que l'utilisateur change à un compte : son rôle et ses drapeaux. */
 export type AccountPatch = Partial<Pick<Account, 'name' | 'role' | 'includeInDailyCash' | 'includeInNetWorth' | 'deferredDebit' | 'ownershipRatio' | 'alertThreshold' | 'balance' | 'archivedAt'>>;
+
+export interface ManualEntry {
+  transaction: Transaction;
+  flow: Flow;
+  categoryId: string | null;
+}
+export interface SplitPart {
+  categoryId: string | null;
+  /** Signé, comme la transaction. */
+  amount: number;
+}
+/** Une saisie à la main et l'opération bancaire qui la confirme : même compte, même montant, à quelques jours près. */
+export const MANUAL_MATCH_DAYS = 4;
 
 export interface ClosedCycle {
   start: ISODate;
@@ -51,6 +64,12 @@ export interface EngineState {
   tags?: Tag[];
   /** Les comptes créés à la main (espèces, bien, dette, compte de provision…). */
   accounts?: Account[];
+  /** Les opérations saisies à la main (espèces, ou avant que la banque les envoie). */
+  manual?: ManualEntry[];
+  /** Les opérations ventilées : par transaction, ses parts (leur somme égale son montant). */
+  splits?: Record<string, SplitPart[]>;
+  /** Hypothèse de rendement annuel de la projection du patrimoine, en points de base (500 = 5 %). */
+  projectionRateBp?: number;
   settings: EngineSettings;
   carryIn: Db['carryIn'];
   /** Début du cycle en cours la dernière fois que le moteur a tourné : sert à détecter qu'un cycle s'est terminé. */
@@ -78,13 +97,47 @@ export function applyState(base: Db, s: EngineState): Db {
   const known = new Set(base.accounts.map((a) => a.id));
   const accounts = [...base.accounts, ...(s.accounts ?? []).filter((a) => !known.has(a.id))].map((a) => (s.accountPatches?.[a.id] ? { ...a, ...s.accountPatches[a.id] } : a));
   const accountIds = new Set(accounts.map((a) => a.id));
+  // Saisies à la main. Sur un compte suivi par la banque, la saisie attend l'opération réelle : quand elle arrive
+  // (même compte, même montant, à quelques jours près), la saisie s'efface devant elle et lui laisse son classement.
+  // Jamais comptée deux fois.
+  const bank = new Set(accounts.filter((a) => a.source === 'bank').map((a) => a.id));
+  const taken = new Set<string>();
+  const alias = new Map<string, string>();
+  const inherited = new Map<string, { flow: Flow; categoryId: string | null }>();
+  const kept: ManualEntry[] = [];
+  for (const m of s.manual ?? []) {
+    const t = m.transaction;
+    const twin = bank.has(t.accountId) ? base.transactions.filter((b) => b.accountId === t.accountId && b.amount === t.amount && !taken.has(b.id) && Math.abs(diffDays(b.date, t.date)) <= MANUAL_MATCH_DAYS).sort((a, b) => Math.abs(diffDays(a.date, t.date)) - Math.abs(diffDays(b.date, t.date)))[0] : undefined;
+    if (!twin) {
+      if (accounts.some((a) => a.id === t.accountId)) kept.push(m);
+      continue;
+    }
+    taken.add(twin.id);
+    alias.set(`${t.id}#0`, `${twin.id}#0`);
+    inherited.set(`${twin.id}#0`, { flow: m.flow, categoryId: m.categoryId });
+  }
+  // Ce qui a été décidé sur la saisie (levier, avance) suit l'opération bancaire.
+  const patches: Record<string, AllocationPatch> = { ...s.allocationPatches };
+  for (const [from, to] of alias) if (patches[from]) patches[to] = { ...patches[from], ...patches[to] };
   const defaults = s.merchantDefaults ?? {};
   const merchants = base.merchants.map((m) => (defaults[m.id] ? { ...m, ...defaults[m.id] } : m));
   // Ce qui est décidé à la main (nature, catégorie, lien) est marqué avant tout : les automatismes n'y touchent pas.
   const decided = (p: AllocationPatch | undefined) => !!p && ('flow' in p || 'categoryId' in p || 'linkedTransactionId' in p || 'settlesReceivableId' in p);
-  const patched = base.allocations.map((a) => (decided(s.allocationPatches[a.id]) ? { ...a, origin: 'manual' as const } : a));
-  const automated = automate({ ...base, accounts, categories, tags: s.tags ?? [], merchants, rules: s.rules ?? [], allocations: patched, settings: { ...base.settings, ...s.settings } }, new Set(Object.keys(defaults)));
-  const receivables = (s.receivables ?? []).filter((r) => base.allocations.some((a) => a.id === r.allocationId));
+  const withManual = [
+    ...base.allocations.map((a) => (inherited.has(a.id) ? { ...a, ...inherited.get(a.id), origin: 'manual' as const } : a)),
+    ...kept.map((m): Allocation => ({ id: `${m.transaction.id}#0`, transactionId: m.transaction.id, amount: m.transaction.amount, flow: m.flow, categoryId: m.flow === 'EXPENSE' || m.flow === 'REFUND' ? m.categoryId : null, tagIds: [], origin: 'manual', note: '' })),
+  ];
+  // Ventilation : la ligne unique d'une opération est remplacée par ses parts, si leur somme tombe juste.
+  const txAmount = new Map([...base.transactions, ...kept.map((m) => m.transaction)].map((t) => [t.id, t.amount]));
+  const split = withManual.flatMap((a) => {
+    const parts = s.splits?.[a.transactionId];
+    if (!parts?.length || parts.reduce((n, p) => n + p.amount, 0) !== txAmount.get(a.transactionId) || a.id !== `${a.transactionId}#0`) return [a];
+    return parts.map((p, i): Allocation => ({ ...a, id: `${a.transactionId}#${i}`, amount: p.amount, flow: 'EXPENSE', categoryId: p.categoryId, origin: 'manual' }));
+  });
+  const patched = split.map((a) => (decided(patches[a.id]) ? { ...a, origin: 'manual' as const } : a));
+  const automated = automate({ ...base, transactions: [...base.transactions, ...kept.map((m) => m.transaction)], accounts, categories, tags: s.tags ?? [], merchants, rules: s.rules ?? [], allocations: patched, settings: { ...base.settings, ...s.settings } }, new Set(Object.keys(defaults)));
+  const ids = new Set(automated.allocations.map((a) => a.id));
+  const receivables = (s.receivables ?? []).map((r) => ({ ...r, allocationId: alias.get(r.allocationId) ?? r.allocationId })).filter((r) => ids.has(r.allocationId));
   const advanced = new Map<string, number>();
   for (const r of receivables) advanced.set(r.allocationId, (advanced.get(r.allocationId) ?? 0) + r.amount);
   return {
@@ -96,7 +149,7 @@ export function applyState(base: Db, s: EngineState): Db {
     occurrenceOverrides: s.occurrenceOverrides,
     receivables,
     allocations: automated.allocations.map((a) => {
-      const p = s.allocationPatches[a.id];
+      const p = patches[a.id];
       const part = advanced.get(a.id);
       if (!p && part === undefined) return a;
       // La part avancée ne dépasse jamais la dépense.
@@ -355,4 +408,29 @@ export function mergeCategories(s: EngineState, fromId: string, intoId: string, 
     rules: (s.rules ?? []).map((r) => ({ ...r, categoryId: swap(r.categoryId) })),
     merchantDefaults: Object.fromEntries(Object.entries(s.merchantDefaults ?? {}).map(([k, v]) => [k, { ...v, categoryId: swap(v.categoryId) }])),
   };
+}
+
+// ---------------------------------------------------------------- saisie à la main, ventilation (M5)
+
+/** Le nouveau solde d'un compte tenu à la main après une opération (jamais négatif). Un compte bancaire ne bouge pas : la banque fait foi. */
+const afterManual = (s: EngineState, account: Account, delta: number): EngineState => (account.source === 'manual' ? patchAccount(s, account.id, { balance: Math.max(0, (account.balance ?? 0) + delta) }) : s);
+
+/** Saisir une opération à la main. `account` : le compte tel qu'il est aujourd'hui. */
+export function addManual(s: EngineState, entry: ManualEntry, account: Account): EngineState {
+  return afterManual({ ...s, manual: [...(s.manual ?? []), entry] }, account, entry.transaction.amount);
+}
+
+export function removeManual(s: EngineState, id: string, account: Account | undefined): EngineState {
+  const entry = (s.manual ?? []).find((m) => m.transaction.id === id);
+  if (!entry) return s;
+  const next = { ...s, manual: (s.manual ?? []).filter((m) => m.transaction.id !== id) };
+  return account ? afterManual(next, account, -entry.transaction.amount) : next;
+}
+
+/** Ventiler une opération en plusieurs parts (un ticket, deux catégories). Vide : retirer la ventilation. */
+export function setSplit(s: EngineState, transactionId: string, parts: SplitPart[]): EngineState {
+  const splits = { ...s.splits };
+  if (parts.length >= 2) splits[transactionId] = parts;
+  else delete splits[transactionId];
+  return { ...s, splits };
 }
