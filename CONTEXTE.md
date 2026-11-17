@@ -1,6 +1,6 @@
 # MyLife : contexte technique
 
-> **État du code au 13/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
+> **État du code au 17/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
 > devient, et dans quel ordre) est dans **`docs/VISION.md`**, qui prime en cas de désaccord. Le journal de la V5 est
 > `docs/V5.md` ; l'historique d'avant la V5 est dans `docs/archives/`.
 >
@@ -11,16 +11,16 @@
 
 ## 1. Où on en est
 
-- **V5** (suivi détaillé : tableau en tête de `docs/V5.md`) : phases 0, 1 et 2 faites : la coquille (`app/`, kit
-  `packages/kit`, contrat de module `app/src/contract.ts`) sert `/`. **Phase 3 en cours, à l'essai en usage réel** :
-  MyFinances est reconstruit comme module de la coquille à `/argent` (moteur, écrans Jour, Opérations, Plan,
-  Patrimoine, réglages en rubriques, banques, synchro) ; l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits.
-  Reste en phase 3 : Copilot (conversations
-  synchronisées, domaines), classement assisté. Phases 4 (MyPerf) et 5 (MyRave, Sorties) : à faire.
+- **V5** (où on en est exactement, et ce qu'il faut garder : tête de `docs/V5.md`) : phases 0, 1 et 2 faites ; la
+  coquille (`app/`, kit `packages/kit`, contrat de module `app/src/contract.ts`) sert `/`. **Phase 3 faite, à l'essai
+  en usage réel** : MyFinances est un module de la coquille à `/argent` (moteur, écrans, banques, synchro, placements) ;
+  l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits. Copilot a des conversations
+  synchronisées et des domaines. **Phase 4 (MyPerf) préparée** : `docs/V5-MYPERF-PHASE4.pdf`, en attente de validation.
+  Phase 5 (MyRave, Sorties) : à faire.
 - **Interface** : l'effet de verre se règle (Réglages → Apparence : sobre, subtil, prononcé ; `data-glass`), avec une
   seule source de lumière pour tout l'écran (`packages/kit/src/glassLight.ts`). Navigation : barre du bas sur
   téléphone, rail d'icônes sur tablette, barre latérale à trois étages sur ordinateur ; le « + » suit l'écran.
-- **Production** : https://mylife-liart.vercel.app ; elle n'a pas encore la phase 1 (à déployer).
+- **Production** : https://mylife-liart.vercel.app ; déployée par l'utilisateur (`npm run deploy`), jamais depuis une session.
 - **Dépôt** : `~/PersoDev/MyLife`, GitHub privé `SENE-Pablo-2326099b/mylife`, branche `master`. Il contient le
   programme et l'historique d'entraînement de l'utilisateur (build privé de MyPerf) : il reste privé.
 - **De ton côté, toujours en attente** : clés VAPID et `CRON_SECRET` sur Vercel (sans elles, aucun rappel ne part) ;
@@ -94,7 +94,8 @@ nécessaire (chemins absolus en cache).
   abonnements aux notifications).
 - `/api/sync` (`server/sync.ts`) : `status`, `sync`. Registre des apps de synchro et de leurs quotas : `SYNC_APPS`
   (`server/core.ts`) + `AppId` (sync-client) : `finances` (les faits de MyFinances, partagés par l'ancienne app et le
-  module V5), `finances5` (les réglages du moteur du module V5), `perf`, `mylife` (réglages communs) ; et `miniapps`,
+  module V5), `finances5` (les réglages du moteur du module V5), `copilot` (les conversations de Copilot), `perf`,
+  `mylife` (réglages communs) ; et `miniapps`,
   `objectifs`, `chef`, `calendrier`, plus lues par aucun écran depuis la phase 1 (gardées jusqu'à la purge, § 8). Seules les lignes vivantes comptent dans le quota ; une ligne trop grosse est écartée
   seule (`tooBig`). Traces de suppression purgées après 90 jours (cron du dimanche) ; un appareil plus ancien reçoit
   `resync`.

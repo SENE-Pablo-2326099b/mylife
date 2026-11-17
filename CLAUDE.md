@@ -5,7 +5,7 @@ les paquets partagés (`packages/`) et trois apps (`apps/finances`, `apps/perf`,
 
 **Au début d'une tâche, lire `docs/VISION.md`** (la direction de la V5, décidée le 13/11/2026 : elle prime sur
 tout le reste), puis `CONTEXTE.md` (état technique actuel : architecture, commandes, règles, ce qui part en phase 1)
-et `docs/V5.md` (journal de la V5). Selon le sujet : `docs/ARCHITECTURE.md` (détail technique), `apps/perf/CLAUDE.md`
+et `docs/V5.md` (journal de la V5 : **sa tête dit où on en est exactement et ce qu'il faut garder obligatoirement**). Selon le sujet : `docs/ARCHITECTURE.md` (détail technique), `apps/perf/CLAUDE.md`
 pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances…) est dans `docs/archives/`.
 
 ## Règles qui ne se négocient pas
