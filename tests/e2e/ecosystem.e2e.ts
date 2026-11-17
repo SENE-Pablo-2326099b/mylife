@@ -958,10 +958,47 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('link', { name: /^Livret/ }).click();
     await p.getByRole('button', { name: 'Revenir aux valeurs par défaut' }).click();
     await p.getByRole('link', { name: 'Retour', exact: true }).click();
-    // Le « + » suit l'écran : ici, un compte.
+    // Le « + » suit l'écran : ici, un compte. Un placement se crée, puis ses lignes et leurs mouvements.
     await tabs.getByRole('link', { name: 'Ajouter : un compte' }).click();
-    await p.getByRole('dialog').getByLabel('Nom').waitFor();
+    await p.getByRole('dialog', { name: 'Ajouter' }).getByRole('button', { name: /^Un placement/ }).click();
+    await p.getByRole('button', { name: 'Boursobank' }).click();
+    await p.getByRole('button', { name: 'Créer le placement' }).click();
+    await p.getByRole('heading', { name: 'Boursobank' }).waitFor();
+    await p.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await p.getByLabel('Nom de la ligne').fill('ETF Monde');
+    await p.getByLabel('Cours actuel, par unité (€)').fill('100');
+    await p.getByLabel('Quantité détenue').fill('10');
+    await p.getByLabel('Total investi (€)').fill('900');
+    await p.getByRole('button', { name: 'Ajouter la ligne' }).click();
+    await p.getByRole('button', { name: /^ETF Monde.*10 parts.*\+11,1 %.*1\s000\s€/ }).click();
+    await p.getByRole('button', { name: 'Mouvement' }).click();
+    await p.getByLabel('Quantité').fill('2');
+    await p.getByLabel('Montant (€)').fill('190');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    await p.getByRole('dialog', { name: 'ETF Monde' }).getByText(/12 parts/).waitFor();
+    await p.getByRole('dialog', { name: 'ETF Monde' }).getByRole('button', { name: /^Achat · 2/ }).waitFor();
+    await shot(p, '75-finances-v5-ligne');
     await p.getByRole('button', { name: 'Fermer' }).click();
+    await p.getByText(/1\s200\s€/).first().waitFor();
+    await shot(p, '76-finances-v5-placement');
+    expect(await overflow(p)).toBeLessThanOrEqual(0);
+    await p.getByRole('link', { name: 'Retour', exact: true }).click();
+    await p.getByRole('heading', { name: 'Patrimoine' }).waitFor();
+    await p.getByRole('button', { name: /^Placements.*1 compte/ }).waitFor();
+    // Un objectif, suivi à la main.
+    await p.locator('.fin-sec', { hasText: 'Objectifs' }).getByRole('button', { name: 'Ajouter' }).click();
+    await p.getByLabel('Nom').fill('Voyage');
+    await p.getByLabel('Montant visé (€)').fill('2000');
+    await p.getByRole('button', { name: 'Créer l’objectif' }).click();
+    await p.getByRole('button', { name: /^Voyage.*0\s€ sur 2\s000\s€/ }).click();
+    await p.getByLabel('Noter un versement (€)').fill('500');
+    await p.getByRole('button', { name: 'Noter' }).click();
+    await p.getByRole('button', { name: 'Fermer' }).click();
+    await p.getByRole('button', { name: /^Voyage.*500\s€ sur 2\s000\s€/ }).waitFor();
+    // Le relevé Trade Republic s'importe dans le module.
+    await p.goto(`${server.url}/argent/patrimoine/import`);
+    await p.getByRole('button', { name: 'Choisir le relevé (PDF)' }).waitFor();
+    await p.goto(`${server.url}/argent/patrimoine`);
     // La projection se règle : un montant placé chaque mois et un rendement, saisis ; « revenir au plan » l'annule.
     const projected = () => p.getByRole('img', { name: /Projection du patrimoine/ }).getAttribute('aria-label');
     const before = await projected();

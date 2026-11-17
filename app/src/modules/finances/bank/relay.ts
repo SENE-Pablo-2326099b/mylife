@@ -132,6 +132,11 @@ export class Relay {
     return (await this.call<{ quotes: Record<string, { price: number; at: number } | { error: string }> }>('quotes', { items })).quotes ?? {};
   }
 
+  /** Titres et cryptos dont le nom ou le symbole ressemble à la recherche. */
+  async searchAsset(query: string): Promise<{ source: 'yahoo' | 'coingecko'; symbol: string; name: string; assetClass: 'etf' | 'stock' | 'crypto' | 'fund' | 'other'; exchange: string | null }[]> {
+    return (await this.call<{ results: { source: 'yahoo' | 'coingecko'; symbol: string; name: string; assetClass: 'etf' | 'stock' | 'crypto' | 'fund' | 'other'; exchange: string | null }[] }>('searchAsset', { query })).results ?? [];
+  }
+
   /** Cours de clôture quotidiens en euros sur les `days` derniers jours. */
   async priceHistory(source: 'yahoo' | 'coingecko', symbol: string, days: number): Promise<[string, number][]> {
     return (await this.call<{ prices: [string, number][] }>('priceHistory', { source, symbol, days })).prices ?? [];

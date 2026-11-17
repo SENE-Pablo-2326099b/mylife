@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { Button, Glass, List, ListRow } from '@mylife/kit';
 import { position } from '../core/budget';
@@ -12,6 +13,11 @@ import { Amount } from './fields';
 import { day, ROLE } from './labels';
 import { opViews } from './opViews';
 import { AccountSheet } from './sheets';
+import type { Position } from '../core/budget';
+import type { InvestmentOp } from '../core/model';
+import { portfolioIdOf, rawPortfolio, type RawPortfolio } from '../data/wealth';
+import { Form } from './controls';
+import { HoldingSheet, OpList, OpSheet, PlanSheet, PortfolioSheet, type LineValue } from './wealthSheets';
 import { FAMILIES, canSimulate, familyOf, plannedMonthly, simulationOf, valueOf } from './worth';
 
 /**
@@ -26,7 +32,13 @@ export function ComptePage() {
   const engine = useEngine();
   const { id } = useParams();
   const [editing, setEditing] = useState(false);
+  const [line, setLine] = useState<string | null>(null);
+  const [holding, setHolding] = useState<LineValue | null>(null);
+  const [op, setOp] = useState<{ position: Position; op: InvestmentOp | 'new' | 'adjust' } | null>(null);
+  const [plan, setPlan] = useState<Position | null>(null);
   const account = engine.db?.accounts.find((a) => a.id === id);
+  const pid = id ? portfolioIdOf(id) : null;
+  const portfolio = useLiveQuery(() => (pid ? rawPortfolio(pid) : undefined), [pid]) as RawPortfolio | undefined;
   if (engine.db && !account) return <Navigate to="/argent/patrimoine" replace />;
   return (
     <Screen engine={engine} tone="worth" title={account?.name ?? 'Compte'} kicker="Patrimoine" back="/argent/patrimoine" right={account ? <Button onClick={() => setEditing(true)}>Modifier</Button> : undefined}>
@@ -78,6 +90,32 @@ export function ComptePage() {
               {planned > 0 && <ListRow title="Versement prévu au plan" value={`${short(planned)} par mois`} />}
             </List>
 
+            {(pid || lines.length > 0) && (
+              <>
+                <Sec action={pid ? 'Ajouter' : undefined} onAction={pid && portfolio ? () => setHolding({ portfolioId: pid, kind: portfolio.kind, position: null }) : undefined}>Lignes</Sec>
+                {lines.length === 0 ? (
+                  <span className="t-small muted">Ajoute tes lignes (un ETF, une action, une crypto) ou importe un relevé : la valeur et la plus-value se calculent toutes seules.</span>
+                ) : (
+                  <List>
+                    {lines.map((p) => (
+                      <ListRow
+                        key={p.holding.id}
+                        title={p.holding.name}
+                        detail={[p.quantity ? `${String(Math.round(p.quantity * 1e6) / 1e6).replace('.', ',')} parts` : null, p.invested > 0 ? `${p.gain >= 0 ? '+' : ''}${((p.gain / p.invested) * 100).toFixed(1).replace('.', ',')} %` : null, p.holding.quoteSource === 'manual' ? 'cours manuel' : null].filter(Boolean).join(' · ') || undefined}
+                        value={short(p.value)}
+                        onClick={() => setLine(p.holding.id)}
+                      />
+                    ))}
+                  </List>
+                )}
+                {pid && (
+                  <Button block icon="plus" href="/argent/patrimoine/import">
+                    Importer un relevé Trade Republic
+                  </Button>
+                )}
+              </>
+            )}
+
             {canSimulate(a) && (
               <>
                 <Sec action={own ? 'Revenir aux valeurs par défaut' : undefined} onAction={own ? reset : undefined}>Simulation</Sec>
@@ -113,18 +151,6 @@ export function ComptePage() {
               </>
             )}
 
-            {lines.length > 0 && (
-              <>
-                <Sec>Lignes</Sec>
-                <List>
-                  {lines.map((p) => (
-                    <ListRow key={p.holding.id} title={p.holding.name} detail={p.invested > 0 ? `${short(p.invested)} investis · ${p.gain >= 0 ? '+' : ''}${((p.gain / p.invested) * 100).toFixed(1).replace('.', ',')} %` : undefined} value={short(p.value)} />
-                  ))}
-                </List>
-                <a href="/finances/patrimoine" className="link link-quiet t-small" style={{ alignSelf: 'flex-start' }}>Ajouter une ligne ou un achat : dans l’ancienne app, le temps de la bascule</a>
-              </>
-            )}
-
             <Sec action={ops.length ? 'Toutes les opérations' : undefined} to="/argent/operations">Historique</Sec>
             {moves.length > 0 ? (
               <List>
@@ -149,7 +175,41 @@ export function ComptePage() {
               <span className="t-small muted">Aucune opération sur ce compte pour l’instant.</span>
             )}
 
-            <AccountSheet value={editing ? a : null} onClose={() => setEditing(false)} onPatch={(aid, patch) => update((s) => patchAccount(s, aid, patch))} onCreate={() => setEditing(false)} />
+            {(() => {
+              const p = lines.find((x) => x.holding.id === line);
+              if (!p) return null;
+              const mine = data.investmentOps.filter((o) => o.holdingId === p.holding.id);
+              const average = p.quantity > 0 ? Math.round(p.invested / p.quantity) : null;
+              return (
+                <Form open={!op && !plan && !holding} title={p.holding.name} onClose={() => setLine(null)}>
+                  <div className="fin-proj">
+                    <span>
+                      <span className="t-small muted">Valeur</span>
+                      <span className="fin-num" style={{ fontSize: 18 }}>{short(p.value)}</span>
+                    </span>
+                    <span>
+                      <span className="t-small muted">Plus-value</span>
+                      <span className={`fin-num ${p.gain >= 0 ? 'c-ok' : ''}`} style={{ fontSize: 18 }}>{euros(p.gain, { round: true, sign: true })}</span>
+                    </span>
+                  </div>
+                  <span className="t-small muted">
+                    {[p.quantity ? `${String(Math.round(p.quantity * 1e6) / 1e6).replace('.', ',')} parts` : null, average ? `prix moyen ${euros(average)}` : null, p.holding.price !== null ? `cours ${euros(Math.round(p.holding.price))}` : null, `${short(p.invested)} investis`].filter(Boolean).join(' · ')}
+                  </span>
+                  <div className="grid-2">
+                    <Button variant="action" icon="plus" onClick={() => setOp({ position: p, op: 'new' })}>Mouvement</Button>
+                    <Button onClick={() => setOp({ position: p, op: 'adjust' })}>Recaler</Button>
+                    <Button onClick={() => setPlan(p)}>Programmer</Button>
+                    <Button onClick={() => pid && portfolio && setHolding({ portfolioId: pid, kind: portfolio.kind, position: p })}>Modifier</Button>
+                  </div>
+                  <OpList ops={mine} onOpen={(o) => setOp({ position: p, op: o })} />
+                </Form>
+              );
+            })()}
+            <HoldingSheet value={holding} onClose={() => setHolding(null)} />
+            <OpSheet value={op} onClose={() => setOp(null)} />
+            <PlanSheet value={plan} onClose={() => setPlan(null)} />
+            <PortfolioSheet value={pid && editing && portfolio ? portfolio : null} onClose={() => setEditing(false)} />
+            <AccountSheet value={editing && !pid ? a : null} onClose={() => setEditing(false)} onPatch={(aid, patch) => update((s) => patchAccount(s, aid, patch))} onCreate={() => setEditing(false)} />
           </>
         );
       }}

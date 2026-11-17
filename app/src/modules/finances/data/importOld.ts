@@ -1,7 +1,7 @@
 import { mergeImport, migrate, type OldDump } from '../core/migrate';
 import type { FinanceData } from '../core/model';
 import { db, loadAll, saveAll } from './db';
-import { facts } from './facts';
+import { facts, type FactsDB } from './facts';
 
 /**
  * Passe les faits (base `myfinances`, partagée avec l'ancienne app le temps de la bascule : `facts.ts`) dans le modèle
@@ -10,10 +10,10 @@ import { facts } from './facts';
 const TABLES = ['transactions', 'accounts', 'categories', 'portfolios', 'holdings', 'investmentOps', 'plans', 'goals', 'goalMoves', 'manualAssets', 'snapshots'] as const;
 
 /** Le contenu de la base des faits. */
-export async function readOld(): Promise<OldDump | null> {
+export async function readOld(database: FactsDB = facts): Promise<OldDump | null> {
   const dump: Record<string, unknown> = {};
-  for (const t of TABLES) dump[t] = await facts.table(t).toArray();
-  dump.settings = (await facts.settings.get('main')) ?? null;
+  for (const t of TABLES) dump[t] = await database.table(t).toArray();
+  dump.settings = (await database.settings.get('main')) ?? null;
   return dump as OldDump;
 }
 

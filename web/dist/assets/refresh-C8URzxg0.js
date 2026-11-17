@@ -1,1 +1,0 @@
-import{v as n,y as c,x as i,A as p,I as l,B as u,K as f,J as m}from"./publish-D589_0jF.js";import"./index-QDXjfdso.js";async function b(t){var e;await n();const a=await c();if(!a)return;const{data:s}=await i();if(s.accounts.length===0&&!((e=a.accounts)!=null&&e.length))return;const o=p(s),r=l(o,u(a,o,t));f(r,m(r,t))}export{b as refreshGlance};

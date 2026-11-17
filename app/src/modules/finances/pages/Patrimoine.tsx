@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { Button, Glass, Icon } from '@mylife/kit';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Button, Glass, Icon, List, ListRow } from '@mylife/kit';
 import { position } from '../core/budget';
 import { addDays } from '../core/dates';
 import { euros } from '../core/format';
@@ -12,7 +12,11 @@ import { project, projectAccounts } from '../engine/views';
 import { ConeChart, MiniRing, WorthChart } from './charts';
 import { Screen, Sec } from './common';
 import { Amount } from './fields';
+import { Form } from './controls';
 import { AccountSheet } from './sheets';
+import { GoalSheet, PortfolioSheet } from './wealthSheets';
+import type { Goal } from '../core/model';
+import type { RawPortfolio } from '../data/wealth';
 import { FAMILIES, canSimulate, familyChange, familyOf, simulationOf, valueOf, type Family } from './worth';
 
 /**
@@ -37,6 +41,10 @@ export function PatrimoinePage() {
   const [range, setRange] = useState<(typeof RANGES)[number]['id'] | null>(null);
   const [open, setOpen] = useState<Family | null>(null);
   const adding = params.get('ajouter') === '1';
+  const navigate = useNavigate();
+  const [portfolio, setPortfolio] = useState<RawPortfolio | 'new' | null>(null);
+  const [goal, setGoal] = useState<Goal | 'new' | null>(null);
+  const [other, setOther] = useState(false);
   const stopAdding = () => {
     params.delete('ajouter');
     setParams(params, { replace: true });
@@ -194,23 +202,21 @@ export function PatrimoinePage() {
             )}
             <Button block icon="plus" onClick={() => setParams({ ajouter: '1' }, { replace: true })}>Ajouter un compte</Button>
 
-            {goals.length > 0 && (
-              <>
-                <Sec>Objectifs</Sec>
-                {goals.map(({ goal, have, fraction }) => (
-                  <Glass key={goal.id} className="row" style={{ padding: '12px 16px' }}>
-                    <MiniRing fraction={fraction} color="#5ccbe6" size={56} label={`${goal.name} : ${Math.round(fraction * 100)} % atteint`} />
-                    <span className="grow" style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="t-strong">{goal.name}</span>
-                      <span className="t-small muted">
-                        {short(have)} sur {short(goal.target)}
-                        {goal.deadline ? ` · ${new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date(`${goal.deadline}T12:00:00`))}` : ''}
-                      </span>
-                    </span>
-                  </Glass>
-                ))}
-              </>
-            )}
+            <Sec action="Ajouter" onAction={() => setGoal('new')}>Objectifs</Sec>
+            {goals.length === 0 && <span className="t-small muted">Un voyage, un apport, un matelas de sécurité : fixe un montant et une date, l’avancement se suit tout seul.</span>}
+            {goals.map(({ goal, have, fraction }) => (
+              <button key={goal.id} type="button" className="glass row fin-goal" onClick={() => setGoal(goal)}>
+                <MiniRing fraction={fraction} color="#5ccbe6" size={56} label={`${goal.name} : ${Math.round(fraction * 100)} % atteint`} />
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                  <span className="t-strong">{goal.name}</span>
+                  <span className="t-small muted">
+                    {short(have)} sur {short(goal.target)}
+                    {goal.deadline ? ` · ${new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(new Date(`${goal.deadline}T12:00:00`))}` : ''}
+                  </span>
+                </span>
+                <Icon name="chevron" size={16} />
+              </button>
+            ))}
 
             <Sec action={detailed ? `${short(paidMonthly)} par mois, selon tes placements` : custom ? `Revenir au plan (${short(planned)})` : `ton plan prévoit ${short(planned)} par mois`} onAction={!detailed && custom ? () => update((s) => ({ ...s, projectionMonthly: null })) : undefined}>À ce rythme</Sec>
             <Glass style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -236,13 +242,22 @@ export function PatrimoinePage() {
               <span className="t-small muted">Une hypothèse, pas une promesse : le cône montre deux points de rendement en plus ou en moins.</span>
             </Glass>
 
+            <Form open={adding} title="Ajouter" onClose={stopAdding}>
+              <List>
+                <ListRow lead={<span className="fin-ic" style={{ background: '#9bf0b7' }}><Icon name="chart" size={19} /></span>} title="Un placement" detail="PEA, compte-titres, crypto, assurance vie : ses lignes et leurs cours" onClick={() => { stopAdding(); setPortfolio('new'); }} />
+                <ListRow lead={<span className="fin-ic" style={{ background: '#cdbeff' }}><Icon name="shield" size={19} /></span>} title="Un relevé Trade Republic" detail="Le PDF, lu sur ton appareil : lignes et mouvements d’un coup" href="/argent/patrimoine/import" />
+                <ListRow lead={<span className="fin-ic" style={{ background: '#ffc29b' }}><Icon name="card" size={19} /></span>} title="Un autre compte" detail="Des espèces, un bien, une dette : une valeur que tu tiens à jour" onClick={() => { stopAdding(); setOther(true); }} />
+              </List>
+            </Form>
+            <PortfolioSheet value={portfolio} onClose={() => setPortfolio(null)} onSaved={(id) => navigate(`/argent/patrimoine/compte/${encodeURIComponent(id)}`)} />
+            <GoalSheet value={goal} accounts={accounts} onClose={() => setGoal(null)} />
             <AccountSheet
-              value={adding ? 'new' : null}
-              onClose={stopAdding}
+              value={other ? 'new' : null}
+              onClose={() => setOther(false)}
               onPatch={(id, patch) => update((s) => patchAccount(s, id, patch))}
               onCreate={(a) => {
                 update((s) => addAccount(s, a));
-                stopAdding();
+                setOther(false);
               }}
             />
           </>

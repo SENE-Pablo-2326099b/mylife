@@ -107,7 +107,7 @@ function Hub({ db, e }: Ready) {
       <List>
         <Entry onClick={() => void downloadExport()} icon="shield" color="#cdbeff" title="Exporter mes données" detail="Un fichier, fabriqué sur ton appareil" />
         <Entry to="/argent/moteur" icon="eye" color="#9bf0b7" title="Pourquoi ce chiffre" detail="Le calcul, terme par terme" />
-        <Entry to="/finances/patrimoine" icon="chart" color="#ffc29b" title="Gérer mes placements" detail="Dans l’ancienne app, le temps de la bascule" />
+        <Entry to="/argent/patrimoine/import" icon="chart" color="#ffc29b" title="Importer un relevé Trade Republic" detail="Lignes et mouvements de tes placements, d’un coup" />
       </List>
     </>
   );
