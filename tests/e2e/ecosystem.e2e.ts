@@ -49,8 +49,9 @@ describe('MyLife, une seule app', () => {
     for (const path of ['/', '/finances/', '/perf/', '/raveloc/']) {
       const [ctx, fresh] = await device();
       await fresh.goto(`${server.url}${path}`);
-      // L'accueil commence par une présentation, puis le même formulaire que les apps.
-      if (path === '/') await fresh.getByRole('button', { name: 'Commencer' }).click();
+      // L'accueil commence par une présentation, puis le même formulaire que les apps. L'ancienne adresse de
+      // MyFinances (`/finances/`) est servie par la coquille, depuis le retrait de l'app d'avant.
+      if (path === '/' || path === '/finances/') await fresh.getByRole('button', { name: 'Commencer' }).click();
       await fresh.getByText('Crée ton compte').waitFor({ timeout: 30_000 });
       await fresh.waitForTimeout(2500);
       const text = await fresh.evaluate(() => document.body.innerText);
@@ -85,8 +86,8 @@ describe('MyLife, une seule app', () => {
     expect(manifest.screenshots).toHaveLength(4);
     for (const s of manifest.screenshots) expect((await fetch(`${server.url}${s.src}`)).ok, s.src).toBe(true);
     expect(manifest.scope).toBe('/');
-    expect(manifest.shortcuts.map((s) => s.url)).toEqual(['/finances/', '/perf/', '/raveloc/']);
-    for (const path of ['/', '/finances/', '/perf/', '/raveloc/']) {
+    expect(manifest.shortcuts.map((s) => s.url)).toEqual(['/argent', '/perf/', '/raveloc/']);
+    for (const path of ['/', '/argent', '/finances/', '/perf/', '/raveloc/']) {
       const html = await (await fetch(`${server.url}${path}`)).text();
       const links = [...html.matchAll(/<link[^>]+rel="manifest"[^>]*>/g)].map((m) => m[0]);
       expect(links, path).toHaveLength(1);
@@ -94,11 +95,14 @@ describe('MyLife, une seule app', () => {
     }
   });
 
-  it('depuis l’accueil, les trois apps se préparent en arrière-plan (hors ligne, ouverture immédiate)', async () => {
+  it('depuis l’accueil, les deux apps d’avant qui restent se préparent en arrière-plan ; celle de MyFinances est désinscrite', async () => {
     await page.goto(`${server.url}/`);
+    // Un appareil qui avait l'app MyFinances d'avant : son service worker est remplacé par celui qui la désinscrit.
+    await page.evaluate(() => navigator.serviceWorker.register('/finances/sw.js', { scope: '/finances/' }));
+    await page.reload();
     await expect
       .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((r) => new URL(r.scope).pathname).sort()), { timeout: 20_000, interval: 500 })
-      .toEqual(['/', '/finances/', '/perf/', '/raveloc/']);
+      .toEqual(['/', '/perf/', '/raveloc/']);
   });
 
   it('MyRave : déjà connecté (même session), même interface', async () => {
@@ -108,12 +112,12 @@ describe('MyLife, une seule app', () => {
     await shot(page, '05-raveloc');
   });
 
-  it('MyFinances : déjà connecté, l’appareil relié tout seul', async () => {
+  it('MyFinances : l’app d’avant est retirée, ses anciennes adresses mènent au module', async () => {
     await page.goto(`${server.url}/finances/`);
-    await page.getByText(`Connecté à MyLife : ${LOGIN}`).waitFor();
+    await page.waitForURL('**/argent');
+    await page.goto(`${server.url}/finances/patrimoine/placements`);
+    await page.waitForURL('**/argent/patrimoine');
     await shot(page, '06-finances');
-    await page.goto(`${server.url}/finances/reglages/compte`);
-    await page.getByText(/Synchronisé/).first().waitFor();
   });
 
   it('MyPerf : déjà connecté, relié tout seul', async () => {
@@ -167,7 +171,7 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('clair');
     await shot(page, '08-reglages-clair');
-    for (const path of ['/raveloc/', '/finances/']) {
+    for (const path of ['/raveloc/']) {
       await page.goto(`${server.url}${path}`);
       await page.waitForTimeout(800);
       expect(await page.evaluate(() => document.documentElement.dataset.scheme), path).toBe('light');
@@ -319,7 +323,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/finances/', '/perf/']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -327,16 +331,37 @@ describe('MyLife, une seule app', () => {
   });
 
   it('même navigateur, autre compte : rien du précédent (données, clé d’IA, aperçus)', async () => {
-    // Le premier compte laisse des traces : un prénom dans MyFinances (synchronisé), sa clé d'IA.
-    await page.goto(`${server.url}/finances/`);
-    const firstName = page.getByLabel('Ton prénom (facultatif)');
-    await firstName.fill('Zébulon');
-    await firstName.blur();
-    await page.waitForTimeout(800);
-    await page.evaluate(() => localStorage.setItem('mylife:anthropic-key', 'sk-ant-du-premier'));
-    await page.goto(`${server.url}/finances/reglages/compte`);
+    // Un premier compte, à lui (le compte principal des parcours suivants doit rester sans finances) ; il laisse des
+    // traces : un compte dans MyFinances (synchronisé), sa clé d'IA.
+    const first = `${LOGIN}-a`;
+    await page.goto(`${server.url}/compte`);
     await page.getByRole('button', { name: 'Se déconnecter' }).click();
-    await page.getByText('Crée ton compte').waitFor();
+    await page.getByRole('button', { name: 'Commencer' }).click();
+    await page.getByLabel('Identifiant').fill(first);
+    await page.getByText('Libre').waitFor();
+    await page.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: 'Créer mon compte' }).click();
+    await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await page.goto(`${server.url}/argent/patrimoine`);
+    const begin = page.getByRole('button', { name: 'Commencer à la main' });
+    const add = page.getByRole('button', { name: 'Ajouter un compte' });
+    await begin.or(add).first().waitFor({ timeout: 30_000 });
+    if (await begin.isVisible()) await begin.click();
+    else {
+      await add.click();
+      await page.getByRole('dialog', { name: 'Ajouter' }).getByRole('button', { name: /^Un autre compte/ }).click();
+    }
+    await page.getByLabel('Nom').fill('Zébulon');
+    await page.getByLabel('Solde ou valeur').fill('12');
+    await page.getByRole('button', { name: 'Créer' }).click();
+    await page.getByRole('button', { name: /^Quotidien|^Épargne|^Biens/ }).first().waitFor({ timeout: 30_000 });
+    // Parti dans le compte avant la déconnexion (la file de synchro des réglages du moteur est vide).
+    await page.waitForFunction(() => (JSON.parse(localStorage.getItem('mylife-queue-finances5') ?? '[]') as unknown[]).length === 0, undefined, { timeout: 30_000 });
+    await page.evaluate(() => localStorage.setItem('mylife:anthropic-key', 'sk-ant-du-premier'));
+    await page.goto(`${server.url}/compte`);
+    await page.getByRole('button', { name: 'Se déconnecter' }).click();
+    await page.getByRole('button', { name: 'Commencer' }).click();
     // Un autre compte, dans le même navigateur.
     const other = `${LOGIN}-b`;
     await page.getByLabel('Identifiant').fill(other);
@@ -344,14 +369,13 @@ describe('MyLife, une seule app', () => {
     await page.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: 'Créer mon compte' }).click();
     await page.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
-    await page.goto(`${server.url}/finances/`);
-    await page.getByText(`Connecté à MyLife : ${other}`).waitFor({ timeout: 30_000 });
-    expect(await page.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
-    expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
-    expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
-    await page.goto(`${server.url}/`);
     await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    await page.goto(`${server.url}/finances/`);
+    expect(await page.evaluate(() => localStorage.getItem('mylife:anthropic-key'))).toBeNull();
+    await page.goto(`${server.url}/argent/patrimoine`);
+    await page.getByRole('heading', { name: 'Patrimoine' }).waitFor();
+    await page.waitForTimeout(1500);
+    for (const family of await page.locator('.fin-family > button[aria-expanded="false"]').all()) await family.click();
+    expect(await page.evaluate(() => document.body.innerText)).not.toContain('Zébulon');
     await shot(page, '14-autre-compte');
     // MyPerf : relié au nouveau compte, sans rien du précédent.
     await page.goto(`${server.url}/perf/account`);
@@ -359,45 +383,50 @@ describe('MyLife, une seule app', () => {
     await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
     // Le premier compte, lui, a toujours ses données : il les retrouve en se reconnectant ailleurs.
     const [, back] = await device();
-    await back.goto(`${server.url}/finances/`);
+    await back.goto(`${server.url}/`);
     await back.getByRole('button', { name: 'J’ai déjà un compte' }).click();
-    await back.getByLabel('Identifiant').fill(LOGIN);
+    await back.getByLabel('Identifiant').fill(first);
     await back.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await back.getByRole('button', { name: 'Se connecter' }).click();
-    await expect.poll(() => back.getByLabel('Ton prénom (facultatif)').inputValue().catch(() => ''), { timeout: 30_000, interval: 500 }).toBe('Zébulon');
+    await back.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await back.goto(`${server.url}/argent/patrimoine`);
+    await back.locator('.fin-family > button').first().waitFor({ timeout: 30_000 });
+    for (const family of await back.locator('.fin-family > button[aria-expanded="false"]').all()) await family.click();
+    await back.getByRole('link', { name: /^Zébulon/ }).waitFor({ timeout: 30_000 });
   });
 
-  it('navigateur avec des données d’avant tout compte : un compte neuf part de zéro (proposé d’abord)', async () => {
+  it('navigateur avec des données d’avant tout compte : un compte neuf part de zéro', async () => {
     const [ctx, used] = await device();
-    await used.goto(`${server.url}/finances/`);
-    await used.getByText('Crée ton compte').waitFor();
-    await used.waitForTimeout(1000);
-    // Des réglages saisis sur cet appareil, reliés à aucun compte.
+    await used.goto(`${server.url}/`);
+    await used.getByRole('button', { name: 'Commencer' }).waitFor();
+    // Des opérations laissées par l'app d'avant, utilisée sans compte sur cet appareil.
     await used.evaluate(
       () =>
         new Promise((resolve, reject) => {
-          const open = indexedDB.open('myfinances');
+          const open = indexedDB.open('myfinances', 20);
+          open.onupgradeneeded = () => {
+            for (const name of ['transactions', 'accounts', 'settings', 'meta']) if (!open.result.objectStoreNames.contains(name)) open.result.createObjectStore(name, { keyPath: name === 'meta' ? 'key' : 'id' });
+          };
           open.onerror = () => reject(open.error);
           open.onsuccess = () => {
-            const tx = open.result.transaction('settings', 'readwrite');
-            const settings = tx.objectStore('settings');
-            const main = settings.get('main');
-            main.onsuccess = () => settings.put({ ...main.result, onboarded: true, firstName: 'Orphelin' });
+            const tx = open.result.transaction(['accounts', 'transactions'], 'readwrite');
+            tx.objectStore('accounts').put({ id: 'orph', name: 'Compte Orphelin', bank: 'Banque', iban: null, currency: 'EUR', source: 'demo', connectionId: null, remoteUid: null, balance: 100, balanceDate: null, lastSyncAt: null, lastSyncError: null, hidden: false });
+            tx.objectStore('transactions').put({ id: 'orph-1', accountId: 'orph', date: '2026-11-01', amount: -500, label: 'Achat Orphelin', currency: 'EUR' });
             tx.oncomplete = () => resolve(open.result.close());
             tx.onerror = () => reject(tx.error);
           };
         }),
     );
+    await used.getByRole('button', { name: 'Commencer' }).click();
     const login = `${LOGIN}-c`;
     await used.getByLabel('Identifiant').fill(login);
     await used.getByText('Libre').waitFor();
     await used.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await used.getByRole('button', { name: 'Créer mon compte' }).click();
-    await used.getByText('Ton compte est neuf').waitFor({ timeout: 30_000 });
+    await used.getByRole('button', { name: 'C’est fait, je l’ai mise de côté' }).click();
+    await used.goto(`${server.url}/argent`);
+    await used.getByRole('button', { name: 'Commencer à la main' }).waitFor({ timeout: 30_000 });
     await shot(used, '15-compte-neuf');
-    await used.getByRole('button', { name: 'Partir de zéro' }).click();
-    await used.getByText(`Connecté à MyLife : ${login}`).waitFor({ timeout: 30_000 });
-    expect(await used.getByLabel('Ton prénom (facultatif)').inputValue()).toBe('');
     expect(await used.evaluate(() => document.body.innerText)).not.toContain('Orphelin');
     await ctx.close();
   });
@@ -1074,8 +1103,8 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Ta banque').fill('fictive');
     await expect.poll(() => p.getByRole('button', { name: /Établissement/ }).count()).toBe(0);
     await shot(p, '68-finances-v5-banques');
-    // La banque renvoie à l'adresse déclarée (servie par l'ancienne app) : elle termine dans la base commune, puis
-    // rend la main au module.
+    // La banque renvoie à l'adresse déclarée (`/finances/connexion/retour`, servie par la coquille depuis le retrait de
+    // l'app d'avant) : la connexion s'y termine, puis Banques s'ouvre.
     await p.getByRole('button', { name: 'Banque Fictive' }).click();
     await p.waitForURL('**/argent/banques', { timeout: 30_000 });
     await p.getByText('1 compte relié').waitFor();

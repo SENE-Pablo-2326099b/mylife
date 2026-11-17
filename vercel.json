@@ -4,18 +4,6 @@
   "outputDirectory": "web/dist",
   "rewrites": [
     {
-      "source": "/finances",
-      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/index.html"
-    },
-    {
-      "source": "/finances/",
-      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/index.html"
-    },
-    {
-      "source": "/finances/:path+",
-      "destination": "https://myfinances-sepia-sigma.vercel.app/finances/:path+"
-    },
-    {
       "source": "/api/eb",
       "destination": "https://myfinances-sepia-sigma.vercel.app/api/eb"
     },
@@ -48,13 +36,13 @@
       "destination": "/ancien/index.html"
     },
     {
-      "source": "/((?!api/|finances|perf|raveloc|ancien/).*)",
+      "source": "/((?!api/|perf|raveloc|ancien/).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/((?!finances|perf|raveloc|api|ancien).*)",
+      "source": "/((?!perf|raveloc|api|ancien).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
@@ -85,6 +73,19 @@
         {
           "key": "Cache-Control",
           "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/finances/sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/finances/"
         }
       ]
     }

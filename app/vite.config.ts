@@ -46,7 +46,7 @@ export default defineConfig({
           { src: '/screenshots/4-raveloc.jpg', sizes: '780x1688', type: 'image/jpeg', form_factor: 'narrow', label: 'MyRave : retrouver ses amis' },
         ],
         shortcuts: [
-          { name: 'MyFinances', short_name: 'Finances', description: 'Budget et patrimoine', url: '/finances/', icons: [{ src: '/shortcut-finances.png', sizes: '96x96', type: 'image/png' }] },
+          { name: 'MyFinances', short_name: 'Finances', description: 'Budget et patrimoine', url: '/argent', icons: [{ src: '/shortcut-finances.png', sizes: '96x96', type: 'image/png' }] },
           { name: 'MyPerf', short_name: 'Perf', description: 'Séances et progression', url: '/perf/', icons: [{ src: '/shortcut-perf.png', sizes: '96x96', type: 'image/png' }] },
           { name: 'MyRave', short_name: 'Rave', description: 'Sorties entre amis', url: '/raveloc/', icons: [{ src: '/shortcut-raveloc.png', sizes: '96x96', type: 'image/png' }] },
         ],
@@ -56,8 +56,8 @@ export default defineConfig({
         // L'ancien accueil et les apps ont leurs propres fichiers : ce service worker ne sert que la coquille.
         globIgnores: ['ancien/**', 'finances/**', 'perf/**', 'raveloc/**', 'screenshots/**'],
         navigateFallback: '/index.html',
-        navigateFallbackAllowlist: [/^\/(?!finances|perf|raveloc|api|ancien)/],
-        navigateFallbackDenylist: [/^\/(finances|perf|raveloc|api|ancien)(\/|$)/],
+        navigateFallbackAllowlist: [/^\/(?!perf|raveloc|api|ancien)/],
+        navigateFallbackDenylist: [/^\/(perf|raveloc|api|ancien)(\/|$)/, /^\/finances\/sw\.js$/],
         runtimeCaching: [],
         // Rappels écrits par l'appareil : réception et clic des notifications (app/public/push-sw.js).
         importScripts: ['/push-sw.js'],

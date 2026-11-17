@@ -122,7 +122,9 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       if (req.method !== 'POST') return void res.writeHead(405).end();
       return void api(req, res, path);
     }
-    for (const app of ['finances', 'perf', 'raveloc'] as const) {
+    // L'app MyFinances d'avant est retirée, comme en production : ses adresses vont à la coquille (sauf le service
+    // worker qui la désinscrit, fichier de la coquille).
+    for (const app of ['perf', 'raveloc'] as const) {
       if (path === `/${app}`) return void res.writeHead(301, { location: `/${app}/` }).end();
       if (path.startsWith(`/${app}/`)) return void file(res, builds[app], path, `${app}/index.html`, app).catch(fail);
     }

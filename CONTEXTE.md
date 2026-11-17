@@ -14,8 +14,8 @@
 - **V5** (suivi détaillé : tableau en tête de `docs/V5.md`) : phases 0, 1 et 2 faites : la coquille (`app/`, kit
   `packages/kit`, contrat de module `app/src/contract.ts`) sert `/`. **Phase 3 en cours, à l'essai en usage réel** :
   MyFinances est reconstruit comme module de la coquille à `/argent` (moteur, écrans Jour, Opérations, Plan,
-  Patrimoine, réglages en rubriques, banques, synchro) ; l'ancienne app reste à `/finances/` et partage la même base
-  de faits. Reste en phase 3 : porter la gestion des placements, retirer l'ancienne app, Copilot (conversations
+  Patrimoine, réglages en rubriques, banques, synchro) ; l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits.
+  Reste en phase 3 : Copilot (conversations
   synchronisées, domaines), classement assisté. Phases 4 (MyPerf) et 5 (MyRave, Sorties) : à faire.
 - **Interface** : l'effet de verre se règle (Réglages → Apparence : sobre, subtil, prononcé ; `data-glass`), avec une
   seule source de lumière pour tout l'écran (`packages/kit/src/glassLight.ts`). Navigation : barre du bas sur
@@ -37,7 +37,7 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 |---|---|---|---|---|
 | `/` | **Accueil** : « Ta journée », Copilot, Sorties, apps et aperçus, compte, apparence, installation ; **seul manifeste** | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
 | `/api/*` | Comptes, synchro chiffrée, espaces partagés, MyRave, notifications, support | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
-| `/finances/` | **MyFinances** | `apps/finances` | `myfinances` | React 18 + Vite + Tailwind + Dexie |
+| `/finances/` | **Retirée le 17/11/2026** : ses adresses mènent au module `/argent` (la coquille sert `/finances/connexion/retour`, retour de la banque ; `/finances/sw.js` désinscrit l'ancien service worker). Le code reste dans `apps/finances`, et son projet Vercel sert encore le relais `/api/eb` | `apps/finances` | `myfinances` (base des faits, lue et écrite par le module) | React 18 + Vite + Tailwind + Dexie |
 | `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
 | `/perf/` | **MyPerf** | `apps/perf` | `myperf` | Expo / React Native (React 19) + SQLite ; web + APK Android |
 | `/raveloc/` | **MyRave** (ex-myRaveLoc ; chemin et identifiants inchangés) | `apps/raveloc` | `myraveloc` | React 18 + Vite + kit `packages/ui` |

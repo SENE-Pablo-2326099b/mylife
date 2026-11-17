@@ -23,11 +23,18 @@ listenForInstall();
 installErrorLog();
 startPrefsSync();
 followSharedAppearance();
-// Les trois apps se préparent en arrière-plan : elles s'ouvrent tout de suite, même hors ligne.
+// L'app MyFinances d'avant est retirée : son service worker (portée /finances/) est désinscrit, pour que ses adresses
+// arrivent à la coquille (la banque revient à /finances/connexion/retour).
+if ('serviceWorker' in navigator)
+  void navigator.serviceWorker
+    .getRegistrations()
+    .then((all) => all.filter((r) => new URL(r.scope).pathname.startsWith('/finances')).forEach((r) => void r.unregister()))
+    .catch(() => undefined);
+// Les deux apps d'avant qui restent se préparent en arrière-plan : elles s'ouvrent tout de suite, même hors ligne.
 if ('serviceWorker' in navigator) {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
   if (!connection?.saveData && !/(^|-)2g$/.test(connection?.effectiveType ?? '')) {
-    const run = () => ['/finances/', '/perf/', '/raveloc/'].forEach((scope) => void navigator.serviceWorker.register(`${scope}sw.js`, { scope }).catch(() => undefined));
+    const run = () => ['/perf/', '/raveloc/'].forEach((scope) => void navigator.serviceWorker.register(`${scope}sw.js`, { scope }).catch(() => undefined));
     setTimeout(() => ('requestIdleCallback' in window ? window.requestIdleCallback(run, { timeout: 8000 }) : run()), 3000);
   }
 }

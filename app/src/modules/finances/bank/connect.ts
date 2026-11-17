@@ -8,8 +8,8 @@ import type { Relay } from './relay';
  * Relier une banque : on part vers la page d'authentification de la banque, qui renvoie à l'adresse de retour avec un
  * code ; ce code s'échange contre un accès (90 à 180 jours selon la banque) et la liste des comptes.
  *
- * L'adresse de retour est celle déclarée auprès d'Enable Banking, `/finances/connexion/retour` : tant que l'ancienne
- * app existe, c'est elle qui la sert ; elle termine la connexion dans la base commune puis renvoie ici (`returnTo`).
+ * L'adresse de retour est celle déclarée auprès d'Enable Banking, `/finances/connexion/retour` : depuis le retrait de
+ * l'app d'avant, la coquille la sert elle-même (`pages/BankReturn.tsx`), termine la connexion et ouvre Banques.
  */
 export const CALLBACK_URL_PATH = '/finances/connexion/retour';
 export const RETURN_TO = '/argent/banques';

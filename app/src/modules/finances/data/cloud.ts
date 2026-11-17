@@ -52,14 +52,23 @@ export function useCloud(): CloudState {
  * Les données d'un autre compte que celui qui est connecté ne sont jamais montrées : elles sont effacées de
  * l'appareil avant toute lecture, même hors ligne. L'appareil reprendra ensuite ce que garde le compte connecté.
  */
+let firstLook = true;
+
 export async function dropForeign(): Promise<void> {
   const session = currentSession();
   if (!session) return;
-  for (const { store } of Object.values(PARTS)) {
+  const first = firstLook;
+  firstLook = false;
+  for (const [part, { store, hasData }] of Object.entries(PARTS)) {
     const local = await store.getState();
-    if (!local?.joinedAs || local.joinedAs === session.login) continue;
+    if (local?.joinedAs === session.login) continue;
+    // Les faits d'avant tout compte (l'app d'avant pouvait servir sans compte) : un compte ne les reprend jamais, il
+    // part de zéro. Les réglages du moteur, eux, n'ont jamais existé hors d'un compte : seuls ceux d'un autre compte partent.
+    // Une seule fois, à la première lecture et avant toute synchro : pendant qu'un appareil rejoint le compte, ses
+    // faits arrivent alors qu'il n'est pas encore marqué relié, et ne doivent surtout pas être effacés.
+    if (!local?.joinedAs && (part !== 'facts' || !first || current || !(await hasData()))) continue;
     await store.forget?.();
-    await store.setState({ ...local, cursor: 0, joinedAs: null, lastSyncAt: null });
+    if (local) await store.setState({ ...local, cursor: 0, joinedAs: null, lastSyncAt: null });
   }
 }
 

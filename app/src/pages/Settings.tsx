@@ -55,7 +55,6 @@ export function SettingsPage() {
         <SectionTitle>Plus</SectionTitle>
         <List>
           <ListRow href="/ancien/" lead={<Icon name="flag" size={20} />} title="Ancien accueil" detail="Les Sorties, en attendant MyRave" />
-          <ListRow href="/finances/" lead={<Icon name="card" size={20} />} title="Ancienne MyFinances" detail="Encore là le temps de la bascule : mêmes données" />
           <ListRow href="/kit" lead={<Icon name="modules" size={20} />} title="Le kit" detail="Les briques de l’interface" />
         </List>
       </section>
