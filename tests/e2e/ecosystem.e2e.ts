@@ -625,6 +625,43 @@ describe('MyLife, une seule app', () => {
     await p.getByText('A lu : tes modules').waitFor();
     expect(bodies[0]!.model).toBe('claude-opus-5-5');
     await shot(p, '53-v5-copilot');
+    // La conversation est gardée : elle porte le titre de la question et rejoint l'historique.
+    await p.getByRole('heading', { name: 'Résume ma semaine.' }).waitFor();
+    // Une nouvelle conversation, dans le domaine Finances : le domaine part avec la question.
+    await p.getByRole('button', { name: 'Nouvelle' }).click();
+    await p.getByRole('group', { name: 'Domaine de la conversation' }).getByRole('button', { name: 'Finances' }).click();
+    await p.getByLabel('Ta question').fill('Mon budget tient ?');
+    await p.getByRole('button', { name: 'Demander', exact: true }).click();
+    await p.getByRole('heading', { name: 'Mon budget tient ?' }).waitFor({ timeout: 20_000 });
+    expect(JSON.stringify(bodies[bodies.length - 1])).toContain('Conversation sur les finances');
+    // L'historique : deux conversations, rangées par domaine ; en rouvrir une ; en supprimer une.
+    await p.getByRole('button', { name: /^Historique/ }).click();
+    await p.getByRole('heading', { name: 'Conversations' }).waitFor();
+    await p.getByRole('button', { name: /^Résume ma semaine\./ }).waitFor();
+    await shot(p, '53b-v5-copilot-historique');
+    await p.getByRole('button', { name: 'Supprimer « Mon budget tient ? »' }).click();
+    await p.getByRole('button', { name: 'Supprimer', exact: true }).click();
+    expect(await p.getByRole('button', { name: /^Mon budget tient/ }).count()).toBe(0);
+    await p.getByRole('button', { name: /^Résume ma semaine\./ }).click();
+    await p.getByText('Rien à signaler cette semaine.').waitFor();
+    // Les conversations suivent sur un autre appareil du compte (chiffrées) ; la clé d'API, elle, reste ici.
+    await p.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('mylife:app:copilot:dirty') ?? '{}')).length === 0, undefined, { timeout: 20_000 });
+    const [ctxB, pB] = await device();
+    await pB.goto(`${server.url}/`);
+    await pB.getByRole('button', { name: 'J’ai déjà un compte' }).click();
+    await pB.getByLabel('Identifiant').fill(who);
+    await pB.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
+    await pB.getByRole('button', { name: 'Se connecter' }).click();
+    await pB.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await pB.goto(`${server.url}/copilot`);
+    await pB.getByLabel('Clé API').waitFor();
+    await pB.getByRole('button', { name: /^Historique \(1\)/ }).click({ timeout: 20_000 });
+    await pB.getByRole('button', { name: /^Résume ma semaine\./ }).waitFor();
+    await ctxB.close();
+    // Un module ouvre Copilot avec une question préparée, à relire avant l'envoi.
+    await p.goto(`${server.url}/copilot?domaine=sport&q=${encodeURIComponent('Quelle séance aujourd’hui ?')}`);
+    expect(await p.getByLabel('Ta question').inputValue()).toBe('Quelle séance aujourd’hui ?');
+    expect(await p.getByRole('group', { name: 'Domaine de la conversation' }).getByRole('button', { name: 'Sport' }).getAttribute('aria-pressed')).toBe('true');
     await p.unroute('https://api.anthropic.com/**');
     // Données : export et archive ; support.
     await p.goto(`${server.url}/donnees`);

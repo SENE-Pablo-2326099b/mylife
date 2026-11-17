@@ -10,7 +10,7 @@ import type { Account } from '../engine/schema';
 import { addAccount, patchAccount } from '../engine/state';
 import { project, projectAccounts } from '../engine/views';
 import { ConeChart, MiniRing, WorthChart } from './charts';
-import { Screen, Sec } from './common';
+import { AskCopilot, Screen, Sec } from './common';
 import { Amount } from './fields';
 import { Form } from './controls';
 import { AccountSheet } from './sheets';
@@ -241,6 +241,7 @@ export function PatrimoinePage() {
               </div>
               <span className="t-small muted">Une hypothèse, pas une promesse : le cône montre deux points de rendement en plus ou en moins.</span>
             </Glass>
+            <AskCopilot question="Comment évolue mon patrimoine, et que changerait 100 € de plus placés chaque mois ?" />
 
             <Form open={adding} title="Ajouter" onClose={stopAdding}>
               <List>

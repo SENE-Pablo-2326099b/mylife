@@ -10,7 +10,7 @@ import type { Commitment, Envelope, Provision } from '../engine/schema';
 import { acceptSuggestion, addInstallmentPlan, decideOccurrence, ignoreSuggestion, removeCommitment, removeEnvelope, removeInstallmentPlan, removeProvision, saveCommitment, saveEnvelope, saveProvision } from '../engine/state';
 import { forecast } from '../engine/views';
 import { FlowChart, ForecastChart, MiniRing } from './charts';
-import { Screen, Sec } from './common';
+import { AskCopilot, Screen, Sec } from './common';
 import { day, RHYTHM } from './labels';
 import { CommitmentSheet, EnvelopeSheet, InstallmentSheet, OccurrenceSheet, ProvisionSheet } from './sheets';
 
@@ -175,6 +175,7 @@ export function PlanPage() {
             </div>
 
             <Button block icon="plus" onClick={() => setCommitment('new')}>Ajouter un engagement</Button>
+            <AskCopilot question="Je finis le mois dans le vert ? Quelles charges pourrais-je réduire ?" />
 
             <Sec action="Ajouter" onAction={() => setEnvelope('new')}>Budgets par enveloppe</Sec>
             {capped.length === 0 ? (

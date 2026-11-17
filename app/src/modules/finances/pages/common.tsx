@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Button, IconButton, Notice } from '@mylife/kit';
+import { Button, Icon, IconButton, Notice } from '@mylife/kit';
 import type { FinanceData } from '../core/model';
 import type { Engine } from '../data/engineStore';
 import type { Explanation } from '../engine/engine';
@@ -90,5 +90,19 @@ export function Avatar({ op }: { op: Pick<OpView, 'color' | 'letter' | 'unclassi
     <span className={`fin-av${op.color ? '' : ' fin-av-plain'}`} style={op.color ? { background: op.color } : op.unclassified ? { borderStyle: 'dashed' } : undefined} aria-hidden="true">
       {op.unclassified && !op.color ? '?' : op.letter}
     </span>
+  );
+}
+
+/**
+ * « Demander à Copilot » : ouvre Copilot dans une nouvelle conversation du domaine Finances, la question déjà
+ * écrite, à relire ou modifier avant de l'envoyer. Rien ne part sans geste de l'utilisateur.
+ */
+export function AskCopilot({ question, label = 'Demander à Copilot' }: { question: string; label?: string }) {
+  return (
+    <Link to={`/copilot?domaine=finances&q=${encodeURIComponent(question)}`} className="fin-ask">
+      <Icon name="copilot" size={16} />
+      <span className="grow">{label}</span>
+      <span className="t-small muted fin-ask-q">{question}</span>
+    </Link>
   );
 }

@@ -6,7 +6,7 @@ import { useEngine } from '../data/engineStore';
 import { toClassify } from '../engine/automation';
 import { lastCycles, pace, settledIn, spendByDay } from '../engine/views';
 import { DayBars, PaceChart, Ring } from './charts';
-import { Avatar, Screen, Sec } from './common';
+import { AskCopilot, Avatar, Screen, Sec } from './common';
 import { opViews } from './opViews';
 import { day, KIND } from './labels';
 
@@ -140,6 +140,8 @@ export function JourPage() {
                 </div>
               </>
             )}
+
+            <AskCopilot question={e.resteAujourdhui < 0 ? 'J’ai dépassé mon budget du jour : comment rattraper d’ici la paie ?' : 'Est-ce que je tiens mon budget ce cycle ? Qu’est-ce qui pèse le plus ?'} />
 
             <Sec action={todays.length ? 'Toutes les opérations' : undefined} to="/argent/operations">Aujourd’hui · {euros(e.spentToday)} dépensés</Sec>
             {todays.length === 0 ? (

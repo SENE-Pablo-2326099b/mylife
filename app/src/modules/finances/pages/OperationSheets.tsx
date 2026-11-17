@@ -6,6 +6,7 @@ import type { AllocationPatch, ManualEntry, SplitPart } from '../engine/state';
 import type { OpView } from './opViews';
 import { Form, Select, Toggle } from './controls';
 import { categoryOptions, cents, day, FLOWS } from './labels';
+import { AskCopilot } from './common';
 
 /** Les feuilles de l'écran Opérations : la fiche d'une opération, et la saisie à la main. */
 
@@ -122,6 +123,7 @@ export function OperationSheet({ op, account, categories, tags, onClose, onClass
           Supprimer cette saisie
         </Button>
       )}
+      <AskCopilot question={`${op.name} : ${euros(Math.abs(op.tx.amount))} le ${day(op.tx.date)}. Combien je dépense chez ce marchand chaque mois, et est-ce raisonnable ?`} />
       <Button variant="quiet" onClick={onClose}>
         Terminé
       </Button>
