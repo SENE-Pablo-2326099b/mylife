@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { migrate } from '../app/src/modules/finances/core/migrate';
 import { automate, classify, detectRecurring, pairTransfers, ruleMatches, toClassify } from '../app/src/modules/finances/engine/automation';
 import { compute, debitDate, envelopeOf, netWorth, weight } from '../app/src/modules/finances/engine/engine';
-import { byCategory, cashflow, forecast, lastCycles, pace, project, projectAccounts, settledIn, simulate, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
+import { byCategory, cashflow, categoryDetail, forecast, lastCycles, pace, project, projectAccounts, settledIn, simulate, spendByDay, topMerchants } from '../app/src/modules/finances/engine/views';
 import { fromV3 } from '../app/src/modules/finances/engine/fromV3';
 import { checkIntegrity } from '../app/src/modules/finances/engine/integrity';
 import { buildOccurrences, currentCycle, dueDates } from '../app/src/modules/finances/engine/occurrences';
@@ -1077,6 +1077,20 @@ describe('moteur M5 : ce que montrent les écrans', () => {
     // « Courses » compte pour sa parente ; le remboursement réduit « Restos » ; le loyer payé est une dépense aussi.
     expect(byCategory(db, '2026-10-26', TODAY).map((x) => [x.name, x.amount])).toEqual([['À classer', 41200], ['alim', 18000], ['restos', 10000]]);
     expect(topMerchants(db, '2026-10-26', TODAY, 1)).toMatchObject([{ name: 'PRLV LOYER AGENCE', amount: 40000 }]);
+  });
+
+  it('analyse : une catégorie ouverte donne ses sous-catégories et chacune de ses dépenses, au total près', () => {
+    const db = shown();
+    const top = byCategory(db, '2026-10-26', TODAY);
+    for (const slice of top) {
+      const d = categoryDetail(db, slice.id, '2026-10-26', TODAY);
+      expect(d.lines.reduce((s, l) => s + l.amount, 0)).toBe(slice.amount);
+      expect(d.subs.reduce((s, x) => s + x.amount, 0)).toBe(slice.amount);
+    }
+    // Les dépenses les plus récentes d'abord ; une catégorie sans dépense sur la période n'a rien.
+    const alim = categoryDetail(db, 'alim', '2026-10-26', TODAY);
+    expect(alim.lines.map((l) => l.date)).toEqual([...alim.lines.map((l) => l.date)].sort().reverse());
+    expect(categoryDetail(db, 'alim', '2020-01-01', '2020-01-31')).toEqual({ subs: [], lines: [] });
   });
 
   it('rythme du cycle : cumul jour après jour, écart au rythme idéal, projection, cycle précédent', () => {

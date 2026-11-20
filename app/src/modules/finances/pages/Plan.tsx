@@ -181,7 +181,9 @@ export function PlanPage() {
             {capped.length === 0 ? (
               <span className="t-small muted">Aucune enveloppe plafonnée. Facultatif : un plafond par cycle pour les courses, les sorties…</span>
             ) : (
-              <Glass className="fin-rings">
+              // Le verre ne défile pas : seule la rangée intérieure défile (un verre qui défile emporterait ses reflets).
+              <Glass className="fin-rings-frame">
+                <div className="fin-rings">
                 {capped.map((x) => (
                   <button key={x.envelope.id} type="button" onClick={() => setEnvelope(x.envelope)}>
                     <MiniRing fraction={x.spent / x.budget!} color="#5ccbe6" label={`${x.envelope.name} : ${Math.round((x.spent / x.budget!) * 100)} % du budget`} />
@@ -189,6 +191,7 @@ export function PlanPage() {
                     <span className="t-small muted" style={x.spent > x.budget! ? { color: '#ff9a62' } : undefined}>{x.spent > x.budget! ? `dépassé de ${short(x.spent - x.budget!)}` : `${short(x.budget! - x.spent)} restants`}</span>
                   </button>
                 ))}
+                </div>
               </Glass>
             )}
 

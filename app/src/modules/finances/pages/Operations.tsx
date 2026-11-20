@@ -7,7 +7,7 @@ import { useEngine } from '../data/engineStore';
 import { toClassify } from '../engine/automation';
 import type { Flow } from '../engine/schema';
 import { addManual, addReceivable, classifyAllocation, classifyMerchant, patchAllocation, removeManual, setSplit } from '../engine/state';
-import { byCategory, cashflow, lastCycles, settledIn, spendByDay, topMerchants } from '../engine/views';
+import { byCategory, cashflow, categoryDetail, lastCycles, settledIn, spendByDay, topMerchants } from '../engine/views';
 import { CashflowBars, Donut, Histogram } from './charts';
 import { Avatar, Screen, Sec, type Ready } from './common';
 import { opViews, type OpView } from './opViews';
@@ -31,6 +31,42 @@ const dayTitle = (iso: string, today: string) => (iso === today ? 'Aujourd’hui
 const month = (iso: string) => new Intl.DateTimeFormat('fr-FR', { month: 'short' }).format(new Date(`${iso}T12:00:00`));
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+/** La fiche de l'opération ouverte (`?op=`), dans la liste comme dans l'analyse. */
+function OpenedSheet({ r }: { r: Ready }) {
+  const { db, update } = r;
+  const [params, setParams] = useSearchParams();
+  const all = useMemo(() => opViews(db), [db]);
+  const opened = all.find((o) => o.tx.id === params.get('op')) ?? null;
+  const categories = db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId && c.scope === 'EXPENSE');
+  const accounts = db.accounts.filter((a) => !a.archivedAt);
+  const close = (key: string) => {
+    params.delete(key);
+    setParams(params, { replace: true });
+  };
+  return (
+    <>
+        <OperationSheet
+        op={opened}
+        account={accounts.find((a) => a.id === opened?.tx.accountId)?.name ?? ''}
+        categories={categories}
+        tags={db.tags.filter((t) => !t.archivedAt)}
+        onClose={() => close('op')}
+        onClassify={(op: OpView, flow, cat, whole) => {
+          update((s) => (whole && op.tx.merchantId ? classifyMerchant(s, op.tx.merchantId, flow, cat) : classifyAllocation(s, op.lines[0]!.id, flow, cat)));
+          close('op');
+        }}
+        onPatch={(id, patch) => update((s) => patchAllocation(s, id, patch))}
+        onAdvance={(allocationId, person, amount) => update((s) => addReceivable(s, { id: `avance:${crypto.randomUUID().slice(0, 8)}`, person, amount, allocationId }))}
+        onSplit={(id, parts) => update((s) => setSplit(s, id, parts))}
+        onRemove={(id) => {
+          update((s) => removeManual(s, id, db.accounts.find((a) => a.id === opened?.tx.accountId)));
+          close('op');
+        }}
+        />
+    </>
+  );
+}
+
 function Liste({ r }: { r: Ready }) {
   const { db, e, today, update } = r;
   const [params, setParams] = useSearchParams();
@@ -38,7 +74,7 @@ function Liste({ r }: { r: Ready }) {
   const [period, setPeriod] = useState<Period>('cycle');
   const [accountId, setAccountId] = useState('');
   const [nature, setNature] = useState('');
-  const [categoryId, setCategoryId] = useState('');
+  const [categoryId, setCategoryId] = useState(() => params.get('categorie') ?? '');
   const [dayOnly, setDayOnly] = useState<string | null>(null);
   const [filters, setFilters] = useState(false);
   const [limit, setLimit] = useState(60);
@@ -68,7 +104,6 @@ function Liste({ r }: { r: Ready }) {
   const spend = useMemo(() => spendByDay(db, settled, e.cycle.start, today), [db, settled, e.cycle.start, today]);
   const histogram = Array.from({ length: diffDays(e.cycle.start, today) + 1 }, (_, i) => addDays(e.cycle.start, i)).map((date) => ({ date, value: Math.max(0, spend.get(date) ?? 0) }));
   const groups = toClassify(db);
-  const opened = all.find((o) => o.tx.id === params.get('op')) ?? null;
   const adding = params.get('ajouter') === '1';
   const close = (key: string) => {
     params.delete(key);
@@ -209,24 +244,7 @@ function Liste({ r }: { r: Ready }) {
         </Button>
       </Form>
 
-      <OperationSheet
-        op={opened}
-        account={accounts.find((a) => a.id === opened?.tx.accountId)?.name ?? ''}
-        categories={categories}
-        tags={db.tags.filter((t) => !t.archivedAt)}
-        onClose={() => close('op')}
-        onClassify={(op: OpView, flow, cat, whole) => {
-          update((s) => (whole && op.tx.merchantId ? classifyMerchant(s, op.tx.merchantId, flow, cat) : classifyAllocation(s, op.lines[0]!.id, flow, cat)));
-          close('op');
-        }}
-        onPatch={(id, patch) => update((s) => patchAllocation(s, id, patch))}
-        onAdvance={(allocationId, person, amount) => update((s) => addReceivable(s, { id: `avance:${crypto.randomUUID().slice(0, 8)}`, person, amount, allocationId }))}
-        onSplit={(id, parts) => update((s) => setSplit(s, id, parts))}
-        onRemove={(id) => {
-          update((s) => removeManual(s, id, db.accounts.find((a) => a.id === opened?.tx.accountId)));
-          close('op');
-        }}
-      />
+      <OpenedSheet r={r} />
       <AddSheet
         open={adding}
         today={today}
@@ -243,15 +261,34 @@ function Liste({ r }: { r: Ready }) {
   );
 }
 
+const SPANS = [
+  { id: 'cycle', label: 'Ce cycle' },
+  { id: 'avant', label: 'Cycle dernier' },
+  { id: 'trois', label: '3 cycles' },
+] as const;
+
 function Analyse({ r }: { r: Ready }) {
   const { db, e, today } = r;
+  const [params, setParams] = useSearchParams();
+  const [period, setPeriod] = useState<(typeof SPANS)[number]['id']>('cycle');
+  const [open, setOpen] = useState<string | null | undefined>(undefined);
   const cycles = lastCycles(db, today, 6);
   const previous = cycles[cycles.length - 2]!;
-  const slices = byCategory(db, e.cycle.start, today);
+  // La période analysée : le cycle en cours (jusqu'à aujourd'hui), le précédent en entier, ou les trois derniers.
+  const [from, to] = period === 'cycle' ? [e.cycle.start, today] : period === 'avant' ? [previous.start, previous.end] : [cycles[cycles.length - 3]!.start, today];
+  const slices = byCategory(db, from, to);
   const total = slices.reduce((s, x) => s + x.amount, 0);
-  const shown = slices.length > 6 ? [...slices.slice(0, 5), { id: 'autres', name: 'Autres', color: '#94a3b8', amount: slices.slice(5).reduce((s, x) => s + x.amount, 0) }] : slices;
-  // Le cycle dernier, arrêté au même nombre de jours : on compare ce qui est comparable.
+  // Toutes les catégories de dépense, même celles qui n'ont rien eu sur la période : on voit aussi ce qui ne coûte rien.
+  const idle = db.categories.filter((c) => c.scope === 'EXPENSE' && !c.parentId && !c.archivedAt && !c.mergedIntoId && !slices.some((x) => x.id === c.id));
+  // Le cycle dernier, arrêté au même nombre de jours : on compare ce qui est comparable (seulement pour le cycle en cours).
   const before = new Map(byCategory(db, previous.start, addDays(previous.start, diffDays(e.cycle.start, today))).map((x) => [x.id, x.amount]));
+  const views = useMemo(() => new Map(opViews(db).map((o) => [o.tx.id, o])), [db]);
+  const selected = open === undefined ? undefined : slices.find((x) => x.id === open) ?? null;
+  const detail = open === undefined ? null : categoryDetail(db, open, from, to);
+  const openOp = (id: string) => {
+    params.set('op', id);
+    setParams(params, { replace: true });
+  };
   const diffs = slices
     .map((x) => ({ ...x, diff: x.amount - (before.get(x.id) ?? 0) }))
     .filter((x) => x.diff !== 0 && x.id !== null)
@@ -261,28 +298,89 @@ function Analyse({ r }: { r: Ready }) {
   const flows = cashflow(db, cycles, today);
   const past = flows.slice(0, -1).filter((x) => x.income > 0 || x.expense > 0);
   const net = past.length ? Math.round(past.reduce((s, x) => s + x.income - x.expense, 0) / past.length) : 0;
-  const merchants = topMerchants(db, e.cycle.start, today, 5);
+  const merchants = topMerchants(db, from, to, 5);
   const top = merchants[0]?.amount ?? 1;
-  if (total === 0 && past.length === 0) return <EmptyState title="Rien à analyser encore" body="Les graphiques apparaissent dès les premières dépenses du cycle." />;
+  const biggest = slices[0]?.amount ?? 1;
+  if (total === 0 && past.length === 0 && period === 'cycle') return <EmptyState title="Rien à analyser encore" body="Les graphiques apparaissent dès les premières dépenses du cycle." />;
   return (
     <>
+      <Segmented label="Période analysée" value={period} options={SPANS} onChange={(v) => { setPeriod(v); setOpen(undefined); }} />
       <Glass style={{ padding: 18, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-        <Donut slices={shown.map((x) => ({ key: x.id ?? 'null', color: x.color, amount: x.amount }))} label={`Dépenses du cycle par catégorie : ${shown.map((x) => `${x.name} ${euros(x.amount, { round: true })}`).join(', ')}`}>
-          <span className="fin-num" style={{ fontSize: 24 }}>{euros(total, { round: true })}</span>
-          <span className="t-small muted">ce cycle</span>
+        <Donut
+          slices={slices.map((x) => ({ key: x.id ?? 'null', color: x.color, amount: x.amount }))}
+          selected={open === undefined ? null : (open ?? 'null')}
+          onSelect={(key) => setOpen(key === null ? undefined : key === 'null' ? null : key)}
+          label={`Dépenses par catégorie : ${slices.map((x) => `${x.name} ${euros(x.amount, { round: true })}`).join(', ')}`}
+        >
+          <span className="fin-num" style={{ fontSize: 24 }}>{euros(selected ? selected.amount : total, { round: true })}</span>
+          <span className="t-small muted" style={{ maxWidth: 110, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected ? `${selected.name} · ${Math.round((selected.amount / (total || 1)) * 100)} %` : SPANS.find((p) => p.id === period)!.label.toLowerCase()}</span>
         </Donut>
-        <div style={{ flex: '1 1 140px', display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0 }}>
-          {shown.map((x) => (
-            <span key={x.id ?? 'null'} className="fin-legend">
-              <span className="fin-dot" style={{ background: x.color }} />
-              <span className="grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</span>
-              <b>{euros(x.amount, { round: true })}</b>
-            </span>
-          ))}
-        </div>
       </Glass>
 
-      {diffs.length > 0 && (
+      <Sec action={`${slices.length} catégorie${slices.length > 1 ? 's' : ''}`}>Où part l’argent, catégorie par catégorie</Sec>
+      <Glass className="list" style={{ padding: '4px 16px' }}>
+        {slices.map((x) => {
+          const shown = open !== undefined && open === x.id;
+          const was = period === 'cycle' ? before.get(x.id) : undefined;
+          return (
+            <div key={x.id ?? 'null'} className="fin-cat" data-open={shown}>
+              <button type="button" className="fin-cat-row" aria-expanded={shown} onClick={() => setOpen(shown ? undefined : x.id)}>
+                <span className="fin-dot" style={{ background: x.color, width: 12, height: 12 }} />
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+                  <span className="row" style={{ gap: 8 }}>
+                    <span className="grow t-strong" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.name}</span>
+                    <span className="t-small muted">{Math.round((x.amount / (total || 1)) * 100)} %</span>
+                    <span className="t-strong" style={{ minWidth: 64, textAlign: 'right' }}>{euros(x.amount, { round: true })}</span>
+                  </span>
+                  <span className="fin-hbar" style={{ width: `${Math.max(3, (x.amount / biggest) * 100)}%`, background: x.color }} />
+                  {was !== undefined && was !== x.amount && <span className="t-small" style={{ color: x.amount > was ? '#ff9a62' : 'var(--ok)' }}>{euros(x.amount - was, { round: true, sign: true })} par rapport au cycle dernier, au même jour</span>}
+                </span>
+              </button>
+              {shown && detail && (
+                <div className="fin-cat-detail">
+                  {detail.subs.length > 1 && (
+                    <div className="fin-subs">
+                      {detail.subs.map((s) => (
+                        <span key={s.id ?? 'null'} className="fin-sub"><span className="fin-dot" style={{ background: s.color }} />{s.name}<b>{euros(s.amount, { round: true })}</b></span>
+                      ))}
+                    </div>
+                  )}
+                  {detail.lines.slice(0, 40).map((l, i) => {
+                    const v = views.get(l.transactionId);
+                    return (
+                      <button key={`${l.transactionId}${i}`} type="button" className="fin-cat-op" onClick={() => openOp(l.transactionId)}>
+                        {v ? <Avatar op={v} /> : null}
+                        <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0, textAlign: 'left' }}>
+                          <span className="t-body" style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v?.name ?? '?'}</span>
+                          <span className="t-small muted">{day(l.date)}</span>
+                        </span>
+                        <span className={`t-strong ${l.amount < 0 ? 'c-ok' : ''}`}>{euros(-l.amount, { sign: l.amount < 0 })}</span>
+                      </button>
+                    );
+                  })}
+                  {detail.lines.length > 40 && <span className="t-small muted">Et {detail.lines.length - 40} autres.</span>}
+                  {x.id && (
+                    <Link to={`/argent/operations?categorie=${encodeURIComponent(x.id)}`} className="link t-small" style={{ alignSelf: 'flex-start', padding: '6px 0 10px' }}>
+                      Voir dans la liste des opérations
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {idle.map((c) => (
+          <div key={c.id} className="fin-cat-row" style={{ opacity: 0.5 }}>
+            <span className="fin-dot" style={{ background: c.color, width: 12, height: 12 }} />
+            <span className="grow t-body">{c.name}</span>
+            <span className="t-small muted">rien</span>
+          </div>
+        ))}
+        {slices.length === 0 && idle.length === 0 && <span className="t-small muted" style={{ padding: '12px 0', display: 'block' }}>Aucune dépense sur cette période.</span>}
+      </Glass>
+      <OpenedSheet r={r} />
+
+      {period === 'cycle' && diffs.length > 0 && (
         <>
           <Sec>Par rapport au cycle dernier, au même jour</Sec>
           <Glass className="fin-diff" style={{ padding: 16 }}>

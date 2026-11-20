@@ -75,6 +75,8 @@ export interface EngineState {
   simulations?: Record<string, Partial<Simulation>>;
   /** Ce que l'utilisateur compte placer chaque mois, pour la projection (centimes). Absent : ce que prévoit le plan. */
   projectionMonthly?: number | null;
+  /** La durée de la projection, en années (5 à 40). Absent : 10 ans. */
+  projectionYears?: number;
   settings: EngineSettings;
   carryIn: Db['carryIn'];
   /** Début du cycle en cours la dernière fois que le moteur a tourné : sert à détecter qu'un cycle s'est terminé. */

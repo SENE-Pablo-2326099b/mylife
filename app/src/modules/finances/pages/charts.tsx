@@ -40,11 +40,21 @@ export function Ring({ fraction, label, tone = 'ok', children }: { fraction: num
   );
 }
 
+/** L'indice d'un point sous le doigt ou la souris, d'après sa position horizontale dans un SVG de largeur `width`. */
+function pickIndex(e: PointerEvent<SVGSVGElement>, width: number, at: (i: number) => number, count: number): number {
+  const box = e.currentTarget.getBoundingClientRect();
+  const px = ((e.clientX - box.left) / box.width) * width;
+  let best = 0;
+  for (let i = 1; i < count; i++) if (Math.abs(at(i) - px) < Math.abs(at(best) - px)) best = i;
+  return best;
+}
+
 /**
  * Les dépenses cumulées du cycle : ce cycle (trait plein, jusqu'à aujourd'hui), le rythme idéal (pointillés, de zéro
- * au budget du cycle) et le cycle précédent (trait fin). Une seule échelle pour les trois.
+ * au budget du cycle) et le cycle précédent (trait fin). Une seule échelle pour les trois. Un doigt ou la souris
+ * promène un curseur sur les jours du cycle (`onPick`) ; sans geste, il est sur aujourd'hui.
  */
-export function PaceChart({ current, previous, pot, length, label, format, labels }: { current: number[]; previous: number[]; pot: number; length: number; label: string; format: (cents: number) => string; labels: [string, string] }) {
+export function PaceChart({ current, previous, pot, length, label, format, labels, picked, onPick }: { current: number[]; previous: number[]; pot: number; length: number; label: string; format: (cents: number) => string; labels: [string, string]; picked?: number | null; onPick?: (i: number | null) => void }) {
   const id = useId();
   const top = Math.max(pot, ...current, ...previous, 1);
   const [X0, X1, Y0, Y1] = [54, 318, 128, 16];
@@ -54,8 +64,19 @@ export function PaceChart({ current, previous, pot, length, label, format, label
   const day = current.length - 1;
   const line = path(current);
   const ticks = [top, top / 2, 0];
+  const at = picked ?? day;
+  const ideal = pot > 0 ? (pot * Math.min(at, length)) / length : null;
+  const pick = (e: PointerEvent<SVGSVGElement>) => onPick?.(pickIndex(e, 326, x, length + 1));
   return (
-    <svg role="img" aria-label={label} viewBox="0 0 326 156" style={{ width: '100%', height: 'auto', maxHeight: 190 }}>
+    <svg
+      role="img"
+      aria-label={label}
+      viewBox="0 0 326 156"
+      style={{ width: '100%', height: 'auto', maxHeight: 200, touchAction: 'pan-y', cursor: onPick ? 'crosshair' : undefined }}
+      onPointerDown={onPick ? pick : undefined}
+      onPointerMove={onPick ? (e) => (e.pointerType === 'mouse' || e.buttons) && pick(e) : undefined}
+      onPointerLeave={onPick ? () => onPick(null) : undefined}
+    >
       <defs>
         <linearGradient id={`${id}l`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={GRAD_A} />
@@ -76,25 +97,40 @@ export function PaceChart({ current, previous, pot, length, label, format, label
       {pot > 0 && <line x1={x(0)} y1={y(0)} x2={x(length)} y2={y(pot)} stroke="var(--warn)" strokeWidth="2" strokeDasharray="2 6" strokeLinecap="round" />}
       <path d={`${line} L${x(day).toFixed(1)} ${Y0} L${X0} ${Y0} Z`} fill={`url(#${id}f)`} />
       <path d={line} fill="none" stroke={`url(#${id}l)`} strokeWidth="3.2" strokeLinejoin="round" strokeLinecap="round" />
-      <line x1={x(day)} y1={Y1 - 4} x2={x(day)} y2={Y0} stroke="var(--ink-2)" strokeOpacity="0.5" strokeWidth="1" strokeDasharray="2 4" />
-      <circle cx={x(day)} cy={y(current[day] ?? 0)} r="6" fill="var(--ink)" />
+      <line x1={x(at)} y1={Y1 - 4} x2={x(at)} y2={Y0} stroke="var(--ink-2)" strokeOpacity={picked != null ? 0.9 : 0.5} strokeWidth={picked != null ? 1.5 : 1} strokeDasharray={picked != null ? undefined : '2 4'} />
+      {previous.length > at && <circle cx={x(at)} cy={y(previous[at]!)} r="4" fill="var(--bg)" stroke="var(--ink-2)" strokeWidth="2" />}
+      {ideal !== null && <circle cx={x(at)} cy={y(ideal)} r="4" fill="var(--warn)" />}
+      {at <= day && <circle cx={x(at)} cy={y(current[at] ?? 0)} r="6" fill="var(--ink)" />}
       <text x={X0} y="150" className="fin-axis">{labels[0]}</text>
-      {day > 3 && day < length - 3 && <text x={x(day)} y="150" textAnchor="middle" className="fin-axis" style={{ fill: 'var(--ink)' }}>auj.</text>}
+      {at > 3 && at < length - 3 && <text x={x(at)} y="150" textAnchor="middle" className="fin-axis" style={{ fill: 'var(--ink)' }}>{picked != null ? '' : 'auj.'}</text>}
       <text x={X1} y="150" textAnchor="end" className="fin-axis">{labels[1]}</text>
     </svg>
   );
 }
 
-/** Les derniers jours en barres, face au budget du jour (pointillés). Au-dessus : orange. Aujourd'hui : en clair. */
-export function DayBars({ days, budget, label }: { days: { key: string; name: string; value: number; today: boolean }[]; budget: number; label: string }) {
+/**
+ * Les derniers jours en barres, face au budget du jour (pointillés). Au-dessus : orange. Aujourd'hui : en clair. Un
+ * jour touché (ou survolé) est mis en avant (`onPick`).
+ */
+export function DayBars({ days, budget, label, picked, onPick }: { days: { key: string; name: string; value: number; today: boolean }[]; budget: number; label: string; picked?: string | null; onPick?: (key: string | null) => void }) {
   const id = useId();
   const max = Math.max(budget * 1.25, ...days.map((d) => d.value), 1);
   const H = 96;
   const y = (v: number) => 12 + H - (Math.max(0, v) / max) * H;
   const step = 320 / days.length;
-  const top = days.reduce((a, b) => (b.value > a.value ? b : a), days[0]!);
+  const w = Math.max(6, Math.min(28, step - 6));
+  const every = days.length > 10 ? 2 : 1;
+  const pick = (e: PointerEvent<SVGSVGElement>) => onPick?.(days[pickIndex(e, 320, (i) => i * step + step / 2, days.length)]!.key);
   return (
-    <svg role="img" aria-label={label} viewBox="0 0 320 132" style={{ width: '100%', height: 132 }}>
+    <svg
+      role="img"
+      aria-label={label}
+      viewBox="0 0 320 132"
+      style={{ width: '100%', height: 132, touchAction: 'pan-y', cursor: onPick ? 'pointer' : undefined }}
+      onPointerDown={onPick ? pick : undefined}
+      onPointerMove={onPick ? (e) => (e.pointerType === 'mouse' || e.buttons) && pick(e) : undefined}
+      onPointerLeave={onPick ? () => onPick(null) : undefined}
+    >
       <defs>
         <linearGradient id={`${id}b`} x1="0" y1="1" x2="0" y2="0">
           <stop offset="0" stopColor={GRAD_A} />
@@ -104,21 +140,20 @@ export function DayBars({ days, budget, label }: { days: { key: string; name: st
       {budget > 0 && <line x1="0" y1={y(budget)} x2="320" y2={y(budget)} stroke="var(--ink-2)" strokeWidth="1.5" strokeDasharray="3 6" />}
       {days.map((d, i) => {
         const h = Math.max(d.value > 0 ? 4 : 0, 12 + H - y(d.value));
-        const x = i * step + (step - 28) / 2;
+        const x = i * step + (step - w) / 2;
+        const lit = picked === d.key;
+        const dim = picked != null && !lit;
         return (
-          <g key={d.key}>
-            {h > 0 && <rect x={x} y={12 + H - h} width="28" height={h} rx={Math.min(8, h / 2)} fill={d.today ? 'var(--ink)' : d.value > budget && budget > 0 ? '#ff9a62' : `url(#${id}b)`} />}
-            <text x={x + 14} y="126" textAnchor="middle" className="fin-axis" style={d.today ? { fill: 'var(--ink)' } : undefined}>
-              {d.name}
-            </text>
+          <g key={d.key} opacity={dim ? 0.45 : 1}>
+            {h > 0 && <rect x={x} y={12 + H - h} width={w} height={h} rx={Math.min(w / 3.5, h / 2)} fill={d.today || lit ? 'var(--ink)' : d.value > budget && budget > 0 ? '#ff9a62' : `url(#${id}b)`} />}
+            {(i % every === (days.length - 1) % every || lit) && (
+              <text x={x + w / 2} y="126" textAnchor="middle" className="fin-axis" style={d.today || lit ? { fill: 'var(--ink)', fontWeight: 700 } : undefined}>
+                {d.name}
+              </text>
+            )}
           </g>
         );
       })}
-      {top && top.value > budget && budget > 0 && (
-        <text x={days.indexOf(top) * step + step / 2} y={Math.max(10, y(top.value) - 5)} textAnchor="middle" className="fin-axis" style={{ fill: '#ff9a62', fontWeight: 700 }}>
-          {Math.round(top.value / 100)} €
-        </text>
-      )}
     </svg>
   );
 }
@@ -151,24 +186,39 @@ export function Histogram({ days, selected, onSelect, label }: { days: { date: s
 }
 
 /** L'anneau par catégorie, le total au centre. */
-export function Donut({ slices, label, children }: { slices: { key: string; color: string; amount: number }[]; label: string; children: ReactNode }) {
+export function Donut({ slices, label, children, selected = null, onSelect }: { slices: { key: string; color: string; amount: number }[]; label: string; children: ReactNode; selected?: string | null; onSelect?: (key: string | null) => void }) {
   const total = slices.reduce((s, x) => s + x.amount, 0);
   const C = 2 * Math.PI * 70;
   let offset = 0;
   return (
-    <div style={{ position: 'relative', width: 168, height: 168, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg role="img" aria-label={label} viewBox="0 0 180 180" style={{ position: 'absolute', inset: 0, width: 168, height: 168 }}>
-        <g transform="rotate(-90 90 90)" fill="none" strokeWidth="22">
-          {total === 0 && <circle cx="90" cy="90" r="70" stroke="var(--line)" />}
+    <div style={{ position: 'relative', width: 188, height: 188, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg role="img" aria-label={label} viewBox="0 0 180 180" style={{ position: 'absolute', inset: 0, width: 188, height: 188, overflow: 'visible' }}>
+        <g transform="rotate(-90 90 90)" fill="none">
+          {total === 0 && <circle cx="90" cy="90" r="70" stroke="var(--line)" strokeWidth="22" />}
           {slices.map((s) => {
             const len = (s.amount / total) * C;
             const at = offset;
             offset += len;
-            return <circle key={s.key} cx="90" cy="90" r="70" stroke={s.color} strokeDasharray={`${Math.max(0, len - (slices.length > 1 ? 3 : 0))} ${C}`} strokeDashoffset={-at} />;
+            const lit = selected === s.key;
+            return (
+              <circle
+                key={s.key}
+                cx="90"
+                cy="90"
+                r="70"
+                stroke={s.color}
+                strokeWidth={lit ? 30 : 22}
+                opacity={selected && !lit ? 0.35 : 1}
+                strokeDasharray={`${Math.max(0, len - (slices.length > 1 ? 3 : 0))} ${C}`}
+                strokeDashoffset={-at}
+                style={{ cursor: onSelect ? 'pointer' : undefined, transition: 'stroke-width .2s ease, opacity .2s ease' }}
+                onClick={onSelect ? () => onSelect(lit ? null : s.key) : undefined}
+              />
+            );
           })}
         </g>
       </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15 }}>{children}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.15, pointerEvents: 'none' }}>{children}</div>
     </div>
   );
 }
@@ -422,15 +472,15 @@ export function SimChart({ points, label, format }: { points: { year: number; pa
 }
 
 /** La projection : aujourd'hui, puis un cône qui s'élargit jusqu'à 10 ans, avec trois jalons. */
-export function ConeChart({ now, marks, low, high, format }: { now: number; marks: { years: number; value: number }[]; low: number; high: number; format: (cents: number) => string }) {
+export function ConeChart({ now, marks, low, high, format, horizon = 10 }: { now: number; marks: { years: number; value: number }[]; low: number; high: number; format: (cents: number) => string; horizon?: number }) {
   const top = Math.max(high, now, 1);
   const bottom = Math.min(now, low);
-  const x = (years: number) => 40 + (years / 10) * 272;
+  const x = (years: number) => 40 + (years / horizon) * 272;
   const y = (v: number) => 20 + (1 - (v - bottom) / (top - bottom || 1)) * 116;
   const last = marks[marks.length - 1]!;
   return (
     <svg role="img" aria-label={`Projection du patrimoine : ${marks.map((m) => `${format(m.value)} dans ${m.years} an${m.years > 1 ? 's' : ''}`).join(', ')}`} viewBox="0 0 320 170" style={{ width: '100%', height: 170 }}>
-      <path d={`M${x(0)} ${y(now)} L${x(10)} ${y(high)} L${x(10)} ${y(low)} Z`} fill={GRAD_A} opacity="0.26" />
+      <path d={`M${x(0)} ${y(now)} L${x(horizon)} ${y(high)} L${x(horizon)} ${y(low)} Z`} fill={GRAD_A} opacity="0.26" />
       <path d={`M2 ${Math.min(150, y(now) + 12)} L${x(0)} ${y(now)}`} fill="none" stroke="#6fe0a0" strokeWidth="3" strokeLinecap="round" />
       <path d={`M${x(0)} ${y(now)} ${marks.map((m) => `L${x(m.years)} ${y(m.value)}`).join(' ')}`} fill="none" stroke="#cdbeff" strokeWidth="2.5" strokeDasharray="2 7" strokeLinecap="round" />
       <circle cx={x(0)} cy={y(now)} r="5" fill="var(--ink)" />

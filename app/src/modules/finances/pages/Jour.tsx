@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Glass, Icon, IconButton } from '@mylife/kit';
 import { addDays } from '../core/dates';
@@ -15,24 +16,36 @@ import { day, KIND } from './labels';
  * jours face au budget du jour, ce qui attend d'être classé, ce qui tombe bientôt, et les opérations du jour.
  */
 const longDay = (iso: string) => new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${iso}T12:00:00`));
-const shortDay = (iso: string) => new Intl.DateTimeFormat('fr-FR', { weekday: 'short' }).format(new Date(`${iso}T12:00:00`)).replace('.', '');
 const TONE = { INCOME: '#5ccbe6', CHARGE: '#f472b6', INSTALLMENT: '#f472b6', SAVING: '#6fe0a0' } as const;
+
+const DAYS = 14;
 
 export function JourPage() {
   const engine = useEngine();
+  const [paceDay, setPaceDay] = useState<number | null>(null);
+  const [barDay, setBarDay] = useState<string | null>(null);
   return (
     <Screen engine={engine} tone="jour" kicker={longDay(engine.today)} title="Jour" right={<IconButton icon="settings" label="Réglages de MyFinances" href="/argent/reglages" />}>
       {({ db, e, today }) => {
         const over = e.resteAujourdhui < 0;
         const groups = toClassify(db);
         const settled = settledIn(db, lastCycles(db, today, 2));
-        const week = spendByDay(db, settled, addDays(today, -6), today);
-        const days = Array.from({ length: 7 }, (_, i) => addDays(today, i - 6)).map((d) => ({ key: d, name: d === today ? 'auj.' : shortDay(d), value: Math.max(0, week.get(d) ?? 0), today: d === today }));
+        const week = spendByDay(db, settled, addDays(today, -(DAYS - 1)), today);
+        const days = Array.from({ length: DAYS }, (_, i) => addDays(today, i - (DAYS - 1))).map((d) => ({ key: d, name: d === today ? 'auj.' : String(Number(d.slice(8))), value: Math.max(0, week.get(d) ?? 0), today: d === today }));
+        const barPicked = days.find((d) => d.key === barDay) ?? null;
+        const fortnight = days.reduce((sum, d) => sum + d.value, 0);
         const overDays = days.filter((d) => !d.today && d.value > e.budgetJour && e.budgetJour > 0).length;
         const upcoming = e.occurrences.filter((o) => o.status === 'DUE' || o.status === 'PARTIAL').slice(0, 8);
         const todays = opViews(db).filter((o) => o.tx.date === today);
         const left = Math.max(0, e.disponible - e.spentToday);
         const rhythm = pace(db, e, today);
+        // Le curseur du graphique cumulé : un jour du cycle (0 = avant le premier jour), aujourd'hui sans geste.
+        const at = paceDay ?? rhythm.day;
+        const atDate = addDays(e.cycle.start, Math.max(0, at - 1));
+        const atSpent = at <= rhythm.day ? (rhythm.current[at] ?? 0) : null;
+        const atIdeal = Math.round((Math.max(0, rhythm.pot) * Math.min(at, rhythm.length)) / rhythm.length);
+        const atPrevious = rhythm.previous.length > at ? rhythm.previous[at]! : null;
+        const atGap = atSpent === null ? null : atIdeal - atSpent;
         return (
           <>
             <Ring fraction={e.pot > 0 ? e.spent / e.pot : e.spent > 0 ? 1 : 0} tone={over || e.deficit > 0 ? 'warn' : 'ok'} label={`${Math.round((e.pot > 0 ? e.spent / e.pot : 0) * 100)} % du budget du cycle déjà dépensé`}>
@@ -66,15 +79,27 @@ export function JourPage() {
               <>
                 <Sec action={`sur ${euros(e.pot, { round: true })} de budget`}>Tes dépenses du cycle, cumulées</Sec>
                 <Glass className="list" style={{ padding: '16px 14px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }} aria-live="polite">
                     <span style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span className="fin-num" style={{ fontSize: 26, lineHeight: 1.1 }}>{euros(rhythm.spent, { round: true })}</span>
-                      <span className="t-small muted">dépensés en {rhythm.day} jour{rhythm.day > 1 ? 's' : ''}</span>
+                      <span className="fin-num" style={{ fontSize: 26, lineHeight: 1.1 }}>{atSpent === null ? '—' : euros(atSpent, { round: true })}</span>
+                      <span className="t-small muted">{paceDay === null ? `dépensés en ${rhythm.day} jour${rhythm.day > 1 ? 's' : ''}` : at === 0 ? 'au début du cycle' : atSpent === null ? `le ${day(atDate)}, à venir` : `dépensés au ${day(atDate)}`}</span>
                     </span>
-                    <span className="fin-gap" data-late={rhythm.gap < 0}>
-                      <span className="fin-num" style={{ fontSize: 18, lineHeight: 1.15 }}>{euros(Math.abs(rhythm.gap), { round: true })} {rhythm.gap < 0 ? 'de retard' : 'd’avance'}</span>
-                      <span className="t-small">sur le rythme idéal</span>
-                    </span>
+                    {atGap !== null ? (
+                      <span className="fin-gap" data-late={atGap < 0}>
+                        <span className="fin-num" style={{ fontSize: 18, lineHeight: 1.15 }}>{euros(Math.abs(atGap), { round: true })} {atGap < 0 ? 'de retard' : 'd’avance'}</span>
+                        <span className="t-small">sur le rythme idéal</span>
+                      </span>
+                    ) : (
+                      <span className="fin-gap">
+                        <span className="fin-num" style={{ fontSize: 18, lineHeight: 1.15 }}>{euros(atIdeal, { round: true })}</span>
+                        <span className="t-small">au rythme idéal</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="fin-readout">
+                    <span><i style={{ background: 'var(--warn)' }} />idéal <b>{euros(atIdeal, { round: true })}</b></span>
+                    {atPrevious !== null && <span><i style={{ background: 'var(--ink-2)' }} />cycle dernier <b>{euros(atPrevious, { round: true })}</b></span>}
+                    <span className="muted">{paceDay === null ? 'glisse le doigt sur le graphique' : at === 0 ? '' : day(atDate)}</span>
                   </div>
                   <PaceChart
                     current={rhythm.current}
@@ -83,6 +108,8 @@ export function JourPage() {
                     length={rhythm.length}
                     format={(v) => euros(v, { round: true })}
                     labels={[day(e.cycle.start), day(e.cycle.end)]}
+                    picked={paceDay}
+                    onPick={setPaceDay}
                     label={`Dépenses cumulées du cycle : ${euros(rhythm.spent, { round: true })} au jour ${rhythm.day} sur ${rhythm.length}, pour un rythme idéal de ${euros(rhythm.ideal, { round: true })}${rhythm.previousSameDay !== null ? ` ; ${euros(rhythm.previousSameDay, { round: true })} au même jour du cycle précédent` : ''}`}
                   />
                   <div className="fin-legend">
@@ -98,9 +125,13 @@ export function JourPage() {
               </>
             )}
 
-            <Sec action={overDays > 0 ? `${overDays} jour${overDays > 1 ? 's' : ''} au-dessus` : 'budget du jour en pointillés'}>Tes 7 derniers jours</Sec>
-            <Glass style={{ padding: '16px 16px 10px' }}>
-              <DayBars days={days} budget={e.budgetJour} label={`Dépenses des 7 derniers jours comparées au budget du jour de ${euros(e.budgetJour)} : ${overDays} au-dessus`} />
+            <Sec action={overDays > 0 ? `${overDays} jour${overDays > 1 ? 's' : ''} au-dessus` : 'budget du jour en pointillés'}>Tes {DAYS} derniers jours</Sec>
+            <Glass style={{ padding: '14px 16px 10px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div className="row" style={{ justifyContent: 'space-between' }} aria-live="polite">
+                <span className={`t-small muted${barPicked ? ' fin-day-pick' : ''}`}>{barPicked ? longDay(barPicked.key) : `${euros(fortnight, { round: true })} en ${DAYS} jours`}</span>
+                <span className="t-strong" style={barPicked && barPicked.value > e.budgetJour && e.budgetJour > 0 ? { color: '#ff9a62' } : undefined}>{barPicked ? euros(barPicked.value) : `${euros(Math.round(fortnight / DAYS), { round: true })} par jour`}</span>
+              </div>
+              <DayBars days={days} budget={e.budgetJour} picked={barDay} onPick={setBarDay} label={`Dépenses des ${DAYS} derniers jours comparées au budget du jour de ${euros(e.budgetJour)} : ${overDays} au-dessus`} />
             </Glass>
 
             {groups.length > 0 && (

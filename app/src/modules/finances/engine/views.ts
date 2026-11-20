@@ -277,3 +277,33 @@ export function projectAccounts(net: number, placements: readonly { value: numbe
     return total - Math.max(0, a.value) + end[end.length - 1]!.value;
   }, net);
 }
+
+/**
+ * Vue analyse, une catégorie de premier niveau ouverte : ses sous-catégories et chacune de ses dépenses sur la
+ * période (mêmes règles que `byCategory` : montant complet, remboursement classé en moins, part avancée exclue).
+ * `topId` null : ce qui n'est pas classé.
+ */
+export function categoryDetail(db: Db, topId: string | null, from: ISODate, to: ISODate): { subs: Slice[]; lines: { transactionId: string; date: ISODate; amount: number; categoryId: string | null }[] } {
+  const dates = new Map(db.transactions.map((t) => [t.id, t.date]));
+  const cats = new Map(db.categories.map((c) => [c.id, c]));
+  const sums = new Map<string | null, number>();
+  const lines: { transactionId: string; date: ISODate; amount: number; categoryId: string | null }[] = [];
+  for (const a of db.allocations) {
+    const date = dates.get(a.transactionId);
+    if (!date || !inRange(date, from, to)) continue;
+    const expense = a.flow === 'EXPENSE' || (a.flow === null && a.amount < 0);
+    const refund = a.flow === 'REFUND' && !a.settlesReceivableId && (a.categoryId || a.linkedTransactionId);
+    if (!expense && !refund) continue;
+    const id = resolveCategory(db, a.categoryId);
+    const top = id ? (cats.get(id)?.parentId ?? id) : null;
+    if (top !== topId) continue;
+    const amount = -a.amount - (expense ? (a.receivableAmount ?? 0) : 0);
+    sums.set(id, (sums.get(id) ?? 0) + amount);
+    lines.push({ transactionId: a.transactionId, date, amount, categoryId: id });
+  }
+  const subs = [...sums]
+    .filter(([, amount]) => amount !== 0)
+    .map(([id, amount]) => ({ id, name: id === topId ? (id ? 'Sans sous-catégorie' : 'À classer') : (cats.get(id!)?.name ?? '?'), color: id ? (cats.get(id)?.color ?? '#94a3b8') : '#94a3b8', amount }))
+    .sort((a, b) => b.amount - a.amount);
+  return { subs, lines: lines.sort((a, b) => b.date.localeCompare(a.date) || b.amount - a.amount) };
+}

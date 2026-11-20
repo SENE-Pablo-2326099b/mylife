@@ -33,6 +33,15 @@ const RANGES = [
 ] as const;
 const dated = (iso: string, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('fr-FR', options).format(new Date(`${iso}T12:00:00`));
 const short = (v: number) => euros(v, { round: true });
+const HORIZONS = [5, 10, 15, 20, 30] as const;
+const SIM_KEY = 'mylife:finances:simulation';
+const readSimOpen = () => {
+  try {
+    return localStorage.getItem(SIM_KEY) === 'ouverte';
+  } catch {
+    return false;
+  }
+};
 const kilo = (v: number) => (Math.abs(v) >= 1000000 ? `${Math.round(v / 100000)} k€` : short(v));
 
 export function PatrimoinePage() {
@@ -45,6 +54,16 @@ export function PatrimoinePage() {
   const [portfolio, setPortfolio] = useState<RawPortfolio | 'new' | null>(null);
   const [goal, setGoal] = useState<Goal | 'new' | null>(null);
   const [other, setOther] = useState(false);
+  // La simulation est un outil d'appoint : repliée par défaut, elle garde son état sur l'appareil.
+  const [simOpen, setSimOpen] = useState(readSimOpen);
+  const toggleSim = (open: boolean) => {
+    setSimOpen(open);
+    try {
+      localStorage.setItem(SIM_KEY, open ? 'ouverte' : 'repliee');
+    } catch {
+      /* stockage indisponible : l'état vaut pour cette visite */
+    }
+  };
   const stopAdding = () => {
     params.delete('ajouter');
     setParams(params, { replace: true });
@@ -90,6 +109,9 @@ export function PatrimoinePage() {
         const at = (years: number, shift = 0) => (detailed ? projectAccounts(worth.net, earning, years, shift) : project(worth.net, sums.placements, monthly, Math.max(0, rate + shift), years));
         const paidMonthly = detailed ? earning.reduce((s, a) => s + a.sim.monthly, 0) : monthly;
         const custom = state.projectionMonthly != null && state.projectionMonthly !== planned;
+        // La durée : 5 à 40 ans ; trois jalons répartis sur la période (le dernier est la fin).
+        const years = Math.min(40, Math.max(5, state.projectionYears ?? 10));
+        const milestones = [...new Set([Math.max(1, Math.round(years / 5)), Math.round(years / 2), years])];
         return (
           <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -218,29 +240,56 @@ export function PatrimoinePage() {
               </button>
             ))}
 
-            <Sec action={detailed ? `${short(paidMonthly)} par mois, selon tes placements` : custom ? `Revenir au plan (${short(planned)})` : `ton plan prévoit ${short(planned)} par mois`} onAction={!detailed && custom ? () => update((s) => ({ ...s, projectionMonthly: null })) : undefined}>À ce rythme</Sec>
-            <Glass style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {detailed ? (
-                <span className="t-small muted">La projection additionne la simulation de chaque compte qui rapporte (versement, rendement, frais) : ouvre un compte pour régler la sienne.</span>
-              ) : (
-                <div className="grid-2">
-                  <Amount id="proj-monthly" label="Je place chaque mois" unit="€" max={1000000} value={monthly / 100} onChange={(v) => update((s) => ({ ...s, projectionMonthly: Math.round(v * 100) }))} />
-                  <Amount id="proj-rate" label="Rendement annuel" unit="%" max={30} value={rate / 100} onChange={(v) => update((s) => ({ ...s, projectionRateBp: Math.round(v * 100) }))} />
+            <Sec action={<button type="button" className="link" aria-expanded={simOpen} onClick={() => toggleSim(!simOpen)}>{simOpen ? 'Replier' : 'Simuler'}</button>}>À ce rythme</Sec>
+            {!simOpen ? (
+              <button type="button" className="glass fin-sim-fold" onClick={() => toggleSim(true)} aria-expanded={false}>
+                <span className="grow" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+                  <span className="t-small muted">Dans {years} ans, à {short(paidMonthly)} par mois</span>
+                  <span className="fin-num" style={{ fontSize: 22 }}>{kilo(at(years))}</span>
+                </span>
+                <span className="fin-chevron" style={{ transform: 'rotate(90deg)' }}><Icon name="chevron" size={16} /></span>
+              </button>
+            ) : (
+              <Glass className="fin-sim" style={{ padding: '16px 16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {detailed ? (
+                  <span className="t-small muted">La projection additionne la simulation de chaque compte qui rapporte (versement, rendement, frais) : ouvre un compte pour régler la sienne.</span>
+                ) : (
+                  <>
+                    <div className="grid-2">
+                      <Amount id="proj-monthly" label="Je place chaque mois" unit="€" max={1000000} value={monthly / 100} onChange={(v) => update((s) => ({ ...s, projectionMonthly: Math.round(v * 100) }))} />
+                      <Amount id="proj-rate" label="Rendement annuel" unit="%" max={30} value={rate / 100} onChange={(v) => update((s) => ({ ...s, projectionRateBp: Math.round(v * 100) }))} />
+                    </div>
+                    {custom && (
+                      <button type="button" className="link t-small" style={{ alignSelf: 'flex-start' }} onClick={() => update((s) => ({ ...s, projectionMonthly: null }))}>
+                        Revenir au plan ({short(planned)} par mois)
+                      </button>
+                    )}
+                  </>
+                )}
+                <div className="stack" style={{ gap: 6 }}>
+                  <span className="t-label muted">Sur combien de temps</span>
+                  <div className="segmented" role="group" aria-label="Durée de la simulation">
+                    {HORIZONS.map((h) => (
+                      <button key={h} type="button" aria-pressed={years === h} onClick={() => update((s) => ({ ...s, projectionYears: h }))}>
+                        {h} ans
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              )}
-              <ConeChart now={worth.net} marks={[1, 5, 10].map((years) => ({ years, value: at(years) }))} low={at(10, -200)} high={at(10, 200)} format={kilo} />
-              <div className="fin-proj">
-                <span>
-                  <span className="t-small muted">Versé en 10 ans</span>
-                  <span className="fin-num" style={{ fontSize: 17 }}>{short(paidMonthly * 120)}</span>
-                </span>
-                <span>
-                  <span className="t-small muted">Gagné par le rendement</span>
-                  <span className="fin-num c-ok" style={{ fontSize: 17 }}>{short(Math.max(0, at(10) - worth.net - paidMonthly * 120))}</span>
-                </span>
-              </div>
-              <span className="t-small muted">Une hypothèse, pas une promesse : le cône montre deux points de rendement en plus ou en moins.</span>
-            </Glass>
+                <ConeChart now={worth.net} horizon={years} marks={milestones.map((y) => ({ years: y, value: at(y) }))} low={at(years, -200)} high={at(years, 200)} format={kilo} />
+                <div className="fin-proj">
+                  <span>
+                    <span className="t-small muted">Versé en {years} ans</span>
+                    <span className="fin-num" style={{ fontSize: 17 }}>{short(paidMonthly * 12 * years)}</span>
+                  </span>
+                  <span>
+                    <span className="t-small muted">Gagné par le rendement</span>
+                    <span className="fin-num c-ok" style={{ fontSize: 17 }}>{short(Math.max(0, at(years) - worth.net - paidMonthly * 12 * years))}</span>
+                  </span>
+                </div>
+                <span className="t-small muted">Une hypothèse, pas une promesse : le cône montre deux points de rendement en plus ou en moins.</span>
+              </Glass>
+            )}
             <AskCopilot question="Comment évolue mon patrimoine, et que changerait 100 € de plus placés chaque mois ?" />
 
             <Form open={adding} title="Ajouter" onClose={stopAdding}>

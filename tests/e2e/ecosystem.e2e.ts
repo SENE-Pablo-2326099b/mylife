@@ -925,11 +925,21 @@ describe('MyLife, une seule app', () => {
     // ---- M5. Les écrans : Jour, Opérations et Analyse, À classer, Plan, Patrimoine, et leur navigation propre.
     await p.goto(`${server.url}/argent`);
     await p.getByRole('heading', { name: 'Jour' }).waitFor();
-    await p.getByText('Tes 7 derniers jours').waitFor();
+    await p.getByText('Tes 14 derniers jours').waitFor();
     await p.getByRole('img', { name: /du budget du cycle déjà dépensé/ }).waitFor();
     // Les dépenses cumulées du cycle, face au rythme idéal.
     await p.getByRole('img', { name: /Dépenses cumulées du cycle/ }).waitFor();
     await p.getByText('sur le rythme idéal').waitFor();
+    // Un curseur au doigt ou à la souris : le jour visé, ce qui était dépensé, l'idéal et le cycle dernier à ce jour.
+    const cumul = p.getByRole('img', { name: /Dépenses cumulées du cycle/ });
+    await cumul.hover({ position: { x: 70, y: 60 } });
+    await p.getByText(/dépensés au |au début du cycle/).waitFor();
+    await p.mouse.move(5, 5);
+    await p.getByText(/^dépensés en \d+ jours?$/).waitFor();
+    // Quatorze jours en barres ; un jour touché donne son montant.
+    const bars = p.getByRole('img', { name: /Dépenses des 14 derniers jours/ });
+    await bars.click({ position: { x: 300, y: 80 } });
+    await p.locator('.fin-day-pick').waitFor();
     await p.getByRole('img', { name: /Dépenses cumulées du cycle/ }).scrollIntoViewIfNeeded();
     await shot(p, '63b-finances-v5-jour-cumul');
     await p.evaluate(() => (document.documentElement.dataset.glass = 'prononce'));
@@ -971,8 +981,13 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('button', { name: 'Annuler' }).click();
     // Analyse, À classer, Plan, Patrimoine : chacun son graphique.
     await p.getByRole('button', { name: 'Analyse' }).click();
-    await p.getByRole('img', { name: /Dépenses du cycle par catégorie/ }).waitFor();
+    await p.getByRole('img', { name: /Dépenses par catégorie/ }).waitFor();
+    // Toutes les catégories ; une catégorie touchée se déplie sur ses dépenses ; « voir dans la liste » filtre la liste.
+    await p.getByRole('button', { name: /^Courses/ }).click();
+    await p.locator('.fin-cat-op').first().waitFor();
     await shot(p, '65-finances-v5-analyse');
+    await p.getByRole('group', { name: 'Période analysée' }).getByRole('button', { name: '3 cycles' }).click();
+    await p.getByRole('button', { name: /^Courses/ }).waitFor();
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await tabs.getByRole('link', { name: 'Plan' }).click();
     await p.getByRole('img', { name: /Où vont tes revenus du cycle/ }).waitFor();
@@ -990,6 +1005,9 @@ describe('MyLife, une seule app', () => {
     await shot(p, '66-finances-v5-plan');
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await tabs.getByRole('link', { name: 'Patrimoine' }).click();
+    // La simulation est repliée par défaut : une ligne ; « Simuler » la déplie (et elle le reste sur l'appareil).
+    await p.getByRole('button', { name: /^Dans 10 ans/ }).waitFor();
+    await p.getByRole('button', { name: 'Simuler' }).click();
     await p.getByRole('img', { name: /Projection du patrimoine/ }).waitFor();
     await p.getByRole('img', { name: /Répartition :/ }).waitFor();
     // Du général au détail : les familles d'abord ; une famille se déplie sur ses comptes ; un compte ouvre sa fiche.
@@ -1017,7 +1035,7 @@ describe('MyLife, une seule app', () => {
     await p.getByRole('link', { name: 'Retour', exact: true }).click();
     await p.getByRole('heading', { name: 'Patrimoine' }).waitFor();
     // La projection du patrimoine suit désormais la simulation des comptes.
-    await p.getByText(/selon tes placements/).waitFor();
+    await p.getByText(/La projection additionne la simulation/).waitFor();
     await p.goto(`${server.url}/argent/patrimoine/compte/${'x'}`);
     await p.getByRole('heading', { name: 'Patrimoine' }).waitFor();
     await p.getByRole('button', { name: /^Épargne/ }).click();
@@ -1071,6 +1089,10 @@ describe('MyLife, une seule app', () => {
     await p.getByLabel('Je place chaque mois (€)').fill('300');
     await expect.poll(projected).not.toBe(before);
     await p.getByLabel('Rendement annuel (%)').fill('7,5');
+    // La durée se choisit : la projection va jusqu'au bout de la période.
+    await p.getByRole('group', { name: 'Durée de la simulation' }).getByRole('button', { name: '20 ans' }).click();
+    await expect.poll(projected).toMatch(/dans 20 ans/);
+    await p.getByText('Versé en 20 ans').waitFor();
     await p.getByRole('button', { name: /Revenir au plan/ }).click();
     await expect.poll(() => p.getByRole('button', { name: /Revenir au plan/ }).count()).toBe(0);
     await shot(p, '67-finances-v5-patrimoine');
