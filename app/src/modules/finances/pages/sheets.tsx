@@ -51,25 +51,60 @@ export function OccurrenceSheet({ o, onClose, onDecide, onEdit }: { o: Occurrenc
 
 // ---------------------------------------------------------------- un engagement
 
-const RHYTHMS: readonly (readonly [Rhythm, string])[] = [
-  ['MONTHLY', 'Chaque mois'],
-  ['WEEKLY', 'Chaque semaine'],
-  ['BIWEEKLY', 'Toutes les deux semaines'],
-  ['YEARLY', 'Chaque année'],
-  ['ONCE', 'Une seule fois'],
-];
 const WEEKDAYS = [['1', 'Lundi'], ['2', 'Mardi'], ['3', 'Mercredi'], ['4', 'Jeudi'], ['5', 'Vendredi'], ['6', 'Samedi'], ['0', 'Dimanche']] as const;
 const blankCommitment = (): Commitment => ({ id: newId('eng'), kind: 'CHARGE', label: '', amount: 0, tolerance: 0.2, rhythm: 'MONTHLY', anchorDay: null, anchorDate: null, accountId: null, counterAccountId: null, categoryId: null, startDate: null, endDate: null, remainingOccurrences: null, installmentPlanId: null, direct: false, paused: false, reserveInCash: null, provisionMonthly: false });
 
+const KINDS = [
+  { id: 'CHARGE', label: 'Charge', detail: 'loyer, abonnement', color: '#f472b6' },
+  { id: 'INCOME', label: 'Revenu', detail: 'salaire, aide', color: '#5ccbe6' },
+  { id: 'SAVING', label: 'Épargne', detail: 'livret, PEA', color: '#6fe0a0' },
+] as const;
+const SHORT_RHYTHMS: readonly (readonly [Rhythm, string])[] = [
+  ['MONTHLY', 'Chaque mois'],
+  ['WEEKLY', 'Chaque semaine'],
+  ['BIWEEKLY', 'Toutes les 2 semaines'],
+  ['YEARLY', 'Chaque année'],
+  ['ONCE', 'Une fois'],
+];
+
+/** La prochaine échéance, en clair, pour l'aperçu du formulaire. */
+function nextLabel(c: Commitment, today: string): string | null {
+  const fmt = (iso: string) => new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' }).format(new Date(`${iso}T12:00:00`));
+  if (c.rhythm === 'MONTHLY') {
+    if (c.anchorDay === null) return 'd’ici la fin du cycle';
+    const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+    const at = (yy: number, mm: number) => {
+      const last = new Date(yy, mm, 0).getDate();
+      return `${yy}-${String(mm).padStart(2, '0')}-${String(Math.min(c.anchorDay!, last)).padStart(2, '0')}`;
+    };
+    const next = c.anchorDay >= d ? at(y, m) : m === 12 ? at(y + 1, 1) : at(y, m + 1);
+    return `le ${c.anchorDay} de chaque mois · prochaine le ${fmt(next)}`;
+  }
+  if (c.rhythm === 'WEEKLY') return `chaque ${WEEKDAYS.find(([v]) => Number(v) === (c.anchorDay ?? 1))?.[1].toLowerCase() ?? 'semaine'}`;
+  if (!c.anchorDate) return null;
+  if (c.rhythm === 'ONCE') return `le ${fmt(c.anchorDate)}`;
+  if (c.rhythm === 'YEARLY') return `chaque année le ${fmt(c.anchorDate)}`;
+  return `toutes les deux semaines, à partir du ${fmt(c.anchorDate)}`;
+}
+
+/**
+ * Ajouter ou modifier un engagement (une charge, un revenu, une épargne) : le type en trois tuiles, le montant en
+ * grand, le rythme et le jour à toucher, le compte en pastilles ; les réglages rares repliés dans « Options ».
+ * L'aperçu de la prochaine échéance et le bouton disent ce qui sera enregistré.
+ */
 export function CommitmentSheet({ value, db, onClose, onSave, onRemove }: { value: Commitment | 'new' | null; db: Db; onClose: () => void; onSave: (c: Commitment, opensCycle: boolean) => void; onRemove: (id: string) => void }) {
   const [c, setC] = useState<Commitment>(blankCommitment);
   const [amount, setAmount] = useState('');
   const [opens, setOpens] = useState(false);
+  const [options, setOptions] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   useEffect(() => {
     const next = value && value !== 'new' ? value : blankCommitment();
     setC(next);
     setAmount(text(next.amount || null));
     setOpens(value !== 'new' && value !== null && db.settings.openingCommitmentId === value.id);
+    setOptions(value !== 'new' && value !== null);
+    setConfirm(false);
   }, [value, db.settings.openingCommitmentId]);
   if (!value) return null;
   const isNew = value === 'new';
@@ -80,44 +115,126 @@ export function CommitmentSheet({ value, db, onClose, onSave, onRemove }: { valu
   const reserve = c.kind === 'INCOME' ? false : (c.reserveInCash ?? db.settings.reserveDue[c.kind]);
   const canProvision = c.kind === 'CHARGE' && (c.rhythm === 'YEARLY' || c.rhythm === 'ONCE');
   const daily = db.accounts.filter((a) => a.includeInDailyCash && !a.archivedAt);
+  const kind = KINDS.find((k) => k.id === c.kind);
+  const today = new Date().toISOString().slice(0, 10);
+  const when = nextLabel(c, today);
+  const noun = c.kind === 'INCOME' ? 'le revenu' : c.kind === 'SAVING' ? 'l’épargne' : 'la charge';
   return (
-    <Form open title={isNew ? 'Nouvel engagement' : c.label || 'Engagement'} onClose={onClose}>
+    <Form open title={isNew ? (kind ? `Nouvelle ${kind.label.toLowerCase()}`.replace('Nouvelle revenu', 'Nouveau revenu') : 'Nouvel engagement') : c.label || 'Engagement'} onClose={onClose}>
       {c.kind === 'INSTALLMENT' ? (
         <span className="t-small muted">Échéance d’un paiement en plusieurs fois, du {c.startDate ? day(c.startDate) : '?'} au {c.endDate ? day(c.endDate) : '?'}.</span>
       ) : (
-        <Select id="eng-kind" label="Type" value={c.kind} options={[['CHARGE', 'Charge'], ['INCOME', 'Revenu'], ['SAVING', 'Épargne']] as const} onChange={(kind) => set({ kind })} />
+        <div className="fin-kinds" role="group" aria-label="Type">
+          {KINDS.map((k) => (
+            <button key={k.id} type="button" aria-pressed={c.kind === k.id} style={{ ['--k' as string]: k.color }} onClick={() => set({ kind: k.id })}>
+              <b>{k.label}</b>
+              <span className="t-small muted">{k.detail}</span>
+            </button>
+          ))}
+        </div>
       )}
-      <Field id="eng-label" label="Libellé" hint="Un mot du libellé bancaire aide à reconnaître l’opération.">
-        <input id="eng-label" value={c.label} onChange={(e) => set({ label: e.target.value })} placeholder="Loyer, salaire, assurance…" />
-      </Field>
-      <Field id="eng-amount" label="Montant par échéance">
-        <input id="eng-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" />
-      </Field>
-      {c.kind !== 'INSTALLMENT' && <Select id="eng-rhythm" label="Rythme" value={c.rhythm} options={RHYTHMS} onChange={(rhythm) => set({ rhythm, anchorDay: null })} />}
-      {c.rhythm === 'MONTHLY' && (
-        <Field id="eng-day" label="Jour du mois" hint="Vide : n’importe quand avant la fin du cycle.">
-          <input id="eng-day" inputMode="numeric" value={c.anchorDay ?? ''} onChange={(e) => set({ anchorDay: e.target.value ? Math.max(1, Math.min(31, Math.trunc(Number(e.target.value)) || 1)) : null })} placeholder="5" />
-        </Field>
+
+      <div className="glass fin-amount">
+        <label htmlFor="eng-amount" className="t-small muted">Montant par échéance</label>
+        <span className="row" style={{ gap: 4, justifyContent: 'center' }}>
+          <input id="eng-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoComplete="off" size={Math.max(2, amount.length + 1)} />
+          <span className="fin-num muted" style={{ fontSize: 30 }}>€</span>
+        </span>
+        <span className="row" style={{ gap: 8, justifyContent: 'center', width: '100%' }}>
+          <span className="fin-av" aria-hidden="true" style={{ background: kind?.color ?? '#cdbeff', color: '#0b0e1a', width: 32, height: 32, borderRadius: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>{(c.label.trim()[0] ?? '?').toUpperCase()}</span>
+          <input id="eng-label" aria-label="Libellé" className="fin-label-input" value={c.label} onChange={(e) => set({ label: e.target.value })} placeholder="Loyer, box, salaire…" autoComplete="off" />
+        </span>
+        <span className="t-small muted" style={{ textAlign: 'center' }}>Un mot du libellé bancaire aide à reconnaître l’opération.</span>
+      </div>
+
+      {c.kind !== 'INSTALLMENT' && (
+        <div className="stack" style={{ gap: 8 }}>
+          <span className="t-label muted">Quand</span>
+          <div className="fin-pills" role="group" aria-label="Rythme">
+            {SHORT_RHYTHMS.map(([r, label]) => (
+              <button key={r} type="button" className="fin-pill" aria-pressed={c.rhythm === r} onClick={() => set({ rhythm: r, anchorDay: r === 'WEEKLY' ? 1 : null })}>
+                {label}
+              </button>
+            ))}
+          </div>
+          {c.rhythm === 'MONTHLY' && (
+            <div className="fin-days" role="group" aria-label="Jour du mois">
+              <button type="button" className="fin-pill" aria-pressed={c.anchorDay === null} onClick={() => set({ anchorDay: null })}>
+                N’importe quand
+              </button>
+              {Array.from({ length: 31 }, (_, k) => k + 1).map((d) => (
+                <button key={d} type="button" className="fin-day" aria-pressed={c.anchorDay === d} aria-label={`Le ${d}`} onClick={() => set({ anchorDay: d })}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          )}
+          {c.rhythm === 'WEEKLY' && (
+            <div className="fin-pills" role="group" aria-label="Jour">
+              {WEEKDAYS.map(([v, label]) => (
+                <button key={v} type="button" className="fin-pill" aria-pressed={String(c.anchorDay ?? 1) === v} onClick={() => set({ anchorDay: Number(v) })}>
+                  {label.slice(0, 3)}.
+                </button>
+              ))}
+            </div>
+          )}
+          {needsDate && (
+            <Field id="eng-date" label={c.rhythm === 'ONCE' ? 'Date' : c.rhythm === 'YEARLY' ? 'Prochaine date' : 'Une date de référence'}>
+              <input id="eng-date" type="date" value={c.anchorDate ?? ''} onChange={(e) => set({ anchorDate: e.target.value || null })} />
+            </Field>
+          )}
+          {when && <span className="t-small muted" style={{ textAlign: 'center' }}>{when.replace(/^./, (x) => x.toUpperCase())}</span>}
+        </div>
       )}
-      {c.rhythm === 'WEEKLY' && <Select id="eng-weekday" label="Jour" value={String(c.anchorDay ?? 1) as (typeof WEEKDAYS)[number][0]} options={WEEKDAYS} onChange={(d) => set({ anchorDay: Number(d) })} />}
-      {needsDate && (
-        <Field id="eng-date" label={c.rhythm === 'ONCE' ? 'Date' : c.rhythm === 'YEARLY' ? 'Prochaine date' : 'Une date de référence'}>
-          <input id="eng-date" type="date" value={c.anchorDate ?? ''} onChange={(e) => set({ anchorDate: e.target.value || null })} />
-        </Field>
+
+      {c.kind !== 'SAVING' && daily.length > 0 && (
+        <div className="stack" style={{ gap: 8 }}>
+          <span className="t-label muted">{c.kind === 'INCOME' ? 'Sur' : 'Depuis'}</span>
+          <div className="fin-pills" role="group" aria-label="Compte">
+            {daily.map((a) => (
+              <button key={a.id} type="button" className="fin-pill" aria-pressed={c.accountId === a.id} onClick={() => set({ accountId: a.id })}>
+                {a.name}
+              </button>
+            ))}
+            <button type="button" className="fin-pill" aria-pressed={c.accountId === null} onClick={() => set({ accountId: null })}>
+              N’importe lequel
+            </button>
+          </div>
+        </div>
       )}
-      {c.kind !== 'SAVING' && <Select id="eng-account" label="Compte" value={c.accountId ?? ''} options={[['', 'N’importe quel compte du quotidien'], ...daily.map((a) => [a.id, a.name] as const)]} onChange={(id) => set({ accountId: id || null })} />}
-      {c.kind !== 'INCOME' && <Toggle label="Réserver dans la trésorerie" detail="Déduite du cash libre dès maintenant. Sinon, seulement quand l’opération apparaît sur le compte." checked={reserve} onChange={(v) => set({ reserveInCash: v })} />}
-      {canProvision && <Toggle label="Provisionner chaque cycle" detail="Un peu mis de côté à chaque cycle, pour que l’argent soit prêt le jour J." checked={c.provisionMonthly} onChange={(v) => set({ provisionMonthly: v })} />}
-      {c.kind === 'INCOME' && <Toggle label="Ouvre le cycle" detail="Son arrivée, même en avance, démarre le nouveau cycle." checked={opens} onChange={setOpens} />}
-      <Toggle label="En pause" detail="Plus d’échéance tant qu’il est en pause." checked={c.paused} onChange={(v) => set({ paused: v })} />
+
+      <div className="glass list" style={{ padding: '2px 16px' }}>
+        <button type="button" className="list-row" aria-expanded={options} onClick={() => setOptions(!options)} style={{ width: '100%' }}>
+          <span className="grow" style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
+            <span className="t-strong">Options</span>
+            <span className="t-small muted">{[c.kind !== 'INCOME' ? (reserve ? 'réservée dès maintenant' : 'compte au débit réel') : null, c.provisionMonthly ? 'provisionnée' : null, c.kind === 'INCOME' && opens ? 'ouvre le cycle' : null, c.paused ? 'en pause' : null].filter(Boolean).join(' · ') || 'réserver, provisionner, mettre en pause'}</span>
+          </span>
+          <span className="fin-chevron" style={{ transform: options ? 'rotate(90deg)' : undefined }}>›</span>
+        </button>
+        {options && (
+          <div className="stack" style={{ gap: 4, paddingBottom: 10 }}>
+            {c.kind !== 'INCOME' && <Toggle label="Réserver dans la trésorerie" detail="Retirée de ton budget du jour avant d’être prélevée. Sinon, seulement quand l’opération apparaît sur le compte." checked={reserve} onChange={(v) => set({ reserveInCash: v })} />}
+            {canProvision && <Toggle label="Provisionner chaque cycle" detail="Un peu mis de côté à chaque cycle, pour que l’argent soit prêt le jour J." checked={c.provisionMonthly} onChange={(v) => set({ provisionMonthly: v })} />}
+            {c.kind === 'INCOME' && <Toggle label="Ouvre le cycle" detail="Son arrivée, même en avance, démarre le nouveau cycle." checked={opens} onChange={setOpens} />}
+            <Toggle label="En pause" detail="Plus d’échéance tant qu’il est en pause." checked={c.paused} onChange={(v) => set({ paused: v })} />
+          </div>
+        )}
+      </div>
+
       <Button variant="action" block disabled={!ready} onClick={() => onSave({ ...c, label: c.label.trim(), amount: value_ ?? 0 }, opens)}>
-        Enregistrer
+        {isNew ? `Ajouter ${noun}` : 'Enregistrer'}
+        {ready ? ` · ${euros(value_!)}` : ''}
       </Button>
-      {!isNew && (
-        <Button variant="danger" block onClick={() => onRemove(c.id)}>
-          Supprimer
-        </Button>
-      )}
+      {!isNew &&
+        (confirm ? (
+          <Button variant="danger" block onClick={() => onRemove(c.id)}>
+            Supprimer définitivement
+          </Button>
+        ) : (
+          <Button variant="quiet" block onClick={() => setConfirm(true)}>
+            Supprimer
+          </Button>
+        ))}
     </Form>
   );
 }

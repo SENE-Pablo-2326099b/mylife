@@ -253,97 +253,90 @@ export function CashflowBars({ items, label }: { items: { key: string; name: str
   );
 }
 
-/** Où vont les revenus du cycle : un flux qui se partage entre charges, épargne et reste à vivre. */
-export function FlowChart({ revenus, charges, epargne, reste, format }: { revenus: number; charges: number; epargne: number; reste: number; format: (cents: number) => string }) {
-  const id = useId();
-  const parts = [
-    { key: 'charges', name: 'Charges', value: Math.max(0, charges), color: '#f472b6', opacity: 0.4 },
-    { key: 'epargne', name: 'Épargne', value: Math.max(0, epargne), color: '#6fe0a0', opacity: 0.45 },
-    { key: 'reste', name: 'Reste à vivre', value: Math.max(0, reste), color: `url(#${id}r)`, opacity: 1 },
-  ].filter((p) => p.value > 0);
-  const total = parts.reduce((s, p) => s + p.value, 0) || 1;
-  const H = 150;
-  const gap = 8;
-  let left = 10;
-  let right = 2;
-  const scale = (H - gap * (parts.length - 1) * 0) / total;
-  return (
-    <svg role="img" aria-label={`Où vont tes revenus du cycle : ${format(revenus)}, dont ${parts.map((p) => `${p.name.toLowerCase()} ${format(p.value)}`).join(', ')}`} viewBox="0 0 354 176" style={{ width: '100%', height: 176 }}>
-      <defs>
-        <linearGradient id={`${id}r`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor={GRAD_B} stopOpacity="0.55" />
-          <stop offset="1" stopColor={GRAD_A} stopOpacity="0.9" />
-        </linearGradient>
-      </defs>
-      {parts.map((p) => {
-        const h = p.value * scale;
-        const rh = Math.max(4, h - gap * (parts.length - 1) / parts.length);
-        const [l0, r0] = [left, right];
-        left += h;
-        right += rh + gap;
-        const big = p.key === 'reste';
-        return (
-          <g key={p.key}>
-            <path d={`M14 ${l0} C177 ${l0} 177 ${r0} 340 ${r0} L340 ${r0 + rh} C177 ${r0 + rh} 177 ${l0 + h} 14 ${l0 + h} Z`} fill={p.color} opacity={p.opacity} />
-            <rect x="340" y={r0} width="14" height={rh} rx="5" fill={p.key === 'reste' ? '#a58bff' : p.color} />
-            {rh >= 16 && (
-              <text x="328" y={r0 + rh / 2 + (big ? 8 : 4)} textAnchor="end" style={{ font: big ? '800 20px var(--font-display)' : '600 13px var(--font-text)', fill: 'var(--ink)' }}>
-                {big ? format(p.value) : `${p.name}  ${format(p.value)}`}
-              </text>
-            )}
-            {big && rh >= 44 && (
-              <text x="328" y={r0 + rh / 2 - 14} textAnchor="end" style={{ font: '600 12px var(--font-text)', fill: 'var(--ink-2)' }}>
-                Reste à vivre
-              </text>
-            )}
-          </g>
-        );
-      })}
-      <rect x="0" y="10" width="14" height={H} rx="5" fill="#5ccbe6" />
-      <text x="26" y="44" style={{ font: '600 12px var(--font-text)', fill: 'var(--ink-2)' }}>Revenus</text>
-      <text x="26" y="66" style={{ font: '800 20px var(--font-display)', fill: 'var(--ink)' }}>{format(revenus)}</text>
-    </svg>
-  );
-}
-
-/** Le solde jusqu'à la paie : une courbe en marches, le point bas marqué, la ligne du zéro en pointillés. */
-export function ForecastChart({ points, low, format, labels }: { points: { date: string; balance: number }[]; low: { date: string; balance: number }; format: (cents: number) => string; labels: [string, string] }) {
+/**
+ * La trésorerie jusqu'à la paie : le solde des comptes du quotidien jour par jour ; les échéances font des marches,
+ * nommées sur la courbe (les plus grosses), le point bas est marqué. Un doigt ou la souris promène un curseur
+ * (`onPick`) ; sans geste, il est sur aujourd'hui.
+ */
+export function TreasuryChart({ points, low, format, labels, picked, onPick }: { points: { date: string; balance: number; events: { label: string; amount: number }[] }[]; low: { date: string; balance: number }; format: (cents: number) => string; labels: [string, string]; picked?: number | null; onPick?: (i: number | null) => void }) {
   const id = useId();
   if (points.length < 2) return null;
   const values = points.map((p) => p.balance);
   const [min, max] = [Math.min(0, ...values), Math.max(...values, 1)];
-  const x = (i: number) => 6 + (i / (points.length - 1)) * 308;
-  const y = (v: number) => 14 + (1 - (v - min) / (max - min || 1)) * 104;
-  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)} ${y(p.balance).toFixed(1)}`).join(' ');
-  const lowIndex = points.findIndex((p) => p.date === low.date);
+  const [X0, X1, Y0, Y1] = [44, 324, 128, 26];
+  const x = (i: number) => X0 + (i / (points.length - 1)) * (X1 - X0);
+  const y = (v: number) => Y0 - ((v - min) / (max - min || 1)) * (Y0 - Y1);
+  // Une marche par jour : le solde reste plat, puis bouge d'un coup le jour suivant.
+  const line = points.map((p, i) => (i === 0 ? `M${x(0).toFixed(1)} ${y(p.balance).toFixed(1)}` : `L${x(i).toFixed(1)} ${y(points[i - 1]!.balance).toFixed(1)} L${x(i).toFixed(1)} ${y(p.balance).toFixed(1)}`)).join(' ');
+  const lowIndex = Math.max(0, points.findIndex((p) => p.date === low.date));
   const negative = low.balance < 0;
+  // Les jours qui bougent le plus, chacun nommé une fois (plusieurs échéances le même jour : la plus grosse, « +1 »).
+  const named = points
+    .map((p, i) => ({ i, amount: p.events.reduce((t, ev) => t + ev.amount, 0), label: [...p.events].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))[0]?.label ?? '', more: p.events.length - 1 }))
+    .filter((d) => d.label && d.amount !== 0)
+    .sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount))
+    .slice(0, 3)
+    .sort((a, b) => a.i - b.i);
+  const ticks = [max, (max + min) / 2, min];
+  const pick = (e: PointerEvent<SVGSVGElement>) => onPick?.(pickIndex(e, 330, x, points.length));
+  const at = picked ?? null;
   return (
-    <svg role="img" aria-label={`Solde prévu jusqu'à la paie : de ${format(points[0]!.balance)} aujourd'hui à un point bas de ${format(low.balance)}`} viewBox="0 0 320 150" style={{ width: '100%', height: 150 }}>
+    <svg
+      role="img"
+      aria-label={`Solde prévu jusqu'à la paie : de ${format(points[0]!.balance)} aujourd'hui à un point bas de ${format(low.balance)}${named.length ? ` ; ${named.map((n) => `${n.label} ${format(n.amount)}`).join(', ')}` : ''}`}
+      viewBox="0 0 330 156"
+      style={{ width: '100%', height: 'auto', maxHeight: 210, touchAction: 'pan-y', cursor: onPick ? 'crosshair' : undefined }}
+      onPointerDown={onPick ? pick : undefined}
+      onPointerMove={onPick ? (e) => (e.pointerType === 'mouse' || e.buttons) && pick(e) : undefined}
+      onPointerLeave={onPick ? () => onPick(null) : undefined}
+    >
       <defs>
         <linearGradient id={`${id}a`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={GRAD_B} stopOpacity="0.35" />
           <stop offset="1" stopColor={GRAD_B} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <line x1="0" y1={y(0)} x2="320" y2={y(0)} stroke="var(--ink-2)" strokeWidth="1" strokeDasharray="3 6" opacity="0.6" />
-      <path d={`${line} L${x(points.length - 1)} ${y(min)} L${x(0)} ${y(min)} Z`} fill={`url(#${id}a)`} />
-      <path d={line} fill="none" stroke="#5ccbe6" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={x(0)} cy={y(points[0]!.balance)} r="5" fill="var(--ink)" />
-      <circle cx={x(lowIndex)} cy={y(low.balance)} r="5" fill={negative ? '#ffb8b8' : '#ffe0a3'} />
-      <text x={Math.min(250, x(0) + 10)} y={Math.max(11, y(points[0]!.balance) - 9)} className="fin-axis" style={{ fill: 'var(--ink)' }}>
-        {format(points[0]!.balance)}
-      </text>
-      <text x={Math.max(70, Math.min(314, x(lowIndex) - 8))} y={Math.max(11, y(low.balance) - 9)} textAnchor="end" className="fin-axis" style={{ fill: negative ? 'var(--bad)' : 'var(--warn)' }}>
-        point bas {format(low.balance)}
-      </text>
-      <text x="6" y="144" className="fin-axis">{labels[0]}</text>
-      <text x="314" y="144" textAnchor="end" className="fin-axis">{labels[1]}</text>
+      {ticks.map((t, i) => (
+        <g key={i}>
+          <line x1={X0} y1={y(t)} x2={X1} y2={y(t)} stroke="var(--line)" strokeWidth="1" />
+          <text x={X0 - 6} y={y(t) + 4} textAnchor="end" className="fin-axis">{format(t)}</text>
+        </g>
+      ))}
+      {min < 0 && <line x1={X0} y1={y(0)} x2={X1} y2={y(0)} stroke="var(--bad)" strokeWidth="1" strokeDasharray="3 5" opacity="0.7" />}
+      <path d={`${line} L${X1} ${Y0} L${X0} ${Y0} Z`} fill={`url(#${id}a)`} />
+      <path d={line} fill="none" stroke="#7fe6f7" strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" />
+      {named.map((n, k) => {
+        const up = n.amount > 0;
+        const cx = x(n.i);
+        const cy = y(points[n.i]!.balance);
+        const right = cx > (X0 + X1) / 2;
+        return (
+          <g key={k}>
+            <circle cx={cx} cy={cy} r="4" fill={up ? '#5ccbe6' : '#f472b6'} />
+            <text x={right ? cx - 6 : cx + 6} y={Math.max(11, cy - 8 - (k % 2) * 12)} textAnchor={right ? 'end' : 'start'} className="fin-axis" style={{ fill: up ? '#9be9f8' : '#f9a8d4', fontWeight: 700 }}>
+              {n.label.length > 14 ? `${n.label.slice(0, 13)}…` : n.label}{n.more > 0 ? ` +${n.more}` : ''} {format(n.amount).replace(/^(\d)/, up ? '+$1' : '$1')}
+            </text>
+          </g>
+        );
+      })}
+      <circle cx={x(lowIndex)} cy={y(low.balance)} r="5.5" fill={negative ? '#ffb8b8' : '#ffe0a3'} />
+      {at !== null ? (
+        <>
+          <line x1={x(at)} y1={Y1 - 10} x2={x(at)} y2={Y0} stroke="var(--ink-2)" strokeWidth="1.5" />
+          <circle cx={x(at)} cy={y(points[at]!.balance)} r="6" fill="var(--ink)" />
+        </>
+      ) : (
+        <circle cx={x(0)} cy={y(points[0]!.balance)} r="6" fill="var(--ink)" />
+      )}
+      <text x={X0} y="150" className="fin-axis">{labels[0]}</text>
+      {lowIndex > 2 && lowIndex < points.length - 3 && <text x={x(lowIndex)} y="150" textAnchor="middle" className="fin-axis" style={{ fill: negative ? 'var(--bad)' : 'var(--warn)' }}>{Number(points[lowIndex]!.date.slice(8))}</text>}
+      <text x={X1} y="150" textAnchor="end" className="fin-axis">{labels[1]}</text>
     </svg>
   );
 }
 
 /** Un petit anneau de budget : la part consommée, en pourcentage au centre. */
-export function MiniRing({ fraction, color, label, size = 72 }: { fraction: number; color: string; label: string; size?: number }) {
+export function MiniRing({ fraction, color, label, size = 72, text }: { fraction: number; color: string; label: string; size?: number; text?: string }) {
   const C = 2 * Math.PI * 26;
   const over = fraction > 1;
   return (
@@ -353,7 +346,7 @@ export function MiniRing({ fraction, color, label, size = 72 }: { fraction: numb
         {fraction > 0 && <circle cx="36" cy="36" r="26" stroke={over ? '#ff9a62' : color} strokeDasharray={`${Math.min(1, fraction) * C} ${C}`} />}
       </g>
       <text x="36" y="41" textAnchor="middle" style={{ font: '800 15px var(--font-display)', fill: over ? '#ff9a62' : 'var(--ink)' }}>
-        {Math.round(fraction * 100)} %
+        {text ?? `${Math.round(fraction * 100)} %`}
       </text>
     </svg>
   );

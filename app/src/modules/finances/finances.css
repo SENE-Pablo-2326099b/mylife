@@ -143,3 +143,54 @@ a.list-row, a.fin-tile { color: inherit; text-decoration: none; }
 .fin-sim-fold { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: inherit; font: inherit; border: 0; text-align: left; }
 .fin-sim { animation: fin-fold-in .24s ease-out; }
 @media (prefers-reduced-motion: reduce) { .fin-sim { animation: none; } }
+
+/* Plan : où va le revenu, en une barre ; le dépensé hachuré dans le reste à vivre. */
+.fin-income { display: flex; gap: 4px; height: 46px; }
+.fin-income > span { min-width: 8px; border-radius: 5px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+.fin-income > span:first-child { border-top-left-radius: 14px; border-bottom-left-radius: 14px; }
+.fin-income > span:last-child { border-top-right-radius: 14px; border-bottom-right-radius: 14px; }
+.fin-income-spent { position: absolute; left: 0; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgba(11, 14, 26, 0.42) 0 6px, rgba(11, 14, 26, 0.2) 6px 12px); border-right: 2px solid #fff; box-shadow: 4px 0 10px rgba(255, 255, 255, 0.5); }
+.fin-income-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fin-income-legend > span { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fin-income-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 3px; margin-right: 5px; }
+.fin-income-legend b { font-size: 17px; }
+/* Trésorerie : le point bas en pastille. */
+.fin-low { display: flex; flex-direction: column; align-items: flex-end; text-align: right; padding: 8px 12px; border-radius: 14px; background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); }
+.fin-low[data-bad='true'] { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad); }
+/* Ce qui revient : une carte d'avancement par groupe, puis une ligne par échéance. */
+.fin-group-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.fin-occ { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 4px 0; background: none; border: 0; color: inherit; font: inherit; }
+.fin-occ + .fin-occ { border-top: 1px solid var(--line); }
+.fin-occ .fin-av { color: #0b0e1a; font-family: var(--font-display); font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+.fin-badge { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 8px; font-size: 11px; font-weight: 700; background: var(--tile); border: 1px solid var(--tile-border); color: var(--ink); white-space: nowrap; }
+.fin-badge[data-tone='ok'] { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok); }
+.fin-badge[data-tone='warn'] { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn); }
+.fin-badge[data-tone='muted'] { color: var(--ink-2); }
+/* Enveloppes : de grandes cartes aimantées ; le verre est sur chaque carte, la rangée seule défile. */
+.fin-envs { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; margin: 0 calc(var(--pad) * -1); padding: 4px var(--pad) 10px; scroll-padding: 0 var(--pad); scrollbar-width: none; }
+.fin-envs::-webkit-scrollbar { display: none; }
+.fin-env { flex: none; width: 250px; scroll-snap-align: start; padding: 16px; display: flex; flex-direction: column; gap: 10px; color: inherit; font: inherit; text-align: left; opacity: 0.82; transition: opacity 0.2s ease, transform 0.2s ease; }
+.fin-env[data-on='true'] { opacity: 1; }
+.fin-dots { display: flex; justify-content: center; gap: 6px; }
+.fin-dots i { width: 6px; height: 6px; border-radius: 99px; background: var(--ink-2); opacity: 0.4; transition: width 0.2s ease, opacity 0.2s ease; }
+.fin-dots i[data-on='true'] { width: 18px; opacity: 1; background: var(--ink); }
+/* Poches. */
+.fin-poche { display: flex; flex-direction: column; gap: 6px; background: none; border: 0; padding: 0; color: inherit; font: inherit; width: 100%; }
+.fin-lock { width: 30px; height: 30px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, #a58bff 22%, transparent); color: #cdbeff; }
+:root[data-theme='clair'] .fin-lock { color: #6a49f2; }
+
+/* Formulaire d'un engagement : trois tuiles, un grand montant, des pastilles à toucher. */
+.fin-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fin-kinds > button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; border-radius: 18px; background: var(--tile); border: 1px solid var(--tile-border); color: var(--ink); font: inherit; text-align: center; }
+.fin-kinds > button[aria-pressed='true'] { background: color-mix(in srgb, var(--k) 26%, transparent); border: 1.5px solid var(--k); box-shadow: 0 8px 22px -10px var(--k); }
+.fin-amount { padding: 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.fin-amount input#eng-amount { background: none; border: 0; outline: none; color: var(--ink); font: 800 50px/1.05 var(--font-display); letter-spacing: -0.03em; text-align: right; min-width: 1.6ch; max-width: 70%; padding: 0; }
+.fin-amount input#eng-amount::placeholder { color: var(--ink-2); opacity: 0.5; }
+.fin-label-input { flex: 1; min-width: 0; max-width: 240px; background: none; border: 0; border-bottom: 1.5px solid var(--field-border); outline: none; color: var(--ink); font: 700 18px var(--font-text); padding: 4px 2px; }
+.fin-label-input:focus { border-bottom-color: var(--ink); }
+.fin-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.fin-pill { min-height: 38px; padding: 0 14px; border-radius: 999px; background: var(--tile); border: 1px solid var(--tile-border); color: var(--ink); font: 600 14px var(--font-text); white-space: nowrap; }
+.fin-pill[aria-pressed='true'], .fin-day[aria-pressed='true'] { color: #fff; background: linear-gradient(135deg, #8b6cff, #3cc8f0); border-color: rgba(205, 190, 255, 0.8); box-shadow: 0 8px 20px -10px rgba(124, 92, 255, 0.8); }
+.fin-days { display: flex; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; scrollbar-width: none; padding: 2px 0 4px; scroll-snap-type: x proximity; }
+.fin-days::-webkit-scrollbar { display: none; }
+.fin-day { flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--tile); border: 1px solid var(--tile-border); color: var(--ink); font: 700 15px var(--font-text); scroll-snap-align: center; }

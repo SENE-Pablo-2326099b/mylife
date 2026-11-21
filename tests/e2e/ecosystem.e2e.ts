@@ -1002,7 +1002,24 @@ describe('MyLife, une seule app', () => {
     await p.locator('.fin-cal-month').click();
     expect(await monthLabel()).toBe(thisMonth);
     await p.locator('.fin-cal > span[data-today="true"]').waitFor();
+    // La trésorerie se lit au doigt : un jour, son solde et ses échéances.
+    await p.getByRole('img', { name: /Solde prévu jusqu'à la paie/ }).hover({ position: { x: 200, y: 80 } });
+    await p.getByText(/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche) \d+ /).first().waitFor();
+    // Les enveloppes : une grande carte par enveloppe, et les dépenses de celle choisie en dessous.
+    await p.getByRole('button', { name: /^Alimentation/ }).first().waitFor();
+    await p.getByText(/^Alimentation, ce cycle/).waitFor();
+    // Ajouter une charge : le type en tuiles, le montant en grand, le jour à toucher.
+    await tabs.getByRole('link', { name: 'Ajouter : un engagement' }).click();
+    await p.getByRole('group', { name: 'Type' }).getByRole('button', { name: /^Charge/ }).waitFor();
+    await p.getByLabel('Montant par échéance').fill('35');
+    await p.getByLabel('Libellé').fill('Box internet');
+    await p.getByRole('button', { name: 'Le 23' }).click();
+    await p.getByText(/^Le 23 de chaque mois/).waitFor();
+    await shot(p, '66b-finances-v5-formulaire');
+    await p.getByRole('button', { name: /^Ajouter la charge · 35/ }).click();
+    await p.getByRole('button', { name: /^Box internet.*35\s€/ }).waitFor();
     await shot(p, '66-finances-v5-plan');
+    if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/66c-finances-v5-plan-entier.png`, fullPage: true });
     expect(await overflow(p)).toBeLessThanOrEqual(0);
     await tabs.getByRole('link', { name: 'Patrimoine' }).click();
     // La simulation est repliée par défaut : une ligne ; « Simuler » la déplie (et elle le reste sur l'appareil).

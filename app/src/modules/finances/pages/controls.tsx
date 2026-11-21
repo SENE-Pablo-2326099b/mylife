@@ -32,7 +32,7 @@ export function Select<T extends string>({ id, label, value, options, onChange, 
 export function Form({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
   return (
     <Sheet open={open} title={title} onClose={onClose}>
-      <div className="stack" style={{ maxHeight: '70dvh', overflowY: 'auto', paddingBottom: 4 }}>{children}</div>
+      <div className="stack" style={{ maxHeight: '70dvh', overflowY: 'auto', overflowX: 'hidden', paddingBottom: 4 }}>{children}</div>
     </Sheet>
   );
 }
