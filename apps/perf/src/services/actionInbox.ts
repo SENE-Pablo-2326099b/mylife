@@ -5,7 +5,7 @@ import { getPlanned, movePlanned } from '@/db/repos/planning';
 
 /**
  * Boîte d'envoi de MyPerf (actions validées, V4 F1) : ce que tu as validé dans Copilot (accueil MyLife), exécuté ici avec
- * le code de MyPerf. Web seulement : la boîte est dans le stockage de l'adresse MyLife ; l'app Android ne la voit pas.
+ * le code de MyPerf. La boîte est dans le stockage de l'adresse MyLife.
  */
 const fr = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 

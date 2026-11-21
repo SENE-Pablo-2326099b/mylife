@@ -95,7 +95,7 @@ export function Orbit({ visible, onClose }: { visible: boolean; onClose: () => v
   const accountColor = !cloud.session ? t.textMuted : cloud.recovery ? t.danger : t.success;
   const syncLine = cloud.error ?? (cloud.syncing ? 'Synchro en cours…' : !cloud.joined ? 'Appareil en cours de liaison…' : 'Synchronisé');
   const syncColor = cloud.error ? t.danger : cloud.syncing || !cloud.joined ? t.accent : t.success;
-  // Aperçus déposés par les apps sur ce navigateur (web seulement : l'app Android n'y a pas accès).
+  // Aperçus déposés par les apps sur ce navigateur.
   const glances = Platform.OS === 'web' && visible ? Object.fromEntries(MYLIFE_APPS.map((a) => [a.id, readGlance(a.id)])) : {};
 
   const targets: Target[] = [

@@ -52,7 +52,7 @@ function Source({ onParsed }: { onParsed: (r: ParseResult, from: string) => void
     else setProblems(r.issues.length ? r.issues : ['Rien à importer.']);
   };
   const copyPrompt = async () => {
-    const r = await copyOrShare(programPrompt(), 'Instructions pour ton IA');
+    const r = await copyOrShare(programPrompt());
     if (r === 'copied') showToast({ message: 'Instructions copiées : colle-les dans ton IA' });
     else if (r === 'failed') showToast({ message: 'Copie impossible : sélectionne le texte de l’aperçu ci-dessous' });
   };

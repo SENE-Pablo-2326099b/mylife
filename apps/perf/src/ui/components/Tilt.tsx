@@ -1,44 +1,84 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import type { ReactNode } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { interpolate, SensorType, useAnimatedSensor, useAnimatedStyle, useReducedMotion, useSharedValue, withSpring } from 'react-native-reanimated';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 
 /**
- * Verre en relief : la carte suit l'inclinaison du téléphone (gyroscope, sur le thread UI) de
- * quelques degrés, et un reflet glisse à sa surface dans le sens opposé. Natif seulement ; sur le web
- * la carte reste à plat. Comme dans MyFinances.
+ * Verre en relief sur le web (PWA MyLife), comme Tilt de MyFinances : la carte s'incline de quelques
+ * degrés vers le pointeur (ordinateur) ou suit l'inclinaison du téléphone (gyroscope, Android), et un
+ * reflet glisse à sa surface dans le sens opposé. Mis à jour une fois par image, hors de React.
  */
 const MAX = 5;
-
-function NativeTilt({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  const sensor = useAnimatedSensor(SensorType.ROTATION, { interval: 33 });
-  const base = useSharedValue<{ p: number; r: number } | null>(null);
-  const card = useAnimatedStyle(() => {
-    const { pitch, roll } = sensor.sensor.value;
-    if (base.value === null) base.value = { p: pitch, r: roll };
-    const dx = Math.max(-1, Math.min(1, (roll - base.value.r) / 0.35));
-    const dy = Math.max(-1, Math.min(1, (pitch - base.value.p) / 0.35));
-    return {
-      transform: [{ perspective: 900 }, { rotateY: withSpring(`${dx * MAX}deg`, { damping: 18, stiffness: 140 }) }, { rotateX: withSpring(`${-dy * MAX}deg`, { damping: 18, stiffness: 140 }) }],
-    };
-  });
-  const glare = useAnimatedStyle(() => {
-    const { roll } = sensor.sensor.value;
-    const dx = base.value === null ? 0 : Math.max(-1, Math.min(1, (roll - base.value.r) / 0.35));
-    return { transform: [{ translateX: interpolate(dx, [-1, 1], [60, -60]) }], opacity: 0.6 + Math.abs(dx) * 0.4 };
-  });
-  return (
-    <Animated.View style={[style, card]}>
-      {children}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden', borderRadius: 28 }, glare]}>
-        <LinearGradient colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.08)', 'rgba(255,255,255,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      </Animated.View>
-    </Animated.View>
-  );
-}
+const RADIUS = 28;
 
 export function Tilt({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const reduce = useReducedMotion();
-  if (Platform.OS === 'web' || reduce) return <View style={style}>{children}</View>;
-  return <NativeTilt style={style}>{children}</NativeTilt>;
+  const outer = useRef<View>(null);
+  const inner = useRef<View>(null);
+  const glare = useRef<View>(null);
+
+  useEffect(() => {
+    const host = outer.current as unknown as HTMLElement | null;
+    const card = inner.current as unknown as HTMLElement | null;
+    const shine = glare.current as unknown as HTMLElement | null;
+    if (reduce || !host || !card || !shine) return;
+    host.style.perspective = '900px';
+    let tx = 0;
+    let ty = 0;
+    let x = 0;
+    let y = 0;
+    let raf = 0;
+    let base: { b: number; g: number } | null = null;
+    const paint = () => {
+      raf = 0;
+      x += (tx - x) * 0.14;
+      y += (ty - y) * 0.14;
+      card.style.transform = `rotateX(${(-y * MAX).toFixed(2)}deg) rotateY(${(x * MAX).toFixed(2)}deg)`;
+      shine.style.background = `radial-gradient(70% 60% at ${(50 - x * 30).toFixed(1)}% ${(45 - y * 35).toFixed(1)}%, rgba(255,255,255,0.13), transparent 60%)`;
+      if (Math.abs(tx - x) > 0.002 || Math.abs(ty - y) > 0.002) raf = requestAnimationFrame(paint);
+    };
+    const go = () => {
+      if (!raf) raf = requestAnimationFrame(paint);
+    };
+    const onTilt = (e: DeviceOrientationEvent) => {
+      if (e.beta === null || e.gamma === null) return;
+      base ??= { b: e.beta, g: e.gamma };
+      tx = Math.max(-1, Math.min(1, (e.gamma - base.g) / 18));
+      ty = Math.max(-1, Math.min(1, (e.beta - base.b) / 18));
+      go();
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse') return;
+      const r = host.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width) * 2 - 1;
+      ty = ((e.clientY - r.top) / r.height) * 2 - 1;
+      go();
+    };
+    const onLeave = () => {
+      tx = 0;
+      ty = 0;
+      go();
+    };
+    // iOS demande une permission explicite : seul le pointeur y anime la carte.
+    const needsPermission = typeof (DeviceOrientationEvent as unknown as { requestPermission?: unknown }).requestPermission === 'function';
+    if (!needsPermission) window.addEventListener('deviceorientation', onTilt);
+    host.addEventListener('pointermove', onMove);
+    host.addEventListener('pointerleave', onLeave);
+    go();
+    return () => {
+      window.removeEventListener('deviceorientation', onTilt);
+      host.removeEventListener('pointermove', onMove);
+      host.removeEventListener('pointerleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [reduce]);
+
+  if (reduce) return <View style={style}>{children}</View>;
+  return (
+    <View ref={outer} style={style}>
+      <View ref={inner} style={{ flex: 1 }}>
+        {children}
+        <View ref={glare} pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: RADIUS, mixBlendMode: 'screen' } as ViewStyle]} />
+      </View>
+    </View>
+  );
 }

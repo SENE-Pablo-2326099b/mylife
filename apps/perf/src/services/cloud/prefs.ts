@@ -8,7 +8,7 @@ import { currentSession, platform } from './platform';
 /**
  * Apparence de MyLife synchronisée entre appareils par le compte (app `mylife`), comme dans les apps
  * web (MyLife/packages/ui/src/prefsSync.ts) : une seule ligne datée du choix de l'utilisateur, la plus
- * récente gagne, un thème jamais choisi n'est jamais envoyé. Ici pour l'app Android et MyPerf web.
+ * récente gagne, un thème jamais choisi n'est jamais envoyé. Ici pour MyPerf web.
  * L'état de cette synchro reste sur l'appareil (table sync_state, jamais synchronisée).
  */
 const kv = (k: string) => db().first<{ v: string }>('SELECT v FROM sync_state WHERE k = ?', [k])?.v ?? null;

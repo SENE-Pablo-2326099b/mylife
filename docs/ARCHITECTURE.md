@@ -502,8 +502,7 @@ octets sont recodés par un accumulateur de bits (décalages et masques), sans b
 
 La clé de l'utilisateur sert à appeler Claude depuis l'appareil ; elle n'est jamais synchronisée, sauvegardée ni
 envoyée au serveur de MyLife (principe de la V5). Sur le web, elle est dans le stockage du navigateur
-(`packages/sync-client/src/aiKey.ts`), commun à toutes les parties de l'origine ; dans l'app Android de MyPerf, dans
-le trousseau du système.
+(`packages/sync-client/src/aiKey.ts`), commun à toutes les parties de l'origine (il n'y a plus d'app native).
 
 | Menace | Parade |
 |---|---|

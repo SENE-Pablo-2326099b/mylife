@@ -40,7 +40,7 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 | `/api/*` | Comptes, synchro chiffrée, espaces partagés, MyRave, notifications, support | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
 | `/finances/` | **Retirée le 17/11/2026** : ses adresses mènent au module `/argent` (la coquille sert `/finances/connexion/retour`, retour de la banque ; `/finances/sw.js` désinscrit l'ancien service worker). Le code reste dans `apps/finances`, et son projet Vercel sert encore le relais `/api/eb` | `apps/finances` | `myfinances` (base des faits, lue et écrite par le module) | React 18 + Vite + Tailwind + Dexie |
 | `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
-| `/perf/` | **MyPerf** | `apps/perf` | `myperf` | Expo / React Native (React 19) + SQLite ; web + APK Android |
+| `/perf/` | **MyPerf** | `apps/perf` | `myperf` | Expo / React Native (React 19), export web seulement + SQLite (sql.js) |
 | `/raveloc/` | **MyRave** (ex-myRaveLoc ; chemin et identifiants inchangés) | `apps/raveloc` | `myraveloc` | React 18 + Vite + kit `packages/ui` |
 
 - Pas d'espace de travail npm : chaque dossier a ses `node_modules` (React 18 contre 19).
@@ -48,7 +48,7 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
   `packages/`, jamais dans les copies (`*/src/vendor/*`, `*/src/ui`). Fin de ce mécanisme en phase 2.
 - Même origine = même stockage : une session, une apparence, une installation pour tout.
 
-**Appareils de l'utilisateur** : PC (Windows + WSL), Android (PWA, et l'APK MyPerf), iPhone plus tard (PWA).
+**Appareils de l'utilisateur** : PC (Windows + WSL), Android (PWA), iPhone plus tard (PWA). Plus d'app native : l'APK de MyPerf a été retirée le 21/11/2026.
 
 ---
 
@@ -77,11 +77,6 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 | Types / lint | `npx tsc -b --noEmit` / `npx eslint src --quiet` | `npx tsc --noEmit` / `npx expo lint` | `npx tsc -b --noEmit` / `npx eslint .` |
 | Tests | `npm test` ; `npm run e2e` | `npx jest` | `npm test` ; `npm run e2e` (deux téléphones simulés) |
 | Déployer | `npm run deploy` | `npm run build:web && npm run deploy:web` | `npm run deploy` |
-
-**APK MyPerf** : `cd apps/perf/android && ANDROID_HOME=~/android-sdk ./gradlew assembleRelease
--PreactNativeArchitectures=arm64-v8a --max-workers=2` (pas plus de 2 workers : WSL manque de mémoire), puis copier
-`android/app/build/outputs/apk/release/app-release.apk` vers les Téléchargements Windows. Un `./gradlew clean` peut être
-nécessaire (chemins absolus en cache).
 
 **Commits** : en français, descriptifs, terminés par la ligne `Co-Authored-By` du modèle utilisé (`Claude Fable 5.2 <noreply@anthropic.com>` ou `Claude Opus 5.5 <noreply@anthropic.com>`).
 
@@ -198,7 +193,7 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
   `README.md`.
 - **Données personnelles de l'auteur** : seulement dans le build privé (`EXPO_PUBLIC_PERSONAL_DATA=1`,
   `src/import/personal.ts`). `PERSONAL_IMPORT_VERSION` reconstruit l'historique importé avec des identifiants fixes.
-- La V5 la passe sur le web (phase 4) ; l'APK reste jusque-là.
+- Web seulement depuis le 21/11/2026 (`app.json` : `platforms: ["web"]`, plus de projet Android ni d'APK) ; la phase 4 la refait comme module de la coquille.
 
 ### MyRave (`apps/raveloc`)
 - Retrouver ses amis en festival : groupes temporaires (14 jours max), partage de position limité dans le temps, flèche

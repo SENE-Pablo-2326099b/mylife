@@ -68,8 +68,8 @@ d'API Anthropic reste sur l'appareil, dépôt privé.
 les efface (retrait de `SYNC_APPS`, purge). L'effacement est définitif : il attend un dernier accord explicite au
 moment de le faire.
 
-**L'APK Android de MyPerf** reste en l'état jusqu'à ce que MyPerf V5 (web) la remplace ; ensuite, MyLife s'installe
-comme PWA sur Android comme sur iPhone.
+**L'APK Android de MyPerf est retirée** (21/11/2026) : MyPerf n'existe plus qu'en web, et MyLife s'installe comme PWA
+sur Android comme sur iPhone.
 
 ---
 
@@ -264,3 +264,4 @@ coquille et MyFinances sont prêtes, puis module par module.
 | 13/11/2026 | La nouvelle coquille est servie à `/v5/` à côté de l'ancien accueil jusqu'à ce qu'elle le remplace |
 | 13/11/2026 | Phase 1 : thèmes en trop et cartes en relief reportés à la phase 2 (le design system y est refait entièrement) |
 | 13/11/2026 | Phase 1 : données des fonctions retirées gardées dans le compte, récupérables par « Mes données » → « Télécharger l'archive » |
+| 21/11/2026 | L'APK Android de MyPerf ne doit plus exister : MyPerf est web seulement (plus de projet Android, de build ni de code propre au téléphone) ; ses dernières branches natives partent avec Expo en phase 4 |

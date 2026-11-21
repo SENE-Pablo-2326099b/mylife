@@ -431,7 +431,7 @@ function TodayOverview() {
           <IconButton icon="apps-outline" label="Espaces MyLife" glass onPress={() => setSpaces(true)} />
         </View>
       }>
-      {/* Web : une copie des données est proposée chaque semaine (l'app Android se sauvegarde seule). */}
+      {/* Une copie des données est proposée chaque semaine. */}
       <View style={{ marginBottom: space.md }}>
         <BackupReminder hasData={data.recent.length > 0 || data.planned.length > 0} />
       </View>

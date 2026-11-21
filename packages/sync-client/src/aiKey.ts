@@ -2,7 +2,7 @@
  * Clé API Anthropic de l'utilisateur, **une seule pour toutes les apps web de MyLife** (MyFinances et son
  * assistant, MyPerf et son coach) : saisie une fois, utilisée partout. Elle reste sur l'appareil
  * (stockage du navigateur) : jamais synchronisée, jamais sauvegardée, jamais envoyée ailleurs qu'à
- * l'API d'Anthropic. L'app Android de MyPerf garde la sienne dans le trousseau du système.
+ * l'API d'Anthropic. Effacée à la déconnexion.
  */
 export const AI_KEY = 'mylife:anthropic-key';
 /** Anciennes clés propres à chaque app : reprises une fois, puis supprimées. */

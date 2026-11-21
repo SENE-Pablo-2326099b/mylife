@@ -1,36 +1,56 @@
-import { File, Paths } from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-
+/**
+ * Export et import (PWA MyLife) : l'export télécharge le fichier, l'import passe par le sélecteur de
+ * fichiers du navigateur. Une sauvegarde exportée de l'ancienne app Android se restaure aussi ici.
+ */
 import { today } from '@/domain/dates';
 import { buildBackup, restoreBackup, setsCsv } from '@/db/backup';
+import { markWebBackedUp } from './webBackup';
 
-function writeTemp(name: string, content: string): File {
-  const file = new File(Paths.cache, name);
-  if (file.exists) file.delete();
-  file.create();
-  file.write(content);
-  return file;
-}
-
-async function share(file: File, mimeType: string, UTI: string): Promise<void> {
-  if (!(await Sharing.isAvailableAsync())) throw new Error('Partage indisponible sur cet appareil');
-  await Sharing.shareAsync(file.uri, { mimeType, UTI, dialogTitle: 'Exporter' });
+function download(name: string, content: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export async function exportJson(): Promise<void> {
-  const file = writeTemp(`myperf-${today()}.json`, JSON.stringify(buildBackup()));
-  await share(file, 'application/json', 'public.json');
+  download(`myperf-${today()}.json`, JSON.stringify(buildBackup()), 'application/json');
+  markWebBackedUp();
 }
 
 export async function exportCsv(): Promise<void> {
-  const file = writeTemp(`myperf-series-${today()}.csv`, setsCsv());
-  await share(file, 'text/csv', 'public.comma-separated-values-text');
+  download(`myperf-series-${today()}.csv`, setsCsv(), 'text/csv');
 }
 
-/** Lets the user pick a JSON backup and restores it. Returns restored rows, or null if cancelled. */
-export async function importJson(): Promise<number | null> {
-  const picked = await File.pickFileAsync({ mimeTypes: ['application/json', 'text/plain', '*/*'] });
-  if (picked.canceled) return null;
-  const parsed: unknown = JSON.parse(await picked.result.text());
-  return restoreBackup(parsed);
+/** Sélection d'un fichier de sauvegarde JSON puis restauration. null si annulé. */
+export function importJson(): Promise<number | null> {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json,text/plain';
+    let settled = false;
+    input.addEventListener('change', () => {
+      settled = true;
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      file
+        .text()
+        .then((text) => resolve(restoreBackup(JSON.parse(text) as unknown)))
+        .catch(reject);
+    });
+    // Fenêtre fermée sans choix : le focus revient sans « change ».
+    window.addEventListener(
+      'focus',
+      () =>
+        setTimeout(() => {
+          if (!settled) resolve(null);
+        }, 1000),
+      { once: true },
+    );
+    input.click();
+  });
 }

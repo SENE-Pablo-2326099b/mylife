@@ -1,31 +1,48 @@
-import { Linking, Share } from 'react-native';
-
 /**
- * Partage autour de l'import de programmes, dans l'app Android : la feuille de partage du téléphone sert
- * à copier les instructions ou à les envoyer directement à l'app d'IA (ChatGPT, Gemini…), et à partager
- * l'export. (Web : programShare.web.ts.)
+ * Partage autour de l'import de programmes, sur le web : presse-papier, téléchargement du fichier
+ * d'export, ouverture d'un fichier .json / .txt. (Téléphone : programShare.ts.)
  */
-export const CAN_PICK_FILE = false;
+export const CAN_PICK_FILE = true;
 
-/** Copie (web) ou partage (téléphone) un texte ; renvoie ce qui s'est passé, pour le message à afficher. */
-export async function copyOrShare(text: string, title: string): Promise<'copied' | 'shared' | 'failed'> {
+export async function copyOrShare(text: string): Promise<'copied' | 'shared' | 'failed'> {
   try {
-    const r = await Share.share({ message: text, title });
-    return r.action === Share.dismissedAction ? 'failed' : 'shared';
+    await navigator.clipboard.writeText(text);
+    return 'copied';
   } catch {
     return 'failed';
   }
 }
 
 export async function shareProgramFile(json: string, name: string): Promise<'downloaded' | 'shared' | 'failed'> {
-  const r = await copyOrShare(json, name);
-  return r === 'shared' ? 'shared' : 'failed';
+  try {
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    return 'downloaded';
+  } catch {
+    return 'failed';
+  }
 }
 
-export async function pickTextFile(): Promise<string | null> {
-  return null;
+/** Ouvre un fichier texte (.json, .txt, .md, .csv) choisi par l'utilisateur ; null s'il annule. */
+export function pickTextFile(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.txt,.md,.csv,application/json,text/plain';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return resolve(null);
+      file.text().then(resolve, () => resolve(null));
+    };
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
 }
 
 export function openUrl(url: string): void {
-  void Linking.openURL(url);
+  window.open(url, '_blank', 'noopener');
 }

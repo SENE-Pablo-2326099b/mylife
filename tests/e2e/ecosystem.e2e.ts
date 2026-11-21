@@ -660,8 +660,10 @@ describe('MyLife, une seule app', () => {
     await ctxB.close();
     // Un module ouvre Copilot avec une question préparée, à relire avant l'envoi.
     await p.goto(`${server.url}/copilot?domaine=sport&q=${encodeURIComponent('Quelle séance aujourd’hui ?')}`);
-    expect(await p.getByLabel('Ta question').inputValue()).toBe('Quelle séance aujourd’hui ?');
-    expect(await p.getByRole('group', { name: 'Domaine de la conversation' }).getByRole('button', { name: 'Sport' }).getAttribute('aria-pressed')).toBe('true');
+    // Le champ se remplit une fois l'écran prêt : on attend la valeur au lieu de la lire tout de suite (cause de
+    // l'instabilité notée au journal).
+    await expect.poll(() => p.getByLabel('Ta question').inputValue()).toBe('Quelle séance aujourd’hui ?');
+    await expect.poll(() => p.getByRole('group', { name: 'Domaine de la conversation' }).getByRole('button', { name: 'Sport' }).getAttribute('aria-pressed')).toBe('true');
     await p.unroute('https://api.anthropic.com/**');
     // Données : export et archive ; support.
     await p.goto(`${server.url}/donnees`);

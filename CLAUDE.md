@@ -35,4 +35,3 @@ pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances�
 - Travailler sur une branche, la pousser ; l'utilisateur relit et fusionne.
 - **Pas de déploiement depuis le cloud** : `npm run deploy:all` se lance sur la machine de l'utilisateur, après fusion.
 - Pas d'accès à la base de production ni aux scripts qui la lisent (`npm run support`, `npm run stats:serveur`).
-- L'APK Android de MyPerf ne se construit pas dans le cloud (SDK Android local).

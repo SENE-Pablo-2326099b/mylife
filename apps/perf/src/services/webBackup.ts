@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 /**
  * Sauvegarde hebdomadaire de MyPerf sur le web (mêmes règles que packages/ui/src/backup.ts de MyLife) :
  * la date de la dernière sauvegarde reste dans le navigateur, une copie est proposée tous les 7 jours,
- * « Plus tard » repousse d'un jour. L'app Android a ses sauvegardes automatiques (autoBackup.ts).
+ * « Plus tard » repousse d'un jour.
  */
 const EVERY = 7 * 86_400_000;
 const SNOOZE = 86_400_000;

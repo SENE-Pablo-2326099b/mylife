@@ -1,24 +1,24 @@
 # MyPerf — suivi d'entraînement (force / street lifting)
 
-App mobile offline-first de suivi de musculation : saisie de séance ultra-rapide, mésocycles avec rampe top set + backoff, double progression, stats e1RM.
+App web (PWA MyLife, `/perf/`) hors ligne d'abord, de suivi de musculation : saisie de séance ultra-rapide, mésocycles avec rampe top set + backoff, double progression, stats e1RM.
 
 ## Lancer
 
 ```bash
 npm install
-npx expo start          # puis Expo Go (Android/iOS) ou un dev build
+npx expo start --web    # aperçu dans le navigateur
 npm test                # tests métier + base de données (Jest)
 npm run typecheck       # TypeScript strict
 npm run lint
 ```
 
-`npx expo start --web` ouvre un **aperçu navigateur** (voir « Web » plus bas) — la cible réelle est iOS/Android.
+MyPerf n'existe plus qu'en web (l'app Android a été retirée le 21/11/2026) ; la phase 4 de la V5 la refait comme module de la coquille MyLife.
 
 ## Stack — et pourquoi
 
 | Choix | Raison |
 |---|---|
-| **Expo SDK 57 / React Native 0.86**, React Compiler | Standard actuel, build sans Xcode/Android Studio (EAS), perfs natives. |
+| **Expo SDK 57 / React Native 0.86** (export web), React Compiler | Héritage de l'app d'origine ; remplacé par le web en phase 4. |
 | **expo-router** (onglets JS personnalisés) | Navigation par fichiers ; barre d'onglets custom pour y loger le timer de repos et le clavier numérique. |
 | **expo-sqlite, API synchrone** | Chaque action est écrite sur disque *avant* que l'UI avance → aucune perte si l'app est tuée en pleine séance. WAL + écritures d'une ligne : < 1 ms. |
 | **zustand** | État de la séance en cours : mises à jour immuables ciblées → seules les lignes touchées re-rendent. |
@@ -119,8 +119,8 @@ Au premier lancement (base vide), tout est chargé automatiquement ; sinon Régl
 
 ## Données
 
-Tout reste sur le téléphone (SQLite). Réglages → Export JSON (sauvegarde complète, ré-importable) ou CSV des séries. La séance en cours et le timer survivent à un kill de l'app.
+Tout reste sur l'appareil (SQLite dans le navigateur), synchronisé chiffré par le compte MyLife. Réglages → Export JSON (sauvegarde complète, ré-importable) ou CSV des séries. La séance en cours et le timer survivent à un kill de l'app.
 
 ## Web
 
-L'aperçu navigateur utilise **sql.js** en mémoire (sauvegardé dans `localStorage`) car l'API synchrone d'expo-sqlite sur le web est en alpha. Utile pour développer l'UI ; pas une cible de production.
+MyPerf web utilise **sql.js** en mémoire (sauvegardé dans le navigateur) car l'API synchrone d'expo-sqlite sur le web est en alpha. C'est la seule cible.

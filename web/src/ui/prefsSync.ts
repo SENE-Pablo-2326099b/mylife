@@ -9,8 +9,7 @@ import { clearSyncIssue, noteSyncIssue } from './syncIssue';
 /**
  * Réglages communs de MyLife synchronisés entre appareils par le compte, chiffrés comme le reste (app
  * `mylife` du serveur) : l'apparence (`prefs/appearance`). La ligne est datée, la plus récente gagne :
- * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web ; l'app Android fait
- * de même de son côté.
+ * changer de thème sur le PC le change sur le téléphone. Lancé par chaque app web.
  *
  * Les autres lignes de `mylife` (compteurs du Personnage, musique, jeux, anciennes lignes de « Mes apps ») ne sont plus
  * lues depuis la V5 : elles restent dans le compte, récupérables par l'archive de « Mes données », jusqu'à leur purge.

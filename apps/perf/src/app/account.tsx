@@ -20,8 +20,8 @@ import { space, useTheme } from '@/ui/theme';
 import { passwordIssue } from '@/vendor/mylife-sync';
 
 /**
- * Compte MyLife dans MyPerf : les mêmes écrans que dans les apps web (src/ui/account.tsx de MyLife),
- * en React Native pour l'app Android. Création en un écran (identifiant + mot de passe), clé de secours
+ * Compte MyLife dans MyPerf : les mêmes écrans que dans les autres apps (src/ui/account.tsx de MyLife),
+ * écrits avec les composants de MyPerf. Création en un écran (identifiant + mot de passe), clé de secours
  * montrée juste après puis rappelée, gestion complète du compte.
  */
 

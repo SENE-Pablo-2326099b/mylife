@@ -1,13 +1,13 @@
-import * as SecureStore from 'expo-secure-store';
+import { readAiKey, writeAiKey } from '@/vendor/mylife-sync/aiKey';
 
-const KEY = 'anthropic_api_key';
-
-/** The user's Anthropic API key lives in the OS keychain / keystore, never in the database or exports. */
+/**
+ * Web (PWA MyLife) : la même clé que l'assistant de MyFinances, saisie une seule fois (même adresse, même
+ * stockage).
+ */
 export async function loadApiKey(): Promise<string | null> {
-  return SecureStore.getItemAsync(KEY);
+  return readAiKey();
 }
 
 export async function saveApiKey(value: string | null): Promise<void> {
-  if (value === null || value.trim() === '') await SecureStore.deleteItemAsync(KEY);
-  else await SecureStore.setItemAsync(KEY, value.trim());
+  writeAiKey(value);
 }

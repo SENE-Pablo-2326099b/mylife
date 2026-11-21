@@ -8,7 +8,7 @@ import { readSharedAppearance, writeSharedAppearance, type SharedAppearance } fr
 
 const web = Platform.OS === 'web';
 
-/** Date du dernier choix d'apparence sur cet appareil (app Android ; sur le web, dans l'apparence commune). */
+/** Date du dernier choix d'apparence sur cet appareil (l'apparence commune de MyLife fait foi). */
 export function appearanceAt(): number {
   if (web) return readSharedAppearance()?.at ?? 0;
   return Number(db().first<{ v: string }>("SELECT v FROM sync_state WHERE k = 'appearance_at'")?.v ?? 0);
