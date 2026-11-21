@@ -58,6 +58,12 @@ const SESSION_DAYS = 365;
 const MAX_CHANGES = 500;
 const MAX_PAYLOAD = 200_000;
 const PULL_LIMIT = 1000;
+/**
+ * Avance d'horloge tolérée pour un appareil. Les dates de modification viennent de l'appareil (la plus récente
+ * gagne) : une date plus lointaine, horloge déréglée ou malveillance, est ramenée à cette limite, sans quoi la ligne
+ * ne pourrait plus jamais être modifiée ailleurs.
+ */
+export const CLOCK_SKEW_MS = 5 * 60_000;
 
 /** Garde-fous contre les abus (fenêtres simples, par clé). */
 export const RATES = {
@@ -489,6 +495,7 @@ export async function sync(
   db: Db,
   uid: string,
   body: Record<string, unknown>,
+  now = Date.now(),
 ): Promise<{ changes: (Change & { seq: number })[]; cursor: number; more: boolean; accepted: number; tooBig: { tbl: string; rid: string }[]; resync?: true }> {
   const app = appOf(body);
   const device = typeof body.device === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(body.device) ? body.device : null;
@@ -496,40 +503,45 @@ export async function sync(
   const cursor = typeof body.cursor === 'number' && body.cursor >= 0 ? Math.floor(body.cursor) : 0;
   const { changes, tooBig } = parseChanges(body.changes);
 
-  if (body.reset === true) await db.query('DELETE FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
-  await checkQuota(db, uid, app, changes);
+  // Dates ramenées dans le présent (au plus quelques minutes d'avance), jamais avant 1970.
+  const horizon = now + CLOCK_SKEW_MS;
+  for (const c of changes) c.updatedAt = Math.min(Math.max(0, c.updatedAt), horizon);
 
-  let accepted = 0;
-  let overruled: RecordRow[] = [];
-  if (changes.length) {
+  // Tout ou rien : un lot qui remplace le compte (`reset`, « garder les données de cet appareil ») n'efface ce que le
+  // compte avait que si ses lignes sont bien écrites (quota compris) ; sinon rien ne change.
+  const { accepted, overruled } = await db.transaction(async (tx) => {
+    if (body.reset === true) await tx.query('DELETE FROM records WHERE user_id = $1 AND app = $2', [uid, app]);
+    await checkQuota(tx, uid, app, changes);
+    if (!changes.length) return { accepted: 0, overruled: [] as RecordRow[] };
     const values: unknown[] = [];
     const tuples = changes.map((c, i) => {
       values.push(uid, app, c.tbl, c.rid, c.updatedAt, c.deleted, device, c.deleted ? null : c.payload);
       const b = i * 8;
       return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},nextval('records_seq'),$${b + 5},$${b + 6},$${b + 7},$${b + 8})`;
     });
-    // Une même ligne envoyée deux fois dans un lot : on garde la dernière.
-    const res = await db.query(
+    values.push(horizon);
+    // Une même ligne envoyée deux fois dans un lot : on garde la dernière. Une date enregistrée au-delà de l'horizon
+    // (écrite avant cette borne par une horloge déréglée) ne bloque plus rien : n'importe quelle modification la remplace.
+    const res = await tx.query(
       `INSERT INTO records (user_id, app, tbl, rid, seq, updated_at, deleted, device, payload) VALUES ${tuples.join(',')}
        ON CONFLICT (user_id, app, tbl, rid) DO UPDATE SET seq = nextval('records_seq'), updated_at = EXCLUDED.updated_at,
          deleted = EXCLUDED.deleted, device = EXCLUDED.device, payload = EXCLUDED.payload
-       WHERE records.updated_at <= EXCLUDED.updated_at
+       WHERE (CASE WHEN records.updated_at > $${values.length} THEN 0 ELSE records.updated_at END) <= EXCLUDED.updated_at
        RETURNING tbl, rid`,
       values,
     );
-    accepted = res.rows.length;
     // Refusées : le compte a plus récent. On renvoie sa version pour que l'appareil s'aligne.
     const ok = new Set((res.rows as { tbl: string; rid: string }[]).map((r) => `${r.tbl}|${r.rid}`));
     const refused = changes.filter((c) => !ok.has(`${c.tbl}|${c.rid}`));
-    if (refused.length) {
-      const params: unknown[] = [uid, app];
-      const pairs = refused.map((c, i) => {
-        params.push(c.tbl, c.rid);
-        return `($${i * 2 + 3},$${i * 2 + 4})`;
-      });
-      overruled = (await db.query<RecordRow>(`SELECT tbl, rid, seq, updated_at, deleted, payload FROM records WHERE user_id = $1 AND app = $2 AND (tbl, rid) IN (${pairs.join(',')})`, params)).rows;
-    }
-  }
+    if (!refused.length) return { accepted: res.rows.length, overruled: [] as RecordRow[] };
+    const params: unknown[] = [uid, app];
+    const pairs = refused.map((c, i) => {
+      params.push(c.tbl, c.rid);
+      return `($${i * 2 + 3},$${i * 2 + 4})`;
+    });
+    const lost = (await tx.query<RecordRow>(`SELECT tbl, rid, seq, updated_at, deleted, payload FROM records WHERE user_id = $1 AND app = $2 AND (tbl, rid) IN (${pairs.join(',')})`, params)).rows;
+    return { accepted: res.rows.length, overruled: lost };
+  });
 
   // Curseur d'avant une purge : des suppressions ont pu disparaître du serveur avant que l'appareil les voie.
   // Ses modifications sont reçues ci-dessus ; il doit ensuite repartir de tout le compte.

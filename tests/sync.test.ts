@@ -8,6 +8,7 @@ import { ensurePushSchema, pushDispatch } from '../server/push';
 import { spaceDispatch } from '../server/space';
 import { supportDispatch } from '../server/support';
 import { syncDispatch } from '../server/sync';
+import { seedUsers } from './seedUsers';
 import {
   autoJoin,
   changePassword,
@@ -507,4 +508,58 @@ describe('sessions révocables et suppression de compte tout ou rien', () => {
     expect(await core.verifySession(db, session.token, env.secret)).toBeNull();
     expect(await statuses(db, session.token)).toEqual([401, 401, 401, 401, 401, 401]);
   }, 60_000);
+});
+
+describe('synchronisation : dates bornées et remplacement tout ou rien', () => {
+  const NOW = Date.parse('2026-11-21T12:00:00Z');
+  const YEAR = 365 * 86_400_000;
+  async function setup() {
+    const srv = await server();
+    const db = srv.db as unknown as core.Db;
+    await seedUsers(db, 'u1');
+    const write = (device: string, rows: { rid: string; at: number; payload?: string }[], now: number, extra: Record<string, unknown> = {}) =>
+      core.sync(db, 'u1', { app: 'mylife', device, cursor: 0, changes: rows.map((r) => ({ tbl: 't', rid: r.rid, updatedAt: r.at, deleted: false, payload: r.payload ?? `v-${device}` })), ...extra }, now);
+    const stored = async (rid: string) => (await db.query<{ updated_at: string; payload: string }>('SELECT updated_at, payload FROM records WHERE rid = $1', [rid])).rows[0];
+    return { db, write, stored };
+  }
+
+  it('une date lointaine (horloge déréglée) est ramenée à quelques minutes : un autre appareil peut ensuite modifier la ligne', async () => {
+    const { write, stored } = await setup();
+    await write('appareil-a', [{ rid: 'x', at: NOW + YEAR }], NOW);
+    expect(Number((await stored('x'))!.updated_at)).toBe(NOW + core.CLOCK_SKEW_MS);
+    // Dix minutes plus tard, une vraie modification ailleurs l'emporte.
+    const later = NOW + 10 * 60_000;
+    expect((await write('appareil-b', [{ rid: 'x', at: later }], later)).accepted).toBe(1);
+    expect((await stored('x'))!.payload).toBe('v-appareil-b');
+    // Une date négative ou nulle ne passe pas devant non plus.
+    await write('appareil-a', [{ rid: 'y', at: -5 }], NOW);
+    expect(Number((await stored('y'))!.updated_at)).toBe(0);
+  }, 30_000);
+
+  it('une ligne déjà enregistrée avec une date future (avant cette borne) ne bloque plus : elle est remplacée, sans migration', async () => {
+    const { db, write, stored } = await setup();
+    await db.query(`INSERT INTO records (user_id, app, tbl, rid, seq, updated_at, deleted, device, payload) VALUES ('u1','mylife','t','z',nextval('records_seq'),$1,false,'ancien','bloquee')`, [NOW + 50 * YEAR]);
+    expect((await write('appareil-b', [{ rid: 'z', at: NOW }], NOW)).accepted).toBe(1);
+    expect((await stored('z'))!.payload).toBe('v-appareil-b');
+  }, 30_000);
+
+  it('la plus récente gagne toujours : une modification plus ancienne est refusée et l’appareil reçoit la version du compte', async () => {
+    const { write, stored } = await setup();
+    await write('appareil-a', [{ rid: 'x', at: NOW }], NOW);
+    const r = await write('appareil-b', [{ rid: 'x', at: NOW - 60_000 }], NOW);
+    expect(r.accepted).toBe(0);
+    expect(r.changes.map((c) => [c.rid, c.payload])).toEqual([['x', 'v-appareil-a']]);
+    expect((await stored('x'))!.payload).toBe('v-appareil-a');
+  }, 30_000);
+
+  it('remplacer le compte (« garder les données de cet appareil ») : si le lot est refusé (quota), le compte reste intact', async () => {
+    const { db, write } = await setup();
+    await write('appareil-a', [{ rid: 'garde-1', at: NOW }, { rid: 'garde-2', at: NOW }], NOW);
+    const tooMany = Array.from({ length: core.ROW_QUOTA.mylife + 1 }, (_, i) => ({ rid: `n${i}`, at: NOW }));
+    await expect(write('appareil-b', tooMany, NOW, { reset: true })).rejects.toMatchObject({ status: 413 });
+    expect((await db.query<{ rid: string }>('SELECT rid FROM records ORDER BY rid')).rows.map((r) => r.rid)).toEqual(['garde-1', 'garde-2']);
+    // Un lot valable remplace bien tout.
+    await write('appareil-b', [{ rid: 'nouveau', at: NOW }], NOW, { reset: true });
+    expect((await db.query<{ rid: string }>('SELECT rid FROM records')).rows.map((r) => r.rid)).toEqual(['nouveau']);
+  }, 30_000);
 });
