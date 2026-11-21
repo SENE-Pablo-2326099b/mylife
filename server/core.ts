@@ -12,6 +12,11 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 /** Ce dont la logique a besoin d'une base : pg.Pool en production, PGlite dans les tests. */
 export interface Db {
   query<R = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: R[] }>;
+  /**
+   * Tout ou rien : les requêtes faites sur `tx` sont validées ensemble, ou annulées ensemble si `fn` échoue.
+   * Avec un pool, elles passent toutes par la même connexion (un simple BEGIN sur le pool ne garantirait rien).
+   */
+  transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>;
 }
 
 export interface Env {
@@ -78,6 +83,10 @@ export async function ensureSchema(db: Db): Promise<void> {
     rec_wrapped_key TEXT NOT NULL,
     created_at BIGINT NOT NULL
   )`);
+  // Génération des sessions : un jeton n'est valable que pour la génération en cours. Changer de mot de passe ou
+  // passer par la clé de secours l'augmente, ce qui coupe toutes les sessions ouvertes ailleurs. Ajout sans effet
+  // sur les comptes existants (0 : leurs jetons d'avant, sans génération, restent valables jusque-là).
+  await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS session_gen INTEGER NOT NULL DEFAULT 0`);
   await db.query(`CREATE SEQUENCE IF NOT EXISTS records_seq`);
   await db.query(`CREATE TABLE IF NOT EXISTS records (
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -102,12 +111,14 @@ export async function ensureSchema(db: Db): Promise<void> {
 const b64u = (s: string | Buffer) => Buffer.from(s).toString('base64url');
 const hmac = (secret: string, data: string) => createHmac('sha256', secret).update(data).digest();
 
-export function signToken(uid: string, secret: string, now = Date.now()): string {
-  const payload = b64u(JSON.stringify({ uid, exp: now + SESSION_DAYS * 86_400_000 }));
+/** Jeton de session : le compte, l'échéance et la génération de session du compte au moment de la signature. */
+export function signToken(uid: string, secret: string, now = Date.now(), gen = 0): string {
+  const payload = b64u(JSON.stringify({ uid, exp: now + SESSION_DAYS * 86_400_000, gen }));
   return `${payload}.${b64u(hmac(secret, payload))}`;
 }
 
-export function verifyToken(token: string | undefined | null, secret: string, now = Date.now()): string | null {
+/** Signature et échéance seulement. Un jeton sans génération (signé avant elle) compte pour la génération 0. */
+function readToken(token: string | undefined | null, secret: string, now: number): { uid: string; gen: number } | null {
   if (!token) return null;
   const [payload, sig] = token.replace(/^Bearer\s+/i, '').split('.');
   if (!payload || !sig) return null;
@@ -115,11 +126,39 @@ export function verifyToken(token: string | undefined | null, secret: string, no
   const given = Buffer.from(sig, 'base64url');
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
   try {
-    const { uid, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { uid?: unknown; exp?: unknown };
-    return typeof uid === 'string' && typeof exp === 'number' && exp > now ? uid : null;
+    const { uid, exp, gen } = JSON.parse(Buffer.from(payload, 'base64url').toString()) as { uid?: unknown; exp?: unknown; gen?: unknown };
+    if (typeof uid !== 'string' || typeof exp !== 'number' || exp <= now) return null;
+    if (gen !== undefined && !(Number.isInteger(gen) && (gen as number) >= 0)) return null;
+    return { uid, gen: (gen as number | undefined) ?? 0 };
   } catch {
     return null;
   }
+}
+
+/**
+ * Le jeton est-il authentique et non échu ? **N'autorise rien à lui seul** : il ne sait pas si la session a été
+ * révoquée ni si le compte existe encore. Les points d'entrée utilisent `verifySession`.
+ */
+export function verifyToken(token: string | undefined | null, secret: string, now = Date.now()): string | null {
+  return readToken(token, secret, now)?.uid ?? null;
+}
+
+/**
+ * La session est-elle toujours en vigueur : jeton authentique et non échu, compte qui existe encore, et jeton de la
+ * génération en cours (un changement de mot de passe ou une récupération a coupé les plus anciens).
+ */
+export async function verifySession(db: Db, token: string | undefined | null, secret: string, now = Date.now()): Promise<string | null> {
+  const claim = readToken(token, secret, now);
+  if (!claim) return null;
+  const { rows } = await db.query<{ session_gen: number | string }>('SELECT session_gen FROM users WHERE id = $1', [claim.uid]);
+  return rows[0] && Number(rows[0].session_gen) === claim.gen ? claim.uid : null;
+}
+
+/** Session requise : le compte, ou 401. */
+export async function requireSession(db: Db, token: string | undefined | null, secret: string, now = Date.now()): Promise<string> {
+  const uid = await verifySession(db, token, secret, now);
+  if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
+  return uid;
 }
 
 // ---------------------------------------------------------------- validation
@@ -191,6 +230,7 @@ async function failedAttempt(db: Db, kind: 'password' | 'recovery', login: strin
 
 interface UserRow {
   id: string;
+  session_gen: number | string;
   kdf_salt: string;
   kdf_iter: number;
   auth_hash: string;
@@ -256,13 +296,13 @@ export async function login(db: Db, env: Env, body: Record<string, unknown>, cli
   const name = loginOf(body);
   const authKey = str(body, 'authKey', HEX64);
   await guardAttempts(db, 'password', name, now);
-  const { rows } = await db.query<UserRow>('SELECT id, auth_hash, wrapped_key FROM users WHERE login = $1', [name]);
+  const { rows } = await db.query<UserRow>('SELECT id, auth_hash, wrapped_key, session_gen FROM users WHERE login = $1', [name]);
   const user = rows[0];
   if (!user || !same(fingerprint(env, authKey), user.auth_hash)) {
     await failedAttempt(db, 'password', name, now);
     throw new HttpError(401, 'Identifiant ou mot de passe incorrect.');
   }
-  return { token: signToken(user.id, env.secret, now), login: name, wrappedKey: user.wrapped_key };
+  return { token: signToken(user.id, env.secret, now, Number(user.session_gen)), login: name, wrappedKey: user.wrapped_key };
 }
 
 /** Mot de passe oublié, étape 1 : la clé de secours prouve l'identité et rend la clé de données emballée. */
@@ -271,16 +311,24 @@ export async function recoverStart(db: Db, env: Env, body: Record<string, unknow
   return { recWrappedKey: user.rec_wrapped_key };
 }
 
-/** Étape 2 : nouveau mot de passe (nouvelle clé d'authentification, clé de données ré-emballée). */
+/**
+ * Étape 2 : nouveau mot de passe (nouvelle clé d'authentification, clé de données ré-emballée). Toutes les sessions
+ * ouvertes sont coupées ; seule celle rendue ici vaut.
+ */
 export async function recoverFinish(db: Db, env: Env, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ token: string; login: string }> {
-  const user = await byRecovery(db, env, body, client.now);
-  await setPassword(db, env, user.id, body);
-  return { token: signToken(user.id, env.secret), login: loginOf(body) };
+  const now = client.now ?? Date.now();
+  const user = await byRecovery(db, env, body, now);
+  const gen = await setPassword(db, env, user.id, body);
+  return { token: signToken(user.id, env.secret, now, gen), login: loginOf(body) };
 }
 
-export async function changePassword(db: Db, env: Env, uid: string, body: Record<string, unknown>): Promise<{ ok: true }> {
-  await setPassword(db, env, uid, body);
-  return { ok: true };
+/**
+ * Changer de mot de passe coupe les sessions des autres appareils (ils devront se reconnecter avec le nouveau) ;
+ * l'appareil qui le change reçoit une nouvelle session, qu'il garde.
+ */
+export async function changePassword(db: Db, env: Env, uid: string, body: Record<string, unknown>, now = Date.now()): Promise<{ ok: true; token: string }> {
+  const gen = await setPassword(db, env, uid, body);
+  return { ok: true, token: signToken(uid, env.secret, now, gen) };
 }
 
 async function byRecovery(db: Db, env: Env, body: Record<string, unknown>, now = Date.now()): Promise<UserRow> {
@@ -296,11 +344,17 @@ async function byRecovery(db: Db, env: Env, body: Record<string, unknown>, now =
   return user;
 }
 
-async function setPassword(db: Db, env: Env, uid: string, body: Record<string, unknown>): Promise<void> {
+/** Nouveau mot de passe, et nouvelle génération de session (les jetons d'avant ne valent plus) ; la renvoie. */
+async function setPassword(db: Db, env: Env, uid: string, body: Record<string, unknown>): Promise<number> {
   const salt = str(body, 'newSalt', HEX32);
   const authKey = str(body, 'newAuthKey', HEX64);
   const wrappedKey = str(body, 'newWrappedKey', B64);
-  await db.query('UPDATE users SET kdf_salt = $2, kdf_iter = $3, auth_hash = $4, wrapped_key = $5 WHERE id = $1', [uid, salt, KDF_ITERATIONS, fingerprint(env, authKey), wrappedKey]);
+  const { rows } = await db.query<{ session_gen: number | string }>(
+    'UPDATE users SET kdf_salt = $2, kdf_iter = $3, auth_hash = $4, wrapped_key = $5, session_gen = session_gen + 1 WHERE id = $1 RETURNING session_gen',
+    [uid, salt, KDF_ITERATIONS, fingerprint(env, authKey), wrappedKey],
+  );
+  if (!rows[0]) throw new HttpError(404, 'Compte introuvable.');
+  return Number(rows[0].session_gen);
 }
 
 /** Nouvelle clé de secours (l'ancienne cesse de fonctionner) : la session suffit, comme pour le mot de passe. */
@@ -312,10 +366,12 @@ export async function renewRecovery(db: Db, env: Env, uid: string, body: Record<
 }
 
 /**
- * Suppression du compte : le mot de passe est redemandé (preuve fraîche), puis le compte et toutes ses
- * données synchronisées sont effacés du serveur. Les données restent sur les appareils.
+ * Suppression du compte : le mot de passe est redemandé (preuve fraîche), puis, **en une seule transaction**, ce
+ * que `purge` efface hors des tables du compte (groupes, espaces, support, notifications), et enfin le compte avec
+ * toutes ses données synchronisées. Si une étape échoue, rien n'est effacé et on peut réessayer. Les jetons du
+ * compte cessent aussitôt de valoir (le compte n'existe plus). Les données restent sur les appareils.
  */
-export async function deleteAccount(db: Db, env: Env, uid: string, body: Record<string, unknown>, client: Client = { ip: '' }): Promise<{ ok: true }> {
+export async function deleteAccount(db: Db, env: Env, uid: string, body: Record<string, unknown>, client: Client = { ip: '' }, purge: (tx: Db) => Promise<void> = async () => {}): Promise<{ ok: true }> {
   const now = client.now ?? Date.now();
   const authKey = str(body, 'authKey', HEX64);
   const { rows } = await db.query<UserRow & { login: string }>('SELECT id, login, auth_hash FROM users WHERE id = $1', [uid]);
@@ -326,7 +382,10 @@ export async function deleteAccount(db: Db, env: Env, uid: string, body: Record<
     await failedAttempt(db, 'password', user.login, now);
     throw new HttpError(401, 'Mot de passe incorrect.');
   }
-  await db.query('DELETE FROM users WHERE id = $1', [uid]);
+  await db.transaction(async (tx) => {
+    await purge(tx);
+    await tx.query('DELETE FROM users WHERE id = $1', [uid]);
+  });
   return { ok: true };
 }
 

@@ -172,12 +172,17 @@ export async function recoverAccount(p: Platform, input: { login: string; recove
   return session;
 }
 
+/**
+ * Changer de mot de passe : les autres appareils sont déconnectés (ils se reconnecteront avec le nouveau) ; celui-ci
+ * garde la nouvelle session que le serveur lui rend.
+ */
 export async function changePassword(p: Platform, session: Session, newPassword: string): Promise<void> {
   const issue = passwordIssue(newPassword, session.login);
   if (issue) throw new ApiError(400, `Mot de passe : ${issue}`);
   const salt = bytesToHex(p.random(16));
   const keys = await passwordKeys(newPassword, salt, KDF_ITERATIONS);
-  await p.api.call('/api/auth', { action: 'password', newSalt: salt, newAuthKey: keys.authKey, newWrappedKey: wrapKey(keys.kek, fromB64(session.dek), p.random) }, session.token);
+  const r = await p.api.call<{ ok: true; token?: string }>('/api/auth', { action: 'password', newSalt: salt, newAuthKey: keys.authKey, newWrappedKey: wrapKey(keys.kek, fromB64(session.dek), p.random) }, session.token);
+  if (r.token) await p.sessions.set({ ...session, token: r.token });
 }
 
 /** Nouvelle clé de secours : l'ancienne cesse de fonctionner. Renvoie la nouvelle, à garder. */

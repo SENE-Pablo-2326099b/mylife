@@ -1,11 +1,16 @@
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as core from '../server/core';
 import { authDispatch } from '../server/auth';
-import { createGroup, ensureRavelocSchema } from '../server/raveloc';
+import { createGroup, dispatch as ravelocDispatch, ensureRavelocSchema } from '../server/raveloc';
+import { ensurePushSchema, pushDispatch } from '../server/push';
+import { spaceDispatch } from '../server/space';
+import { supportDispatch } from '../server/support';
+import { syncDispatch } from '../server/sync';
 import {
   autoJoin,
+  changePassword,
   checkLogin,
   createAccount,
   deleteAccount,
@@ -41,9 +46,8 @@ async function server(e: core.Env = env, ip = '203.0.113.7') {
       if (url.endsWith('/api/auth')) {
         out = await authDispatch(db as unknown as core.Db, e, body, auth, { ip });
       } else {
-        const uid = core.verifyToken(auth, env.secret);
-        if (!uid) throw new core.HttpError(401, 'Session expirée');
-        out = body.action === 'status' ? await core.syncStatus(db as unknown as core.Db, uid, body) : await core.sync(db as unknown as core.Db, uid, body);
+        // Le vrai point d'entrée : la session est vérifiée en base (révocation, compte supprimé).
+        out = await syncDispatch(db as unknown as core.Db, e, body, auth);
       }
       return new Response(JSON.stringify(out), { status: 200 });
     } catch (e) {
@@ -382,4 +386,125 @@ describe('compte comme une app ordinaire', () => {
     await core.sync(srv.db as unknown as core.Db, uid, { app: 'mylife', device: 'device-1', cursor: 0, changes: changes(core.ROW_QUOTA.mylife) });
     await expect(core.sync(srv.db as unknown as core.Db, uid, { app: 'mylife', device: 'device-1', cursor: 0, changes: changes(1, 999) })).rejects.toMatchObject({ status: 413 });
   }, 30_000);
+});
+
+describe('sessions révocables et suppression de compte tout ou rien', () => {
+  const PW = 'mot-de-passe-long';
+  const bearer = (t: string) => `Bearer ${t}`;
+  /** Un jeton d'avant la génération de session (charge `{ uid, exp }` seulement), signé comme à l'époque. */
+  const legacyToken = (uid: string) => {
+    const payload = Buffer.from(JSON.stringify({ uid, exp: Date.now() + 86_400_000 })).toString('base64url');
+    return `${payload}.${createHmac('sha256', env.secret).update(payload).digest('base64url')}`;
+  };
+  /** Tous les points d'entrée qui exigent une session, appelés avec ce jeton : leur statut HTTP (200 si accepté). */
+  async function statuses(db: core.Db, token: string): Promise<number[]> {
+    const calls: (() => Promise<unknown>)[] = [
+      () => syncDispatch(db, env, { action: 'status', app: 'finances' }, bearer(token)),
+      () => authDispatch(db, env, { action: 'renewRecovery', recAuth: 'f'.repeat(64), recWrappedKey: 'A'.repeat(40) }, bearer(token), { ip: '' }),
+      () => spaceDispatch(db, env.secret, bearer(token), { action: 'list' }),
+      () => ravelocDispatch(db, env.secret, bearer(token), { action: 'groups' }),
+      () => pushDispatch(db, env.secret, bearer(token), { action: 'status', endpoint: 'https://push.exemple.test/abonnement-1' }, null),
+      () => supportDispatch(db, env.secret, bearer(token), { action: 'send', kind: 'bug', message: 'Ça plante' }),
+    ];
+    const out: number[] = [];
+    for (const call of calls) {
+      try {
+        await call();
+        out.push(200);
+      } catch (e) {
+        out.push(e instanceof core.HttpError ? e.status : 500);
+      }
+    }
+    return out;
+  }
+  const revoked = (codes: number[]) => codes.every((c) => c === 401);
+
+  it('changer de mot de passe coupe les sessions des autres appareils (et les jetons d’avant) ; celui qui le change continue', async () => {
+    const srv = await server();
+    const db = srv.db as unknown as core.Db;
+    const { ensureSpaceSchema } = await import('../server/space');
+    await ensureSpaceSchema(db);
+    await ensurePushSchema(db);
+    const a = new Device();
+    const pa = { api: srv.api, sessions: a.sessions, random };
+    const { session } = await createAccount(pa, { login: 'zoe', password: PW });
+    a.write('accounts', 'bnp', { balance: 1 });
+    await join(a, srv.api, session, random);
+    const b = new Device();
+    const sb = await signIn({ api: srv.api, sessions: b.sessions, random }, { login: 'zoe', password: PW });
+    await join(b, srv.api, sb, random);
+    const uid = core.verifyToken(session.token, env.secret)!;
+    const old = legacyToken(uid);
+    // Avant : toutes ces sessions valent (un jeton d'avant la génération aussi, pour ne déconnecter personne au déploiement).
+    expect(revoked(await statuses(db, old))).toBe(false);
+    expect(await core.verifySession(db, old, env.secret)).toBe(uid);
+
+    await changePassword(pa, session, 'nouveau-mot-de-passe');
+    // L'appareil qui a changé le mot de passe a reçu une nouvelle session et continue sans se reconnecter.
+    expect(a.session!.token).not.toBe(session.token);
+    a.write('accounts', 'bnp', { balance: 2 });
+    expect((await syncNow(a, srv.api, a.session!, random)).pushed).toBe(1);
+    // L'autre appareil, l'ancienne session du premier et le jeton d'avant : refusés partout.
+    for (const t of [sb.token, session.token, old]) {
+      expect(await core.verifySession(db, t, env.secret)).toBeNull();
+      expect(await statuses(db, t)).toEqual([401, 401, 401, 401, 401, 401]);
+    }
+    await expect(syncNow(b, srv.api, sb, random)).rejects.toMatchObject({ status: 401 });
+    // Il se reconnecte avec le nouveau mot de passe : même clé de données, il reçoit la modification.
+    const sb2 = await signIn({ api: srv.api, sessions: b.sessions, random }, { login: 'zoe', password: 'nouveau-mot-de-passe' });
+    expect(sb2.dek).toBe(session.dek);
+    await syncNow(b, srv.api, sb2, random);
+    expect(b.rows.get('accounts|bnp')).toEqual({ balance: 2 });
+  }, 60_000);
+
+  it('passer par la clé de secours coupe toutes les sessions ouvertes ; seule la nouvelle vaut', async () => {
+    const srv = await server();
+    const db = srv.db as unknown as core.Db;
+    const a = new Device();
+    const { session, recoveryKey } = await createAccount({ api: srv.api, sessions: a.sessions, random }, { login: 'max', password: PW });
+    const c = new Device();
+    const fresh = await recoverAccount({ api: srv.api, sessions: c.sessions, random }, { login: 'max', recoveryKey, newPassword: 'nouveau-mot-de-passe' });
+    expect(await core.verifySession(db, session.token, env.secret)).toBeNull();
+    await expect(syncDispatch(db, env, { action: 'status', app: 'finances' }, bearer(session.token))).rejects.toMatchObject({ status: 401 });
+    expect(await core.verifySession(db, fresh.token, env.secret)).toBe(core.verifyToken(session.token, env.secret));
+    // Une connexion ordinaire ensuite reçoit une session de la génération en cours.
+    const again = await signIn({ api: srv.api, sessions: new Device().sessions, random }, { login: 'max', password: 'nouveau-mot-de-passe' });
+    expect(await core.verifySession(db, again.token, env.secret)).not.toBeNull();
+  }, 60_000);
+
+  it('suppression : une panne au milieu n’efface rien (le compte reste entier, on réessaie) ; réussie, ses jetons ne valent plus nulle part', async () => {
+    const srv = await server();
+    const db = srv.db as unknown as core.Db;
+    await ensurePushSchema(db);
+    const a = new Device();
+    const plat = { api: srv.api, sessions: a.sessions, random };
+    const { session } = await createAccount(plat, { login: 'sam', password: PW });
+    a.write('transactions', 't1', { label: 'x' });
+    await join(a, srv.api, session, random);
+    const uid = core.verifyToken(session.token, env.secret)!;
+    const blob = (seed: string, n = 60) => Buffer.from(seed.repeat(n)).toString('base64').slice(0, n);
+    await createGroup(db, uid, { gid: 'a'.repeat(32), name: blob('name'), profile: blob('sam'), wrappedKey: blob('key', 80), durationMs: 3_600_000 });
+    await supportDispatch(db, env.secret, bearer(session.token), { action: 'send', kind: 'bug', message: 'Ça plante' });
+    await db.query(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES ('https://push.exemple.test/abonnement-1', $1, 'p', 'a', 0)`, [uid]);
+    const count = async (table: string) => (await db.query(`SELECT 1 FROM ${table}`)).rows.length;
+    const snapshot = async () => [await count('users'), await count('records'), await count('raveloc_members'), await count('support_messages'), await count('push_subscriptions')];
+    const before = await snapshot();
+    expect(before.every((n) => n > 0)).toBe(true);
+
+    // La dernière étape tombe en panne (après le départ des groupes et l'effacement des messages) : tout est annulé.
+    const { salt, iterations } = await core.getSalt(db, env, { login: 'sam' });
+    const { authKey } = await passwordKeys(PW, salt, iterations);
+    const flaky = (d: Pick<core.Db, 'query'>) => ((text: string, params?: unknown[]) => (/DELETE FROM push_subscriptions/.test(text) ? Promise.reject(new Error('panne simulée')) : d.query(text, params))) as core.Db['query'];
+    const broken: core.Db = { query: flaky(db), transaction: (fn) => db.transaction((tx) => fn({ query: flaky(tx), transaction: tx.transaction })) };
+    await expect(authDispatch(broken, env, { action: 'deleteAccount', authKey }, bearer(session.token), { ip: '' })).rejects.toThrow('panne simulée');
+    expect(await snapshot()).toEqual(before);
+    expect(await core.verifySession(db, session.token, env.secret)).toBe(uid);
+
+    // On réessaie : tout part, et le jeton (pourtant bien signé et non échu) ne vaut plus nulle part.
+    await deleteAccount(plat, session, PW);
+    expect(await snapshot()).toEqual([0, 0, 0, 0, 0]);
+    expect(core.verifyToken(session.token, env.secret)).toBe(uid);
+    expect(await core.verifySession(db, session.token, env.secret)).toBeNull();
+    expect(await statuses(db, session.token)).toEqual([401, 401, 401, 401, 401, 401]);
+  }, 60_000);
 });

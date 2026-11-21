@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { HttpError, verifyToken, type Db } from './core.js';
+import { HttpError, requireSession, type Db } from './core.js';
 
 /**
  * MyRave côté serveur (POST /api/raveloc) : groupes, invitations, partage de position.
@@ -558,8 +558,7 @@ export const ACTIONS = {
 export type Action = keyof typeof ACTIONS;
 
 export async function dispatch(db: Db, secret: string, auth: string | undefined, body: Body, now = Date.now()): Promise<unknown> {
-  const uid = verifyToken(auth, secret, now);
-  if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
+  const uid = await requireSession(db, auth, secret, now);
   const fn = ACTIONS[body.action as Action];
   if (typeof body.action !== 'string' || !Object.hasOwn(ACTIONS, body.action) || !fn) throw new HttpError(400, 'Action inconnue');
   return fn(db, uid, body, now);

@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as core from '../server/raveloc';
 import { HttpError, signToken, verifyToken, type Db } from '../server/core';
+import { seedUsers } from './seedUsers';
 
 /**
  * MyRave (/api/raveloc) sur un vrai Postgres en mémoire, avec les vraies sessions de MyLife.
@@ -45,6 +46,7 @@ beforeEach(async () => {
   now = T0;
   db = new PGlite() as unknown as Db;
   await core.ensureRavelocSchema(db);
+  await seedUsers(db, 'u_alice', 'u_bob', 'u_eve', 'u_x');
 });
 
 describe('sessions MyLife', () => {

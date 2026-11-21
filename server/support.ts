@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { HttpError, verifyToken, type Db } from './core.js';
+import { HttpError, requireSession, type Db } from './core.js';
 
 /**
  * Support (POST /api/support) : « Un problème, une idée ? » depuis l'app. Le message n'est PAS chiffré :
@@ -36,8 +36,7 @@ export async function sendSupport(db: Db, uid: string, body: Record<string, unkn
 }
 
 export async function supportDispatch(db: Db, secret: string, auth: string | undefined, body: Record<string, unknown>): Promise<unknown> {
-  const uid = verifyToken(auth, secret);
-  if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
+  const uid = await requireSession(db, auth, secret);
   if (body.action !== 'send') throw new HttpError(400, 'Action inconnue');
   await ensureSupportSchema(db);
   return sendSupport(db, uid, body);

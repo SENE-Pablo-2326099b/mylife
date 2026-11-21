@@ -2,6 +2,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeEach, describe, expect, it } from 'vitest';
 import * as core from '../../../server/raveloc';
 import { HttpError, signToken, type Db } from '../../../server/core';
+import { seedUsers } from '../../../tests/seedUsers';
 import { ApiError, createApi } from '../src/lib/api';
 import { inviteLink, newGroupId, newGroupKey, openName, openPosition, openProfile, parseInvite, sealName, sealPosition, sealProfile, unwrapGroupKey, wrapGroupKey } from '../src/lib/groupCrypto';
 
@@ -34,6 +35,8 @@ function device(uid: string) {
 beforeEach(async () => {
   db = new PGlite() as unknown as Db;
   await core.ensureRavelocSchema(db);
+  // Une session n'est valable que pour un compte qui existe (server/core.ts, verifySession).
+  await seedUsers(db, 'u_alice', 'u_bob');
   networkUp = true;
   seen.length = 0;
 });

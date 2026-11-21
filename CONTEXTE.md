@@ -123,6 +123,15 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
 ### Session et appareils
 - Une session web pour toutes les apps (`packages/sync-client/src/web.ts`) ; se déconnecter quelque part déconnecte
   partout.
+- **Sessions révocables** (`server/core.ts`) : le jeton porte la génération de session du compte (`users.session_gen`) ;
+  chaque point d'entrée la vérifie en base (`requireSession` / `verifySession` ; `verifyToken` ne contrôle que la
+  signature et n'autorise rien seul). Changer de mot de passe ou passer par la clé de secours augmente la génération :
+  les autres appareils sont déconnectés, celui qui le change reçoit un nouveau jeton. Un compte supprimé n'a plus de
+  session valable. Les jetons d'avant (sans génération) valent comme génération 0. Limite connue : le relais bancaire
+  (`apps/finances/server/bridge.ts`, autre projet, sans base) ne vérifie que la signature.
+- **Suppression du compte en une transaction** (`Db.transaction` : PGlite, ou une seule connexion du pool en production,
+  `poolDb` dans `server/http.ts`) : groupes MyRave, espaces, support, notifications, puis le compte ; une panne au
+  milieu n'efface rien.
 - **Reliure automatique** (`autoJoin`) : les données d'un autre compte sur l'appareil sont effacées, jamais montrées ;
   un appareil vide prend le contenu du compte ; des données saisies hors compte → l'utilisateur choisit (« Partir de
   zéro » d'abord pour un compte neuf). Jamais de fusion. Tant que l'appareil n'est pas relié, `AccountGate` couvre l'app.

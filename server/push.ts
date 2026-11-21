@@ -1,5 +1,5 @@
 import webpush from 'web-push';
-import { HttpError, verifyToken, type Db } from './core.js';
+import { HttpError, requireSession, type Db } from './core.js';
 
 /**
  * Notifications (POST /api/push) : les rappels écrits par l'appareil (V4, F2). Le serveur ne sait rien de tes données :
@@ -50,8 +50,7 @@ const KEY = /^[A-Za-z0-9_-]{10,200}$/;
 
 export async function pushDispatch(db: Db, secret: string, auth: string | undefined, body: Record<string, unknown>, env = pushEnv(), now = Date.now()): Promise<unknown> {
   if (body.action === 'key') return { publicKey: env?.publicKey ?? null };
-  const uid = verifyToken(auth, secret, now);
-  if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
+  const uid = await requireSession(db, auth, secret, now);
   await ensurePushSchema(db);
   const endpoint = typeof body.endpoint === 'string' && ENDPOINT.test(body.endpoint) ? body.endpoint : null;
   switch (body.action) {

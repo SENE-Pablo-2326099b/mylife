@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { HttpError, verifyToken, type Db } from './core.js';
+import { HttpError, requireSession, type Db } from './core.js';
 
 /**
  * Espaces partagés (POST /api/space) : la brique commune des fonctions « à plusieurs » de MyLife
@@ -417,8 +417,7 @@ const ACTIONS = {
 type Action = keyof typeof ACTIONS;
 
 export async function spaceDispatch(db: Db, secret: string, auth: string | undefined, body: Body, now = Date.now()): Promise<unknown> {
-  const uid = verifyToken(auth, secret, now);
-  if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
+  const uid = await requireSession(db, auth, secret, now);
   if (typeof body.action !== 'string' || !Object.hasOwn(ACTIONS, body.action)) throw new HttpError(400, 'Action inconnue');
   const fn = ACTIONS[body.action as Action] as (db: Db, uid: string, body: Body, now: number) => Promise<unknown>;
   return fn(db, uid, body, now);

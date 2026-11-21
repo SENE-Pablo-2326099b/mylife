@@ -3,6 +3,7 @@ import { runInNewContext } from 'node:vm';
 import { PGlite } from '@electric-sql/pglite';
 import { describe, expect, it } from 'vitest';
 import * as core from '../server/core';
+import { seedUsers } from './seedUsers';
 import { pushDispatch, sendWakeups, type PushEnv, type PushSender } from '../server/push';
 import { wakeupMinutes, type PlannedReminder } from '../web/src/reminders';
 
@@ -13,7 +14,7 @@ const token = (uid: string) => core.signToken(uid, secret);
 const sub = (n: number, weekly?: boolean) => ({ action: 'subscribe', endpoint: `https://push.exemple.test/abonnement-${n}`, keys: { p256dh: 'p'.repeat(20), auth: 'a'.repeat(16) }, ...(weekly === undefined ? {} : { weekly }) });
 const db = async () => {
   const p = new PGlite();
-  await core.ensureSchema(p as unknown as core.Db);
+  await seedUsers(p as unknown as core.Db, 'u1', 'u2');
   return p as unknown as core.Db;
 };
 const at = (hhmm: string) => Date.parse(`2026-10-24T${hhmm}:00Z`);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PGlite } from '@electric-sql/pglite';
 import * as core from '../server/core';
+import { seedUsers } from './seedUsers';
 import { pushDispatch, type PushEnv } from '../server/push';
 import { supportDispatch } from '../server/support';
 
@@ -9,7 +10,7 @@ import { supportDispatch } from '../server/support';
 const secret = 'x'.repeat(40);
 const db = async () => {
   const p = new PGlite();
-  await core.ensureSchema(p as unknown as core.Db);
+  await seedUsers(p as unknown as core.Db, 'u1', 'u2');
   return p as unknown as core.Db;
 };
 const token = (uid: string) => core.signToken(uid, secret);

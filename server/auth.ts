@@ -1,4 +1,4 @@
-import { available, changePassword, deleteAccount, getSalt, HttpError, login, recoverFinish, recoverStart, renewRecovery, signup, verifyToken, type Client, type Db, type Env } from './core.js';
+import { available, changePassword, deleteAccount, getSalt, HttpError, login, recoverFinish, recoverStart, renewRecovery, requireSession, signup, type Client, type Db, type Env } from './core.js';
 import { forgetUser } from './raveloc.js';
 import { ensureSpaceSchema, forgetSpaceUser } from './space.js';
 import { ensureSupportSchema } from './support.js';
@@ -9,11 +9,7 @@ import { ensurePushSchema } from './push.js';
  * `recoverStart`, `recoverFinish`. Avec session : `password`, `renewRecovery`, `deleteAccount`.
  */
 export async function authDispatch(db: Db, env: Env, body: Record<string, unknown>, auth: string | undefined, client: Client): Promise<unknown> {
-  const session = () => {
-    const uid = verifyToken(auth, env.secret, client.now);
-    if (!uid) throw new HttpError(401, 'Session expirée : reconnecte-toi.');
-    return uid;
-  };
+  const session = () => requireSession(db, auth, env.secret, client.now);
   switch (body.action) {
     case 'salt':
       return getSalt(db, env, body);
@@ -28,23 +24,25 @@ export async function authDispatch(db: Db, env: Env, body: Record<string, unknow
     case 'recoverFinish':
       return recoverFinish(db, env, body, client);
     case 'password':
-      return changePassword(db, env, session(), body);
+      return changePassword(db, env, await session(), body, client.now);
     case 'renewRecovery':
-      return renewRecovery(db, env, session(), body);
+      return renewRecovery(db, env, await session(), body);
     case 'deleteAccount': {
-      const uid = session();
-      const out = await deleteAccount(db, env, uid, body, client);
-      // Ses groupes MyRave : il les quitte (positions effacées, admin transmis).
-      await forgetUser(db, uid);
-      // Ses espaces partagés (Crew…) : il les quitte, ses lignes sont effacées.
+      const uid = await session();
+      // Les tables hors du compte existent avant d'ouvrir la transaction (création au premier appel).
       await ensureSpaceSchema(db);
-      await forgetSpaceUser(db, uid);
-      // Ses messages au support partent aussi.
       await ensureSupportSchema(db);
-      await db.query('DELETE FROM support_messages WHERE user_id = $1', [uid]);
       await ensurePushSchema(db);
-      await db.query('DELETE FROM push_subscriptions WHERE user_id = $1', [uid]);
-      return out;
+      // Tout ou rien : s'il manque une étape, le compte reste entier et on peut réessayer.
+      return deleteAccount(db, env, uid, body, client, async (tx) => {
+        // Ses groupes MyRave : il les quitte (positions effacées, admin transmis).
+        await forgetUser(tx, uid);
+        // Ses espaces partagés (Crew…) : il les quitte, ses lignes sont effacées.
+        await forgetSpaceUser(tx, uid);
+        // Ses messages au support et ses abonnements aux notifications partent aussi.
+        await tx.query('DELETE FROM support_messages WHERE user_id = $1', [uid]);
+        await tx.query('DELETE FROM push_subscriptions WHERE user_id = $1', [uid]);
+      });
     }
     default:
       throw new HttpError(400, 'Action inconnue');

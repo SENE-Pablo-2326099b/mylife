@@ -3,21 +3,50 @@ import { attachDatabasePool } from '@vercel/functions';
 import pg from 'pg';
 import { ensureSchema, HttpError, type Db, type Env } from './core.js';
 
-let pool: pg.Pool | null = null;
+let db: Db | null = null;
 let ready: Promise<void> | null = null;
+
+/**
+ * Une base sur un pool : chaque requête prend une connexion libre ; une transaction en garde une seule du début à
+ * la fin (BEGIN, les requêtes, COMMIT ; ROLLBACK si quelque chose échoue), puis la rend au pool.
+ */
+export function poolDb(pool: pg.Pool): Db {
+  const self: Db = {
+    query: (text, params) => pool.query(text, params) as never,
+    async transaction(fn) {
+      const conn = await pool.connect();
+      // Une connexion dont l'annulation a échoué n'est pas rendue au pool dans cet état : elle est fermée.
+      let broken = false;
+      try {
+        await conn.query('BEGIN');
+        const out = await fn({ query: (text, params) => conn.query(text, params) as never, transaction: () => Promise.reject(new Error('Transaction déjà ouverte.')) });
+        await conn.query('COMMIT');
+        return out;
+      } catch (e) {
+        await conn.query('ROLLBACK').catch(() => (broken = true));
+        throw e;
+      } finally {
+        conn.release(broken || undefined);
+      }
+    },
+  };
+  return self;
+}
 
 /** Pool Postgres (Neon, connexion « pooled ») réutilisé entre requêtes (Fluid compute). */
 export async function getDb(): Promise<Db> {
-  if (!pool) {
-    pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
+  if (!db) {
+    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 5 });
     attachDatabasePool(pool);
+    db = poolDb(pool);
   }
-  if (!ready) ready = ensureSchema(pool).catch((e) => {
+  const base = db;
+  if (!ready) ready = ensureSchema(base).catch((e) => {
     ready = null;
     throw e;
   });
   await ready;
-  return pool;
+  return base;
 }
 
 export function getEnv(): Env {
