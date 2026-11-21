@@ -55,6 +55,29 @@ describe('rappel du dimanche', () => {
     expect(await status('u1')).toMatchObject({ subscribed: false });
   }, 30_000);
 
+  it('un abonnement ne change de compte que si l’appareil présente ses clés ; il repart alors de zéro', async () => {
+    const d = await db();
+    await pushDispatch(d, secret, token('u1'), { ...sub(1), weekly: false }, env);
+    await pushDispatch(d, secret, token('u1'), { action: 'wakeups', endpoint: sub(1).endpoint, minutes: [600, 1200] }, env);
+    const owner = async () => (await d.query<{ user_id: string }>('SELECT user_id FROM push_subscriptions WHERE endpoint = $1', [sub(1).endpoint])).rows[0]?.user_id;
+    const wakeups = async () => (await d.query('SELECT 1 FROM push_wakeups')).rows.length;
+    // Un autre compte qui connaît seulement l'adresse : refusé, rien ne bouge.
+    const stolen = { ...sub(1), keys: { p256dh: 'q'.repeat(20), auth: 'b'.repeat(16) } };
+    await expect(pushDispatch(d, secret, token('u2'), stolen, env)).rejects.toMatchObject({ status: 409 });
+    expect(await owner()).toBe('u1');
+    expect(await wakeups()).toBe(2);
+    // Le même navigateur, une autre personne connectée (mêmes clés) : l'abonnement passe à son compte, sans les
+    // heures de réveil ni le choix du rappel du compte précédent.
+    await pushDispatch(d, secret, token('u2'), sub(1), env);
+    expect(await owner()).toBe('u2');
+    expect(await wakeups()).toBe(0);
+    expect(await pushDispatch(d, secret, token('u2'), { action: 'status', endpoint: sub(1).endpoint }, env)).toMatchObject({ subscribed: true, weekly: true });
+    expect(await pushDispatch(d, secret, token('u1'), { action: 'status', endpoint: sub(1).endpoint }, env)).toMatchObject({ subscribed: false });
+    // Son propre abonnement, renouvelé avec d'autres clés : accepté.
+    await pushDispatch(d, secret, token('u2'), stolen, env);
+    expect(await owner()).toBe('u2');
+  }, 30_000);
+
   it('10 appareils au plus par compte : le plus ancien laisse sa place', async () => {
     const d = await db();
     for (let i = 0; i < 11; i++) await pushDispatch(d, secret, token('u1'), sub(i), env, Date.now() + i);

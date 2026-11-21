@@ -58,15 +58,27 @@ export async function pushDispatch(db: Db, secret: string, auth: string | undefi
       if (!env) throw new HttpError(503, 'Les notifications ne sont pas encore activées sur ce serveur.');
       const keys = body.keys as { p256dh?: unknown; auth?: unknown } | undefined;
       if (!endpoint || typeof keys?.p256dh !== 'string' || !KEY.test(keys.p256dh) || typeof keys.auth !== 'string' || !KEY.test(keys.auth)) throw new HttpError(400, 'Abonnement invalide.');
-      const { rows } = await db.query<{ n: string | number }>('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = $1', [uid]);
-      if (Number(rows[0]?.n ?? 0) >= 10) await db.query('DELETE FROM push_subscriptions WHERE endpoint = (SELECT endpoint FROM push_subscriptions WHERE user_id = $1 ORDER BY created_at LIMIT 1)', [uid]);
+      const p256dh = keys.p256dh;
+      const authKey = keys.auth;
       // `weekly` : le rappel du dimanche (par défaut) ; un appareil abonné seulement pour ses rappels le refuse.
       const weekly = body.weekly !== false;
-      await db.query(
-        `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, weekly, created_at) VALUES ($1,$2,$3,$4,$6,$5)
-         ON CONFLICT (endpoint) DO UPDATE SET user_id = EXCLUDED.user_id, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, weekly = push_subscriptions.weekly OR EXCLUDED.weekly`,
-        [endpoint, uid, keys.p256dh, keys.auth, now, weekly],
-      );
+      await db.transaction(async (tx) => {
+        // Un abonnement déjà connu sous un autre compte (même navigateur, autre personne connectée) ne change de
+        // compte que si l'appareil présente ses clés : connaître son adresse ne suffit pas pour le détourner.
+        // Il repart alors de zéro : les heures de réveil du compte précédent sont effacées.
+        const { rows: held } = await tx.query<{ user_id: string; p256dh: string; auth: string }>('SELECT user_id, p256dh, auth FROM push_subscriptions WHERE endpoint = $1 FOR UPDATE', [endpoint]);
+        const other = held[0] && held[0].user_id !== uid ? held[0] : null;
+        if (other && (other.p256dh !== p256dh || other.auth !== authKey)) throw new HttpError(409, 'Cet appareil est déjà abonné aux notifications avec un autre compte.');
+        if (other) await tx.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+        const { rows } = await tx.query<{ n: string | number }>('SELECT COUNT(*) AS n FROM push_subscriptions WHERE user_id = $1 AND endpoint <> $2', [uid, endpoint]);
+        if (Number(rows[0]?.n ?? 0) >= 10) await tx.query('DELETE FROM push_subscriptions WHERE endpoint = (SELECT endpoint FROM push_subscriptions WHERE user_id = $1 AND endpoint <> $2 ORDER BY created_at LIMIT 1)', [uid, endpoint]);
+        await tx.query(
+          `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, weekly, created_at) VALUES ($1,$2,$3,$4,$6,$5)
+           ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, weekly = push_subscriptions.weekly OR EXCLUDED.weekly
+           WHERE push_subscriptions.user_id = EXCLUDED.user_id`,
+          [endpoint, uid, p256dh, authKey, now, weekly],
+        );
+      });
       return { ok: true };
     }
     case 'weekly': {
