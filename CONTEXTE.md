@@ -1,6 +1,6 @@
 # MyLife : contexte technique
 
-> **État du code au 17/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
+> **État du code au 21/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
 > devient, et dans quel ordre) est dans **`docs/VISION.md`**, qui prime en cas de désaccord. Le journal de la V5 est
 > `docs/V5.md` ; l'historique d'avant la V5 est dans `docs/archives/`.
 >
@@ -14,7 +14,8 @@
 - **V5** (où on en est exactement, et ce qu'il faut garder : tête de `docs/V5.md`) : phases 0, 1 et 2 faites ; la
   coquille (`app/`, kit `packages/kit`, contrat de module `app/src/contract.ts`) sert `/`. **Phase 3 faite, à l'essai
   en usage réel** : MyFinances est un module de la coquille à `/argent` (moteur, écrans, banques, synchro, placements) ;
-  l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits. Copilot a des conversations
+  l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits ; export et import de données
+  (Réglages de MyFinances → Tes données). Copilot a des conversations
   synchronisées et des domaines. **Phase 4 (MyPerf) préparée** : `docs/V5-MYPERF-PHASE4.pdf`, en attente de validation.
   Phase 5 (MyRave, Sorties) : à faire.
 - **Interface** : l'effet de verre se règle (Réglages → Apparence : sobre, subtil, prononcé ; `data-glass`), avec une
