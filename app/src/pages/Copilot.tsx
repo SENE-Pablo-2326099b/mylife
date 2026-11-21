@@ -131,7 +131,7 @@ function KeyCard({ onSaved }: { onSaved: () => void }) {
     <ModuleCard tone="neutral">
       <div className="pad stack">
         <span className="t-card">Ta clé API Anthropic</span>
-        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l’assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu’à Anthropic.</span>
+        <span className="t-small muted">Copilot parle à Claude avec ta propre clé (la même que l’assistant de MyFinances et le coach de MyPerf). Elle reste sur cet appareil : jamais synchronisée, jamais envoyée ailleurs qu’à Anthropic, effacée si tu te déconnectes.</span>
         <Field id="api-key" label="Clé API" hint="Une clé se crée sur console.anthropic.com (API Keys). Chaque question est facturée sur ton compte Anthropic.">
           <input id="api-key" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder="sk-ant-…" autoComplete="off" />
         </Field>

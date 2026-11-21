@@ -3,6 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform as RN } from 'react-native';
 
 import { MyLifeApi, adoptDevice, claimDevice, type Platform, type Session } from '@/vendor/mylife-sync';
+import { writeAiKey } from '@/vendor/mylife-sync/aiKey';
 
 /**
  * Compte MyLife dans MyPerf. Sur le web (PWA MyLife), même adresse que MyFinances : la session est
@@ -108,6 +109,17 @@ export const platform: Platform = {
         }
       } else if (raw) await SecureStore.setItemAsync(SESSION_KEY, raw);
       else await SecureStore.deleteItemAsync(SESSION_KEY);
+      // Déconnexion : la clé d'API Anthropic ne reste pas sur l'appareil (web : stockage commun ; téléphone : trousseau).
+      if (!s) await forgetAiKey();
     },
   },
 };
+
+async function forgetAiKey(): Promise<void> {
+  try {
+    if (web) writeAiKey(null);
+    else await SecureStore.deleteItemAsync('anthropic_api_key');
+  } catch {
+    /* stockage indisponible */
+  }
+}

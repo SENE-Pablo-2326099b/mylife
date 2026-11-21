@@ -1,5 +1,6 @@
 // GÉNÉRÉ depuis MyLife/packages/sync-client — ne pas modifier ici (MyLife : npm run vendor).
 import { MyLifeApi, type Platform, type Session } from './account';
+import { writeAiKey } from './aiKey';
 import { adoptDevice, claimDevice } from './device';
 
 /**
@@ -80,8 +81,12 @@ export const webPlatform: Platform = {
       if (s) claimDevice(s.login);
       session = s;
       writeJson(SESSION_KEY, s);
-      // Déconnexion : une clé de secours en attente ne doit pas rester sur un appareil partagé.
-      if (!s) writeJson(RECOVERY_KEY, null);
+      // Déconnexion : ni une clé de secours en attente, ni la clé d'API Anthropic ne restent sur l'appareil (elle
+      // serait utilisable par quiconque l'ouvre, et facturée sur ton compte) ; elle se saisit de nouveau à la reconnexion.
+      if (!s) {
+        writeJson(RECOVERY_KEY, null);
+        writeAiKey(null);
+      }
       emit();
     },
   },

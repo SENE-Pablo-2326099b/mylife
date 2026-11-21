@@ -1,1 +1,0 @@
-import{A as o}from"./Copilot-DjWIDuPR.js";import"./index-3Af49KfN.js";import"./actions-DPud0m47.js";function n(e){return new Proxy({},{get(i,t){if(typeof t!="symbol")throw new o(`\`${e}.${t}\` is not available in this environment; it needs a Node.js-compatible runtime`)}})}const m=n("fs"),f=n("path");export{m as fs,f as path};

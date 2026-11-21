@@ -29,3 +29,16 @@ describe('clé IA commune à MyFinances et MyPerf', () => {
     expect(readAiKey()).toBeNull();
   });
 });
+
+describe('clé IA et déconnexion', () => {
+  it('se déconnecter efface la clé de l’appareil ; changer de session sans se déconnecter la garde', async () => {
+    const { webPlatform } = await import('../packages/sync-client/src/web');
+    await webPlatform.sessions.set({ login: 'camille', token: 't1', dek: 'd' });
+    writeAiKey('sk-ant-perso');
+    // Nouvelle session du même compte (mot de passe changé ici) : la clé reste.
+    await webPlatform.sessions.set({ login: 'camille', token: 't2', dek: 'd' });
+    expect(readAiKey()).toBe('sk-ant-perso');
+    await webPlatform.sessions.set(null);
+    expect(readAiKey()).toBeNull();
+  });
+});

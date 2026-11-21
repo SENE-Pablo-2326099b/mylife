@@ -164,7 +164,7 @@ type HeaderRule = { re: RegExp; headers: { key: string; value: string }[] };
 
 /** Règles d'en-têtes de chaque partie (vercel.json de l'accueil et des apps). Motifs Vercel simples → expressions régulières. */
 async function loadSecurityHeaders(): Promise<Partial<Record<'home' | 'finances' | 'perf' | 'raveloc', HeaderRule[]>>> {
-  const files = { home: here('../vercel.json'), finances: here('../apps/finances/vercel.json'), perf: here('../apps/perf/vercel.json'), raveloc: here('../apps/raveloc/vercel.json') };
+  const files = { home: here('../vercel.json'), finances: here('../apps/finances/vercel.json'), perf: here('../apps/perf/web/vercel.json'), raveloc: here('../apps/raveloc/vercel.json') };
   const out: Partial<Record<keyof typeof files, HeaderRule[]>> = {};
   for (const [part, f] of Object.entries(files) as [keyof typeof files, string][]) {
     try {

@@ -205,7 +205,7 @@ Le système contient quatre automates principaux.
 | Synchronisation | Fin sans erreur | Relié | Curseur avancé, `lastSyncAt` |
 | Synchronisation | Réponse 401 | SessionExpirée | Message « reconnecte-toi » ; données locales intactes |
 | SessionExpirée | Connexion réussie | ConnectéNonRelié | `autoJoin` (l'appareil est déjà relié à ce login : retour direct à Relié) |
-| Relié / ConnectéNonRelié | Déconnexion (de toutes les apps) | Anonyme | Session et clé en attente effacées ; données locales conservées |
+| Relié / ConnectéNonRelié | Déconnexion (de toutes les apps) | Anonyme | Session, clé de secours en attente et clé d'API Anthropic effacées ; données locales conservées |
 | Relié | Suppression du compte (mot de passe redemandé) | Anonyme | Serveur : compte, lignes, groupes quittés ; local conservé |
 
 ```mermaid
@@ -298,6 +298,7 @@ erDiagram
         text login UK
         text kdf_salt
         int kdf_iter
+        int session_gen "génération de session : un jeton d'une autre génération est refusé"
         text auth_hash "empreinte HMAC de la clé d'authentification"
         text rec_hash "empreinte HMAC de la preuve de secours"
         text wrapped_key "DEK emballée par le mot de passe"
@@ -497,6 +498,20 @@ octets sont recodés par un accumulateur de bits (décalages et masques), sans b
 
 ---
 
+### 6.10 Clé d'API Anthropic : modèle de menace
+
+La clé de l'utilisateur sert à appeler Claude depuis l'appareil ; elle n'est jamais synchronisée, sauvegardée ni
+envoyée au serveur de MyLife (principe de la V5). Sur le web, elle est dans le stockage du navigateur
+(`packages/sync-client/src/aiKey.ts`), commun à toutes les parties de l'origine ; dans l'app Android de MyPerf, dans
+le trousseau du système.
+
+| Menace | Parade |
+|---|---|
+| Script injecté (XSS) qui lit la clé et l'envoie ailleurs | CSP stricte sur **chaque** partie de l'origine (accueil, MyPerf, MyRave, ancienne MyFinances) : scripts du site seulement, connexions au site et à `api.anthropic.com` seulement ; vérifiée par `tests/csp.test.ts`. Pas de bibliothèque tierce chargée à l'exécution. |
+| Appareil partagé : la personne suivante utilise la clé | Effacée à la déconnexion et quand un autre compte se connecte (`web.ts`, `claimDevice` ; MyPerf : `platform.ts`). |
+| Vol de l'appareil déverrouillé, extension malveillante du navigateur | Non couvert : hors de portée d'une app web (un chiffrement local serait déchiffré par l'app elle-même au moment de s'en servir). Parade côté utilisateur : une clé dédiée à MyLife, avec un plafond de dépense dans la console Anthropic, révocable à tout moment. |
+| Relais par le serveur de MyLife | Écarté : la clé quitterait l'appareil, contraire au principe. |
+
 ## Annexe — Invariants de sécurité vérifiés par les tests
 
 | Invariant | Vérifié par |
@@ -506,4 +521,10 @@ octets sont recodés par un accumulateur de bits (décalages et masques), sans b
 | Pas de devinette en ligne du mot de passe | `sync.test.ts` : garde-fous (429 après 10 échecs) |
 | Suppression de compte : données et groupes effacés | `sync.test.ts` : « supprimer son compte… » |
 | Accès aux groupes revérifié à chaque requête | `raveloc.test.ts` (24 tests) |
+| Sessions coupées au changement de mot de passe, à la récupération et à la suppression du compte, sur tous les points d'entrée | `sync.test.ts` : « sessions révocables… » |
+| Suppression du compte tout ou rien (panne simulée) | `sync.test.ts`, `poolDb.test.ts` |
+| Un abonnement aux notifications ne change de compte qu'avec ses clés | `opening.test.ts` |
+| Corps des requêtes limité et vérifié avant lecture | `limits.test.ts` |
+| Dates de synchro bornées ; remplacement du compte tout ou rien | `sync.test.ts` : « dates bornées… » |
+| CSP stricte sur chaque partie de l'origine ; clé d'API effacée à la déconnexion | `csp.test.ts`, `aikey.test.ts` |
 | Parcours complet : compte, session commune, thème, second appareil | `tests/e2e/ecosystem.e2e.ts` (13 étapes) |
