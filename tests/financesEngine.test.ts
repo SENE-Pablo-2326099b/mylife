@@ -748,6 +748,22 @@ describe('moteur M3 : marchands et règles de tri', () => {
     expect(toClassify(db)).toEqual([]);
     expect(checkIntegrity(db).errors).toEqual([]);
   });
+
+  it('un remboursement se reclasse dans la catégorie qu’il allège, seul ou pour tout son marchand', () => {
+    const base = shop();
+    let s = initState(base);
+    // L'avoir de l'épicerie arrive en « Courses » (le marchand) ; il revenait en fait aux restos.
+    expect(lineOf(applyState(base, s), 'e2')).toMatchObject({ flow: 'REFUND', categoryId: 'courses' });
+    s = classifyAllocation(s, 'e2#0', 'REFUND', 'restos');
+    let db = applyState(base, s);
+    expect(lineOf(db, 'e2')).toMatchObject({ flow: 'REFUND', categoryId: 'restos', origin: 'manual' });
+    expect(byCategory(db, '2026-11-01', '2026-11-30').find((x) => x.id === 'courses')?.amount).toBe(2000);
+    // Pour tout le marchand : la catégorie du remboursement n'est plus perdue.
+    s = classifyMerchant(initState(base), 'm:epicerie', 'REFUND', 'pro');
+    db = applyState(base, s);
+    expect(lineOf(db, 'e2')).toMatchObject({ flow: 'REFUND', categoryId: 'pro' });
+    expect(checkIntegrity(db).errors).toEqual([]);
+  });
 });
 
 describe('moteur M3 : détection des récurrents', () => {

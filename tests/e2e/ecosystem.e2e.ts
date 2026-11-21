@@ -971,6 +971,16 @@ describe('MyLife, une seule app', () => {
     await p.getByText('Ventilée en 2 parts').waitFor();
     await p.getByRole('button', { name: 'Retirer la ventilation' }).click();
     await p.getByRole('button', { name: 'Terminé' }).click();
+    // Un remboursement se rattache à la catégorie qu'il allège (ici le salaire, reclassé le temps de le vérifier).
+    await p.getByRole('button', { name: /employeur/i }).first().click();
+    await p.getByLabel('C’est').selectOption('REFUND');
+    await p.getByLabel('Remboursement de').selectOption('courses');
+    await p.getByRole('button', { name: 'Classer' }).click();
+    await p.getByRole('button', { name: /employeur/i }).first().click();
+    expect(await p.getByLabel('Remboursement de').inputValue()).toBe('courses');
+    await p.getByLabel('C’est').selectOption('INCOME');
+    await expect.poll(() => p.getByLabel('Remboursement de').count()).toBe(0);
+    await p.getByRole('button', { name: 'Classer' }).click();
     // Chercher, puis la sélection multiple.
     await p.getByLabel('Chercher une opération').fill('cafe');
     await expect.poll(() => p.locator('button.fin-op').count()).toBe(1);
@@ -1008,6 +1018,26 @@ describe('MyLife, une seule app', () => {
     // Les enveloppes : une grande carte par enveloppe, et les dépenses de celle choisie en dessous.
     await p.getByRole('button', { name: /^Alimentation/ }).first().waitFor();
     await p.getByText(/^Alimentation, ce cycle/).waitFor();
+    // À la souris aussi, les cartes glissent et se recalent ; le glissement ne choisit pas d'enveloppe, un clic oui.
+    await p.locator('.fin-sec', { hasText: 'Budgets par enveloppe' }).getByRole('button', { name: 'Ajouter' }).click();
+    await p.getByLabel('Nom').fill('Loisirs');
+    await p.getByLabel('Plafond par cycle').fill('50');
+    await p.getByRole('button', { name: 'Enregistrer' }).click();
+    const envs = p.locator('.fin-envs');
+    await envs.getByRole('button', { name: /^Loisirs/ }).waitFor();
+    const row = (await envs.boundingBox())!;
+    await p.mouse.move(row.x + 220, row.y + 60);
+    await p.mouse.down();
+    await p.mouse.move(row.x + 60, row.y + 60, { steps: 8 });
+    await p.mouse.up();
+    await expect.poll(() => envs.evaluate((el) => el.scrollLeft > 0 && el.scrollLeft >= el.scrollWidth - el.clientWidth - 1)).toBe(true);
+    await p.locator('.fin-dots i').nth(1).and(p.locator('[data-on="true"]')).waitFor();
+    await p.getByText(/^Alimentation, ce cycle/).waitFor();
+    await envs.getByRole('button', { name: /^Loisirs/ }).click();
+    await p.getByText(/^Loisirs, ce cycle/).waitFor();
+    await p.locator('.fin-sec', { hasText: 'Loisirs, ce cycle' }).getByRole('button', { name: 'Modifier' }).click();
+    await p.getByRole('button', { name: 'Supprimer' }).click();
+    await envs.getByRole('button', { name: /^Loisirs/ }).waitFor({ state: 'detached' });
     // Ajouter une charge : le type en tuiles, le montant en grand, le jour à toucher.
     await tabs.getByRole('link', { name: 'Ajouter : un engagement' }).click();
     await p.getByRole('group', { name: 'Type' }).getByRole('button', { name: /^Charge/ }).waitFor();

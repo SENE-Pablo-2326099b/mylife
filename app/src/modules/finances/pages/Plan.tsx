@@ -11,6 +11,7 @@ import { acceptSuggestion, addInstallmentPlan, decideOccurrence, ignoreSuggestio
 import { forecast } from '../engine/views';
 import { MiniRing, TreasuryChart } from './charts';
 import { AskCopilot, Avatar, Screen, Sec } from './common';
+import { useMouseSwipe } from './swipe';
 import { opViews } from './opViews';
 import { envelopeOf, type Explanation } from '../engine/engine';
 import { day, RHYTHM } from './labels';
@@ -102,6 +103,7 @@ export function PlanPage() {
   const [installment, setInstallment] = useState(false);
   const [provision, setProvision] = useState<Provision | 'new' | null>(null);
   const [envelope, setEnvelope] = useState<Envelope | 'new' | null>(null);
+  const swipe = useMouseSwipe();
   return (
     <Screen engine={engine} tone="plan" title="Plan" kicker={engine.explanation ? `Cycle du ${day(engine.explanation.cycle.start)} au ${day(engine.explanation.cycle.end)}` : undefined}>
       {({ db, state, e, today, update }) => {
@@ -263,7 +265,7 @@ export function PlanPage() {
             ) : (
               <>
                 <span className="t-small muted">Un plafond par cycle pour ce que tu veux surveiller. Glisse pour passer d’une enveloppe à l’autre.</span>
-                <div className="fin-envs" onScroll={(ev) => setEnvPage(Math.round(ev.currentTarget.scrollLeft / 262))}>
+                <div className="fin-envs" {...swipe} onScroll={(ev) => setEnvPage(Math.round(ev.currentTarget.scrollLeft / 262))}>
                   {capped.map((x) => {
                     const budget = x.budget!;
                     const over = x.spent > budget;

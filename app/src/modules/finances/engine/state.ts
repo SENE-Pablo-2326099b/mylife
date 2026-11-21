@@ -187,7 +187,7 @@ export const patchAccount = (s: EngineState, id: string, patch: AccountPatch): E
 export const saveRule = (s: EngineState, r: Rule): EngineState => ({ ...s, rules: upsert(s.rules ?? [], r) });
 export const removeRule = (s: EngineState, id: string): EngineState => ({ ...s, rules: (s.rules ?? []).filter((r) => r.id !== id) });
 /** Classer un marchand : toutes ses opérations suivent, sauf celles décidées une à une. */
-export const classifyMerchant = (s: EngineState, merchantId: string, flow: Flow, categoryId: string | null): EngineState => ({ ...s, merchantDefaults: { ...s.merchantDefaults, [merchantId]: { flow, categoryId: flow === 'EXPENSE' ? categoryId : null } } });
+export const classifyMerchant = (s: EngineState, merchantId: string, flow: Flow, categoryId: string | null): EngineState => ({ ...s, merchantDefaults: { ...s.merchantDefaults, [merchantId]: { flow, categoryId: flow === 'EXPENSE' || flow === 'REFUND' ? categoryId : null } } });
 /** Classer une seule ligne, à la main. */
 export const classifyAllocation = (s: EngineState, id: string, flow: Flow, categoryId: string | null): EngineState => patchAllocation(s, id, { flow, categoryId: flow === 'EXPENSE' || flow === 'REFUND' ? categoryId : null });
 export const ignoreSuggestion = (s: EngineState, key: string): EngineState => ({ ...s, ignoredSuggestions: [...new Set([...(s.ignoredSuggestions ?? []), key])] });

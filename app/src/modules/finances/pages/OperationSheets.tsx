@@ -41,7 +41,10 @@ export function OperationSheet({ op, account, categories, tags, onClose, onClass
   if (!op || !first) return null;
   const split = op.lines.length > 1;
   const expense = first.flow === 'EXPENSE' && !split;
-  const changed = flow !== first.flow || (flow === 'EXPENSE' && categoryId !== (first.categoryId ?? ''));
+  // Un remboursement porte la catégorie qu'il vient alléger (sans catégorie, il ne compte nulle part) ; une avance
+  // remboursée n'en a pas besoin.
+  const withCat = flow === 'EXPENSE' || (flow === 'REFUND' && !first.settlesReceivableId);
+  const changed = flow !== first.flow || (withCat && categoryId !== (first.categoryId ?? ''));
   const shareCents = cents(share);
   const room = -first.amount - (first.receivableAmount ?? 0);
   const partCents = cents(part);
@@ -69,10 +72,10 @@ export function OperationSheet({ op, account, categories, tags, onClose, onClass
       ) : (
         <>
           <Select id="op-flow" label="C’est" value={flow} options={FLOWS} onChange={setFlow} />
-          {flow === 'EXPENSE' && <Select id="op-cat" label="Catégorie" value={categoryId} options={[['', 'Choisir…'], ...categoryOptions(categories)]} onChange={setCategoryId} />}
+          {withCat && <Select id="op-cat" label={flow === 'REFUND' ? 'Remboursement de' : 'Catégorie'} value={categoryId} options={[['', flow === 'REFUND' ? 'Aucune catégorie' : 'Choisir…'], ...categoryOptions(categories)]} onChange={setCategoryId} />}
           {op.tx.merchantId && changed && <Toggle label="Pour tout ce marchand" detail="Ses opérations passées et à venir seront classées de la même façon." checked={whole} onChange={setWhole} />}
           {changed && (
-            <Button variant="action" block disabled={flow === 'EXPENSE' && !categoryId} onClick={() => onClassify(op, flow, flow === 'EXPENSE' ? categoryId : null, whole)}>
+            <Button variant="action" block disabled={flow === 'EXPENSE' && !categoryId} onClick={() => onClassify(op, flow, withCat ? categoryId || null : null, whole)}>
               Classer
             </Button>
           )}
