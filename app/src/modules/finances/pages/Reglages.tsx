@@ -7,6 +7,7 @@ import { checkIntegrity } from '../engine/integrity';
 import type { Account, Envelope, Rule, Tag } from '../engine/schema';
 import { addAccount, patchAccount, patchSettings, removeEnvelope, removeRule, removeTag, saveEnvelope, saveRule, saveTag } from '../engine/state';
 import { downloadExport } from '../data/export';
+import { ImportSheet } from './ImportData';
 import { Select, Toggle } from './controls';
 import { Screen, Sec, type Ready } from './common';
 import { END, FLOW, ROLE } from './labels';
@@ -69,6 +70,7 @@ function Entry({ to, onClick, icon, color, title, detail }: { to?: string; onCli
 
 /** Le sommaire : l'essentiel en deux tuiles, puis les rubriques, chacune avec ce qu'elle contient aujourd'hui. */
 function Hub({ db, e }: Ready) {
+  const [importing, setImporting] = useState(false);
   const live = db.categories.filter((c) => !c.archivedAt && !c.mergedIntoId);
   const accounts = db.accounts.filter((a) => !a.archivedAt);
   const linked = accounts.filter((a) => a.source === 'bank').length;
@@ -106,9 +108,11 @@ function Hub({ db, e }: Ready) {
       <Sec>Tes données</Sec>
       <List>
         <Entry onClick={() => void downloadExport()} icon="shield" color="#cdbeff" title="Exporter mes données" detail="Un fichier, fabriqué sur ton appareil" />
+        <Entry onClick={() => setImporting(true)} icon="plus" color="#9be9f8" title="Importer des données" detail="Un fichier exporté, ou une sauvegarde de l’ancienne MyFinances" />
         <Entry to="/argent/moteur" icon="eye" color="#9bf0b7" title="Pourquoi ce chiffre" detail="Le calcul, terme par terme" />
         <Entry to="/argent/patrimoine/import" icon="chart" color="#ffc29b" title="Importer un relevé Trade Republic" detail="Lignes et mouvements de tes placements, d’un coup" />
       </List>
+      <ImportSheet open={importing} onClose={() => setImporting(false)} />
     </>
   );
 }

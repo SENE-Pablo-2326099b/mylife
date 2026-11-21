@@ -1197,10 +1197,20 @@ describe('MyLife, une seule app', () => {
     await p.goto(`${server.url}/argent/reglages`);
     const exported = p.waitForEvent('download');
     await p.getByRole('button', { name: /Exporter mes données/ }).click();
-    const file = JSON.parse(readFileSync((await (await exported).path())!, 'utf8')) as { format: string; tables: { transactions: unknown[] }; engine: { version: number } | null };
+    const exportedPath = (await (await exported).path())!;
+    const file = JSON.parse(readFileSync(exportedPath, 'utf8')) as { format: string; tables: { transactions: unknown[] }; engine: { version: number } | null };
     expect(file.format).toBe('myfinances-backup');
     expect(file.tables.transactions.length).toBeGreaterThan(4);
     expect(file.engine?.version).toBe(1);
+    // Importer : le fichier se relit ; tout y est déjà, rien n'est doublé ; l'import s'annule.
+    await p.getByRole('button', { name: /^Importer des données/ }).click();
+    await p.getByLabel('Fichier de données').setInputFiles(exportedPath);
+    await p.getByText('Toutes ces opérations sont déjà là.').waitFor();
+    await p.getByRole('button', { name: /^Ajouter 0 opération/ }).click();
+    await p.getByText(/0 opération ajoutée/).waitFor();
+    await p.getByRole('button', { name: 'Annuler le dernier import' }).click();
+    await p.getByText('Import annulé : tes données sont revenues comme avant.').waitFor();
+    await p.getByRole('button', { name: 'Fermer' }).click();
     // Un second appareil du même compte : faits et réglages arrivent tout seuls (l'espèce saisie, l'enveloppe créée).
     const [ctx2, p2] = await device();
     await p.waitForFunction(() => (JSON.parse(localStorage.getItem('mylife-queue-finances5') ?? '[]') as unknown[]).length === 0 && (JSON.parse(localStorage.getItem('mylife-queue-finances') ?? '[]') as unknown[]).length === 0, undefined, { timeout: 30_000 });
