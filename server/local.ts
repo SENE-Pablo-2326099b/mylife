@@ -16,6 +16,7 @@ import { ensureSpaceSchema, spaceDispatch } from './space.js';
 import { supportDispatch } from './support.js';
 import { pushDispatch } from './push.js';
 import { syncDispatch } from './sync.js';
+import { bodyLimit, checkDeclaredLength, checkJsonType, readLimited } from './limits.js';
 
 const TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -60,10 +61,20 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
   const env: Env = { secret: 'local-secret-'.padEnd(40, 'x'), invite: 'local-invite', signup: 'open', ...opts.env };
   const builds = { ...BUILDS, ...opts.builds };
 
-  async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
-    const chunks: Buffer[] = [];
-    for await (const c of req) chunks.push(c as Buffer);
-    return JSON.parse(Buffer.concat(chunks).toString() || '{}') as Record<string, unknown>;
+  /** Mêmes règles qu'en ligne (server/limits.ts) : du JSON, et pas plus que la limite du point d'entrée. */
+  async function readBody(req: IncomingMessage, path: string): Promise<Record<string, unknown>> {
+    const max = bodyLimit(path);
+    checkJsonType(req.headers['content-type']);
+    checkDeclaredLength(req.headers['content-length'], max);
+    let body: unknown;
+    try {
+      body = JSON.parse((await readLimited(req, max)) || '{}');
+    } catch (e) {
+      if (e instanceof HttpError) throw e;
+      throw new HttpError(400, 'Corps JSON invalide');
+    }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Corps JSON invalide');
+    return body as Record<string, unknown>;
   }
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string) {
@@ -72,7 +83,7 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
       res.end(JSON.stringify(data));
     };
     try {
-      const body = await readBody(req);
+      const body = await readBody(req, path);
       const auth = req.headers.authorization;
       if (path === '/api/auth') return send(200, await authDispatch(db, env, body, auth, { ip: req.socket.remoteAddress ?? '' }));
       if (path === '/api/sync') return send(200, await syncDispatch(db, env, body, auth));
@@ -84,6 +95,11 @@ export async function startLocalServer(opts: { port: number; env?: Partial<Env>;
     } catch (e) {
       const status = e instanceof HttpError ? e.status : 500;
       if (status === 500) console.error(e);
+      // Corps refusé pour sa taille : la suite n'est pas lue, la connexion est fermée après la réponse.
+      if (status === 413) {
+        res.setHeader('connection', 'close');
+        res.on('finish', () => req.destroy());
+      }
       send(status, { error: (e as Error).message });
     }
   }

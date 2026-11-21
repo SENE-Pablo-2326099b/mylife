@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { attachDatabasePool } from '@vercel/functions';
 import pg from 'pg';
 import { ensureSchema, HttpError, type Db, type Env } from './core.js';
+import { bodyLimit, checkDeclaredLength, checkJsonType } from './limits.js';
 
 let db: Db | null = null;
 let ready: Promise<void> | null = null;
@@ -66,8 +67,17 @@ export async function handle(req: Req, res: ServerResponse, fn: (body: Record<st
     res.end(JSON.stringify(body));
   };
   if (req.method !== 'POST') return send(405, { error: 'Méthode non autorisée' });
+  // Type et taille vérifiés avant de lire le corps (sur Vercel, `req.body` n'est analysé qu'au premier accès).
+  const max = bodyLimit(req.url);
+  try {
+    checkJsonType(req.headers['content-type']);
+    checkDeclaredLength(req.headers['content-length'], max);
+  } catch (e) {
+    return send((e as HttpError).status, { error: (e as Error).message });
+  }
   let body = req.body;
   if (typeof body === 'string') {
+    if (Buffer.byteLength(body) > max) return send(413, { error: 'Requête trop volumineuse.' });
     try {
       body = JSON.parse(body);
     } catch {
