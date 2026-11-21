@@ -129,6 +129,11 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
   les autres appareils sont déconnectés, celui qui le change reçoit un nouveau jeton. Un compte supprimé n'a plus de
   session valable. Les jetons d'avant (sans génération) valent comme génération 0. Limite connue : le relais bancaire
   (`apps/finances/server/bridge.ts`, autre projet, sans base) ne vérifie que la signature.
+- **Requêtes et synchro** : corps limité avant lecture (`server/limits.ts` : JSON, 64 ko pour compte, notifications et
+  support, 4,5 Mo ailleurs) ; dates de modification bornées à 5 minutes d'avance (`CLOCK_SKEW_MS`) ; un lot `reset`
+  s'écrit en une transaction. Un abonnement aux notifications ne change de compte qu'avec ses clés.
+- **CSP sur chaque partie de l'origine** (accueil, MyPerf, MyRave, ancienne MyFinances), vérifiée par
+  `tests/csp.test.ts` : elles partagent le stockage, donc la clé d'API Anthropic (effacée à la déconnexion).
 - **Suppression du compte en une transaction** (`Db.transaction` : PGlite, ou une seule connexion du pool en production,
   `poolDb` dans `server/http.ts`) : groupes MyRave, espaces, support, notifications, puis le compte ; une panne au
   milieu n'efface rien.
