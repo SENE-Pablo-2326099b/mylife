@@ -223,9 +223,10 @@ export interface NewExercise {
   category: 'main' | 'compound' | 'isolation';
   equipment: string;
   primary: string[];
+  secondary?: string[];
 }
 
-/** Un exercice à soi (le « + ») : progression en double progression par défaut, tout se règle ensuite. */
+/** Un exercice à soi : au % du 1RM s'il est principal, sinon double progression ; tout se règle ensuite. */
 export function createExercise(d: Db, e: NewExercise): string {
   const name = e.name.trim();
   if (!name || name.length > 80) throw new Error('Nom invalide');
@@ -233,8 +234,21 @@ export function createExercise(d: Db, e: NewExercise): string {
   const id = `ex_${newId()}`;
   d.run(
     `INSERT INTO exercises (id, name, primary_muscles, secondary_muscles, equipment, unilateral, load_type, category, progression_type, backoff_percent, rep_range_min, rep_range_max, weight_increment, is_custom, archived, notes, created_at)
-     VALUES (?, ?, ?, '[]', ?, 0, ?, ?, 'double_progression', 0.8, ?, ?, NULL, 1, 0, '', ?)`,
-    [id, name, JSON.stringify(e.primary.slice(0, 4)), e.equipment, e.loadType, e.category, e.category === 'main' ? 3 : 8, e.category === 'main' ? 6 : 12, Date.now()],
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, 0.8, ?, ?, NULL, 1, 0, '', ?)`,
+    [
+      id,
+      name,
+      JSON.stringify(e.primary.slice(0, 4)),
+      JSON.stringify((e.secondary ?? []).filter((m) => !e.primary.includes(m)).slice(0, 6)),
+      e.equipment,
+      e.loadType,
+      e.category,
+      // Un mouvement principal suit les blocs (au % du 1RM) ; les autres, la double progression.
+      e.category === 'main' ? 'top_set_backoff' : 'double_progression',
+      e.category === 'main' ? 3 : 8,
+      e.category === 'main' ? 6 : 12,
+      Date.now(),
+    ],
   );
   return id;
 }

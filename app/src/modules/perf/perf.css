@@ -123,3 +123,27 @@ button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: point
 .pf-numrow { display: flex; align-items: center; gap: 8px; min-height: 52px; }
 .pf-numrow + .pf-numrow { border-top: 1px solid var(--line); }
 .pf-numval { min-width: 72px; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 16px; }
+
+/* Programme revu et réglages (maquettes E1 à E4). */
+.pf-title { overflow-wrap: anywhere; }
+.pf-weeks { display: flex; gap: 5px; }
+.pf-wk { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 0; border-radius: 12px; background: var(--tile); border: 1px solid var(--tile-border); font-size: 12px; font-weight: 700; }
+.pf-wk small { font-size: 10.5px; font-weight: 500; color: var(--ink-2); white-space: nowrap; }
+.pf-wk.is-current { color: #fff; background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.4); }
+.pf-wk.is-current small { color: rgba(255, 255, 255, 0.85); }
+.pf-wk.is-past { opacity: 0.45; }
+.pf-wk.is-deload { border-style: dashed; }
+.pf-blocks { display: flex; flex-direction: column; padding: 2px 16px; }
+.pf-bl { display: flex; align-items: center; gap: 12px; min-height: 56px; color: var(--ink); }
+.pf-bl + .pf-bl { border-top: 1px solid var(--line); }
+.pf-bl-bar { width: 6px; align-self: stretch; margin: 10px 0; border-radius: 6px; flex: none; }
+.pf-bl.is-past { opacity: 0.5; }
+.pf-table.is-edit td:not(.pf-tl) { padding: 3px 2px; }
+.pf-cellbtn { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 2px; border-radius: 9px; background: var(--field); border: 1px solid var(--field-border); color: inherit; font: inherit; font-weight: inherit; cursor: pointer; }
+.pf-table .is-adjusted .pf-cellbtn { border-color: var(--tone-solid); box-shadow: 0 0 0 2px color-mix(in srgb, var(--tone-solid) 30%, transparent); }
+.pf-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pf-mini { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; border-radius: var(--r-control); background: var(--field); border: 1px solid var(--field-border); }
+.pf-mini-val { font-family: var(--font-display); font-weight: 800; font-size: 20px; }
+.pf-mini-label { font-size: 11px; color: var(--ink-2); }
+.pf-mini .pf-more { width: 32px; height: 32px; }
+.pf-create { border-bottom: 1px solid var(--line); }

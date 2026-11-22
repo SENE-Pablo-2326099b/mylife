@@ -202,8 +202,11 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
   OPFS en mode « pool d'accès synchrones » (pas besoin de COOP/COEP ; `'wasm-unsafe-eval'` dans la CSP de la coquille),
   schéma de l'app d'avant plus une migration en ajout ; synchro `perf` au même format de lignes que l'app d'avant (les
   deux lisent et écrivent le même compte). Métier : `packages/training`. Écrans refaits : Jour, la séance (plein écran :
-  `nav.focus` du contrat des modules efface la barre du bas), Programme (séances types, créneaux : format, progression,
-  groupe, repos, consigne ; colonnes de l'app d'avant tenues à jour, formats à soi dans la table `formats`).
+  `nav.focus` du contrat des modules efface la barre du bas), Programme (bloc en cours et blocs en liste, séances types, créneaux :
+  format, progression, groupe, repos, consigne ; formats à soi dans la table `formats`) et Réglages d'entraînement (un
+  seul endroit : semaines du bloc, semaines ajustées par lift, 1RM de référence en lest net, blocs, valeurs de base ;
+  `data/plan.ts`). Tout s'écrit au format de l'app d'avant (`mesocycles`, `cycle_week_overrides`, `exercise_one_rm`,
+  réglage `app`).
 - **Liens de la coquille** : les liens internes (les `<a>` du kit) naviguent sans recharger la page (`useInAppLinks`,
   `app/src/App.tsx`) ; ceux des apps servies à part (`/perf/`, `/raveloc/`, `/finances/`, `/api`) restent de vrais liens.
 

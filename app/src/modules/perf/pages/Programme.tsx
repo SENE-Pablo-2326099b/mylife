@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Field, Glass, IconButton, List, ListRow, Notice, Sheet } from '@mylife/kit';
 import type { ParamSpec, StrategyId } from '@mylife/training';
 import { call } from '../data/client';
-import { useCloud } from '../data/cloud';
 import type { FormatBase, FormatChoice, ProgramView, SlotDetail, SlotPatch, TemplateDetail, TemplateSummary } from '../data/program';
+import { Head, NumberRow } from './common';
+import { DAYS, longDay, today, useData } from './util';
+import { NewExerciseSheet } from './Reglages';
 import '../perf.css';
 
 /**
@@ -12,47 +14,16 @@ import '../perf.css';
  * structure : des blocs (frise, semaine type, tableau semaine par semaine « Auto » du moteur) ou une routine (prochaine
  * séance, ce qui monte la prochaine fois). Les séances types et leurs créneaux se règlent d'un toucher.
  */
-const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
-const DAYS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
-const longDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long' });
 const BLOCK_TONE: Record<string, string> = { accumulation: 'var(--tone-grad)', transmutation: 'color-mix(in srgb, var(--focus) 85%, white)', realization: 'var(--warn)', transition: 'var(--ok)', custom: 'var(--ink-2)' };
-
-/** Lecture d'une donnée du module, relue quand la synchro apporte du neuf. */
-function useData<T>(read: () => Promise<T>, deps: unknown[]): { data: T | null; error: string | null; reload: () => void } {
-  const cloud = useCloud();
-  const [data, setData] = useState<T | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const reload = useCallback(() => {
-    read().then(setData, (e: Error) => setError(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  useEffect(() => reload(), [reload, cloud.lastSyncAt]);
-  return { data, error, reload };
-}
-
-function Head({ back, kicker, title, right }: { back: string; kicker?: string; title: string; right?: React.ReactNode }) {
-  return (
-    <header className="row" style={{ alignItems: 'flex-end' }}>
-      <IconButton icon="back" label="Retour" href={back} />
-      <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        {kicker && <span className="pf-kick pf-nowrap">{kicker}</span>}
-        <h1 className="t-screen pf-nowrap">{title}</h1>
-      </div>
-      {right}
-    </header>
-  );
-}
 
 // ---------------------------------------------------------------- la page Programme
 
 export function ProgrammePage() {
   const date = today();
   const { data: v, error } = useData<ProgramView>(() => call('programView', date), [date]);
-  const [shown, setShown] = useState(0);
   if (error) return <Notice tone="bad">Le programme n’a pas pu être lu : {error}</Notice>;
   if (!v) return <span className="t-small muted">Lecture du programme…</span>;
-  const table = v.tables[Math.min(shown, v.tables.length - 1)];
-  const totalWeeks = v.blocks.reduce((n, b) => n + b.weeks + b.deloadWeeks, 0);
+  const hero = v.hero;
   return (
     <div className="pf-screen tone-perf" style={{ paddingBottom: 110 }}>
       <div className="pf-amb" aria-hidden="true" />
@@ -67,33 +38,41 @@ export function ProgrammePage() {
           <Button variant="action" block href="/sport/programme/seances">
             Séances types
           </Button>
+          <Button block href="/sport/programme/bloc/nouveau">
+            Ou commence par un bloc
+          </Button>
         </div>
       )}
 
-      {v.kind === 'periodized' && v.blocks.length > 0 && (
-        <>
-          <span className="pf-sec">
-            <span>Les blocs</span>
-            <span>{`${totalWeeks} semaines`}</span>
-          </span>
-          <div className="card-module pf-hero" style={{ gap: 10 }}>
-            <div className="pf-frieze" style={{ gridTemplateColumns: v.blocks.map((b) => `${b.weeks + b.deloadWeeks}fr`).join(' ') }}>
-              {v.blocks.map((b) => (
-                <span key={b.id} className={`pf-blk${b.current ? ' is-current' : ''}`} style={{ background: BLOCK_TONE[b.kind] ?? BLOCK_TONE.custom }} title={`${b.name} · ${b.weeks} semaines${b.deloadWeeks ? ` + ${b.deloadWeeks} de décharge` : ''}`}>
-                  <span className="pf-nowrap">{b.name}</span>
-                  {b.deloadWeeks > 0 && <span className="pf-blk-deload" style={{ width: `${(b.deloadWeeks / (b.weeks + b.deloadWeeks)) * 100}%` }} />}
-                </span>
-              ))}
-              {v.today && <span className="pf-now" style={{ left: `${v.today.at * 100}%` }} aria-hidden="true" />}
-            </div>
-            {v.today && (
-              <span className="t-small" style={{ paddingLeft: `min(${v.today.at * 100}%, 62%)` }}>
-                <b>{`│ aujourd’hui · S${v.today.week}`}</b>
-              </span>
-            )}
-            {v.current && <span className="t-small muted">{`${v.current.name} : ${v.current.goal}${v.current.deloadFrom ? ` Décharge en S${v.current.deloadFrom}.` : ''}`}</span>}
+      {hero && (
+        <div className="card-module pf-hero">
+          <div className="row" style={{ gap: 8 }}>
+            <span className="grow pf-kick">{`${hero.week ? 'Bloc en cours' : 'Prochain bloc'} · ${hero.index} sur ${hero.total} · ${hero.kindLabel}`}</span>
+            {hero.week && <span className="pf-chip">{hero.weeks.find((w) => w.state === 'current')?.label ?? `S${hero.week}`}</span>}
           </div>
-        </>
+          <span className="pf-big" style={{ fontSize: 28 }}>
+            {hero.name}
+          </span>
+          <span className="t-small muted" style={{ marginTop: -6 }}>
+            {`${hero.dates}${hero.deloadFrom ? ` · décharge en S${hero.deloadFrom}` : ''}`}
+          </span>
+          <div className="pf-weeks">
+            {hero.weeks.map((w) => (
+              <span key={w.label} className={`pf-wk is-${w.state}${w.deload ? ' is-deload' : ''}`}>
+                {w.label}
+                <small>{w.pct}</small>
+              </span>
+            ))}
+          </div>
+          <div className="row" style={{ gap: 8 }}>
+            <div className="grow">
+              <Button variant="action" block href={`/sport/programme/bloc/${hero.id}`}>
+                Régler le bloc
+              </Button>
+            </div>
+            <Button href="/sport/programme/reglages">Tous les réglages</Button>
+          </div>
+        </div>
       )}
 
       {v.kind !== 'periodized' && v.next && (
@@ -117,6 +96,31 @@ export function ProgrammePage() {
         </div>
       )}
 
+      {v.blocks.length > 0 && (
+        <>
+          <span className="pf-sec">
+            <span>Les blocs</span>
+            <span>{v.blocks.length}</span>
+          </span>
+          <Glass className="pf-blocks">
+            {v.blocks.map((b) => (
+              <a key={b.id} href={`/sport/programme/bloc/${b.id}`} className={`pf-bl is-${b.state}`}>
+                <span className="pf-bl-bar" style={{ background: BLOCK_TONE[b.kind] ?? BLOCK_TONE.custom }} />
+                <span className="grow" style={{ minWidth: 0 }}>
+                  <span className="t-strong">{b.name}</span>
+                  <br />
+                  <span className="t-small muted">{`${b.dates} · ${b.state === 'future' && b.kind !== 'accumulation' ? b.kindLabel : b.weeks}`}</span>
+                </span>
+                {b.state === 'current' ? <span className="pf-chip">en cours</span> : b.state === 'past' ? <span className="t-small muted">fait</span> : <span className="t-small muted">›</span>}
+              </a>
+            ))}
+          </Glass>
+          <a href="/sport/programme/bloc/nouveau" className="pf-link" style={{ alignSelf: 'flex-start', marginTop: -8 }}>
+            + Ajouter un bloc
+          </a>
+        </>
+      )}
+
       {v.week.length > 0 && (
         <>
           <span className="pf-sec">
@@ -133,64 +137,12 @@ export function ProgrammePage() {
                   href={`/sport/programme/seance/${s.id}`}
                   lead={<span className="t-small muted" style={{ width: 30 }}>{DAYS[w.weekday]}</span>}
                   title={<span className="t-strong">{s.name}</span>}
-                  detail={s.exercises.join(' · ')}
+                  detail={s.exercises.length > 3 ? `${s.exercises.slice(0, 2).join(' · ')} · ${s.exercises.length - 2} autres` : s.exercises.join(' · ')}
                   value={s.tag ? <span className={`pf-chip${s.tag === 'force' ? '' : ' is-neutral'}`}>{s.tag}</span> : undefined}
                 />
               )),
             )}
           </List>
-        </>
-      )}
-
-      {table && (
-        <>
-          <span className="pf-sec">
-            <span>{`${table.name}, semaine par semaine`}</span>
-            <span>Auto</span>
-          </span>
-          <Glass className="pf-tablewrap">
-            <table className="pf-table">
-              <thead>
-                <tr>
-                  <th />
-                  {table.weeks.map((w) => (
-                    <th key={w.label} className={w.current ? 'is-current' : undefined}>
-                      {w.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="pf-tl">top set</td>
-                  {table.weeks.map((w) => (
-                    <td key={w.label} className={w.current ? 'is-current' : undefined}>
-                      {w.top ?? '—'}
-                      {w.topPct && <small>{w.topPct}</small>}
-                    </td>
-                  ))}
-                </tr>
-                <tr>
-                  <td className="pf-tl">backoffs</td>
-                  {table.weeks.map((w) => (
-                    <td key={w.label} className={w.current ? 'is-current' : undefined}>
-                      {w.back ?? '—'}
-                      {w.backPct && <small>{w.backPct}</small>}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </Glass>
-          {v.tables.length > 1 && (
-            <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              {v.tables.map((t, i) => (
-                <button key={t.exerciseId} type="button" className={`pf-chip${t === table ? '' : ' is-neutral'}`} aria-pressed={t === table} onClick={() => setShown(i)}>
-                  {t.name}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
 
@@ -202,7 +154,7 @@ export function ProgrammePage() {
           </span>
           <List>
             {v.ups.map((u) => (
-              <ListRow key={u.name} title={<span className="t-strong">{u.name}</span>} detail={u.why} value={<span className="pf-chip">{`${u.from} → ${u.to}`}</span>} />
+              <ListRow key={u.name} title={<span className="t-strong">{u.name}</span>} value={<span className="pf-chip">{`${u.from.replace(' kg', '')} → ${u.to}`}</span>} />
             ))}
           </List>
         </>
@@ -210,11 +162,12 @@ export function ProgrammePage() {
 
       {v.hasProgram && (
         <List>
+          <ListRow title="Réglages d’entraînement" value={`${v.lifts} exercice${v.lifts > 1 ? 's' : ''}`} href="/sport/programme/reglages" />
           <ListRow title="Séances types" value={String(v.templates)} href="/sport/programme/seances" />
         </List>
       )}
       <a className="btn btn-quiet" href="/perf/" style={{ alignSelf: 'center', whiteSpace: 'normal', textAlign: 'center' }}>
-        Import et blocs : app d’avant
+        Importer un programme : app d’avant
       </a>
     </div>
   );
@@ -341,10 +294,15 @@ export function TemplatePage() {
 
       <ExercisePicker
         open={adding}
+        templateId={id}
         onClose={() => setAdding(false)}
         onPick={async (exerciseId) => {
           setAdding(false);
           await act(call('addSlot', id, exerciseId));
+        }}
+        onCreated={() => {
+          setAdding(false);
+          reload();
         }}
       />
       <RenameSheet
@@ -364,9 +322,10 @@ export function TemplatePage() {
   );
 }
 
-function ExercisePicker({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (id: string) => void }) {
+function ExercisePicker({ open, templateId, onClose, onPick, onCreated }: { open: boolean; templateId: string; onClose: () => void; onPick: (id: string) => void; onCreated: () => void }) {
   const [choices, setChoices] = useState<{ id: string; name: string }[]>([]);
   const [q, setQ] = useState('');
+  const [creating, setCreating] = useState(false);
   useEffect(() => {
     if (!open) return;
     setQ('');
@@ -374,20 +333,38 @@ function ExercisePicker({ open, onClose, onPick }: { open: boolean; onClose: () 
   }, [open]);
   const norm = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
   const shown = (q ? choices.filter((c) => norm(c.name).includes(norm(q))) : choices).slice(0, 30);
+  const exact = choices.some((c) => norm(c.name) === norm(q.trim()));
   return (
-    <Sheet open={open} title="Ajouter un exercice" onClose={onClose}>
-      <div className="stack">
-        <input className="input" aria-label="Chercher un exercice" placeholder="Chercher un exercice" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="stack-0">
-          {shown.map((c) => (
-            <button key={c.id} type="button" className="pf-pick" onClick={() => onPick(c.id)}>
-              <span className="grow">{c.name}</span>
+    <>
+      <Sheet open={open && !creating} title="Ajouter un exercice" onClose={onClose}>
+        <div className="stack">
+          <input className="input" aria-label="Chercher un exercice" placeholder="Chercher ou créer un exercice" value={q} onChange={(e) => setQ(e.target.value)} />
+          {q.trim() && !exact && (
+            <button type="button" className="pf-pick pf-create" onClick={() => setCreating(true)}>
+              <span className="grow">{`Créer « ${q.trim()} »`}</span>
+              <span className="pf-chip">nouveau</span>
             </button>
-          ))}
+          )}
+          <div className="stack-0">
+            {shown.map((c) => (
+              <button key={c.id} type="button" className="pf-pick" onClick={() => onPick(c.id)}>
+                <span className="grow">{c.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
-        <span className="t-small muted">Un exercice qui manque : le « + » de MyPerf, « Nouvel exercice ».</span>
-      </div>
-    </Sheet>
+      </Sheet>
+      <NewExerciseSheet
+        open={open && creating}
+        name={q.trim()}
+        templateId={templateId}
+        onClose={() => setCreating(false)}
+        onCreated={() => {
+          setCreating(false);
+          onCreated();
+        }}
+      />
+    </>
   );
 }
 
@@ -475,21 +452,6 @@ export function SlotPage() {
       <GroupSheet open={sheet === 'group'} slot={s} onClose={() => setSheet(null)} onSave={(group) => void save({ group })} />
       <RestSheet open={sheet === 'rest'} slot={s} onClose={() => setSheet(null)} onSave={(restSec) => void save({ restSec })} />
       <NoteSheet open={sheet === 'note'} slot={s} onClose={() => setSheet(null)} onSave={(notes) => void save({ notes })} />
-    </div>
-  );
-}
-
-function NumberRow({ label, value, unit, onChange, step = 1, min = 1, max = 999 }: { label: string; value: number; unit: string; onChange: (v: number) => void; step?: number; min?: number; max?: number }) {
-  return (
-    <div className="pf-numrow">
-      <span className="grow">{label}</span>
-      <button type="button" className="pf-more" aria-label={`${label} : moins`} onClick={() => onChange(Math.max(min, value - step))}>
-        −
-      </button>
-      <span className="pf-numval">{`${value} ${unit}`}</span>
-      <button type="button" className="pf-more" aria-label={`${label} : plus`} onClick={() => onChange(Math.min(max, value + step))}>
-        +
-      </button>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { JourPage } from './pages/Jour';
 import { ProgrammePage, SlotPage, TemplatePage, TemplatesPage } from './pages/Programme';
+import { BlocPage, LiftPage, ReglagesPage } from './pages/Reglages';
 import { SessionPage } from './pages/Session';
 import { VerifyPage } from './pages/Verify';
 
@@ -19,6 +20,9 @@ export function PerfRoutes() {
       <Route path="programme/seances" element={<TemplatesPage />} />
       <Route path="programme/seance/:id" element={<TemplatePage />} />
       <Route path="programme/creneau/:id" element={<SlotPage />} />
+      <Route path="programme/reglages" element={<ReglagesPage />} />
+      <Route path="programme/lift/:id" element={<LiftPage />} />
+      <Route path="programme/bloc/:id" element={<BlocPage />} />
       <Route path="*" element={<Navigate to="/sport" replace />} />
     </Routes>
   );

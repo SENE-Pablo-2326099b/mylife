@@ -328,7 +328,55 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('link', { name: 'Retour' }).click();
     await page.locator('.pf-slot', { hasText: exercise }).getByText(/^EMOM 10 min · 5 \/ min$/).waitFor();
     expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Un nouveau mouvement de force, créé et ajouté d'un geste depuis la séance type.
+    await page.getByRole('button', { name: '+ Ajouter un exercice' }).click();
+    await page.getByLabel('Chercher un exercice').fill('Muscle-up');
+    await page.getByRole('button', { name: /^Créer « Muscle-up »/ }).click();
+    const create = page.getByRole('dialog', { name: 'Nouvel exercice' });
+    await create.getByRole('button', { name: 'Poids du corps / lest' }).click();
+    await create.getByRole('button', { name: 'Force (au %)' }).click();
+    await create.getByRole('button', { name: 'Créer et ajouter' }).click();
+    await page.locator('.pf-slot', { hasText: 'Muscle-up' }).waitFor();
     expect(await page.evaluate(() => (window as unknown as { __stay?: boolean }).__stay)).toBe(true);
+  });
+
+  it('MyPerf refait : réglages d’entraînement — un premier bloc, une semaine réglée, un 1RM saisi', async () => {
+    await page.goto(`${server.url}/sport/programme`);
+    await page.getByRole('heading', { name: 'Programme' }).waitFor();
+    await page.locator('.list-row', { hasText: 'Réglages d’entraînement' }).click();
+    await page.getByRole('heading', { name: 'Réglages d’entraînement' }).waitFor();
+    // Pas encore de bloc (routine) : on en crée un, il commence cette semaine.
+    await page.getByRole('link', { name: '+ Créer un bloc' }).click();
+    await page.getByRole('heading', { name: 'Cycle 1' }).waitFor();
+    await page.getByRole('button', { name: 'Créer le bloc' }).click();
+    await page.getByText('Semaine par semaine').waitFor();
+    await shot(page, '07h-sport-bloc');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Le Programme montre le bloc en cours et ses semaines.
+    await page.getByRole('link', { name: 'Retour' }).click();
+    await page.getByText(/^Bloc en cours · 1 sur 1/).waitFor();
+    await shot(page, '07i-sport-programme-bloc');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Réglages : la semaine 1 du bloc réglée pour tous les lifts.
+    await page.getByRole('link', { name: 'Tous les réglages' }).click();
+    await page.getByRole('heading', { name: 'Réglages d’entraînement' }).waitFor();
+    await page.getByRole('button', { name: 'S1, top set : régler' }).click();
+    const week = page.getByRole('dialog', { name: /^Semaine 1/ });
+    await week.getByRole('button', { name: 'reps : moins' }).first().click();
+    await week.getByRole('button', { name: 'Enregistrer' }).click();
+    await week.waitFor({ state: 'detached' });
+    await expect.poll(() => page.getByRole('button', { name: 'S1, top set : régler' }).textContent()).toMatch(/^1×4/);
+    await shot(page, '07j-sport-reglages');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Le nouveau mouvement de force : son 1RM (lest net) se saisit ici.
+    await page.locator('.list-row', { hasText: 'Muscle-up' }).click();
+    await page.getByRole('heading', { name: 'Muscle-up' }).waitFor();
+    await page.locator('.list-row', { hasText: '1RM de référence' }).click();
+    await page.getByLabel('Lest (kg), sans le poids du corps').fill('20');
+    await page.getByRole('dialog', { name: '1RM de référence' }).getByRole('button', { name: 'Enregistrer' }).click();
+    await page.locator('.list-row', { hasText: '1RM de référence' }).getByText('+20 kg').waitFor();
+    await shot(page, '07k-sport-lift');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
   });
 
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
@@ -488,7 +536,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

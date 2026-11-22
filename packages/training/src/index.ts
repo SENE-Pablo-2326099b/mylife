@@ -19,5 +19,5 @@ export { DEFAULT_PLATES, barbellPlates, beltPlates, describePlates } from './pla
 export { recalcBackoffs, typeForNewSet } from './sets';
 export { addDays, diffDays, today, weekday } from './dates';
 export { estimate1RM } from './math';
-export { MESO_KINDS, mesoKindInfo } from './mesoTypes';
-export { totalWeeks } from './mesocycle';
+export { MESO_KINDS, mesoKindInfo, schemeForKind } from './mesoTypes';
+export { DEFAULT_DELOAD, generateScheme, resizeScheme, totalWeeks } from './mesocycle';

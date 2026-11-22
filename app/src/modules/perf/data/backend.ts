@@ -1,5 +1,7 @@
+import type { StrengthWeek } from '@mylife/training';
 import type { PendingChange, RemoteRow, SyncState } from '@mylife/core/engine';
 import { addBodyweight, createExercise, dayView, moveSession, type NewExercise } from './day';
+import { baseValues, blockDetail, deleteBlock, liftView, saveBlock, setBase, setBlockWeek, setLiftWeek, setReference, settingsView, type BasePatch, type BlockPatch } from './plan';
 import { addSlot, archiveTemplate, createTemplate, moveSlot, programView, removeSlot, renameTemplate, setTemplateDays, slotDetail, templateDetail, templatesView, updateSlot, type SlotPatch } from './program';
 import { overview } from './queries';
 import { sessionOps } from './session';
@@ -47,6 +49,21 @@ export function createBackend(d: Db) {
     removeSlot: (id: string) => removeSlot(d, id),
     moveSlot: (id: string, delta: -1 | 1) => moveSlot(d, id, delta),
     updateSlot: (id: string, patch: SlotPatch) => updateSlot(d, id, patch),
+    createExerciseIn: (templateId: string | null, e: NewExercise) => {
+      const id = createExercise(d, e);
+      if (templateId) addSlot(d, templateId, id);
+      return id;
+    },
+    settingsView: (date: string, blockId: string | null) => settingsView(d, date, blockId),
+    liftView: (exerciseId: string, blockId: string | null, date: string) => liftView(d, exerciseId, blockId, date),
+    setLiftWeek: (blockId: string, exerciseId: string, weekIndex: number, week: Partial<StrengthWeek> | null) => setLiftWeek(d, blockId, exerciseId, weekIndex, week),
+    setReference: (exerciseId: string, value: number | null, date: string) => setReference(d, exerciseId, value, date),
+    blockDetail: (id: string | null, date: string) => blockDetail(d, id, date),
+    saveBlock: (id: string | null, patch: BlockPatch, date: string) => saveBlock(d, id, patch, date),
+    setBlockWeek: (id: string, weekIndex: number, week: Partial<StrengthWeek>) => setBlockWeek(d, id, weekIndex, week),
+    deleteBlock: (id: string) => deleteBlock(d, id),
+    baseValues: () => baseValues(d),
+    setBase: (patch: BasePatch) => setBase(d, patch),
     createExercise: (e: NewExercise) => createExercise(d, e),
     // La séance (étape P2).
     activeSession: () => session.active(),

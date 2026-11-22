@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Field, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
+import { Button, Field, Glass, Icon, IconButton, List, ListRow, Notice, Sheet } from '@mylife/kit';
 import { readAgenda, eventsOn } from '@mylife/lumen';
 import type { DayView, PlannedSession } from '../data/day';
 import { call } from '../data/client';
 import { cloudBoot, dropForeign, useCloud } from '../data/cloud';
+import { NewExerciseSheet } from './Reglages';
 import '../perf.css';
 
 /**
@@ -308,40 +309,16 @@ function MoveSheet({ open, view, from, today, sorties, onClose, onMoved }: { ope
   );
 }
 
-const MUSCLES: readonly [string, string][] = [
-  ['chest', 'Pectoraux'],
-  ['back', 'Dos'],
-  ['lats', 'Grand dorsal'],
-  ['shoulders', 'Épaules'],
-  ['rear_delts', 'Arrière d’épaule'],
-  ['biceps', 'Biceps'],
-  ['triceps', 'Triceps'],
-  ['forearms', 'Avant-bras'],
-  ['abs', 'Abdos'],
-  ['lower_back', 'Lombaires'],
-  ['glutes', 'Fessiers'],
-  ['quads', 'Quadriceps'],
-  ['hamstrings', 'Ischios'],
-  ['adductors', 'Adducteurs'],
-  ['calves', 'Mollets'],
-  ['traps', 'Trapèzes'],
-];
-
 /** Le « + » de MyPerf : toujours le même petit menu (séance libre, poids du jour, nouvel exercice). */
 function AddSheet({ open, date, onStartFree, onClose }: { open: boolean; date: string; onStartFree: () => void; onClose: () => void }) {
   const [mode, setMode] = useState<'menu' | 'weight' | 'exercise'>('menu');
   const [weight, setWeight] = useState('');
-  const [name, setName] = useState('');
-  const [load, setLoad] = useState<'external' | 'bodyweight'>('external');
-  const [category, setCategory] = useState<'main' | 'compound' | 'isolation'>('compound');
-  const [muscle, setMuscle] = useState('chest');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
     setMode('menu');
     setWeight('');
-    setName('');
     setError(null);
     setDone(null);
   }, [open]);
@@ -355,17 +332,20 @@ function AddSheet({ open, date, onStartFree, onClose }: { open: boolean; date: s
       setError(e instanceof Error ? e.message : String(e));
     }
   };
-  const saveExercise = async () => {
-    try {
-      await call('createExercise', { name, loadType: load, category, equipment: load === 'bodyweight' ? 'bodyweight' : 'other', primary: [muscle] });
-      setDone(`Exercice créé : ${name.trim()}`);
-      setMode('menu');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
+  if (mode === 'exercise')
+    return (
+      <NewExerciseSheet
+        open={open}
+        name=""
+        onClose={() => setMode('menu')}
+        onCreated={() => {
+          setDone('Exercice créé');
+          setMode('menu');
+        }}
+      />
+    );
   return (
-    <Sheet open={open} title={mode === 'weight' ? 'Poids du jour' : mode === 'exercise' ? 'Nouvel exercice' : 'Ajouter'} onClose={onClose}>
+    <Sheet open={open} title={mode === 'weight' ? 'Poids du jour' : 'Ajouter'} onClose={onClose}>
       <div className="stack">
         {done && <Notice tone="ok">{done}</Notice>}
         {error && <Notice tone="bad">{error}</Notice>}
@@ -383,44 +363,6 @@ function AddSheet({ open, date, onStartFree, onClose }: { open: boolean; date: s
             </Field>
             <Button variant="action" block disabled={!weight.trim()} onClick={() => void saveWeight()}>
               Noter
-            </Button>
-          </>
-        )}
-        {mode === 'exercise' && (
-          <>
-            <Field id="pf-ex-name" label="Nom">
-              <input id="pf-ex-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-            </Field>
-            <Segmented
-              label="Charge"
-              value={load}
-              options={[
-                { id: 'external', label: 'Charge' },
-                { id: 'bodyweight', label: 'Poids du corps / lest' },
-              ]}
-              onChange={setLoad}
-            />
-            <Segmented
-              label="Catégorie"
-              value={category}
-              options={[
-                { id: 'main', label: 'Principal' },
-                { id: 'compound', label: 'Polyarticulaire' },
-                { id: 'isolation', label: 'Isolation' },
-              ]}
-              onChange={setCategory}
-            />
-            <Field id="pf-ex-muscle" label="Muscle principal">
-              <select id="pf-ex-muscle" value={muscle} onChange={(e) => setMuscle(e.target.value)}>
-                {MUSCLES.map(([id, label]) => (
-                  <option key={id} value={id}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Button variant="action" block disabled={!name.trim()} onClick={() => void saveExercise()}>
-              Créer
             </Button>
           </>
         )}

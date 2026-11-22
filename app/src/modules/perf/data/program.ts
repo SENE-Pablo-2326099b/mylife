@@ -1,19 +1,16 @@
 import {
-  addDays,
   BUILTIN_FORMATS,
   DEFAULT_REST,
-  diffDays,
-  mesoKindInfo,
   planSession,
   restSeconds,
   STRATEGIES,
-  totalWeeks,
   type Format,
   type ParamSpec,
   type Program,
   type StrategyId,
 } from '@mylife/training';
 import { dayView, type PlannedSession } from './day';
+import { blocksOverview, type BlockHero, type BlockLine } from './plan';
 import { historyView, readFormats, readProgram } from './queries';
 import { newId, type Db } from './sql';
 
@@ -24,8 +21,6 @@ import { newId, type Db } from './sql';
  * colonnes de l'app d'avant restent tenues à jour (elle lit et écrit le même compte).
  */
 
-const pct = (v: number) => `${(Math.round(v * 1000) / 10).toLocaleString('fr-FR')} %`;
-const longDate = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 const live = (d: Db) => new Set(d.all<{ id: string }>('SELECT id FROM templates WHERE archived = 0').map((r) => r.id));
 const TAG: Record<string, string> = { strength: 'force', hypertrophy: 'volume', power: 'puissance' };
 
@@ -41,39 +36,16 @@ function tagOf(program: Program, sessionId: string): string | null {
   return best ? (TAG[best[0]] ?? null) : null;
 }
 
-export interface BlockView {
-  id: string;
-  name: string;
-  kind: string;
-  goal: string;
-  weeks: number;
-  deloadWeeks: number;
-  start: string;
-  current: boolean;
-}
-
-export interface WeekCell {
-  label: string;
-  current: boolean;
-  deload: boolean;
-  top: string | null;
-  topPct: string | null;
-  back: string | null;
-  backPct: string | null;
-}
-
 export interface ProgramView {
   kind: Program['structure']['kind'];
   subtitle: string;
-  blocks: BlockView[];
-  /** Où tombe aujourd'hui sur la frise (0 à 1), et la semaine du bloc en cours. */
-  today: { at: number; week: number } | null;
-  current: { name: string; goal: string; deloadFrom: number | null } | null;
+  hero: BlockHero | null;
+  blocks: BlockLine[];
   week: { weekday: number; sessions: { id: string; name: string; exercises: string[]; tag: string | null }[] }[];
-  tables: { exerciseId: string; name: string; weeks: WeekCell[] }[];
   next: { date: string; session: PlannedSession } | null;
   ups: { name: string; from: string; to: string; why: string }[];
   templates: number;
+  lifts: number;
   hasProgram: boolean;
 }
 
@@ -95,64 +67,10 @@ export function programView(d: Db, date: string): ProgramView {
       }),
   })).filter((w) => w.sessions.length > 0);
 
-  let blocks: BlockView[] = [];
-  let today: ProgramView['today'] = null;
-  let current: ProgramView['current'] = null;
-  let tables: ProgramView['tables'] = [];
-  let subtitle = '';
-  if (program.structure.kind === 'periodized') {
-    const list = [...program.structure.blocks].sort((a, b) => a.startDate.localeCompare(b.startDate));
-    const at = (iso: string) => list.findIndex((m) => iso >= m.startDate && diffDays(m.startDate, iso) < totalWeeks(m) * 7);
-    const idx = at(date);
-    blocks = list.map((m, i) => {
-      const info = mesoKindInfo(m.kind);
-      return { id: m.id, name: m.name, kind: m.kind, goal: info.goal, weeks: m.workWeeks, deloadWeeks: m.deloadWeeks, start: m.startDate, current: i === idx };
-    });
-    const first = list[0];
-    const last = list[list.length - 1];
-    if (first && last) {
-      const end = addDays(last.startDate, totalWeeks(last) * 7 - 1);
-      const span = Math.max(1, diffDays(first.startDate, end) + 1);
-      subtitle = `Par blocs · du ${longDate(first.startDate)} au ${longDate(end)}`;
-      if (date >= first.startDate && date <= end) {
-        const meso = list[idx];
-        today = { at: diffDays(first.startDate, date) / span, week: meso ? Math.floor(diffDays(meso.startDate, date) / 7) + 1 : 0 };
-      }
-    }
-    // Le bloc en cours, sinon le prochain, sinon le dernier : son tableau semaine par semaine.
-    const shown = list[idx] ?? list.find((m) => m.startDate > date) ?? last;
-    if (shown) {
-      current = { name: shown.name, goal: mesoKindInfo(shown.kind).goal, deloadFrom: shown.deloadWeeks > 0 ? shown.workWeeks + 1 : null };
-      const ids = [...new Set(sessions.flatMap((s) => s.slots.filter((x) => x.strategy.id === 'percent_reference').map((x) => x.exerciseId)))];
-      tables = ids.map((exerciseId) => {
-        const session = sessions.find((s) => s.slots.some((x) => x.exerciseId === exerciseId && x.strategy.id === 'percent_reference'))!;
-        const weekday = pattern.find((p) => p.templateId === session.id)?.weekday ?? 0;
-        const total = totalWeeks(shown);
-        const weeks = Array.from({ length: total }, (_, w): WeekCell => {
-          const on = addDays(shown.startDate, w * 7 + weekday);
-          const item = planSession(program, session.id, on, history)?.items.find((i) => i.exercise.id === exerciseId);
-          const sets = item?.prescription.sets ?? [];
-          const tops = sets.filter((s) => s.setType === 'top_set');
-          const backs = sets.filter((s) => s.setType === 'backoff');
-          const deload = w + 1 > shown.workWeeks;
-          const percents = item?.prescription.percents ?? null;
-          return {
-            label: deload ? 'Déch.' : `S${w + 1}`,
-            current: list[idx] === shown && today?.week === w + 1,
-            deload,
-            top: tops.length ? `${tops.length}×${tops[0]!.targetReps ?? '?'}` : null,
-            topPct: tops.length && percents ? pct(percents.top) : null,
-            back: backs.length ? `${backs.length}×${backs[0]!.targetReps ?? '?'}` : null,
-            backPct: backs.length && percents ? pct(percents.backoff) : null,
-          };
-        });
-        return { exerciseId, name: nameOf(exerciseId), weeks };
-      });
-    }
-  } else {
-    const perWeek = pattern.length;
-    subtitle = `Routine · ${perWeek} séance${perWeek > 1 ? 's' : ''} par semaine`;
-  }
+  const overview = blocksOverview(program, date);
+  const perWeek = pattern.length;
+  const subtitle = program.structure.kind === 'periodized' && overview.span ? overview.span : `Routine · ${perWeek} séance${perWeek > 1 ? 's' : ''} par semaine`;
+  const lifts = new Set(sessions.flatMap((s) => s.slots.map((x) => x.exerciseId))).size;
 
   // Routine : la prochaine séance, et ce qui monte la prochaine fois (progression qui annonce une hausse).
   const day = dayView(d, date);
@@ -173,7 +91,7 @@ export function programView(d: Db, date: string): ProgramView {
       });
     }
   }
-  return { kind: program.structure.kind, subtitle, blocks, today, current, week, tables, next, ups: ups.slice(0, 6), templates: sessions.length, hasProgram: sessions.length > 0 };
+  return { kind: program.structure.kind, subtitle, hero: overview.hero, blocks: overview.blocks, week, next, ups: ups.slice(0, 6), templates: sessions.length, lifts, hasProgram: sessions.length > 0 || overview.blocks.length > 0 };
 }
 
 // ---------------------------------------------------------------- séances types

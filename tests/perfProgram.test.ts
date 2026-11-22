@@ -55,24 +55,15 @@ beforeEach(() => fresh());
 const slotOf = (templateId: string, exerciseId: string) => b.templateDetail(templateId, MONDAY)!.slots.find((s) => s.exerciseId === exerciseId)!;
 
 describe('Programme : la vue', () => {
-  it('par blocs : frise, aujourd’hui, semaine type, tableau semaine par semaine du moteur (semaine en cours, décharge)', () => {
+  it('par blocs : le bloc en cours et ses semaines, les blocs en liste, la semaine type', () => {
     const v = b.programView(MONDAY);
     expect(v.kind).toBe('periodized');
-    expect(v.subtitle).toMatch(/^Par blocs · du 5 janvier au 8 février$/);
-    expect(v.blocks).toMatchObject([{ name: 'Accumulation', weeks: 4, deloadWeeks: 1, current: true }]);
-    expect(v.today).toMatchObject({ week: 3 });
-    expect(v.current).toMatchObject({ name: 'Accumulation', deloadFrom: 5 });
+    expect(v.subtitle).toBe('Par blocs · 5 janv. → 8 févr. · 5 semaines');
+    expect(v.hero).toMatchObject({ name: 'Accumulation', kindLabel: 'Accumulation', index: 1, total: 1, week: 3, deloadFrom: 5 });
+    expect(v.hero!.weeks.map((w) => [w.label, w.state])).toEqual([['S1', 'past'], ['S2', 'past'], ['S3', 'current'], ['S4', 'future'], ['Déch.', 'future']]);
+    expect(v.blocks).toMatchObject([{ name: 'Accumulation', state: 'current', weeks: '4 + 1 sem.' }]);
     expect(v.week.map((w) => [w.weekday, w.sessions.map((s) => s.name)])).toEqual([[0, ['Force A']], [3, ['Volume']]]);
     expect(v.week[0]!.sessions[0]!.tag).toBe('force');
-    const squat = v.tables.find((t) => t.exerciseId === 'ex_squat')!;
-    expect(squat.weeks.map((w) => w.label)).toEqual(['S1', 'S2', 'S3', 'S4', 'Déch.']);
-    expect(squat.weeks.filter((w) => w.current).map((w) => w.label)).toEqual(['S3']);
-    expect(squat.weeks[2]).toMatchObject({ top: expect.stringMatching(/^1×\d$/), topPct: expect.stringMatching(/ %$/), back: expect.stringMatching(/^\d×\d$/) });
-    // Le tableau est celui que la séance prescrira : la semaine 3 vue ici = la séance du lundi 19.
-    const today = b.dayView(MONDAY).today[0]!.lines.find((l) => l.name === getExercise('ex_squat')!.name)!;
-    expect(today.detail).toContain(squat.weeks[2]!.topPct!);
-    expect(v.tables.map((t) => t.exerciseId)).toContain('ex_weighted_pullup');
-    expect(v.tables.map((t) => t.exerciseId)).not.toContain('ex_barbell_curl');
   });
 
   it('en routine (sans bloc) : sous-titre, prochaine séance, pas de frise', () => {
@@ -81,13 +72,13 @@ describe('Programme : la vue', () => {
     expect(v.kind).toBe('routine');
     expect(v.subtitle).toBe('Routine · 2 séances par semaine');
     expect(v.blocks).toEqual([]);
-    expect(v.tables).toEqual([]);
+    expect(v.hero).toBeNull();
     expect(v.next).toMatchObject({ date: '2026-01-22', session: { name: 'Volume' } });
   });
 
   it('un compte neuf : rien', () => {
     const empty = createBackend(wrapOo1(new sqlite3.oo1.DB(':memory:') as unknown as Oo1Db));
-    expect(empty.programView(MONDAY)).toMatchObject({ hasProgram: false, blocks: [], week: [], tables: [], templates: 0 });
+    expect(empty.programView(MONDAY)).toMatchObject({ hasProgram: false, blocks: [], week: [], hero: null, templates: 0 });
   });
 });
 
