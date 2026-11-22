@@ -36,6 +36,8 @@ describe('Copilot : requête et boucle', () => {
     const last = p.messages[p.messages.length - 1]!.content as { cache_control?: unknown }[];
     expect(last[last.length - 1]?.cache_control).toBeDefined();
     expect(p.tool_choice).toBeUndefined();
+    // Le modèle choisi (Sonnet 5.5) passe tel quel, avec le même effort et le même repli.
+    expect(requestParams([userMessage('Salut', TODAY)], 'claude-sonnet-5-5')).toMatchObject({ model: 'claude-sonnet-5-5', output_config: { effort: 'medium' }, fallbacks: 'default' });
   });
 
   it('lit avec ses outils puis répond ; les blocs de réflexion repartent tels quels', async () => {

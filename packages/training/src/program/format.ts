@@ -35,9 +35,21 @@ export interface ProgramFile {
       muscles?: Muscle[];
       /** Exercice au poids du corps qu'on peut lester (tractions, dips) : la charge notée est le lest. */
       bodyweight?: boolean;
+      /** Format : « sets » (séries, défaut), « emom », « amrap », « for_time ». Au temps : reps « 30s ». */
+      format?: 'sets' | 'emom' | 'amrap' | 'for_time';
+      /** Durée d'un EMOM ou d'un AMRAP, en minutes. */
+      minutes?: number;
+      /** EMOM : une série toutes les N secondes (60 par défaut). */
+      everySeconds?: number;
+      /** Même lettre sur des exercices qui se suivent : superset (alternés), repos à la fin du tour. */
+      superset?: string;
+      /** « percent » (au % du 1RM, suit les blocs), « double », « linear », « free ». */
+      progression?: 'percent' | 'double' | 'linear' | 'free';
     }[];
   }[];
   oneRepMaxes?: { exercise: string; kg: number }[];
+  /** Blocs (périodisation), dans l'ordre ; ils s'enchaînent. */
+  blocks?: { name: string; type?: string; weeks: number; deloadWeeks?: number; start?: string }[];
 }
 
 /** Un exercice lu, prêt à être rapproché de la bibliothèque. */
@@ -58,6 +70,22 @@ export interface ParsedExercise {
   equipment: Equipment | null;
   muscles: Muscle[];
   bodyweight: boolean | null;
+  /** Format autre que des séries (au temps : `seconds`). */
+  format: 'emom' | 'amrap' | 'for_time' | null;
+  minutes: number | null;
+  everySeconds: number | null;
+  /** Lettre de superset : des exercices qui se suivent avec la même lettre s'enchaînent. */
+  group: string | null;
+  progression: 'percent' | 'double' | 'linear' | 'free' | null;
+}
+
+export interface ParsedBlock {
+  name: string;
+  kind: 'accumulation' | 'transmutation' | 'realization' | 'transition' | 'custom';
+  weeks: number;
+  deloadWeeks: number;
+  /** Date de début (AAAA-MM-JJ) ; null : enchaîné après le précédent (ou cette semaine). */
+  start: string | null;
 }
 
 export interface ParsedSession {
@@ -73,6 +101,7 @@ export interface ParsedProgram {
   notes: string;
   sessions: ParsedSession[];
   oneRms: { name: string; kg: number }[];
+  blocks: ParsedBlock[];
 }
 
 export interface ParseResult {
@@ -222,7 +251,22 @@ const K = {
   bodyweight: ['bodyweight', 'poidsducorps', 'lest', 'weighted'],
   oneRms: ['onerepmaxes', '1rm', 'onerm', 'maxes', 'records', 'rm'],
   exerciseRef: ['exercise', 'exercice', 'name', 'nom'],
+  format: ['format', 'mode', 'scheme', 'modalite'],
+  minutes: ['minutes', 'duree', 'duration', 'durationminutes', 'min', 'cap', 'timecap'],
+  every: ['everyseconds', 'every', 'interval', 'intervalseconds', 'toutesles'],
+  group: ['superset', 'group', 'groupe', 'circuit', 'bisets', 'biset'],
+  progression: ['progression', 'progressiontype', 'method', 'methode'],
+  blocks: ['blocks', 'blocs', 'mesocycles', 'cycles', 'phases'],
+  weeks: ['weeks', 'semaines', 'workweeks', 'duration'],
+  deload: ['deloadweeks', 'deload', 'decharge', 'semainesdedecharge'],
+  start: ['start', 'startdate', 'debut', 'datededebut', 'date'],
+  kind: ['type', 'kind', 'objectif', 'goal'],
 } as const;
+
+const FORMATS: Record<string, ParsedExercise['format'] | 'sets'> = { sets: 'sets', series: 'sets', emom: 'emom', otm: 'emom', amrap: 'amrap', fortime: 'for_time', for_time: 'for_time', chrono: 'for_time' };
+const PROGRESSIONS: Record<string, ParsedExercise['progression']> = { percent: 'percent', pourcentage: 'percent', '%1rm': 'percent', double: 'double', doubleprogression: 'double', linear: 'linear', lineaire: 'linear', free: 'free', libre: 'free' };
+const KINDS: Record<string, ParsedBlock['kind']> = { accumulation: 'accumulation', volume: 'accumulation', transmutation: 'transmutation', intensification: 'transmutation', realization: 'realization', realisation: 'realization', peak: 'realization', pic: 'realization', test: 'realization', transition: 'transition', recuperation: 'transition', custom: 'custom', libre: 'custom' };
+const key = (v: unknown) => normalizeText(str(v)).replace(/[\s_-]/g, '');
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
 
@@ -269,7 +313,45 @@ function readExercise(raw: unknown, where: string, issues: string[]): ParsedExer
       .map((m) => normalizeText(String(m)).replace(/\s/g, '_'))
       .filter((m): m is Muscle => (MUSCLES as readonly string[]).includes(m)),
     bodyweight: typeof bw === 'boolean' ? bw : null,
+    ...extras(o, reps.seconds),
   };
+}
+
+/** Les clés du format étendu (EMOM, AMRAP, superset, progression), tolérées en français. */
+function extras(o: Record<string, unknown>, seconds: number | null): Pick<ParsedExercise, 'format' | 'minutes' | 'everySeconds' | 'group' | 'progression'> {
+  const f = FORMATS[key(pick(o, K.format))] ?? null;
+  const minutes = num(pick(o, K.minutes));
+  const every = secondsOf(pick(o, K.every));
+  const group = str(pick(o, K.group)).toUpperCase().slice(0, 3);
+  return {
+    format: f === 'sets' || f === null || seconds !== null ? null : f,
+    minutes: minutes !== null && minutes > 0 && minutes <= 180 ? minutes : null,
+    everySeconds: every !== null && every >= 10 && every <= 600 ? every : null,
+    group: group || null,
+    progression: PROGRESSIONS[key(pick(o, K.progression))] ?? null,
+  };
+}
+
+function readBlocks(raw: unknown, issues: string[]): ParsedBlock[] {
+  return (Array.isArray(raw) ? raw : []).flatMap((b, i): ParsedBlock[] => {
+    if (!b || typeof b !== 'object') return [];
+    const o = b as Record<string, unknown>;
+    const weeks = Math.round(num(pick(o, K.weeks)) ?? 0);
+    if (weeks < 1 || weeks > 12) {
+      issues.push(`Bloc ${i + 1} : durée absente ou hors limites (1 à 12 semaines), ignoré.`);
+      return [];
+    }
+    const start = str(pick(o, K.start));
+    return [
+      {
+        name: str(pick(o, K.name)) || `Cycle ${i + 1}`,
+        kind: KINDS[key(pick(o, K.kind))] ?? 'accumulation',
+        weeks,
+        deloadWeeks: Math.max(0, Math.min(2, Math.round(num(pick(o, K.deload)) ?? 1))),
+        start: /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : null,
+      },
+    ];
+  });
 }
 
 function readSession(raw: unknown, index: number, issues: string[]): ParsedSession | null {
@@ -309,16 +391,57 @@ export function readProgram(raw: unknown): ParseResult {
     })
     .filter((r): r is { name: string; kg: number } => r !== null);
   if (!sessions.length) return { program: null, issues: issues.length ? issues : ['Aucune séance trouvée.'], source: 'json' };
-  return { program: { name: str(pick(o, K.name)) || 'Programme importé', notes: str(pick(o, K.notes)), sessions, oneRms }, issues, source: 'json' };
+  const blocks = readBlocks(pick(o, K.blocks), issues);
+  return { program: { name: str(pick(o, K.name)) || 'Programme importé', notes: str(pick(o, K.notes)), sessions, oneRms, blocks }, issues, source: 'json' };
 }
 
 // ---------------------------------------------------------------- texte libre (sans LLM)
 
 const EXERCISE_LINE = /^(?:[-*•·>]|\d+[.)])?\s*(.+?)\s*[:–—-]?\s*(\d+)\s*(?:[x×*]|s[ée]ries?\s*(?:de|x)?)\s*(\d+(?:\s*(?:-|–|à|a)\s*\d+)?\s*(?:s|sec|min)?|max|amrap)\b(.*)$/i;
 
-/** Une ligne « Squat 4x8 @75% repos 2min » (ou « Tractions : 3 séries de max »). */
+const NO_EXTRAS = { format: null, minutes: null, everySeconds: null, group: null, progression: null } as const;
+/** « Tractions EMOM 10 min 5 reps », « Burpees AMRAP 8 min », « EMOM 12' toutes les 90 s : squat 3 ». */
+const TIMED_LINE = /^(?:[-*•·>]|\d+[.)])?\s*(.+?)\s*[:–—-]?\s*\b(emom|amrap|e2mom)\s*(\d+)\s*(?:min|mn|minutes|')?(.*)$/i;
+/** « A1. Tractions 3x8 » / « A2 - Dips 3x10 » : superset A. */
+const GROUP_PREFIX = /^\s*([A-H])[12345]\s*[.):–-]?\s+/;
+
+/** Une ligne « Squat 4x8 @75% repos 2min » (ou « Tractions : 3 séries de max », « Tractions EMOM 10 min 5 reps »). */
 export function parseExerciseLine(line: string): ParsedExercise | null {
-  const m = line.trim().match(EXERCISE_LINE);
+  const g = line.match(GROUP_PREFIX);
+  const group = g ? g[1]!.toUpperCase() : null;
+  const body = g ? line.slice(g[0].length) : line;
+  const timed = body.trim().match(TIMED_LINE);
+  if (timed) {
+    const name = timed[1]!.replace(/[:–—-]+$/, '').trim();
+    if (!name || /^\d+$/.test(name)) return null;
+    const kind = timed[2]!.toLowerCase();
+    const tail = timed[4] ?? '';
+    const reps = tail.match(/(\d+)\s*(?:reps?|rép|x|par minute|\/\s*min)/i) ?? tail.match(/^\s*[x×]?\s*(\d+)\b/);
+    const every = tail.match(/(?:toutes les|every)\s*([\d.,:'’]+\s*(?:s|sec|min)?)/i);
+    const minutes = Number(timed[3]);
+    return {
+      name,
+      sets: kind === 'amrap' ? 1 : Math.min(60, Math.max(1, minutes)),
+      repMin: reps ? Number(reps[1]) : null,
+      repMax: reps ? Number(reps[1]) : null,
+      amrap: false,
+      seconds: null,
+      kg: null,
+      percent: null,
+      rpe: null,
+      restSeconds: null,
+      notes: '',
+      equipment: null,
+      muscles: [],
+      bodyweight: null,
+      format: kind === 'amrap' ? 'amrap' : 'emom',
+      minutes,
+      everySeconds: kind === 'e2mom' ? 120 : every ? secondsOf(every[1]) : null,
+      group,
+      progression: null,
+    };
+  }
+  const m = body.trim().match(EXERCISE_LINE);
   if (!m) return null;
   const name = m[1]!.replace(/[:–—-]+$/, '').trim();
   if (!name || /^\d+$/.test(name)) return null;
@@ -346,6 +469,8 @@ export function parseExerciseLine(line: string): ParsedExercise | null {
     equipment: null,
     muscles: [],
     bodyweight: null,
+    ...NO_EXTRAS,
+    group,
   };
 }
 
@@ -381,7 +506,7 @@ export function parseProgramText(text: string): ParseResult {
   if (!kept.length) return { program: null, issues: ['Aucun exercice reconnu. Écris une ligne par exercice, par exemple « Squat 4x8 @75% ».', ...issues], source: 'text' };
   // Le premier titre sans exercice peut être le nom du programme.
   const title = sessions[0] && sessions[0].exercises.length === 0 && sessions.length > 1 ? sessions[0].name : 'Programme importé';
-  return { program: { name: title, notes: '', sessions: kept, oneRms: [] }, issues, source: 'text' };
+  return { program: { name: title, notes: '', sessions: kept, oneRms: [], blocks: [] }, issues, source: 'text' };
 }
 
 /** Tout ce qu'on peut coller : JSON (de n'importe quel LLM) ou texte. */

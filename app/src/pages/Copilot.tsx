@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Badge, Button, Field, Glass, Icon, List, ListRow, ModuleCard, Notice, ScreenHeader } from '@mylife/kit';
 import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '@mylife/lumen';
-import { readAiKey, writeAiKey } from '@mylife/core/aiKey';
+import { AI_MODELS, readAiKey, readAiModel, writeAiKey, writeAiModel, type AiModel } from '@mylife/core/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '@legacy/copilot';
 import { sortieDigests } from '@legacy/sortieDigest';
 import { loadSpaces, useSpaces } from '@legacy/spaces';
@@ -125,6 +125,22 @@ function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) =
   );
 }
 
+/** Opus 5.5 (le plus capable) ou Sonnet 5.5 (plus rapide, moins cher) : le même choix pour toutes les IA de MyLife. */
+function ModelChoice({ value, onChange }: { value: AiModel; onChange: (m: AiModel) => void }) {
+  return (
+    <div className="row" style={{ gap: 10 }}>
+      <span className="t-small muted">Modèle</span>
+      <div className="glass segmented grow" role="group" aria-label="Modèle de Claude">
+        {AI_MODELS.map((m) => (
+          <button key={m.id} type="button" aria-pressed={value === m.id} title={m.hint} onClick={() => onChange(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function KeyCard({ onSaved }: { onSaved: () => void }) {
   const [key, setKey] = useState('');
   return (
@@ -169,6 +185,7 @@ export function CopilotPage() {
   const spaces = useSpaces();
   const [params, setParams] = useSearchParams();
   const [apiKey, setApiKey] = useState<string | null>(() => readAiKey());
+  const [model, setModel] = useState<AiModel>(() => readAiModel());
   const all = conversations.useList();
   const list = useMemo(() => [...all].sort((a, b) => b.value.updatedAt - a.value.updatedAt), [all]);
   const [current, setCurrent] = useState<string | null>(null);
@@ -253,7 +270,7 @@ export function CopilotPage() {
     setNote(null);
     setReading([]);
     try {
-      const r = await advance(next, (p) => client.beta.messages.create(p), sources);
+      const r = await advance(next, (p) => client.beta.messages.create(p), sources, model);
       conversations.put(id, { ...base, messages: compact(r.messages), updatedAt: Date.now() });
       setCurrent(id);
       setReading([...new Set(r.read)]);
@@ -344,6 +361,7 @@ export function CopilotPage() {
         }
       />
       {!apiKey && <KeyCard onSaved={() => setApiKey(readAiKey())} />}
+      {apiKey && <ModelChoice value={model} onChange={(m) => { writeAiModel(m); setModel(m); }} />}
       {!conv && (
         <div className="glass segmented" role="group" aria-label="Domaine de la conversation" style={{ gridAutoColumns: 'minmax(0, 1fr)' }}>
           {DOMAINS.map((d) => (

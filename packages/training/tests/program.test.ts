@@ -118,7 +118,7 @@ describe('plan d’import', () => {
     expect(summarizePlan(plan)).toMatchObject({ sessions: 2, exercises: 3, recognized: 2, created: 1 });
   });
   it('consignes d’un exercice lesté et chronométré', () => {
-    expect(slotNotes({ name: 'x', sets: 3, repMin: null, repMax: null, amrap: false, seconds: 45, kg: 20, percent: null, rpe: null, restSeconds: 90, notes: '', equipment: null, muscles: [], bodyweight: true })).toBe('45 s · +20 kg · repos 1 min 30');
+    expect(slotNotes({ name: 'x', sets: 3, repMin: null, repMax: null, amrap: false, seconds: 45, kg: 20, percent: null, rpe: null, restSeconds: 90, notes: '', equipment: null, muscles: [], bodyweight: true, format: null, minutes: null, everySeconds: null, group: null, progression: null })).toBe('45 s · +20 kg · repos 1 min 30');
   });
 });
 
@@ -151,5 +151,39 @@ describe('programmes prêts et export', () => {
     expect(prompt).toContain('barbell');
     expect(prompt).toContain('hamstrings');
     expect(prompt).toMatch(/n'invente jamais/);
+  });
+});
+
+describe('format étendu : EMOM, AMRAP, au temps, supersets, progression, blocs', () => {
+  it('JSON (clés tolérées en français) : formats, superset, progression, blocs ; un bloc sans durée est signalé', () => {
+    const r = parseProgramInput(JSON.stringify({
+      nom: 'Hybride',
+      seances: [{ nom: 'Haut', jours: ['mardi'], exercices: [
+        { nom: 'Tractions', series: 10, reps: '5', format: 'EMOM', minutes: 10 },
+        { nom: 'Burpees', series: 1, format: 'amrap', duree: 8 },
+        { nom: 'Dips', series: 3, reps: '8-10', superset: 'a' },
+        { nom: 'Pompes', series: 3, reps: '15', superset: 'A', progression: 'libre' },
+        { nom: 'Gainage', series: 3, reps: '45s', format: 'emom' },
+      ] }],
+      blocs: [{ nom: 'Accu', type: 'volume', semaines: 4, decharge: 1, debut: '2026-12-07' }, { nom: 'Sans durée' }],
+    }));
+    const [emom, amrap, dips, pompes, gainage] = r.program!.sessions[0]!.exercises;
+    expect(emom).toMatchObject({ format: 'emom', minutes: 10, repMin: 5 });
+    expect(amrap).toMatchObject({ format: 'amrap', minutes: 8 });
+    expect([dips!.group, pompes!.group]).toEqual(['A', 'A']);
+    expect(pompes!.progression).toBe('free');
+    // Une durée (« 45s ») prime : c'est du « au temps », pas un EMOM.
+    expect(gainage).toMatchObject({ seconds: 45, format: null });
+    expect(r.program!.blocks).toEqual([{ name: 'Accu', kind: 'accumulation', weeks: 4, deloadWeeks: 1, start: '2026-12-07' }]);
+    expect(r.issues.some((i) => /Bloc 2/.test(i))).toBe(true);
+  });
+
+  it('texte libre : « EMOM 10 min 5 reps », « AMRAP 8 min », supersets « A1 / A2 »', () => {
+    const r = parseProgramInput('Mardi – Haut\nA1. Dips 3x8\nA2. Pompes 3x15\nTractions EMOM 10 min 5 reps\nBurpees AMRAP 8 min\nSquat 4x6 @75%');
+    const ex = r.program!.sessions[0]!.exercises;
+    expect(ex.map((e) => [e.name, e.group])).toEqual([['Dips', 'A'], ['Pompes', 'A'], ['Tractions', null], ['Burpees', null], ['Squat', null]]);
+    expect(ex[2]).toMatchObject({ format: 'emom', minutes: 10, sets: 10, repMin: 5 });
+    expect(ex[3]).toMatchObject({ format: 'amrap', minutes: 8, sets: 1 });
+    expect(ex[4]).toMatchObject({ format: null, sets: 4, percent: 75 });
   });
 });

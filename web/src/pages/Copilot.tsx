@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { useEffect, useRef, useState } from 'react';
 import { ACTION_APP, ACTION_APP_NAME, ACTIONS_EVENT, ACTIONS_KEY, enqueueAction, localToday, readActions, readCopilotCard, type ActionSpec } from '../vendor/lumen';
 import { openMyLifeApp } from '../ui/app';
-import { readAiKey, writeAiKey } from '../vendor/mylife-sync/aiKey';
+import { readAiKey, readAiModel, writeAiKey } from '../vendor/mylife-sync/aiKey';
 import { advance, textOf, userMessage, type CopilotSources, type Msg } from '../copilot';
 import { loadSpaces, useSpaces } from '../spaces';
 import { sortieDigests } from '../sortieDigest';
@@ -253,7 +253,7 @@ export function CopilotPage() {
     setNote(null);
     setReading([]);
     try {
-      const r = await advance(next, (params) => client.beta.messages.create(params), sources);
+      const r = await advance(next, (params) => client.beta.messages.create(params), sources, readAiModel());
       setMessages(r.messages);
       saveHistory(r.messages);
       setReading([...new Set(r.read)]);

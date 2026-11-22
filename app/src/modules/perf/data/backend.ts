@@ -1,6 +1,7 @@
 import type { StrengthWeek } from '@mylife/training';
 import type { PendingChange, RemoteRow, SyncState } from '@mylife/core/engine';
 import { addBodyweight, createExercise, dayView, moveSession, type NewExercise } from './day';
+import { applyImport, exportProgram, importPreview, readyPrograms, readyProgramText, type ImportOptions } from './importer';
 import { baseValues, blockDetail, deleteBlock, liftView, saveBlock, setBase, setBlockWeek, setLiftWeek, setReference, settingsView, type BasePatch, type BlockPatch } from './plan';
 import { addSlot, archiveTemplate, createTemplate, moveSlot, programView, removeSlot, renameTemplate, setTemplateDays, slotDetail, templateDetail, templatesView, updateSlot, type SlotPatch } from './program';
 import { overview } from './queries';
@@ -64,6 +65,11 @@ export function createBackend(d: Db) {
     deleteBlock: (id: string) => deleteBlock(d, id),
     baseValues: () => baseValues(d),
     setBase: (patch: BasePatch) => setBase(d, patch),
+    importPreview: (input: string) => importPreview(d, input),
+    applyImport: (input: string, options: ImportOptions, date: string) => applyImport(d, input, options, date),
+    exportProgram: (name?: string) => JSON.stringify(exportProgram(d, name), null, 2),
+    readyPrograms: () => readyPrograms(),
+    readyProgramText: (id: string) => readyProgramText(id),
     createExercise: (e: NewExercise) => createExercise(d, e),
     // La séance (étape P2).
     activeSession: () => session.active(),

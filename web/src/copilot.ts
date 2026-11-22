@@ -115,17 +115,18 @@ function markCached(m: Msg): Msg {
   return { ...m, content };
 }
 
-export function requestParams(messages: readonly Msg[]): Anthropic.Beta.MessageCreateParamsNonStreaming {
+/** `model` : celui choisi par l'utilisateur (Opus 5.5 par défaut, ou Sonnet 5.5). */
+export function requestParams(messages: readonly Msg[], model: string = COPILOT_MODEL): Anthropic.Beta.MessageCreateParamsNonStreaming {
   // Trois marqueurs de cache : système, outils, dernier message (la conversation se relit du cache).
   const tools = TOOLS.map((t, i) => (i === TOOLS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' as const } } : t));
   const last = messages[messages.length - 1];
   return {
-    model: COPILOT_MODEL,
+    model,
     max_tokens: 16000,
     system: [{ type: 'text', text: COPILOT_SYSTEM, cache_control: { type: 'ephemeral' } }],
     tools,
     messages: last === undefined ? [...messages] : [...messages.slice(0, -1), markCached(last)],
-    // Réflexion adaptative (toujours active sur ce modèle) ; effort explicite.
+    // Réflexion adaptative (par défaut sur Opus 5.5 comme sur Sonnet 5.5) ; effort explicite.
     output_config: { effort: 'medium' },
     // Si un filtre de sécurité décline la demande, l'API la relance sur un modèle de repli.
     betas: ['server-side-fallback-2026-07-01'],
@@ -148,12 +149,12 @@ export interface TurnResult {
 }
 
 /** Fait tourner Claude jusqu'à la fin de son tour (lectures comprises). `messages` finit par l'utilisateur. */
-export async function advance(messages: readonly Msg[], create: CreateMessage, sources: () => CopilotSources): Promise<TurnResult> {
+export async function advance(messages: readonly Msg[], create: CreateMessage, sources: () => CopilotSources, model: string = COPILOT_MODEL): Promise<TurnResult> {
   const history = [...messages];
   const read: string[] = [];
   const proposals: TurnResult['proposals'] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
-    const response = await create(requestParams(history));
+    const response = await create(requestParams(history, model));
     history.push({ role: 'assistant', content: response.content });
     if (response.stop_reason === 'refusal') return { messages: history, read, note: 'Cette demande a été déclinée par les filtres de sécurité.', proposals };
     if (response.stop_reason === 'max_tokens') return { messages: history, read, note: 'Réponse coupée (trop longue) : demande plus court.', proposals };

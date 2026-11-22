@@ -147,3 +147,8 @@ button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: point
 .pf-mini-label { font-size: 11px; color: var(--ink-2); }
 .pf-mini .pf-more { width: 32px; height: 32px; }
 .pf-create { border-bottom: 1px solid var(--line); }
+
+/* Importer (maquette V3-Import). */
+.pf-paste { width: 100%; resize: vertical; min-height: 130px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
+.pf-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px 16px; cursor: pointer; text-align: center; }
+.pf-imp-ex { display: flex; align-items: center; gap: 8px; padding: 6px 0 2px; }

@@ -38,7 +38,10 @@ export function ProgrammePage() {
           <Button variant="action" block href="/sport/programme/seances">
             Séances types
           </Button>
-          <Button block href="/sport/programme/bloc/nouveau">
+          <Button block href="/sport/programme/importer">
+            Importer un programme
+          </Button>
+          <Button variant="quiet" block href="/sport/programme/bloc/nouveau">
             Ou commence par un bloc
           </Button>
         </div>
@@ -164,11 +167,9 @@ export function ProgrammePage() {
         <List>
           <ListRow title="Réglages d’entraînement" value={`${v.lifts} exercice${v.lifts > 1 ? 's' : ''}`} href="/sport/programme/reglages" />
           <ListRow title="Séances types" value={String(v.templates)} href="/sport/programme/seances" />
+          <ListRow title="Importer ou partager" href="/sport/programme/importer" />
         </List>
       )}
-      <a className="btn btn-quiet" href="/perf/" style={{ alignSelf: 'center', whiteSpace: 'normal', textAlign: 'center' }}>
-        Importer un programme : app d’avant
-      </a>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { AI_KEY, readAiKey, writeAiKey } from '../packages/sync-client/src/aiKey';
+import { AI_KEY, AI_MODEL, readAiKey, readAiModel, writeAiKey, writeAiModel } from '../packages/sync-client/src/aiKey';
 
 const store = new Map<string, string>();
 beforeEach(() => {
@@ -27,6 +27,18 @@ describe('clé IA commune à MyFinances et MyPerf', () => {
     writeAiKey('sk-ant-x');
     writeAiKey(null);
     expect(readAiKey()).toBeNull();
+  });
+});
+
+describe('modèle de Claude choisi', () => {
+  it('Opus 5.5 par défaut ; Sonnet 5.5 se choisit et se garde ; une valeur inconnue est ignorée', () => {
+    expect(readAiModel()).toBe('claude-opus-5-5');
+    writeAiModel('claude-sonnet-5-5');
+    expect(readAiModel()).toBe('claude-sonnet-5-5');
+    writeAiModel('gpt' as never);
+    expect(store.get(AI_MODEL)).toBe('claude-sonnet-5-5');
+    store.set(AI_MODEL, 'claude-autre');
+    expect(readAiModel()).toBe('claude-opus-5-5');
   });
 });
 

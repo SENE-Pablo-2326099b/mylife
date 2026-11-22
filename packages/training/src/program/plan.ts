@@ -120,11 +120,28 @@ export interface ExportInput {
   sessions: {
     name: string;
     notes: string;
-    exercises: { name: string; sets: number; repMin: number | null; repMax: number | null; notes: string; equipment: Equipment; muscles: Muscle[]; bodyweight: boolean }[];
+    exercises: {
+      name: string;
+      sets: number;
+      repMin: number | null;
+      repMax: number | null;
+      notes: string;
+      equipment: Equipment;
+      muscles: Muscle[];
+      bodyweight: boolean;
+      /** Format étendu (facultatif) : au temps (secondes), EMOM, AMRAP, superset, progression. */
+      seconds?: number | null;
+      format?: 'emom' | 'amrap' | 'for_time' | null;
+      minutes?: number | null;
+      everySeconds?: number | null;
+      superset?: string | null;
+      progression?: 'percent' | 'double' | 'linear' | 'free' | null;
+    }[];
   }[];
   /** Semaine type : jour (0 = lundi) → nom de la séance. */
   pattern: { weekday: number; session: string }[];
   oneRms: { name: string; kg: number }[];
+  blocks?: { name: string; type: string; weeks: number; deloadWeeks: number; start: string }[];
 }
 
 /** Le programme actuel dans le format d'échange (à partager, à réimporter ailleurs). */
@@ -142,7 +159,12 @@ export function programToFile(input: ExportInput): ProgramFile {
         exercises: s.exercises.map((e) => ({
           name: e.name,
           sets: e.sets,
-          ...(e.repMin !== null ? { reps: e.repMax !== null && e.repMax !== e.repMin ? `${e.repMin}-${e.repMax}` : String(e.repMin) } : {}),
+          ...(e.seconds ? { reps: `${e.seconds}s` } : e.repMin !== null ? { reps: e.repMax !== null && e.repMax !== e.repMin ? `${e.repMin}-${e.repMax}` : String(e.repMin) } : {}),
+          ...(e.format ? { format: e.format } : {}),
+          ...(e.minutes ? { minutes: e.minutes } : {}),
+          ...(e.everySeconds && e.everySeconds !== 60 ? { everySeconds: e.everySeconds } : {}),
+          ...(e.superset ? { superset: e.superset } : {}),
+          ...(e.progression ? { progression: e.progression } : {}),
           ...(e.notes ? { notes: e.notes } : {}),
           equipment: e.equipment,
           ...(e.muscles.length ? { muscles: e.muscles } : {}),
@@ -151,5 +173,6 @@ export function programToFile(input: ExportInput): ProgramFile {
       };
     }),
     ...(input.oneRms.length ? { oneRepMaxes: input.oneRms.map((r) => ({ exercise: r.name, kg: r.kg })) } : {}),
+    ...(input.blocks?.length ? { blocks: input.blocks.map((b) => ({ name: b.name, type: b.type, weeks: b.weeks, deloadWeeks: b.deloadWeeks, start: b.start })) } : {}),
   };
 }

@@ -21,3 +21,7 @@ export { addDays, diffDays, today, weekday } from './dates';
 export { estimate1RM } from './math';
 export { MESO_KINDS, mesoKindInfo, schemeForKind } from './mesoTypes';
 export { DEFAULT_DELOAD, generateScheme, resizeScheme, totalWeeks } from './mesocycle';
+export { parseProgramInput, programPrompt, PROGRAM_FORMAT, type ParsedBlock, type ParsedExercise, type ParsedProgram, type ParseResult, type ProgramFile } from './program/exchange';
+export { buildPlan, newExercises, programToFile, slotNotes, summarizePlan, type ExportInput, type ImportPlan, type PlanExercise } from './program/plan';
+export { guessExercise, matchExercise, type LibraryEntry } from './program/match';
+export { READY_PROGRAMS, type ReadyProgram } from './program/ready';
