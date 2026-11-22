@@ -8,6 +8,12 @@ parmi d'autres**, reproduit à l'identique, jamais une règle du moteur.
 
 Rien n'est codé avant validation de ce document et des maquettes (canevas « MyPerf V5 — P0 révisé »).
 
+**Interface : uniquement le kit MyLife** (décision du 22/11). Le module n'invente ni composant ni palette : verre
+(`.glass`, listes, feuilles, barre du bas), fond atmosphérique, boutons d'action (dégradé violet-cyan du kit),
+champs, pastilles, notices et jetons de couleur de `packages/kit` ; l'effet Liquid Glass suit le réglage d'intensité
+de MyLife. La couleur du module (`tone-perf`) ne sert qu'aux repères discrets (libellé de module, pastille de
+navigation), comme pour MyFinances. Les maquettes chargent la feuille du kit telle quelle.
+
 ## 1. Le principe : un programme est une composition de quatre choix indépendants
 
 Chaque créneau d'une séance (« squat, lundi ») est décrit par quatre axes qui ne se connaissent pas :
@@ -119,7 +125,10 @@ Service à part, utilisé **seulement** si un créneau actif en a besoin (`requi
 - sources : 1RM saisi par l'utilisateur, sinon estimation (formule et seuil de reps en paramètres) ;
 - politique de calibration (paramètres) : quand proposer une mise à jour (après un test, une S4…), plafond par
   cycle ; toujours une **proposition** (Appliquer / Garder), jamais automatique ;
-- lestés : calculs sur la masse totale (poids du corps + lest), affichage et saisie du **lest net**.
+- lestés : la masse totale (poids du corps + lest) sert **uniquement en interne**, pour la précision des %.
+  À l'écran, en séance comme sur les fiches et dans les progrès, le 1RM de référence, les records et la saisie sont
+  **toujours en lest net** (« 1RM réf. +50,8 kg »), jamais en masse totale ; le poids du corps n'apparaît qu'en petit
+  repère modifiable à côté de la saisie (décision du 22/11).
 
 Sans créneau au % du 1RM, la référence n'existe pas pour l'interface (aucune carte, aucune table de %).
 
