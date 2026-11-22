@@ -299,6 +299,38 @@ describe('MyLife, une seule app', () => {
     await page.locator('.list-row', { hasText: 'Mesures' }).getByText(/poids du corps 79,5 kg/).waitFor();
   });
 
+  it('MyPerf refait : Programme — semaine type, séance type, créneau passé en EMOM, sans recharger la page', async () => {
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    // Onglet Programme : navigation dans l'app (la page ne se recharge pas : le marqueur posé reste là).
+    await page.evaluate(() => ((window as unknown as { __stay?: boolean }).__stay = true));
+    await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Programme' }).click();
+    await page.getByRole('heading', { name: 'Programme' }).waitFor();
+    expect(await page.evaluate(() => (window as unknown as { __stay?: boolean }).__stay)).toBe(true);
+    await page.getByText('Semaine type').waitFor({ timeout: 20_000 });
+    await shot(page, '07f-sport-programme');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Une séance type, puis un de ses créneaux.
+    await page.locator('.list-row', { hasText: 'Full body A' }).first().click();
+    await page.getByRole('heading', { name: 'Full body A' }).waitFor();
+    await page.locator('.pf-slot-main').first().click();
+    await page.getByText('Grouper avec le suivant').waitFor();
+    const exercise = (await page.locator('h1').textContent())!;
+    // Format : EMOM 10 min, 5 reps par minute.
+    await page.locator('.list-row', { hasText: 'Format' }).click();
+    const sheet = page.getByRole('dialog', { name: 'Format' });
+    await sheet.getByRole('button', { name: /^EMOM/ }).click();
+    await sheet.getByText('Reps par minute').waitFor();
+    await shot(page, '07g-sport-creneau-format');
+    await sheet.getByRole('button', { name: 'OK' }).click();
+    await page.getByText('Prescrit aujourd’hui : EMOM 10 min · 5 / min').waitFor();
+    // De retour sur la séance type : le créneau dit son format.
+    await page.getByRole('link', { name: 'Retour' }).click();
+    await page.locator('.pf-slot', { hasText: exercise }).getByText(/^EMOM 10 min · 5 \/ min$/).waitFor();
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    expect(await page.evaluate(() => (window as unknown as { __stay?: boolean }).__stay)).toBe(true);
+  });
+
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
     await page.goto(`${server.url}/reglages`);
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
@@ -456,7 +488,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

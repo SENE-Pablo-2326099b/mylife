@@ -94,3 +94,32 @@ button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: point
 .pf-restbar { background: var(--tone-grad) !important; transition: width 0.25s linear; }
 /* Dans la séance, « fait » prend la couleur d'action du kit (bleu-violet), comme les coches : pas de vert. */
 .pf-session .pf-dot.is-done, .pf-session .pf-chip.is-ok { color: #fff; background: var(--action); border-color: var(--action-border); }
+
+/* Programme (maquettes V3-Prog-blocs, V3-Prog-routine, V3-Creneau). */
+.pf-frieze { position: relative; display: grid; gap: 4px; }
+.pf-blk { position: relative; display: flex; align-items: center; height: 34px; padding: 0 9px; border-radius: 10px; font-size: 11.5px; font-weight: 700; color: #0b0e1a; overflow: hidden; min-width: 0; }
+.pf-blk.is-current { box-shadow: 0 0 0 2px var(--ink); }
+.pf-blk-deload { position: absolute; right: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--ok) 85%, transparent); }
+.pf-now { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 8px var(--ink); }
+.pf-tablewrap { padding: 8px 10px; overflow-x: auto; }
+.pf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; text-align: center; }
+.pf-table th, .pf-table td { padding: 7px 3px; white-space: nowrap; }
+.pf-table th { font-size: 11px; color: var(--ink-2); font-weight: 600; }
+.pf-table .pf-tl { text-align: left; color: var(--ink-2); font-size: 11.5px; }
+.pf-table small { display: block; color: var(--ink-2); font-size: 10.5px; }
+.pf-table .is-current, .pf-table .is-current small { color: var(--tone); font-weight: 800; }
+.pf-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.pf-days .pf-chip { justify-content: center; padding: 0; min-height: 36px; }
+.pf-slots { display: flex; flex-direction: column; padding: 4px 10px 4px 16px; }
+.pf-slot { display: flex; align-items: center; gap: 6px; min-height: 60px; }
+.pf-slot + .pf-slot { border-top: 1px solid var(--line); }
+.pf-slot-main { display: flex; flex-direction: column; gap: 1px; padding: 8px 0; min-width: 0; color: var(--ink); }
+.pf-more:disabled { opacity: 0.3; cursor: default; }
+.pf-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.pf-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 11px; border-radius: var(--r-control); background: var(--tile); border: 1px solid var(--tile-border); font-size: 13.5px; font-weight: 700; color: var(--ink); text-align: left; }
+.pf-tile span { font-size: 11.5px; font-weight: 500; color: var(--ink-2); }
+.pf-tile.is-on { border-color: var(--tone-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone-solid) 30%, transparent); background: color-mix(in srgb, var(--tone-solid) 12%, transparent); }
+.pf-numlist { display: flex; flex-direction: column; padding: 4px 14px; }
+.pf-numrow { display: flex; align-items: center; gap: 8px; min-height: 52px; }
+.pf-numrow + .pf-numrow { border-top: 1px solid var(--line); }
+.pf-numval { min-width: 72px; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 16px; }

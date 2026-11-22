@@ -62,6 +62,35 @@ export function referenceFor(program: Program, history: HistoryView, exercise: E
   return referenceAt(history.refSets(exercise.id), cyclesOf(program), date);
 }
 
+const minutes = (sec: number) => `${Math.round((sec / 60) * 10) / 10}`.replace('.', ',');
+
+/**
+ * Le format met en forme ce que la progression prescrit : un EMOM de 10 min donne 10 minutes à N reps, un AMRAP une
+ * seule série comptée en tours, « au temps » N séries tenues. Les séries classiques restent telles quelles.
+ */
+export function shapeForFormat(format: Format, p: Prescription): Prescription {
+  if (format.scheme === 'sets') return p;
+  const load = format.metrics.includes('load');
+  const first = p.sets.find((s) => s.setType !== 'warmup') ?? p.sets[0];
+  const weight = load ? (first?.targetWeight ?? null) : null;
+  const t = format.timer;
+  if (format.scheme === 'interval' && t.kind === 'interval') {
+    const n = Math.max(1, Math.floor(t.totalSec / t.everySec));
+    const reps = first?.targetReps ?? null;
+    const every = t.everySec === 60 ? '' : ` toutes les ${t.everySec} s`;
+    return { ...p, percents: null, label: `EMOM ${minutes(t.totalSec)} min${every}${reps !== null ? ` · ${reps} / min` : ''}`, sets: Array.from({ length: n }, () => ({ setType: 'working', targetWeight: weight, targetReps: reps, targetRepsMax: null })) };
+  }
+  if (format.scheme === 'amrap') {
+    const cap = t.kind === 'cap' ? t.capSec : 480;
+    return { ...p, percents: null, label: `AMRAP ${minutes(cap)} min`, sets: [{ setType: 'working', targetWeight: weight, targetReps: null, targetRepsMax: null }] };
+  }
+  const work = p.sets.filter((s) => s.setType !== 'warmup');
+  const n = Math.max(1, work.length);
+  const sets = Array.from({ length: n }, () => ({ setType: 'working' as const, targetWeight: weight, targetReps: null, targetRepsMax: null }));
+  if (format.scheme === 'hold') return { ...p, percents: null, label: `${n} × ${t.kind === 'countdown' ? `${t.workSec} s` : 'au temps'}`, sets };
+  return { ...p, percents: null, label: `${n} × chrono`, sets };
+}
+
 /** La séance `sessionId` telle qu'elle serait prescrite à `date`. */
 export function planSession(program: Program, sessionId: string, date: string, history: HistoryView): SessionPlan | null {
   const session = program.sessions.find((s) => s.id === sessionId);
@@ -83,7 +112,8 @@ export function planSession(program: Program, sessionId: string, date: string, h
       lastSets: history.lastSets(exercise.id, strategy.historyKey),
       reference: reference?.value ?? null,
     };
-    items.push({ slot, exercise, format: formatOf(program, slot.formatId), prescription: strategy.prescribe(ctx, slot.strategy.params), reference, bodyweight, capabilities: slotCapabilities(program, slot) });
+    const format = formatOf(program, slot.formatId);
+    items.push({ slot, exercise, format, prescription: shapeForFormat(format, strategy.prescribe(ctx, slot.strategy.params)), reference, bodyweight, capabilities: slotCapabilities(program, slot) });
   }
   return { date, session: { id: session.id, name: session.name }, day, items };
 }

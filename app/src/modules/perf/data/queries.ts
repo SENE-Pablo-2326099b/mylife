@@ -1,5 +1,7 @@
 import {
+  BUILTIN_FORMATS,
   capabilities,
+  formatErrors,
   dayContext,
   parseBarSpeed,
   parseSetType,
@@ -9,8 +11,11 @@ import {
   type HistorySet,
   type HistoryView,
   type LegacyTables,
+  type Format,
   type Program,
   type RefSet,
+  type Slot,
+  type StrategyId,
 } from '@mylife/training';
 import type { Db } from './sql';
 
@@ -23,7 +28,55 @@ const PROGRAM_TABLES = ['exercises', 'mesocycles', 'cycle_week_overrides', 'temp
 
 export function readProgram(d: Db): Program {
   const t = Object.fromEntries(PROGRAM_TABLES.map((name) => [name, d.all<Record<string, unknown>>(`SELECT * FROM ${name}`)]));
-  return programFromLegacy(t as unknown as LegacyTables);
+  const legacy = programFromLegacy(t as unknown as LegacyTables);
+  // Les colonnes du moteur composable (migration 10), que l'app d'avant ignore : format, progression autre que les
+  // deux d'avant, groupe, repos du créneau ; et les formats à soi.
+  const formats = readFormats(d);
+  const extra = new Map(
+    d.all<{ id: string; format_id: string | null; strategy: string | null; group_json: string | null; rest_sec: number | null }>('SELECT id, format_id, strategy, group_json, rest_sec FROM template_exercises').map((r) => [r.id, r]),
+  );
+  const known = new Set([...BUILTIN_FORMATS, ...formats].map((f) => f.id));
+  return {
+    ...legacy,
+    formats,
+    sessions: legacy.sessions.map((session) => ({
+      ...session,
+      slots: session.slots.map((slot): Slot => {
+        const x = extra.get(slot.id);
+        if (!x) return slot;
+        const strategy = parseJson<Slot['strategy']>(x.strategy);
+        const group = parseJson<Slot['group']>(x.group_json);
+        return {
+          ...slot,
+          formatId: x.format_id && known.has(x.format_id) ? x.format_id : slot.formatId,
+          // Les deux progressions d'avant restent lues dans leurs colonnes (l'app d'avant peut les modifier) ;
+          // les autres viennent de la colonne du moteur.
+          strategy: strategy && OWN_STRATEGIES.includes(strategy.id) && strategy.params && typeof strategy.params === 'object' ? strategy : slot.strategy,
+          group: group && typeof group.id === 'string' && (group.kind === 'superset' || group.kind === 'circuit') ? { id: group.id, kind: group.kind, rounds: Math.max(1, Math.min(20, Number(group.rounds) || 3)) } : null,
+          restSec: typeof x.rest_sec === 'number' && x.rest_sec > 0 ? x.rest_sec : null,
+        };
+      }),
+    })),
+  };
+}
+
+const OWN_STRATEGIES: readonly StrategyId[] = ['linear', 'free', 'autoregulated'];
+
+function parseJson<T>(v: string | null): T | null {
+  if (!v) return null;
+  try {
+    return JSON.parse(v) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Les formats à soi (table `formats`), seulement ceux qui sont valides. */
+export function readFormats(d: Db): Format[] {
+  return d.all<{ id: string; spec: string }>('SELECT id, spec FROM formats ORDER BY created_at').flatMap((r) => {
+    const f = parseJson<Format>(r.spec);
+    return f && f.id === r.id && formatErrors(f).length === 0 ? [f] : [];
+  });
 }
 
 interface SetRow {

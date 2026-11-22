@@ -1,5 +1,6 @@
 import type { PendingChange, RemoteRow, SyncState } from '@mylife/core/engine';
 import { addBodyweight, createExercise, dayView, moveSession, type NewExercise } from './day';
+import { addSlot, archiveTemplate, createTemplate, moveSlot, programView, removeSlot, renameTemplate, setTemplateDays, slotDetail, templateDetail, templatesView, updateSlot, type SlotPatch } from './program';
 import { overview } from './queries';
 import { sessionOps } from './session';
 import { migrate, SCHEMA_VERSION } from './schema';
@@ -34,6 +35,18 @@ export function createBackend(d: Db) {
     dayView: (date: string) => dayView(d, date),
     addBodyweight: (date: string, value: number) => addBodyweight(d, date, value),
     moveSession: (templateId: string, from: string, to: string) => moveSession(d, templateId, from, to),
+    programView: (date: string) => programView(d, date),
+    templatesView: () => templatesView(d),
+    templateDetail: (id: string, date: string) => templateDetail(d, id, date),
+    slotDetail: (id: string, date: string) => slotDetail(d, id, date),
+    createTemplate: (name: string) => createTemplate(d, name),
+    renameTemplate: (id: string, name: string) => renameTemplate(d, id, name),
+    archiveTemplate: (id: string) => archiveTemplate(d, id),
+    setTemplateDays: (id: string, days: number[]) => setTemplateDays(d, id, days),
+    addSlot: (templateId: string, exerciseId: string) => addSlot(d, templateId, exerciseId),
+    removeSlot: (id: string) => removeSlot(d, id),
+    moveSlot: (id: string, delta: -1 | 1) => moveSlot(d, id, delta),
+    updateSlot: (id: string, patch: SlotPatch) => updateSlot(d, id, patch),
     createExercise: (e: NewExercise) => createExercise(d, e),
     // La séance (étape P2).
     activeSession: () => session.active(),

@@ -1,5 +1,5 @@
-import { lazy, Suspense, useState } from 'react';
-import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useState } from 'react';
+import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Button, EmptyState, Icon, IconTile, Sheet, type IconName } from '@mylife/kit';
 import { enabledModules } from './contract';
 import { MODULES } from './modules';
@@ -229,11 +229,36 @@ function Anonymous() {
 }
 
 /** La coquille une fois connecté. Les Sorties (encore dans l'ancien accueil) publient leur agenda d'ici aussi. */
+/** Les apps d'avant servies à part (et l'API) : leurs liens restent de vrais liens. */
+const OUTSIDE = /^\/(perf|raveloc|finances|api)(\/|$)/;
+
+/**
+ * Les liens internes de la coquille (ceux du kit sont de simples <a>) naviguent sans recharger la page : la base des
+ * modules reste ouverte, l'écran change tout de suite.
+ */
+function useInAppLinks() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.('a[href]');
+      if (!(a instanceof HTMLAnchorElement) || a.target || a.hasAttribute('download') || a.origin !== window.location.origin) return;
+      const path = a.pathname;
+      if (OUTSIDE.test(path) || a.getAttribute('href')?.startsWith('#')) return;
+      e.preventDefault();
+      navigate(`${path}${a.search}${a.hash}`);
+    };
+    document.addEventListener('click', onClick);
+    return () => document.removeEventListener('click', onClick);
+  }, [navigate]);
+}
+
 function Shell({ login }: { login: string }) {
   void login;
   const { pathname } = useLocation();
   const [adding, setAdding] = useState(false);
   useHomeAgenda();
+  useInAppLinks();
   if (pathname === '/bienvenue' && !pendingRecovery()) return <Navigate to="/" replace />;
   if (pathname === '/bienvenue') return <WelcomeKey />;
   return (

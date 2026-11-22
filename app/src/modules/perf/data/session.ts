@@ -18,7 +18,7 @@ import {
   type SetType,
   type WorkoutSet,
 } from '@mylife/training';
-import { historyView, readProgram } from './queries';
+import { historyView, readFormats, readProgram } from './queries';
 import { newId, type Db, type SqlValue } from './sql';
 
 /**
@@ -373,7 +373,7 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
       [setId],
     );
     if (!s) return 'missing';
-    const format = BUILTIN_FORMATS.find((f) => f.id === s.format_id) ?? BUILTIN_FORMATS[0]!;
+    const format = BUILTIN_FORMATS.find((f) => f.id === s.format_id) ?? readFormats(d).find((f) => f.id === s.format_id) ?? BUILTIN_FORMATS[0]!;
     const needsLoad = format.metrics.includes('load');
     const needsReps = format.metrics.includes('reps');
     const weight = 'weight' in patch ? (patch.weight ?? null) : ((s.weight as number | null) ?? (s.target_weight as number | null));

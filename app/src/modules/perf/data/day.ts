@@ -65,7 +65,7 @@ export interface DayView {
 
 const kg = (v: number, weighted: boolean) => `${weighted && v > 0 ? '+' : ''}${v.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} kg`;
 
-function preview(d: Db, program: Program, templateId: string, date: string): PlannedSession | null {
+export function preview(d: Db, program: Program, templateId: string, date: string): PlannedSession | null {
   const plan = planSession(program, templateId, date, historyView(d));
   if (!plan) return null;
   let seconds = 0;

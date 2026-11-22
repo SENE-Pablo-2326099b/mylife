@@ -201,7 +201,11 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
   à `/perf/` jusqu'à la bascule, P8). Base : SQLite WebAssembly (`@sqlite.org/sqlite-wasm`) dans un Worker, fichier
   OPFS en mode « pool d'accès synchrones » (pas besoin de COOP/COEP ; `'wasm-unsafe-eval'` dans la CSP de la coquille),
   schéma de l'app d'avant plus une migration en ajout ; synchro `perf` au même format de lignes que l'app d'avant (les
-  deux lisent et écrivent le même compte). Métier : `packages/training`.
+  deux lisent et écrivent le même compte). Métier : `packages/training`. Écrans refaits : Jour, la séance (plein écran :
+  `nav.focus` du contrat des modules efface la barre du bas), Programme (séances types, créneaux : format, progression,
+  groupe, repos, consigne ; colonnes de l'app d'avant tenues à jour, formats à soi dans la table `formats`).
+- **Liens de la coquille** : les liens internes (les `<a>` du kit) naviguent sans recharger la page (`useInAppLinks`,
+  `app/src/App.tsx`) ; ceux des apps servies à part (`/perf/`, `/raveloc/`, `/finances/`, `/api`) restent de vrais liens.
 
 ### MyRave (`apps/raveloc`)
 - Retrouver ses amis en festival : groupes temporaires (14 jours max), partage de position limité dans le temps, flèche
