@@ -379,6 +379,32 @@ describe('MyLife, une seule app', () => {
     expect(await overflow(page)).toBeLessThanOrEqual(0);
   });
 
+  it('MyPerf refait : importer un programme collé (EMOM, superset, au temps), aperçu vérifié, puis partager', async () => {
+    await page.goto(`${server.url}/sport/programme`);
+    await page.getByRole('heading', { name: 'Programme' }).waitFor();
+    await page.locator('.list-row', { hasText: 'Importer ou partager' }).click();
+    await page.getByRole('heading', { name: 'Importer' }).waitFor();
+    // Un programme prêt se lit d'un toucher ; on le remplace par un texte collé.
+    await page.locator('.pf-chip', { hasText: 'Full body débutant' }).click();
+    await page.getByText('Programme lu · vérifié').waitFor();
+    await page.getByLabel('Programme à importer').fill('Samedi – Circuit\nA1. Dips 3x8\nA2. Pompes 3x15\nTractions EMOM 10 min 5 reps\nGainage 3x45s');
+    await page.getByText('Texte lu · vérifié').waitFor();
+    await page.getByRole('button', { name: 'Voir le détail ›' }).click();
+    await page.getByText('EMOM 10 min · 5 / min').waitFor();
+    await shot(page, '07l-sport-import');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.getByRole('button', { name: 'Valider l’import' }).click();
+    await page.waitForURL(/\/sport\/programme$/);
+    await page.locator('.list-row', { hasText: 'Samedi – Circuit' }).first().waitFor({ timeout: 20_000 });
+    // Partager : le fichier du programme contient la séance importée, avec son EMOM.
+    await page.locator('.list-row', { hasText: 'Importer ou partager' }).click();
+    const [download] = await Promise.all([page.waitForEvent('download'), page.locator('.list-row', { hasText: 'Fichier' }).click()]);
+    const file = JSON.parse(await (await download.createReadStream())!.toArray().then((c) => Buffer.concat(c as Buffer[]).toString('utf8')));
+    const circuit = file.sessions.find((x: { name: string }) => x.name === 'Samedi – Circuit');
+    expect(circuit.days).toEqual(['samedi']);
+    expect(circuit.exercises.find((e: { format?: string }) => e.format === 'emom')).toMatchObject({ minutes: 10, reps: '5' });
+  });
+
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
     await page.goto(`${server.url}/reglages`);
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
@@ -446,8 +472,10 @@ describe('MyLife, une seule app', () => {
     const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     const now = new Date();
     const later = new Date(now.getTime() + 2 * 86_400_000);
-    const from = new Date(now.getTime() - 10 * 60_000);
-    const to = new Date(now.getTime() + 50 * 60_000);
+    // Un set en cours, borné à la journée (lancé autour de minuit, il ne doit pas la traverser).
+    const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const from = new Date(Math.max(now.getTime() - 10 * 60_000, dayStart));
+    const to = new Date(Math.min(now.getTime() + 50 * 60_000, dayStart + 86_400_000 - 60_000));
     await page.goto(`${server.url}/ancien/sorties`);
     await page.getByLabel('Quoi').fill('Festival test');
     await page.getByLabel('Où (facultatif)').fill('Quelque part');
@@ -536,7 +564,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
