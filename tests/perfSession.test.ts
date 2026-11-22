@@ -143,6 +143,45 @@ describe('séance : les séries', () => {
     expect(after.at(-1)).toMatchObject({ setType: 'working', targetReps: curl.sets.at(-1)!.targetReps, completed: false });
     b.removeSet(after.at(-1)!.id);
     expect(itemOf(id, 'ex_barbell_curl').sets.length).toBe(curl.sets.length);
+    // Une série faite se retire aussi (erreur de saisie).
+    const first = itemOf(id, 'ex_barbell_curl').sets[0]!;
+    b.completeSet(first.id, { weight: 30, reps: 10 });
+    b.removeSet(first.id);
+    expect(itemOf(id, 'ex_barbell_curl').sets.map((s) => s.id)).not.toContain(first.id);
+  });
+
+  it('changer la catégorie d’une série : gardée comme choisie à la main ; les backoffs suivent le nouveau top set', () => {
+    const id = b.startSession(template, DATE);
+    const deadlift = itemOf(id, 'ex_deadlift');
+    // La première série de backoff devient un échauffement, puis revient : le type est noté choisi à la main.
+    const backoff = deadlift.sets.find((s) => s.setType === 'backoff')!;
+    b.setSetType(backoff.id, 'warmup');
+    expect(itemOf(id, 'ex_deadlift').sets.find((s) => s.id === backoff.id)!.setType).toBe('warmup');
+    expect(d.first('SELECT type_manual FROM sets WHERE id = ?', [backoff.id])).toEqual({ type_manual: 1 });
+    b.setSetType(backoff.id, 'backoff');
+    // Le top set tapé : les backoffs (dont celle remise) suivent.
+    b.updateSet(itemOf(id, 'ex_deadlift').sets[0]!.id, { weight: 100 });
+    const target = itemOf(id, 'ex_deadlift').sets.find((s) => s.id === backoff.id)!.targetWeight;
+    expect(target).not.toBeNull();
+    expect(target!).toBeLessThan(100);
+    expect(() => b.setSetType(backoff.id, 'nimporte' as never)).toThrow(/inconnu/);
+  });
+
+  it('commentaires : par série, par exercice ; la consigne du programme reste à part ; retrouvés la fois suivante', () => {
+    const id = b.startSession(template, DATE);
+    const squat = itemOf(id, 'ex_squat');
+    expect(squat.comment).toBe('');
+    b.updateSet(squat.sets[0]!.id, { note: '  genou gauche un peu sensible ' });
+    b.exerciseComment(squat.weId, 'Talons surélevés, bien mieux');
+    const after = itemOf(id, 'ex_squat');
+    expect(after.sets[0]!.note).toBe('genou gauche un peu sensible');
+    expect(after.comment).toBe('Talons surélevés, bien mieux');
+    expect(after.note).not.toContain('Talons');
+    // La séance suivante montre le commentaire de la dernière fois.
+    b.completeSet(after.sets[0]!.id, {});
+    b.finishSession(id);
+    const next = b.startSession(template, '2026-01-26');
+    expect(itemOf(next, 'ex_squat')).toMatchObject({ comment: '', lastComment: 'Talons surélevés, bien mieux' });
   });
 });
 

@@ -64,7 +64,12 @@ export interface SessionItem {
   backoffPercent: number;
   /** « Dernière fois » en une ligne. */
   lastTime: string | null;
+  /** Ton commentaire sur cet exercice la dernière fois qu'il en avait un. */
+  lastComment: string | null;
+  /** La consigne du programme (créneau ou exercice). */
   note: string;
+  /** Ton commentaire sur cet exercice, aujourd'hui. */
+  comment: string;
   replaces: string | null;
   restSec: number | null;
   sets: SessionSet[];
@@ -263,7 +268,14 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
           increment: exercise.weightIncrement ?? settings.increment,
           backoffPercent: Number(we.backoff_percent),
           lastTime: summarize(last.filter((s) => s.setType !== 'warmup'), weighted),
-          note: String(we.notes || we.slot_notes || exercise.notes || ''),
+          lastComment:
+            d.first<{ notes: string }>(
+              `SELECT we.notes FROM workout_exercises we JOIN workouts w ON w.id = we.workout_id
+               WHERE we.exercise_id = ? AND w.status = 'completed' AND w.id != ? AND we.notes != '' ORDER BY w.date DESC, w.started_at DESC LIMIT 1`,
+              [exercise.id, id],
+            )?.notes ?? null,
+          note: String(we.slot_notes || exercise.notes || ''),
+          comment: String(we.notes ?? ''),
           replaces: typeof we.replaces_exercise_id === 'string' ? (program.exercises.find((e) => e.id === we.replaces_exercise_id)?.name ?? null) : null,
           restSec: typeof we.rest_sec === 'number' ? we.rest_sec : null,
           sets,
@@ -341,7 +353,7 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
     }
     if ('durationS' in patch) add('duration_s', patch.durationS ?? null);
     if ('rounds' in patch) add('rounds', patch.rounds ?? null);
-    if ('note' in patch) add('note', patch.note ?? '');
+    if ('note' in patch) add('note', (patch.note ?? '').trim().slice(0, 2000));
     if (!cols.length) return;
     d.transaction(() => {
       d.run(`UPDATE sets SET ${cols.join(', ')} WHERE id = ?`, [...vals, setId]);
@@ -390,8 +402,29 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
     insertPlanned(weId, [{ setType, targetWeight: (last?.weight ?? last?.target_weight ?? null) as number | null, targetReps: (last?.target_reps ?? null) as number | null, targetRepsMax: (last?.target_reps_max ?? null) as number | null }], rows.length);
   }
 
+  /** Retire une série, faite ou non (une erreur de saisie se corrige) ; les backoffs suivent le top set. */
   function removeSet(setId: string): void {
-    d.run('DELETE FROM sets WHERE id = ? AND completed = 0', [setId]);
+    const we = weOf(setId);
+    d.transaction(() => {
+      d.run('DELETE FROM sets WHERE id = ?', [setId]);
+      if (we) followTopSet(we);
+    });
+  }
+
+  const SET_TYPES: readonly SetType[] = ['warmup', 'top_set', 'backoff', 'working', 'drop'];
+  /** Change la catégorie d'une série (échauffement, top set, backoff, série, drop) ; gardée comme choisie à la main. */
+  function setType(setId: string, type: SetType): void {
+    if (!SET_TYPES.includes(type)) throw new Error('Type de série inconnu');
+    const we = weOf(setId);
+    d.transaction(() => {
+      d.run('UPDATE sets SET set_type = ?, type_manual = 1 WHERE id = ?', [type, setId]);
+      if (we) followTopSet(we);
+    });
+  }
+
+  /** Ton commentaire sur un exercice de la séance. */
+  function exerciseComment(weId: string, text: string): void {
+    d.run('UPDATE workout_exercises SET notes = ? WHERE id = ?', [text.trim().slice(0, 2000), weId]);
   }
 
   /**
@@ -527,5 +560,5 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
       .map(({ e, r }) => ({ id: e.id, name: e.name, detail: r.detail }));
   }
 
-  return { active, start, doc, update, complete, uncomplete, addSet, removeSet, replace, addExercise, setBodyweight, finish, discard, startOptions, exerciseChoices };
+  return { active, start, doc, update, complete, uncomplete, addSet, removeSet, setType, exerciseComment, replace, addExercise, setBodyweight, finish, discard, startOptions, exerciseChoices };
 }

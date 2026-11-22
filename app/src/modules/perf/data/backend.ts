@@ -45,6 +45,8 @@ export function createBackend(d: Db) {
     uncompleteSet: (setId: string) => session.uncomplete(setId),
     addSet: (weId: string) => session.addSet(weId),
     removeSet: (setId: string) => session.removeSet(setId),
+    setSetType: (setId: string, type: Parameters<typeof session.setType>[1]) => session.setType(setId, type),
+    exerciseComment: (weId: string, text: string) => session.exerciseComment(weId, text),
     replaceExercise: (weId: string, exerciseId: string, scope: 'today' | 'program') => session.replace(weId, exerciseId, scope),
     addExercise: (workoutId: string, exerciseId: string) => session.addExercise(workoutId, exerciseId),
     exerciseChoices: (forExerciseId: string | null) => session.exerciseChoices(forExerciseId),

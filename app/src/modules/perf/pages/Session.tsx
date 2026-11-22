@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
 import { barbellPlates, describePlates, restSeconds } from '@mylife/training';
@@ -64,6 +64,7 @@ export function SessionPage() {
   const [editing, setEditing] = useState<Editing | null>(null);
   const [replacing, setReplacing] = useState<SessionItem | null>(null);
   const [more, setMore] = useState<SessionItem | null>(null);
+  const [setMenu, setSetMenu] = useState<{ item: SessionItem; set: SessionSet; label: string } | null>(null);
   const [ending, setEnding] = useState(false);
   const awake = useWakeLock(doc?.status === 'active');
   const now = useNow();
@@ -102,6 +103,24 @@ export function SessionPage() {
   );
 
   const current = useMemo(() => doc?.items.find((i) => i.weId === open) ?? doc?.items.find((i) => !isDone(i)) ?? null, [doc, open]);
+  // Un exercice ouvert depuis la liste : une fois toutes ses séries faites, on revient au suivant à faire.
+  const openWasDone = useRef<boolean | null>(null);
+  useEffect(() => {
+    const item = doc?.items.find((i) => i.weId === open);
+    if (!item) return void (openWasDone.current = null);
+    const done = isDone(item);
+    if (openWasDone.current === false && done) setOpen(null);
+    else openWasDone.current = done;
+  }, [doc, open]);
+  // Le clavier couvre le bas de l'écran : la série qu'on saisit remonte au-dessus.
+  const editingId = editing?.setId ?? null;
+  useEffect(() => {
+    if (!editingId) return;
+    const row = document.querySelector<HTMLElement>(`[data-set="${editingId}"]`);
+    if (!row) return;
+    const top = row.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: Math.max(0, top - 140), behavior: 'smooth' });
+  }, [editingId]);
 
   if (error) return <Notice tone="bad">La séance n’a pas pu être lue : {error}</Notice>;
   if (!doc || !id) return <span className="t-small muted">Chargement de la séance…</span>;
@@ -120,6 +139,8 @@ export function SessionPage() {
     const order = item.group ? rounds(members) : item.sets.map((s) => ({ item, set: s, tag: '', round: 0 }));
     const nextRow = order.find((r) => !r.set.completed && r.set.id !== set.id);
     const nextItem = doc.items.slice(doc.items.indexOf(item) + 1).find((i) => !isDone(i) && !members.includes(i));
+    // Plus rien après : pas de repos « avant la fin ».
+    if (!nextRow && !nextItem) return skipRest();
     const seconds = item.restSec ?? restSeconds(doc.rest, item.category, item.intention, set.setType);
     const numbered = item.sets.filter((s) => s.setType !== 'warmup' && s.setType !== 'top_set');
     const k = nextRow ? numbered.indexOf(nextRow.set) : -1;
@@ -138,10 +159,20 @@ export function SessionPage() {
   };
 
   const complete = async (item: SessionItem, set: SessionSet, patch: SetPatch = {}) => {
+    // Une série déjà faite qu'on corrige : on enregistre, sans relancer le repos.
+    if (set.completed) {
+      if (Object.keys(patch).length) await act(call('updateSet', set.id, patch));
+      return setEditing(null);
+    }
     const r = await act(call('completeSet', set.id, patch));
     if (r === 'need-weight' || r === 'need-reps') return setEditing({ setId: set.id, field: r === 'need-weight' ? 'weight' : 'reps' });
     if (r === 'ok') {
       setEditing(null);
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        /* pas de vibreur */
+      }
       afterComplete(item, set);
     }
   };
@@ -172,7 +203,7 @@ export function SessionPage() {
   const blockLabel = doc.block ? ` · ${doc.block.name} S${doc.block.week}${doc.block.deload ? ' · décharge' : ''}` : '';
 
   return (
-    <div className="pf-screen tone-perf pf-session">
+    <div className="pf-screen tone-perf pf-session" style={editing ? { paddingBottom: 560 } : undefined}>
       <div className="pf-amb" aria-hidden="true" />
       <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="pf-head">
@@ -183,15 +214,17 @@ export function SessionPage() {
               {elapsedClock(now - doc.startedAt)}
             </span>
           </div>
-          {awake && <span className="pf-chip">Écran allumé</span>}
           <Button onClick={() => setEnding(true)}>Terminer</Button>
         </div>
         <div className="progress">
           <span style={{ width: `${all.length ? Math.round((doneSets.length / all.length) * 100) : 0}%`, background: 'var(--tone-grad)' }} />
         </div>
-        <span className="t-small muted">
+        <div className="row" style={{ gap: 8 }}>
+        <span className="t-small muted grow">
           {[`${doc.items.filter(isDone).length} exercice${doc.items.filter(isDone).length > 1 ? 's' : ''} sur ${doc.items.length}`, `${doneSets.length} série${doneSets.length > 1 ? 's' : ''} sur ${all.length}`, tonnage > 0 ? `${Math.round(tonnage).toLocaleString('fr-FR')} kg` : ''].filter(Boolean).join(' · ')}
         </span>
+          {awake && <span className="pf-chip">Écran allumé</span>}
+        </div>
       </header>
 
       {current && current.group && group.length > 1 ? (
@@ -204,6 +237,8 @@ export function SessionPage() {
           onComplete={(item, set, patch) => void complete(item, set, patch)}
           onUncomplete={(set) => void act(call('uncompleteSet', set.id))}
           onMore={() => setMore(current)}
+          onAddRound={() => void Promise.all(group.map((i) => call('addSet', i.weId))).then(() => act(Promise.resolve()))}
+          onSetMenu={(item, set, label) => setSetMenu({ item, set, label })}
         />
       ) : (
         current && (
@@ -217,6 +252,7 @@ export function SessionPage() {
             onUncomplete={(set) => void act(call('uncompleteSet', set.id))}
             onAddSet={() => void act(call('addSet', current.weId))}
             onMore={() => setMore(current)}
+            onSetMenu={(set, label) => setSetMenu({ item: current, set, label })}
           />
         )
       )}
@@ -278,40 +314,39 @@ export function SessionPage() {
         </div>
       )}
 
-      <Sheet open={more !== null} title={more?.name ?? ''} onClose={() => setMore(null)}>
-        {more && (
-          <div className="stack">
-            {more.note && <span className="t-small">{`Note : ${more.note}`}</span>}
-            <List>
-              <ListRow
-                title="Remplacer l’exercice"
-                onClick={() => {
-                  setReplacing(more);
-                  setMore(null);
-                }}
-              />
-              <ListRow
-                title="Ajouter une série"
-                onClick={() => {
-                  void act(call('addSet', more.weId));
-                  setMore(null);
-                }}
-              />
-              {more.sets.some((s) => !s.completed) && more.sets.length > 1 && (
-                <ListRow
-                  title="Retirer une série"
-                  detail="la dernière pas encore faite"
-                  onClick={() => {
-                    const last = [...more.sets].reverse().find((s) => !s.completed);
-                    if (last) void act(call('removeSet', last.id));
-                    setMore(null);
-                  }}
-                />
-              )}
-            </List>
-          </div>
-        )}
-      </Sheet>
+      <ExerciseSheet
+        item={more}
+        onClose={() => setMore(null)}
+        onComment={async (text) => {
+          if (more) await act(call('exerciseComment', more.weId, text));
+          setMore(null);
+        }}
+        onReplace={() => {
+          setReplacing(more);
+          setMore(null);
+        }}
+        onAddSet={() => {
+          if (more) void act(call('addSet', more.weId));
+          setMore(null);
+        }}
+      />
+
+      <SetSheet
+        menu={setMenu}
+        onClose={() => setSetMenu(null)}
+        onType={async (type) => {
+          if (setMenu) await act(call('setSetType', setMenu.set.id, type));
+          setSetMenu(null);
+        }}
+        onNote={async (note) => {
+          if (setMenu) await act(call('updateSet', setMenu.set.id, { note }));
+          setSetMenu(null);
+        }}
+        onRemove={async () => {
+          if (setMenu) await act(call('removeSet', setMenu.set.id));
+          setSetMenu(null);
+        }}
+      />
 
       <ReplaceSheet
         item={replacing}
@@ -364,7 +399,7 @@ function platesOf(doc: SessionDoc, item: SessionItem, set: SessionSet | null): s
   const target = set.weight ?? set.targetWeight;
   if (target === null) return null;
   const load = barbellPlates(target, doc.barWeight, doc.plates);
-  return load.plates.length ? `Disques par côté : ${describePlates(load.plates)} · barre ${kg(doc.barWeight, false)}` : null;
+  return load.plates.length ? `Disques par côté : ${describePlates(load.plates)} · barre ${kg(doc.barWeight, false)} kg` : null;
 }
 
 // ---------------------------------------------------------------- carte d'exercice
@@ -378,6 +413,7 @@ interface CardProps {
   onUncomplete: (set: SessionSet) => void;
   onAddSet: () => void;
   onMore: () => void;
+  onSetMenu: (set: SessionSet, label: string) => void;
 }
 
 function CardHead({ item, doc, chip, onMore }: { item: SessionItem; doc: SessionDoc; chip?: string; onMore: () => void }) {
@@ -385,7 +421,7 @@ function CardHead({ item, doc, chip, onMore }: { item: SessionItem; doc: Session
   const firstWork = item.sets.find((s) => !s.completed) ?? item.sets[0];
   const rest = item.format.timer.kind === 'rest' ? (item.restSec ?? restSeconds(doc.rest, item.category, item.intention, firstWork?.setType ?? 'working')) : null;
   const facts = [item.reference !== null ? `1RM de référence ${kg(item.reference, weighted)} kg` : '', rest ? `repos ${rest % 60 ? clock(rest) : `${rest / 60} min`}` : ''].filter(Boolean).join(' · ');
-  const last = [item.lastTime ? `Dernière fois : ${item.lastTime}` : '', item.note ? `note : ${item.note}` : ''].filter(Boolean).join(' · ');
+  const last = [item.lastTime ? `Dernière fois : ${item.lastTime}` : '', item.lastComment ? `« ${item.lastComment} »` : ''].filter(Boolean).join(' · ');
   return (
     <div className="pf-card-head">
       <div className="row">
@@ -399,7 +435,13 @@ function CardHead({ item, doc, chip, onMore }: { item: SessionItem; doc: Session
       </div>
       {item.replaces && <span className="t-small muted">{`à la place de ${item.replaces}`}</span>}
       {facts && <span className="t-small muted">{facts}</span>}
-      {last && <span className="t-small muted">{last.replace(/^note/, 'Note')}</span>}
+      {last && <span className="t-small muted">{last}</span>}
+      {item.note && <span className="t-small muted">{`Consigne : ${item.note}`}</span>}
+      {item.comment && (
+        <button type="button" className="pf-comment" onClick={onMore}>
+          {`Ton commentaire : ${item.comment}`}
+        </button>
+      )}
     </div>
   );
 }
@@ -444,13 +486,16 @@ function ExerciseCard(p: CardProps) {
         <span />
       </div>
       {item.sets.map((s) => {
-        const label = s.setType === 'top_set' ? 'T' : s.setType === 'warmup' ? 'É' : String(++n);
+        const label = s.setType === 'top_set' ? 'T' : s.setType === 'warmup' ? 'É' : s.setType === 'drop' ? 'D' : String(++n);
         const percent = item.percents ? (s.setType === 'top_set' ? item.percents.top : s.setType === 'backoff' ? item.percents.backoff : null) : null;
         const isNow = s === now;
         const focus = p.editing?.setId === s.id ? p.editing.field : null;
         return (
-          <div key={s.id} className={`pf-cols pf-set${s.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
-            <span className="pf-idx">{s.setType === 'top_set' || s.setType === 'warmup' ? <span className="pf-tag">{label}</span> : label}</span>
+          <div key={s.id} data-set={s.id} className={`pf-setwrap${s.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
+          <div className="pf-cols pf-set">
+            <button type="button" className="pf-idx" aria-label={`Série ${label} : type, commentaire, retirer`} onClick={() => p.onSetMenu(s, label)}>
+              {s.setType === 'top_set' || s.setType === 'warmup' || s.setType === 'drop' ? <span className="pf-tag">{label}</span> : label}
+            </button>
             <span className="pf-pc">{percent !== null ? pct(percent) : ''}</span>
             <button type="button" className={`pf-cell${focus === 'weight' ? ' is-focus' : ''}`} aria-label={`Charge${weighted ? ' (lest)' : ''}, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'weight' })}>
               {s.weight !== null ? kg(s.weight, weighted) : <span className="pf-ph">{kg(s.targetWeight, weighted)}</span>}
@@ -467,6 +512,8 @@ function ExerciseCard(p: CardProps) {
               {(s.completed || isNow) && <Icon name="check" size={isNow ? 22 : 18} strong />}
             </button>
           </div>
+          <SetExtra set={s} />
+          </div>
         );
       })}
       <div className="row pf-card-foot">
@@ -480,7 +527,7 @@ function ExerciseCard(p: CardProps) {
 }
 
 /** Superset ou circuit : une seule carte, les séries tour par tour (A1, A2…), repos à la fin du tour. */
-function GroupCard({ doc, items, editing, onEdit, onComplete, onUncomplete, onMore }: { doc: SessionDoc; items: SessionItem[]; editing: Editing | null; onEdit: (e: Editing) => void; onComplete: (item: SessionItem, set: SessionSet, patch?: SetPatch) => void; onUncomplete: (set: SessionSet) => void; onMore: () => void }) {
+function GroupCard({ doc, items, editing, onEdit, onComplete, onUncomplete, onMore, onAddRound, onSetMenu }: { doc: SessionDoc; items: SessionItem[]; editing: Editing | null; onEdit: (e: Editing) => void; onComplete: (item: SessionItem, set: SessionSet, patch?: SetPatch) => void; onUncomplete: (set: SessionSet) => void; onMore: () => void; onAddRound: () => void; onSetMenu: (item: SessionItem, set: SessionSet, label: string) => void }) {
   const rows = rounds(items);
   const now = rows.find((r) => !r.set.completed) ?? null;
   const total = Math.max(0, ...items.map((i) => i.sets.length));
@@ -508,8 +555,11 @@ function GroupCard({ doc, items, editing, onEdit, onComplete, onUncomplete, onMo
         const focus = editing?.setId === r.set.id ? editing.field : null;
         const load = r.item.format.metrics.includes('load');
         return (
-          <div key={r.set.id} className={`pf-gcols${anyLoad ? '' : ' is-noload'} pf-set${r.set.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
-            <span className="pf-tag">{r.tag}</span>
+          <div key={r.set.id} data-set={r.set.id} className={`pf-setwrap${r.set.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
+          <div className={`pf-gcols${anyLoad ? '' : ' is-noload'} pf-set`}>
+            <button type="button" className="pf-idx" aria-label={`${r.item.name}, tour ${r.round + 1} : type, commentaire, retirer`} onClick={() => onSetMenu(r.item, r.set, `${r.tag} · tour ${r.round + 1}`)}>
+              <span className="pf-tag">{r.tag}</span>
+            </button>
             <span className="t-small pf-nowrap">{isNow ? <b>{r.item.name}</b> : r.item.name}</span>
             {!anyLoad ? null : load ? (
               <button type="button" className={`pf-cell${focus === 'weight' ? ' is-focus' : ''}`} aria-label={`Charge, ${r.item.name}, tour ${r.round + 1}`} onClick={() => onEdit({ setId: r.set.id, field: 'weight' })}>
@@ -530,9 +580,16 @@ function GroupCard({ doc, items, editing, onEdit, onComplete, onUncomplete, onMo
               {(r.set.completed || isNow) && <Icon name="check" size={isNow ? 22 : 18} strong />}
             </button>
           </div>
+          <SetExtra set={r.set} />
+          </div>
         );
       })}
-      <span className="t-small muted pf-card-foot">{`Repos ${clock(rest)} à la fin du tour`}</span>
+      <div className="row pf-card-foot">
+        <span className="grow t-small muted">{`Repos ${clock(rest)} à la fin du tour`}</span>
+        <button type="button" className="pf-link" onClick={onAddRound}>
+          + Tour
+        </button>
+      </div>
     </div>
   );
 }
@@ -702,8 +759,8 @@ function RestBanner() {
         <Button onClick={() => adjustRest(30)}>+30</Button>
         <Button onClick={skipRest}>Passer</Button>
       </div>
-      <div className="progress">
-        <span style={{ width: `${Math.round(((rest.total - left) / rest.total) * 100)}%`, background: 'var(--tone-grad)' }} />
+      <div className="progress" role="progressbar" aria-label="Repos restant" aria-valuemin={0} aria-valuemax={rest.total} aria-valuenow={left}>
+        <span className="pf-restbar" style={{ width: `${Math.max(0, Math.min(100, ((rest.endAt - Date.now()) / (rest.total * 1000)) * 100))}%` }} />
       </div>
     </Glass>
   );
@@ -862,7 +919,7 @@ function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComple
             );
           if (k === 'ok')
             return (
-              <button key={k} type="button" className="btn btn-action pf-key" aria-label={field === 'bw' ? 'Enregistrer le poids du corps' : 'Valider la série'} onClick={validate}>
+              <button key={k} type="button" className="btn btn-action pf-key" aria-label={field === 'bw' ? 'Enregistrer le poids du corps' : set.completed ? 'Enregistrer la correction' : 'Valider la série'} onClick={validate}>
                 <Icon name="check" size={24} strong />
               </button>
             );
@@ -874,6 +931,93 @@ function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComple
         })}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- série et exercice : type, commentaires
+
+const TYPES: readonly { id: SessionSet['setType']; label: string }[] = [
+  { id: 'warmup', label: 'Échauffement' },
+  { id: 'top_set', label: 'Top set' },
+  { id: 'backoff', label: 'Backoff' },
+  { id: 'working', label: 'Série' },
+  { id: 'drop', label: 'Drop set' },
+];
+
+/** Sous une série : sa vitesse et ton commentaire, s'il y en a. */
+function SetExtra({ set }: { set: SessionSet }) {
+  const bits = [set.speed !== null ? `vitesse ${set.speed}` : '', set.note ? `« ${set.note} »` : ''].filter(Boolean);
+  return bits.length ? <div className="pf-setextra">{bits.join(' · ')}</div> : null;
+}
+
+/** Une série : sa catégorie, ton commentaire, la retirer (même faite : une erreur de saisie se corrige). */
+function SetSheet({ menu, onClose, onType, onNote, onRemove }: { menu: { item: SessionItem; set: SessionSet; label: string } | null; onClose: () => void; onType: (t: SessionSet['setType']) => Promise<void>; onNote: (note: string) => Promise<void>; onRemove: () => Promise<void> }) {
+  const [note, setNote] = useState('');
+  useEffect(() => setNote(menu?.set.note ?? ''), [menu]);
+  const title = menu ? `${/^\d/.test(menu.label) ? `Série ${menu.label}` : menu.label} · ${menu.item.name}` : '';
+  return (
+    <Sheet open={menu !== null} title={title} onClose={onClose}>
+      {menu && (
+        <div className="stack" style={{ gap: 16 }}>
+          {menu.item.format.scheme === 'sets' && (
+            <div className="stack" style={{ gap: 8 }}>
+              <span className="pf-sec" style={{ margin: 0, padding: 0 }}>
+                Type de série
+              </span>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                {TYPES.map((t) => (
+                  <button key={t.id} type="button" className={`pf-chip${menu.set.setType === t.id ? '' : ' is-neutral'}`} aria-pressed={menu.set.setType === t.id} onClick={() => void onType(t.id)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="stack" style={{ gap: 8 }}>
+            <label className="pf-sec" htmlFor="pf-set-note" style={{ margin: 0, padding: 0 }}>
+              Commentaire
+            </label>
+            <textarea id="pf-set-note" className="input pf-note" rows={2} maxLength={2000} placeholder="Sensations, technique, douleur…" value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button variant="action" block disabled={note.trim() === menu.set.note.trim()} onClick={() => void onNote(note)}>
+              Enregistrer le commentaire
+            </Button>
+          </div>
+          <Button variant="danger" block onClick={() => void onRemove()}>
+            Retirer cette série
+          </Button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+/** « ··· » d'un exercice : ton commentaire du jour, remplacer, ajouter une série. */
+function ExerciseSheet({ item, onClose, onComment, onReplace, onAddSet }: { item: SessionItem | null; onClose: () => void; onComment: (text: string) => Promise<void>; onReplace: () => void; onAddSet: () => void }) {
+  const [text, setText] = useState('');
+  useEffect(() => setText(item?.comment ?? ''), [item]);
+  return (
+    <Sheet open={item !== null} title={item?.name ?? ''} onClose={onClose}>
+      {item && (
+        <div className="stack" style={{ gap: 16 }}>
+          {item.note && <span className="t-small muted">{`Consigne : ${item.note}`}</span>}
+          {item.lastComment && <span className="t-small muted">{`La dernière fois : « ${item.lastComment} »`}</span>}
+          <div className="stack" style={{ gap: 8 }}>
+            <label className="pf-sec" htmlFor="pf-ex-note" style={{ margin: 0, padding: 0 }}>
+              Ton commentaire sur l’exercice
+            </label>
+            <textarea id="pf-ex-note" className="input pf-note" rows={3} maxLength={2000} placeholder="Ressenti, réglages, à retenir pour la prochaine fois" value={text} onChange={(e) => setText(e.target.value)} />
+            <Button variant="action" block disabled={text.trim() === item.comment.trim()} onClick={() => void onComment(text)}>
+              Enregistrer le commentaire
+            </Button>
+          </div>
+          <List>
+            <ListRow title="Remplacer l’exercice" onClick={onReplace} />
+            <ListRow title="Ajouter une série" onClick={onAddSet} />
+          </List>
+          <span className="t-small muted">Pour changer le type d’une série, la commenter ou la retirer : touche son numéro.</span>
+        </div>
+      )}
+    </Sheet>
   );
 }
 

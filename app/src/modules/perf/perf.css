@@ -17,10 +17,17 @@
 .pf-colhead { padding: 0 14px 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
 .pf-colhead span:nth-child(3), .pf-colhead span:nth-child(4) { text-align: center; }
 .pf-set { min-height: 56px; padding: 0 14px; }
-.pf-set.is-done { opacity: 0.4; }
-.pf-set.is-now { background: color-mix(in srgb, var(--tone-solid) 10%, transparent); margin: 2px 8px; padding: 6px 8px; border-radius: 18px; min-height: 68px; }
-.pf-idx { font-size: 14px; font-weight: 700; }
+.pf-setwrap { border-radius: 18px; }
+/* Série faite : estompée, sauf sa coche (on voit d'un coup d'œil ce qui est fait). */
+.pf-setwrap.is-done .pf-set > :not(.pf-ck), .pf-setwrap.is-done .pf-setextra { opacity: 0.42; }
+.pf-setwrap.is-now { background: color-mix(in srgb, var(--tone-solid) 10%, transparent); margin: 2px 8px; }
+.pf-setwrap.is-now .pf-set { padding: 6px 8px; min-height: 68px; }
+.pf-setwrap.is-now .pf-setextra { padding-left: 8px; }
+.pf-idx { font-size: 14px; font-weight: 700; color: var(--ink); background: none; border: 0; padding: 0; min-height: 40px; width: 100%; display: flex; align-items: center; justify-content: flex-start; cursor: pointer; text-decoration: underline dotted color-mix(in srgb, var(--ink-2) 60%, transparent); text-underline-offset: 4px; }
 .is-now .pf-idx { color: var(--tone); }
+.pf-setextra { padding: 0 14px 8px 56px; margin-top: -4px; font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.pf-comment { background: none; border: 0; padding: 0; text-align: left; font-size: 13px; line-height: 18px; color: var(--tone); }
+.pf-note { width: 100%; resize: vertical; min-height: 64px; font: inherit; }
 .pf-tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 7px; padding: 2px 6px; color: var(--tone); background: color-mix(in srgb, var(--tone-solid) 18%, transparent); }
 .pf-pc { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
 .pf-cell { height: 46px; border-radius: var(--r-control); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--ink); background: var(--field); border: 1px solid var(--field-border); box-shadow: var(--field-inset); padding: 0; width: 100%; }
@@ -28,8 +35,9 @@
 .pf-cell.is-focus { border-color: var(--tone-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone-solid) 30%, transparent); }
 .pf-ph { color: var(--placeholder); }
 .pf-ck { width: 52px; height: 48px; border-radius: 15px; display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--tile-border); color: var(--ink-2); padding: 0; }
-.pf-ck.is-done { color: var(--ok); border-color: var(--ok-border); background: var(--ok-bg); }
-.pf-ck.is-go { color: #fff; background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 10px 22px -8px var(--glow); height: 52px; }
+/* Valider : le bouton d'action du kit (bleu-violet), plein pour la série en cours, plus discret une fois fait. */
+.pf-ck.is-done { color: #fff; background: var(--action); border-color: var(--action-border); opacity: 0.72; }
+.pf-ck.is-go { color: #fff; background: var(--action); border-color: var(--action-border); box-shadow: var(--action-shadow); height: 52px; }
 .pf-fold { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; padding: 0; color: var(--ink-2); font-size: 13px; text-align: left; }
 /* En bas, à portée de pouce : le repos en bandeau, puis Remplacer et Valider. La séance est plein écran (pas de barre). */
 .pf-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; display: flex; flex-direction: column; gap: 8px; max-width: 584px; margin: 0 auto; padding: 28px 12px max(12px, calc(var(--safe-bottom) + 4px)); background: linear-gradient(to bottom, transparent, var(--bg) 34px); }
@@ -60,7 +68,7 @@
  */
 .pf-screen { position: relative; }
 .pf-amb { position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(95% 38% at 25% 0%, var(--tint), transparent 70%), radial-gradient(90% 45% at 85% 100%, color-mix(in srgb, var(--focus) 34%, transparent), transparent 72%), radial-gradient(60% 30% at 100% 45%, var(--tint-2), transparent 70%), var(--bg); }
-.pf-screen .btn-action, .pf-go { color: #fff; background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 12px 26px -10px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
+.pf-screen:not(.pf-session) .btn-action, .pf-go { color: #fff; background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 12px 26px -10px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.5); }
 .tabbar.tone-perf .tab-plus { background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.4); box-shadow: 0 0 24px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.6); }
 .pf-kick { font-size: 12.5px; color: var(--ink-2); }
 .pf-sec { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 0 4px; margin-bottom: -8px; }
@@ -82,3 +90,7 @@ button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: point
 .pf-dot.is-done { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-border); }
 .pf-dot.is-sortie { border-color: color-mix(in srgb, var(--focus) 70%, transparent); background: color-mix(in srgb, var(--focus) 22%, transparent); }
 .pf-dot.is-off { background: transparent; border-color: transparent; color: var(--ink-2); }
+/* Le repos restant : la barre se vide en même temps que le chrono descend, sans à-coups. */
+.pf-restbar { background: var(--tone-grad) !important; transition: width 0.25s linear; }
+/* Dans la séance, « fait » prend la couleur d'action du kit (bleu-violet), comme les coches : pas de vert. */
+.pf-session .pf-dot.is-done, .pf-session .pf-chip.is-ok { color: #fff; background: var(--action); border-color: var(--action-border); }

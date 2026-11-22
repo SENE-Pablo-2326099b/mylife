@@ -230,7 +230,7 @@ describe('MyLife, une seule app', () => {
     // Plein écran : la barre du module s'efface pendant la séance.
     expect(await page.locator('nav.tabbar').count()).toBe(0);
     // La série en cours seule en évidence ; le clavier s'ouvre en touchant sa case de charge.
-    const now = page.locator('.pf-set.is-now');
+    const now = page.locator('.pf-setwrap.is-now');
     await now.getByRole('button', { name: /^Charge/ }).click();
     const keypad = page.getByRole('dialog', { name: 'Saisie de la série' });
     const keys = keypad.locator('.pf-keys');
@@ -254,10 +254,20 @@ describe('MyLife, une seule app', () => {
     await sheet.getByRole('button', { name: 'Remplacer', exact: true }).click();
     await page.getByText(/^à la place de /).waitFor();
     expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Une série : son commentaire (affiché sous elle), puis on en retire une (touche son numéro).
+    await page.locator('.pf-setwrap.is-now .pf-idx').click();
+    const setSheet = page.getByRole('dialog', { name: /^Série / });
+    await setSheet.getByLabel('Commentaire').fill('genou ok');
+    await setSheet.getByRole('button', { name: 'Enregistrer le commentaire' }).click();
+    await page.locator('.pf-setextra', { hasText: '« genou ok »' }).waitFor();
+    const before = await page.locator('.card-module .pf-setwrap').count();
+    await page.locator('.card-module .pf-setwrap').last().locator('.pf-idx').click();
+    await page.getByRole('dialog', { name: /^Série / }).getByRole('button', { name: 'Retirer cette série' }).click();
+    await expect.poll(() => page.locator('.card-module .pf-setwrap').count()).toBe(before - 1);
     // Hors ligne (salle en sous-sol) : une série se valide, la page se recharge, la séance est là.
     await page.context().setOffline(true);
     try {
-      await page.locator('.pf-set.is-now').getByRole('button', { name: /^Charge/ }).click();
+      await page.locator('.pf-setwrap.is-now').getByRole('button', { name: /^Charge/ }).click();
       const k = page.getByRole('dialog', { name: 'Saisie de la série' }).locator('.pf-keys');
       for (const key of ['2', '0']) await k.getByRole('button', { name: key, exact: true }).click();
       await k.getByRole('button', { name: 'Valider la série' }).click();
