@@ -122,6 +122,8 @@ describe('MyLife, une seule app', () => {
     await expect
       .poll(() => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).map((r) => new URL(r.scope).pathname).sort()), { timeout: 20_000, interval: 500 })
       .toEqual(['/', '/perf/', '/raveloc/']);
+    // Il n'a vidé que ses propres caches : celui de la coquille (hors ligne) est intact.
+    expect(await page.evaluate(async () => (await caches.keys()).some((k) => k.endsWith(`${location.origin}/`)))).toBe(true);
   });
 
   it('MyRave : déjà connecté (même session), même interface', async () => {
@@ -208,6 +210,66 @@ describe('MyLife, une seule app', () => {
     } finally {
       await page.unroute('**/api/**');
     }
+  });
+
+  it('MyPerf refait (/sport, P2) : une vraie séance — saisie au clavier, repos, rechargée en plein milieu, remplacer, terminer, synchronisée', async () => {
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
+    // Démarrer « Full body A » : prévue aujourd'hui (bouton direct) ou parmi les autres séances.
+    const direct = page.getByRole('button', { name: 'Démarrer Full body A' });
+    await direct.or(page.getByRole('button', { name: 'Séance libre' })).first().waitFor({ timeout: 20_000 });
+    if (await direct.isVisible()) await direct.click();
+    else {
+      if (await page.getByRole('button', { name: 'Autre séance' }).isVisible()) await page.getByRole('button', { name: 'Autre séance' }).click();
+      await page.locator('.list-row', { hasText: 'Full body A' }).click();
+    }
+    await page.waitForURL(/\/sport\/seance$/);
+    await page.getByText('Full body A', { exact: true }).waitFor();
+    // La série en cours seule en évidence ; le clavier s'ouvre en touchant sa case de charge.
+    const now = page.locator('.pf-set.is-now');
+    await now.getByRole('button', { name: /^Charge/ }).click();
+    const keypad = page.getByRole('dialog', { name: 'Saisie de la série' });
+    const keys = keypad.locator('.pf-keys');
+    for (const k of ['4', '0']) await keys.getByRole('button', { name: k, exact: true }).click();
+    await keys.getByRole('button', { name: 'Reps →' }).click();
+    await keys.getByRole('button', { name: '8', exact: true }).click();
+    await keypad.getByRole('button', { name: 'Valider la série' }).click();
+    await keypad.waitFor({ state: 'detached' });
+    // Le repos démarre, en bandeau : la séance reste lisible.
+    await page.getByText(/^Repos · /).waitFor();
+    await page.getByText(/^1 \/ \d+ séries$/).waitFor();
+    await shot(page, '07e-sport-seance-repos');
+    await page.getByRole('button', { name: 'Passer' }).click();
+    // Rechargée en plein milieu : rien n'est perdu (chaque série est écrite avant que l'écran avance).
+    await page.reload();
+    await page.getByText(/^1 \/ \d+ séries$/).waitFor({ timeout: 20_000 });
+    // Remplacer, pour aujourd'hui seulement.
+    await page.getByRole('button', { name: 'Remplacer', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: /^Remplacer / });
+    await sheet.locator('.pf-pick').first().click();
+    await sheet.getByRole('button', { name: 'Remplacer', exact: true }).click();
+    await page.getByText(/^à la place de /).waitFor();
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Hors ligne (salle en sous-sol) : une série se valide, la page se recharge, la séance est là.
+    await page.context().setOffline(true);
+    try {
+      await page.locator('.pf-set.is-now').getByRole('button', { name: /^Charge/ }).click();
+      const k = page.getByRole('dialog', { name: 'Saisie de la série' }).locator('.pf-keys');
+      for (const key of ['2', '0']) await k.getByRole('button', { name: key, exact: true }).click();
+      await k.getByRole('button', { name: 'Valider la série' }).click();
+      await page.getByText(/^2 \/ \d+ séries$/).waitFor();
+      await page.reload();
+      await page.getByText(/^2 \/ \d+ séries$/).waitFor({ timeout: 20_000 });
+    } finally {
+      await page.context().setOffline(false);
+    }
+    // Terminer : la séance part au compte tout de suite.
+    await page.getByRole('button', { name: 'Terminer', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Terminer la séance' }).getByRole('button', { name: 'Terminer', exact: true }).click();
+    await page.waitForURL(/\/sport$/);
+    await page.getByText('Tes séances, retrouvées').waitFor();
+    await expect.poll(() => page.locator('.display').first().textContent(), { timeout: 20_000 }).toBe('1');
+    await expect.poll(() => page.locator('.list-row', { hasText: 'Synchro' }).textContent(), { timeout: 30_000, interval: 500 }).toMatch(/à jour$/);
   });
 
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {

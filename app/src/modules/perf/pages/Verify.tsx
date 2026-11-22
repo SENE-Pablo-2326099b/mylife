@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Glass, IconButton, List, ListRow, Notice, SectionTitle } from '@mylife/kit';
 import type { Overview } from '../data/queries';
 import type { StorageInfo } from '../data/backend';
@@ -23,6 +24,13 @@ export function VerifyPage() {
   const [error, setError] = useState<string | null>(null);
   // Rien d'un autre compte n'est lu : ses données partent avant la première lecture.
   const [clean, setClean] = useState(false);
+  const navigate = useNavigate();
+  const [start, setStart] = useState<{ today: { id: string; name: string }[]; others: { id: string; name: string }[]; active: string | null } | null>(null);
+  const [more, setMore] = useState(false);
+  const begin = async (templateId: string | null) => {
+    await call('startSession', templateId, today());
+    navigate('/sport/seance');
+  };
 
   useEffect(() => {
     dropForeign().then(
@@ -35,7 +43,9 @@ export function VerifyPage() {
   }, []);
   // Relu après chaque synchro.
   useEffect(() => {
-    if (clean) call('overview', today()).then(setO, (e: Error) => setError(e.message));
+    if (!clean) return;
+    call('overview', today()).then(setO, (e: Error) => setError(e.message));
+    call('startOptions', today()).then(setStart, (e: Error) => setError(e.message));
   }, [clean, cloud.lastSyncAt, cloud.synced]);
 
   return (
@@ -60,6 +70,45 @@ export function VerifyPage() {
           <Button block onClick={() => void resolveChoice('useDevice')}>
             Garder ceux de cet appareil
           </Button>
+        </Glass>
+      )}
+
+      {start && (
+        <Glass className="pad stack" style={{ gap: 10 }}>
+          {start.active ? (
+            <>
+              <span className="t-small muted">Séance en cours</span>
+              <Button variant="action" block href="/sport/seance">
+                Reprendre la séance
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="t-small muted">{start.today.length ? 'Prévu aujourd’hui' : 'Démarrer une séance'}</span>
+              {start.today.map((t) => (
+                <Button key={t.id} variant="action" block onClick={() => void begin(t.id)}>
+                  {`Démarrer ${t.name}`}
+                </Button>
+              ))}
+              <div className="row" style={{ gap: 8 }}>
+                {start.others.length > 0 && (
+                  <Button block onClick={() => setMore(!more)}>
+                    Autre séance
+                  </Button>
+                )}
+                <Button block onClick={() => void begin(null)}>
+                  Séance libre
+                </Button>
+              </div>
+              {(more || !start.today.length) && start.others.length > 0 && (
+                <List>
+                  {start.others.map((t) => (
+                    <ListRow key={t.id} title={t.name} onClick={() => void begin(t.id)} />
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </Glass>
       )}
 
