@@ -61,7 +61,13 @@ export interface ModuleManifest {
    * ses onglets (quatre au plus, le « + » se glisse au milieu) et `add` ce qu'ouvre le « + » quand on y est. Le « + »
    * suit l'écran : un onglet peut donner sa propre saisie (`tabs[].add`), sinon c'est celle du module.
    */
-  nav?: { base: string; add: ModuleAdd; tabs: readonly { to: string; label: string; icon: IconName; end?: boolean; add?: ModuleAdd }[] };
+  nav?: {
+    base: string;
+    add: ModuleAdd;
+    tabs: readonly { to: string; label: string; icon: IconName; end?: boolean; add?: ModuleAdd }[];
+    /** Écrans plein écran (une séance en cours) : la barre du bas s'efface, l'écran a sa propre sortie. */
+    focus?: readonly string[];
+  };
   /** Lu sur l'appareil, à chaque affichage. */
   todos?: () => TodoItem[];
 }

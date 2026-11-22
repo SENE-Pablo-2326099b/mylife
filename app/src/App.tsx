@@ -158,6 +158,8 @@ function Sidebar({ onAdd }: { onAdd: () => void }) {
 
 function TabBar({ onAdd }: { onAdd: () => void }) {
   const { module, add } = useActiveModule();
+  const { pathname } = useLocation();
+  if (module?.nav?.focus?.includes(pathname)) return null;
   // Dans un module : ses onglets, et son « + » ouvre la saisie de l'écran où l'on est. On en sort par le retour de l'en-tête.
   if (module?.nav && add)
     return (

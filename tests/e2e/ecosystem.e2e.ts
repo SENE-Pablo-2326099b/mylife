@@ -226,7 +226,9 @@ describe('MyLife, une seule app', () => {
       await page.getByRole('dialog', { name: 'Une autre séance' }).locator('.list-row', { hasText: 'Full body A' }).click();
     }
     await page.waitForURL(/\/sport\/seance$/);
-    await page.getByText('Full body A', { exact: true }).waitFor();
+    await page.locator('.pf-kick', { hasText: /^Full body A/ }).waitFor();
+    // Plein écran : la barre du module s'efface pendant la séance.
+    expect(await page.locator('nav.tabbar').count()).toBe(0);
     // La série en cours seule en évidence ; le clavier s'ouvre en touchant sa case de charge.
     const now = page.locator('.pf-set.is-now');
     await now.getByRole('button', { name: /^Charge/ }).click();
@@ -238,13 +240,13 @@ describe('MyLife, une seule app', () => {
     await keypad.getByRole('button', { name: 'Valider la série' }).click();
     await keypad.waitFor({ state: 'detached' });
     // Le repos démarre, en bandeau : la séance reste lisible.
-    await page.getByText(/^Repos · /).waitFor();
-    await page.getByText(/^1 \/ \d+ séries$/).waitFor();
+    await page.getByText(/^Repos avant /).waitFor();
+    await page.getByText(/1 série sur \d+/).waitFor();
     await shot(page, '07e-sport-seance-repos');
     await page.getByRole('button', { name: 'Passer' }).click();
     // Rechargée en plein milieu : rien n'est perdu (chaque série est écrite avant que l'écran avance).
     await page.reload();
-    await page.getByText(/^1 \/ \d+ séries$/).waitFor({ timeout: 20_000 });
+    await page.getByText(/1 série sur \d+/).waitFor({ timeout: 20_000 });
     // Remplacer, pour aujourd'hui seulement.
     await page.getByRole('button', { name: 'Remplacer', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: /^Remplacer / });
@@ -259,9 +261,9 @@ describe('MyLife, une seule app', () => {
       const k = page.getByRole('dialog', { name: 'Saisie de la série' }).locator('.pf-keys');
       for (const key of ['2', '0']) await k.getByRole('button', { name: key, exact: true }).click();
       await k.getByRole('button', { name: 'Valider la série' }).click();
-      await page.getByText(/^2 \/ \d+ séries$/).waitFor();
+      await page.getByText(/2 séries sur \d+/).waitFor();
       await page.reload();
-      await page.getByText(/^2 \/ \d+ séries$/).waitFor({ timeout: 20_000 });
+      await page.getByText(/2 séries sur \d+/).waitFor({ timeout: 20_000 });
     } finally {
       await page.context().setOffline(false);
     }

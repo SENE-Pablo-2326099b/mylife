@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
+import { Button, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
 import { barbellPlates, describePlates, restSeconds } from '@mylife/training';
 import { call } from '../data/client';
 import { syncCloud, syncSoon } from '../data/cloud';
@@ -12,19 +12,47 @@ import { adjustRest, signal, skipRest, startRest, useClock, useRest, useWakeLock
 import '../perf.css';
 
 /**
- * La séance en salle (étape P2). Une seule chose domine : la série en cours. Le repos reste en bandeau, la séance
- * toujours lisible ; le clavier ne s'ouvre qu'en touchant une case. Chaque série est écrite dans la base avant que
- * l'écran avance ; fermer l'app en plein milieu ne perd rien (la séance se relit depuis la base).
+ * La séance en salle (maquettes V3-Seance, V3-Clavier, V3-Formats, V3-Remplacer, validées le 22/11). Une seule chose
+ * domine : l'exercice en cours, la série en cours teintée. En bas, toujours à portée de pouce : le repos en bandeau,
+ * « Remplacer » et « Valider 115 × 5 ». Le clavier ne s'ouvre qu'en touchant une case. Chaque série est écrite dans la
+ * base avant que l'écran avance ; fermer l'app en plein milieu ne perd rien (la séance se relit depuis la base).
  */
 const kg = (v: number | null, weighted: boolean) => (v === null ? '—' : `${weighted && v > 0 ? '+' : ''}${v.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}`);
 const pct = (v: number) => `${Math.round(v * 1000) / 10} %`.replace('.', ',');
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.max(0, s % 60)).padStart(2, '0')}`;
+const elapsedClock = (ms: number) => {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  return h ? `${h}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : clock(s);
+};
 const isDone = (i: SessionItem) => i.sets.length > 0 && i.sets.every((s) => s.completed);
+const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 type Field = 'weight' | 'reps' | 'bw';
 interface Editing {
   setId: string;
   field: Field;
+}
+
+/** L'heure qui avance, à la seconde (le chrono de la séance). */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+/** Les exercices d'un même superset ou circuit, et leurs séries tour par tour (A1, A2, A1, A2…). */
+function groupOf(doc: SessionDoc, item: SessionItem): SessionItem[] {
+  return item.group ? doc.items.filter((i) => i.group?.id === item.group!.id) : [item];
+}
+function rounds(items: readonly SessionItem[]): { item: SessionItem; set: SessionSet; tag: string; round: number }[] {
+  const max = Math.max(0, ...items.map((i) => i.sets.length));
+  const out: { item: SessionItem; set: SessionSet; tag: string; round: number }[] = [];
+  for (let r = 0; r < max; r++) items.forEach((item, k) => item.sets[r] && out.push({ item, set: item.sets[r]!, tag: `A${k + 1}`, round: r }));
+  return out;
 }
 
 export function SessionPage() {
@@ -35,8 +63,10 @@ export function SessionPage() {
   const [open, setOpen] = useState<string | null>(null);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [replacing, setReplacing] = useState<SessionItem | null>(null);
+  const [more, setMore] = useState<SessionItem | null>(null);
   const [ending, setEnding] = useState(false);
   const awake = useWakeLock(doc?.status === 'active');
+  const now = useNow();
 
   const reload = useCallback(async (sid: string) => {
     const next = await call('sessionDoc', sid);
@@ -79,18 +109,32 @@ export function SessionPage() {
   const all = doc.items.flatMap((i) => i.sets);
   const doneSets = all.filter((s) => s.completed);
   const tonnage = doc.items.reduce((t, i) => t + i.sets.reduce((u, s) => u + (s.completed && s.weight !== null && s.reps !== null ? (s.weight + (i.loadType === 'bodyweight' ? (doc.bodyweight ?? 0) : 0)) * s.reps : 0), 0), 0);
-  const minutes = Math.floor((Date.now() - doc.startedAt) / 60_000);
+  const group = current ? groupOf(doc, current) : [];
+  const others = doc.items.filter((i) => !group.includes(i));
 
-  /** Après une série validée : le repos de la catégorie (ou du créneau), sauf au milieu d'un superset. */
+  /** Après une série validée : le repos de la catégorie (ou du créneau), sauf au milieu d'un tour de superset. */
   const afterComplete = (item: SessionItem, set: SessionSet) => {
     if (item.format.timer.kind !== 'rest') return;
-    const index = doc.items.indexOf(item);
-    const nextInGroup = item.group && doc.items[index + 1]?.group?.id === item.group.id;
-    if (nextInGroup) return;
-    const nextSet = item.sets.find((s) => !s.completed && s.id !== set.id);
-    const nextItem = doc.items.slice(index + 1).find((i) => !isDone(i));
+    const members = groupOf(doc, item);
+    if (item.group && members.indexOf(item) < members.length - 1) return;
+    const order = item.group ? rounds(members) : item.sets.map((s) => ({ item, set: s, tag: '', round: 0 }));
+    const nextRow = order.find((r) => !r.set.completed && r.set.id !== set.id);
+    const nextItem = doc.items.slice(doc.items.indexOf(item) + 1).find((i) => !isDone(i) && !members.includes(i));
     const seconds = item.restSec ?? restSeconds(doc.rest, item.category, item.intention, set.setType);
-    startRest(seconds, nextSet ? `série ${item.sets.indexOf(nextSet) + 1}` : (nextItem?.name ?? 'fin de séance'));
+    const numbered = item.sets.filter((s) => s.setType !== 'warmup' && s.setType !== 'top_set');
+    const k = nextRow ? numbered.indexOf(nextRow.set) : -1;
+    const label = nextRow
+      ? item.group
+        ? `le tour ${nextRow.round + 1}`
+        : k >= 0
+          ? `la série ${k + 1}`
+          : nextRow.set.setType === 'top_set'
+            ? 'le top set'
+            : 'la série suivante'
+      : nextItem
+        ? nextItem.name
+        : 'la fin de séance';
+    startRest(seconds, label);
   };
 
   const complete = async (item: SessionItem, set: SessionSet, patch: SetPatch = {}) => {
@@ -113,64 +157,84 @@ export function SessionPage() {
   const editItem = editing ? doc.items.find((i) => i.sets.some((s) => s.id === editing.setId)) : null;
   const editSet = editItem?.sets.find((s) => s.id === editing?.setId) ?? null;
 
+  // La prochaine série à valider d'un toucher (exercices en séries seulement ; un tour de superset dans l'ordre).
+  const setsScheme = current?.format.scheme === 'sets';
+  const nextRow = current && setsScheme ? (current.group ? rounds(group) : current.sets.map((set) => ({ item: current, set, tag: '', round: 0 }))).find((r) => !r.set.completed) : undefined;
+  const validateLabel = nextRow
+    ? (() => {
+        const w = nextRow.set.weight ?? nextRow.set.targetWeight;
+        const reps = nextRow.set.reps ?? nextRow.set.targetReps;
+        if (w === null && nextRow.item.format.metrics.includes('load')) return 'Valider la série';
+        return `Valider ${w !== null ? `${kg(w, nextRow.item.loadType === 'bodyweight')} × ` : ''}${reps ?? '?'}`;
+      })()
+    : null;
+  const allDone = doc.items.length > 0 && doc.items.every(isDone);
+  const blockLabel = doc.block ? ` · ${doc.block.name} S${doc.block.week}${doc.block.deload ? ' · décharge' : ''}` : '';
+
   return (
-    <div className="pf-screen tone-perf">
+    <div className="pf-screen tone-perf pf-session">
+      <div className="pf-amb" aria-hidden="true" />
       <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="pf-head">
           <IconButton icon="back" label="Réduire la séance" href="/sport" />
           <div className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            {doc.block && <span className="module-label">{`${doc.block.name} · S${doc.block.week}${doc.block.deload ? ' · décharge' : ''}`}</span>}
-            <span className="t-card">{doc.name}</span>
+            <span className="pf-kick pf-nowrap">{`${doc.name}${blockLabel}`}</span>
+            <span className="pf-big" style={{ fontSize: 30 }} aria-label="Durée de la séance">
+              {elapsedClock(now - doc.startedAt)}
+            </span>
           </div>
+          {awake && <span className="pf-chip">Écran allumé</span>}
           <Button onClick={() => setEnding(true)}>Terminer</Button>
         </div>
         <div className="progress">
-          <span style={{ width: `${all.length ? Math.round((doneSets.length / all.length) * 100) : 0}%` }} />
+          <span style={{ width: `${all.length ? Math.round((doneSets.length / all.length) * 100) : 0}%`, background: 'var(--tone-grad)' }} />
         </div>
-        <div className="pf-stats">
-          <span>{`${doc.items.filter(isDone).length} / ${doc.items.length} exercices`}</span>
-          <span>{`${doneSets.length} / ${all.length} séries`}</span>
-          {tonnage > 0 && <span>{`${Math.round(tonnage).toLocaleString('fr-FR')} kg`}</span>}
-          <span className="grow" style={{ textAlign: 'right' }} title={awake ? 'Écran allumé' : undefined}>{`${minutes} min`}</span>
-        </div>
+        <span className="t-small muted">
+          {[`${doc.items.filter(isDone).length} exercice${doc.items.filter(isDone).length > 1 ? 's' : ''} sur ${doc.items.length}`, `${doneSets.length} série${doneSets.length > 1 ? 's' : ''} sur ${all.length}`, tonnage > 0 ? `${Math.round(tonnage).toLocaleString('fr-FR')} kg` : ''].filter(Boolean).join(' · ')}
+        </span>
       </header>
 
-      {doc.items.filter((i) => isDone(i) && i !== current).length > 0 && (
-        <List>
-          {doc.items
-            .filter((i) => isDone(i) && i !== current)
-            .map((i) => (
-              <ListRow key={i.weId} lead={<Icon name="check" size={18} />} title={i.name} value={i.sets.length === 1 ? '1 série' : `${i.sets.length} séries`} onClick={() => setOpen(i.weId)} />
-            ))}
-        </List>
-      )}
-
-      {current && (
-        <ExerciseCard
-          key={current.weId}
+      {current && current.group && group.length > 1 ? (
+        <GroupCard
+          key={current.group.id}
           doc={doc}
-          item={current}
+          items={group}
           editing={editing}
           onEdit={setEditing}
-          onComplete={(set, patch) => void complete(current, set, patch)}
+          onComplete={(item, set, patch) => void complete(item, set, patch)}
           onUncomplete={(set) => void act(call('uncompleteSet', set.id))}
-          onAddSet={() => void act(call('addSet', current.weId))}
-          onReplace={() => setReplacing(current)}
+          onMore={() => setMore(current)}
         />
+      ) : (
+        current && (
+          <ExerciseCard
+            key={current.weId}
+            doc={doc}
+            item={current}
+            editing={editing}
+            onEdit={setEditing}
+            onComplete={(set, patch) => void complete(current, set, patch)}
+            onUncomplete={(set) => void act(call('uncompleteSet', set.id))}
+            onAddSet={() => void act(call('addSet', current.weId))}
+            onMore={() => setMore(current)}
+          />
+        )
       )}
       {doc.items.length === 0 && <Notice>Séance libre : ajoute un exercice.</Notice>}
 
-      {doc.items.filter((i) => !isDone(i) && i !== current).length > 0 && (
-        <div className="stack" style={{ gap: 8 }}>
-          <span className="t-label muted" style={{ padding: '0 4px' }}>Ensuite</span>
-          <List>
-            {doc.items
-              .filter((i) => !isDone(i) && i !== current)
-              .map((i) => (
-                <ListRow key={i.weId} title={i.name} detail={i.group ? `${i.group.kind === 'superset' ? 'superset' : 'circuit'} · ${i.group.rounds} tours` : undefined} value={summary(i)} onClick={() => setOpen(i.weId)} />
-              ))}
-          </List>
-        </div>
+      {others.length > 0 && (
+        <List>
+          {others.map((i) => (
+            <ListRow
+              key={i.weId}
+              lead={isDone(i) ? <span className="pf-chip is-ok">fait</span> : <span className="pf-chip is-neutral">à venir</span>}
+              title={<span className="t-strong">{i.name}</span>}
+              detail={i.group ? `${i.group.kind === 'superset' ? 'superset' : 'circuit'} · ${plural(i.group.rounds, 'tour')}` : undefined}
+              value={isDone(i) ? plural(i.sets.length, 'série') : summary(i)}
+              onClick={() => setOpen(i.weId)}
+            />
+          ))}
+        </List>
       )}
 
       <Button variant={doc.items.length === 0 ? 'action' : 'quiet'} onClick={() => setReplacing({ ...(doc.items[0] ?? ({} as SessionItem)), weId: '' })}>
@@ -190,8 +254,64 @@ export function SessionPage() {
           onClose={() => setEditing(null)}
         />
       ) : (
-        <RestDock />
+        <div className="pf-dock">
+          <RestBanner />
+          {(validateLabel || allDone || current) && (
+            <div className="row" style={{ gap: 8 }}>
+              {current && !allDone && <Button onClick={() => setReplacing(current)}>Remplacer</Button>}
+              <div className="grow">
+                {allDone ? (
+                  <Button variant="action" block onClick={() => setEnding(true)}>
+                    Terminer la séance
+                  </Button>
+                ) : (
+                  nextRow &&
+                  validateLabel && (
+                    <Button variant="action" block onClick={() => void complete(nextRow.item, nextRow.set)}>
+                      {validateLabel}
+                    </Button>
+                  )
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
+
+      <Sheet open={more !== null} title={more?.name ?? ''} onClose={() => setMore(null)}>
+        {more && (
+          <div className="stack">
+            {more.note && <span className="t-small">{`Note : ${more.note}`}</span>}
+            <List>
+              <ListRow
+                title="Remplacer l’exercice"
+                onClick={() => {
+                  setReplacing(more);
+                  setMore(null);
+                }}
+              />
+              <ListRow
+                title="Ajouter une série"
+                onClick={() => {
+                  void act(call('addSet', more.weId));
+                  setMore(null);
+                }}
+              />
+              {more.sets.some((s) => !s.completed) && more.sets.length > 1 && (
+                <ListRow
+                  title="Retirer une série"
+                  detail="la dernière pas encore faite"
+                  onClick={() => {
+                    const last = [...more.sets].reverse().find((s) => !s.completed);
+                    if (last) void act(call('removeSet', last.id));
+                    setMore(null);
+                  }}
+                />
+              )}
+            </List>
+          </div>
+        )}
+      </Sheet>
 
       <ReplaceSheet
         item={replacing}
@@ -231,11 +351,20 @@ function summary(i: SessionItem): string {
   const work = i.sets.filter((s) => s.setType !== 'warmup');
   if (!work.length) return '';
   if (i.format.timer.kind === 'countdown') return `${work.length} × ${i.format.timer.workSec} s`;
-  if (i.format.timer.kind === 'interval') return `${Math.round(i.format.timer.totalSec / 60)} min`;
+  if (i.format.timer.kind === 'interval') return `EMOM ${Math.round(i.format.timer.totalSec / 60)} min`;
   if (i.format.timer.kind === 'cap') return `${Math.round(i.format.timer.capSec / 60)} min`;
   const reps = work[0]!.targetReps;
   const w = work[0]!.targetWeight;
-  return `${work.length} × ${reps ?? '?'}${w !== null ? ` · ${kg(w, i.loadType === 'bodyweight')}` : ''}`;
+  return `${w !== null ? `${kg(w, i.loadType === 'bodyweight')} × ` : `${work.length} × `}${reps ?? '?'}`;
+}
+
+/** Les disques par côté de la série en cours (barre seulement). */
+function platesOf(doc: SessionDoc, item: SessionItem, set: SessionSet | null): string | null {
+  if (!set || item.equipment !== 'barbell') return null;
+  const target = set.weight ?? set.targetWeight;
+  if (target === null) return null;
+  const load = barbellPlates(target, doc.barWeight, doc.plates);
+  return load.plates.length ? `Disques par côté : ${describePlates(load.plates)} · barre ${kg(doc.barWeight, false)}` : null;
 }
 
 // ---------------------------------------------------------------- carte d'exercice
@@ -248,96 +377,168 @@ interface CardProps {
   onComplete: (set: SessionSet, patch?: SetPatch) => void;
   onUncomplete: (set: SessionSet) => void;
   onAddSet: () => void;
-  onReplace: () => void;
+  onMore: () => void;
+}
+
+function CardHead({ item, doc, chip, onMore }: { item: SessionItem; doc: SessionDoc; chip?: string; onMore: () => void }) {
+  const weighted = item.loadType === 'bodyweight';
+  const firstWork = item.sets.find((s) => !s.completed) ?? item.sets[0];
+  const rest = item.format.timer.kind === 'rest' ? (item.restSec ?? restSeconds(doc.rest, item.category, item.intention, firstWork?.setType ?? 'working')) : null;
+  const facts = [item.reference !== null ? `1RM de référence ${kg(item.reference, weighted)} kg` : '', rest ? `repos ${rest % 60 ? clock(rest) : `${rest / 60} min`}` : ''].filter(Boolean).join(' · ');
+  const last = [item.lastTime ? `Dernière fois : ${item.lastTime}` : '', item.note ? `note : ${item.note}` : ''].filter(Boolean).join(' · ');
+  return (
+    <div className="pf-card-head">
+      <div className="row">
+        <h2 className="grow pf-big" style={{ fontSize: 22, margin: 0 }}>
+          {item.name}
+        </h2>
+        {chip && <span className="pf-chip">{chip}</span>}
+        <button type="button" className="pf-more" aria-label={`Plus d’actions : ${item.name}`} onClick={onMore}>
+          ···
+        </button>
+      </div>
+      {item.replaces && <span className="t-small muted">{`à la place de ${item.replaces}`}</span>}
+      {facts && <span className="t-small muted">{facts}</span>}
+      {last && <span className="t-small muted">{last.replace(/^note/, 'Note')}</span>}
+    </div>
+  );
 }
 
 function ExerciseCard(p: CardProps) {
   const { item } = p;
-  const [note, setNote] = useState(false);
   const weighted = item.loadType === 'bodyweight';
-  const head = (
-    <div className="pf-card-head">
-      <div className="row">
-        <h2 className="panel-title grow" style={{ fontSize: 21, lineHeight: '27px' }}>
-          {item.name}
-        </h2>
-        {item.reference !== null && <Badge>{`1RM ${kg(item.reference, weighted)} kg`}</Badge>}
-        {item.group && <Badge>{item.group.kind === 'superset' ? 'superset' : 'circuit'}</Badge>}
+  const interval = item.format.timer.kind === 'interval' ? item.format.timer : null;
+  if (item.format.scheme === 'interval')
+    return (
+      <div className="card-module pf-card">
+        <CardHead item={item} doc={p.doc} chip={`${item.sets[0]?.targetReps ?? '?'} reps / min`} onMore={p.onMore} />
+        <IntervalBlock {...p} label={interval ? `EMOM ${Math.round(interval.totalSec / 60)} min` : 'EMOM'} />
       </div>
-      {item.replaces && <span className="t-small muted">{`à la place de ${item.replaces}`}</span>}
-      {item.lastTime && <span className="t-small muted">{`Dernière fois : ${item.lastTime}`}</span>}
-      {item.note && (
-        <button type="button" className="pf-fold" aria-expanded={note} onClick={() => setNote(!note)}>
-          <span className="grow" style={{ whiteSpace: note ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{`Note : ${item.note}`}</span>
-        </button>
-      )}
-    </div>
-  );
-  const foot = (
-    <div className="row" style={{ justifyContent: 'center', gap: 4, padding: '4px 8px 6px' }}>
-      <Button variant="quiet" onClick={p.onAddSet}>
-        + Série
-      </Button>
-      <Button variant="quiet" onClick={p.onReplace}>
-        Remplacer
-      </Button>
-    </div>
-  );
-  if (item.format.scheme === 'interval') return <Glass className="pf-card">{head}<IntervalBlock {...p} />{foot}</Glass>;
-  if (item.format.scheme === 'hold' || item.format.scheme === 'for_time') return <Glass className="pf-card">{head}<TimedBlock {...p} />{foot}</Glass>;
-  if (item.format.scheme === 'amrap') return <Glass className="pf-card">{head}<AmrapBlock {...p} />{foot}</Glass>;
+    );
+  if (item.format.scheme === 'hold' || item.format.scheme === 'for_time')
+    return (
+      <div className="card-module pf-card">
+        <CardHead item={item} doc={p.doc} chip={item.format.scheme === 'hold' ? 'au temps' : 'pour le temps'} onMore={p.onMore} />
+        <TimedBlock {...p} />
+      </div>
+    );
+  if (item.format.scheme === 'amrap')
+    return (
+      <div className="card-module pf-card">
+        <CardHead item={item} doc={p.doc} chip="AMRAP" onMore={p.onMore} />
+        <AmrapBlock {...p} />
+      </div>
+    );
 
   const now = item.sets.find((s) => !s.completed) ?? null;
+  const plates = platesOf(p.doc, item, now);
   let n = 0;
   return (
-    <Glass className="pf-card">
-      {head}
+    <div className="card-module pf-card">
+      <CardHead item={item} doc={p.doc} onMore={p.onMore} />
+      <div className="pf-cols pf-colhead" aria-hidden="true">
+        <span>série</span>
+        <span>{item.percents ? 'plan' : ''}</span>
+        <span>{weighted ? 'lest' : 'kg'}</span>
+        <span>reps</span>
+        <span />
+      </div>
       {item.sets.map((s) => {
         const label = s.setType === 'top_set' ? 'T' : s.setType === 'warmup' ? 'É' : String(++n);
         const percent = item.percents ? (s.setType === 'top_set' ? item.percents.top : s.setType === 'backoff' ? item.percents.backoff : null) : null;
         const isNow = s === now;
         const focus = p.editing?.setId === s.id ? p.editing.field : null;
-        const plates =
-          isNow && item.equipment === 'barbell' && (s.weight ?? s.targetWeight) !== null
-            ? (() => {
-                const target = (s.weight ?? s.targetWeight)!;
-                const load = barbellPlates(target, p.doc.barWeight, p.doc.plates);
-                return load.plates.length ? `par côté : ${describePlates(load.plates)}` : null;
-              })()
-            : null;
         return (
-          <div key={s.id}>
-            <div className={`pf-cols pf-set${s.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
-              <span className="pf-idx" style={isNow ? { color: 'var(--ink)' } : undefined}>
-                {label}
-              </span>
-              <span className="pf-pc">{percent !== null ? pct(percent) : ''}</span>
-              <button type="button" className={`pf-cell${focus === 'weight' ? ' is-focus' : ''}`} aria-label={`Charge${weighted ? ' (lest)' : ''}, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'weight' })}>
-                {s.weight !== null ? kg(s.weight, weighted) : <span className="pf-ph">{kg(s.targetWeight, weighted)}</span>}
-              </button>
-              <button type="button" className={`pf-cell${focus === 'reps' ? ' is-focus' : ''}`} aria-label={`Répétitions, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'reps' })}>
-                {s.reps !== null ? s.reps : <span className="pf-ph">{s.targetReps ?? '—'}</span>}
-              </button>
-              <button
-                type="button"
-                className={`pf-ck${s.completed ? ' is-done' : isNow ? ' is-go' : ''}`}
-                aria-label={s.completed ? `Série ${label} faite : annuler` : `Valider la série ${label}`}
-                onClick={() => (s.completed ? p.onUncomplete(s) : p.onComplete(s))}
-              >
-                {(s.completed || isNow) && <Icon name="check" size={isNow ? 24 : 18} strong />}
-              </button>
-            </div>
-            {plates && <div className="pf-plates">{plates}</div>}
+          <div key={s.id} className={`pf-cols pf-set${s.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
+            <span className="pf-idx">{s.setType === 'top_set' || s.setType === 'warmup' ? <span className="pf-tag">{label}</span> : label}</span>
+            <span className="pf-pc">{percent !== null ? pct(percent) : ''}</span>
+            <button type="button" className={`pf-cell${focus === 'weight' ? ' is-focus' : ''}`} aria-label={`Charge${weighted ? ' (lest)' : ''}, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'weight' })}>
+              {s.weight !== null ? kg(s.weight, weighted) : <span className="pf-ph">{kg(s.targetWeight, weighted)}</span>}
+            </button>
+            <button type="button" className={`pf-cell${focus === 'reps' ? ' is-focus' : ''}`} aria-label={`Répétitions, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'reps' })}>
+              {s.reps !== null ? s.reps : <span className="pf-ph">{s.targetReps ?? '—'}</span>}
+            </button>
+            <button
+              type="button"
+              className={`pf-ck${s.completed ? ' is-done' : isNow ? ' is-go' : ''}`}
+              aria-label={s.completed ? `Série ${label} faite : annuler` : `Valider la série ${label}`}
+              onClick={() => (s.completed ? p.onUncomplete(s) : p.onComplete(s))}
+            >
+              {(s.completed || isNow) && <Icon name="check" size={isNow ? 22 : 18} strong />}
+            </button>
           </div>
         );
       })}
-      {foot}
-    </Glass>
+      <div className="row pf-card-foot">
+        <span className="grow t-small muted">{plates ?? ''}</span>
+        <button type="button" className="pf-link" onClick={p.onAddSet}>
+          + Série
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Superset ou circuit : une seule carte, les séries tour par tour (A1, A2…), repos à la fin du tour. */
+function GroupCard({ doc, items, editing, onEdit, onComplete, onUncomplete, onMore }: { doc: SessionDoc; items: SessionItem[]; editing: Editing | null; onEdit: (e: Editing) => void; onComplete: (item: SessionItem, set: SessionSet, patch?: SetPatch) => void; onUncomplete: (set: SessionSet) => void; onMore: () => void }) {
+  const rows = rounds(items);
+  const now = rows.find((r) => !r.set.completed) ?? null;
+  const total = Math.max(0, ...items.map((i) => i.sets.length));
+  const last = items[items.length - 1]!;
+  const rest = last.restSec ?? restSeconds(doc.rest, last.category, last.intention, 'working');
+  const kind = items[0]!.group?.kind === 'circuit' ? 'Circuit' : 'Superset';
+  const anyLoad = items.some((i) => i.format.metrics.includes('load'));
+  return (
+    <div className="card-module pf-card">
+      <div className="pf-card-head">
+        <div className="row">
+          <h2 className="grow pf-big" style={{ fontSize: 22, margin: 0 }}>
+            {kind}
+          </h2>
+          <span className="pf-chip">{`tour ${now ? now.round + 1 : total} / ${total}`}</span>
+          <button type="button" className="pf-more" aria-label="Plus d’actions" onClick={onMore}>
+            ···
+          </button>
+        </div>
+        <span className="t-small muted">{items.map((i, k) => `A${k + 1} ${i.name}`).join(' · ')}</span>
+      </div>
+      {rows.map((r) => {
+        const weighted = r.item.loadType === 'bodyweight';
+        const isNow = r === now;
+        const focus = editing?.setId === r.set.id ? editing.field : null;
+        const load = r.item.format.metrics.includes('load');
+        return (
+          <div key={r.set.id} className={`pf-gcols${anyLoad ? '' : ' is-noload'} pf-set${r.set.completed ? ' is-done' : ''}${isNow ? ' is-now' : ''}`}>
+            <span className="pf-tag">{r.tag}</span>
+            <span className="t-small pf-nowrap">{isNow ? <b>{r.item.name}</b> : r.item.name}</span>
+            {!anyLoad ? null : load ? (
+              <button type="button" className={`pf-cell${focus === 'weight' ? ' is-focus' : ''}`} aria-label={`Charge, ${r.item.name}, tour ${r.round + 1}`} onClick={() => onEdit({ setId: r.set.id, field: 'weight' })}>
+                {r.set.weight !== null ? kg(r.set.weight, weighted) : <span className="pf-ph">{kg(r.set.targetWeight, weighted)}</span>}
+              </button>
+            ) : (
+              <span />
+            )}
+            <button type="button" className={`pf-cell${focus === 'reps' ? ' is-focus' : ''}`} aria-label={`Répétitions, ${r.item.name}, tour ${r.round + 1}`} onClick={() => onEdit({ setId: r.set.id, field: 'reps' })}>
+              {r.set.reps !== null ? r.set.reps : <span className="pf-ph">{r.set.targetReps ?? '—'}</span>}
+            </button>
+            <button
+              type="button"
+              className={`pf-ck${r.set.completed ? ' is-done' : isNow ? ' is-go' : ''}`}
+              aria-label={r.set.completed ? `${r.item.name}, tour ${r.round + 1} fait : annuler` : `Valider ${r.item.name}, tour ${r.round + 1}`}
+              onClick={() => (r.set.completed ? onUncomplete(r.set) : onComplete(r.item, r.set))}
+            >
+              {(r.set.completed || isNow) && <Icon name="check" size={isNow ? 22 : 18} strong />}
+            </button>
+          </div>
+        );
+      })}
+      <span className="t-small muted pf-card-foot">{`Repos ${clock(rest)} à la fin du tour`}</span>
+    </div>
   );
 }
 
 /** EMOM : un top au début de chaque minute ; chaque minute est une série (reps à corriger d'un toucher). */
-function IntervalBlock(p: CardProps) {
+function IntervalBlock(p: CardProps & { label: string }) {
   const { item } = p;
   const t = item.format.timer.kind === 'interval' ? item.format.timer : { everySec: 60, totalSec: 600 };
   const { startedAt, now, start, stop } = useClock(item.weId);
@@ -362,8 +563,8 @@ function IntervalBlock(p: CardProps) {
       <svg viewBox="0 0 100 100" width="170" height="170" role="img" aria-label={startedAt ? `Minute ${minute + 1} sur ${item.sets.length}, ${left} secondes` : 'EMOM pas commencé'}>
         <defs>
           <linearGradient id={`ac-${item.weId}`} x1="0" x2="1">
-            <stop offset="0" stopColor="#7b5cff" />
-            <stop offset="1" stopColor="#38c6f4" />
+            <stop offset="0" stopColor="var(--tone)" />
+            <stop offset="1" stopColor="var(--tone-solid)" />
           </linearGradient>
         </defs>
         <circle cx="50" cy="50" r={r} fill="none" stroke="var(--line)" strokeWidth="6" />
@@ -377,11 +578,12 @@ function IntervalBlock(p: CardProps) {
       </svg>
       <div className="pf-minutes">
         {item.sets.map((s, i) => (
-          <button key={s.id} type="button" className={`pf-minute${s.completed ? ' is-done' : startedAt && i === minute ? ' is-now' : ''}`} aria-label={`Minute ${i + 1}, ${s.reps ?? s.targetReps ?? 0} reps`} onClick={() => p.onEdit({ setId: s.id, field: 'reps' })}>
+          <button key={s.id} type="button" className={`pf-dot${s.completed ? ' is-done' : startedAt && i === minute ? ' is-today' : ' is-off'}`} aria-label={`Minute ${i + 1}, ${s.reps ?? s.targetReps ?? 0} reps`} onClick={() => p.onEdit({ setId: s.id, field: 'reps' })}>
             {s.completed || (startedAt && i <= minute) ? (s.reps ?? s.targetReps ?? '·') : '·'}
           </button>
         ))}
       </div>
+      <span className="t-small muted">{`${p.label} · ${item.sets.reduce((n, s) => n + (s.completed ? (s.reps ?? s.targetReps ?? 0) : 0), 0)} reps sur ${item.sets.reduce((n, s) => n + (s.targetReps ?? 0), 0)} · bip et vibration chaque minute`}</span>
       {startedAt ? (
         <Button onClick={stop}>Arrêter</Button>
       ) : (
@@ -412,9 +614,9 @@ function TimedBlock(p: CardProps) {
     <div className="stack" style={{ padding: '0 16px 8px', gap: 14 }}>
       <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
         {item.sets.map((s, i) => (
-          <Badge key={s.id} tone={s.completed ? 'ok' : 'neutral'}>
+          <span key={s.id} className={`pf-chip${s.completed ? ' is-ok' : ' is-neutral'}`}>
             {s.completed ? `${i + 1} · ${s.durationS ?? 0} s` : `${i + 1} · ${target !== null ? `${target} s` : 'à faire'}`}
-          </Badge>
+          </span>
         ))}
       </div>
       {now && (
@@ -480,14 +682,15 @@ function AmrapBlock(p: CardProps) {
 
 // ---------------------------------------------------------------- repos et clavier
 
-function RestDock() {
+/** Le repos en bandeau, au-dessus de « Valider » : heure de fin absolue (il survit à l'app fermée). */
+function RestBanner() {
   const { rest, left } = useRest();
   if (!rest) return null;
   return (
-    <Glass className="pf-dock">
+    <Glass className="pf-rest">
       <div className="row" style={{ gap: 6 }}>
         <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <span className="t-label muted pf-nowrap">{`Repos · puis ${rest.next}`}</span>
+          <span className="t-label muted pf-nowrap">{`Repos avant ${rest.next}`}</span>
           <span className="pf-nowrap">
             <span className="pf-big" style={{ fontSize: 28 }}>
               {clock(left)}
@@ -500,7 +703,7 @@ function RestDock() {
         <Button onClick={skipRest}>Passer</Button>
       </div>
       <div className="progress">
-        <span style={{ width: `${Math.round(((rest.total - left) / rest.total) * 100)}%` }} />
+        <span style={{ width: `${Math.round(((rest.total - left) / rest.total) * 100)}%`, background: 'var(--tone-grad)' }} />
       </div>
     </Glass>
   );
@@ -561,87 +764,114 @@ function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComple
     if (field === 'bw') return void commit().then(() => onField('weight'));
     onComplete(field === 'weight' ? { weight: v } : { reps: v === null ? null : Math.round(v) });
   };
-  const label = field === 'weight' ? (weighted ? 'Lest' : 'Charge') : field === 'reps' ? 'Reps' : 'Poids du corps';
+  const hasLoad = item.format.metrics.includes('load');
+  const value = (f: Field) => {
+    if (f === field) return buffer || '0';
+    const v = f === 'weight' ? (set.weight ?? set.targetWeight) : f === 'reps' ? (set.reps ?? set.targetReps) : doc.bodyweight;
+    return show(v) || '—';
+  };
+  const signed = (f: Field, text: string) => (f === 'weight' && weighted && text !== '—' && Number(text.replace(',', '.')) > 0 ? `+${text}` : text);
+  const keys: [string, string | null][] = [
+    ['1', null], ['2', null], ['3', null], ['minus', null],
+    ['4', null], ['5', null], ['6', null], ['plus', null],
+    ['7', null], ['8', null], ['9', null], ['switch', null],
+    [',', null], ['0', null], ['⌫', 'Effacer'], ['ok', null],
+  ];
+  const stepBy = field === 'weight' ? item.increment : field === 'bw' ? 0.5 : 1;
 
   return (
-    <div className="sheet pf-keypad" role="dialog" aria-label="Saisie de la série">
-      {rest && (
-        <div className="row t-small" style={{ gap: 4 }}>
-          <span className="grow muted">
-            Repos <b className="display" style={{ fontSize: 17, color: 'var(--ink)' }}>{clock(left)}</b>
-          </span>
-          <Button variant="quiet" onClick={skipRest}>
-            Passer
-          </Button>
-        </div>
-      )}
-      <div className="row" style={{ alignItems: 'flex-end' }}>
-        <span className="grow">
-          <span className="t-label muted">{label}</span>
-          <br />
-          <span className="pf-big" style={{ fontSize: 36 }}>
-            {field === 'weight' && weighted && parse(buffer) !== null && (parse(buffer) ?? 0) > 0 ? '+' : ''}
-            {buffer || '0'}
-            {field !== 'reps' && <span style={{ fontSize: 18 }}> kg</span>}
-          </span>
-        </span>
-        {weighted && field !== 'bw' && (
-          <Button onClick={() => void switchTo('bw')}>{`PDC ${show(doc.bodyweight) || '—'} kg`}</Button>
+    <div className="sheet card-module pf-keypad" role="dialog" aria-label="Saisie de la série">
+      <div className="row t-small" style={{ gap: 2 }}>
+        {rest ? (
+          <>
+            <span className="grow muted">
+              Repos <b className="pf-big" style={{ fontSize: 17, color: 'var(--ink)' }}>{clock(left)}</b>
+              {` / ${clock(rest.total)}`}
+            </span>
+            <button type="button" className="pf-link is-muted" onClick={() => adjustRest(-15)}>
+              −15
+            </button>
+            <button type="button" className="pf-link is-muted" onClick={() => adjustRest(30)}>
+              +30
+            </button>
+            <button type="button" className="pf-link" onClick={skipRest}>
+              Passer
+            </button>
+          </>
+        ) : (
+          <span className="grow muted">{item.name}</span>
         )}
-        <button type="button" className="tile icon-btn" aria-label="Fermer le clavier" onClick={() => void commit().then(onClose)}>
-          <Icon name="close" size={18} />
+        <button type="button" className="pf-more" aria-label="Fermer le clavier" onClick={() => void commit().then(onClose)}>
+          <Icon name="close" size={16} />
         </button>
       </div>
-      {field !== 'bw' && item.format.metrics.includes('load') && (
-        <div className="row" style={{ gap: 10 }}>
-          <span className="t-small muted">Vitesse</span>
-          <div className="grow">
-            <Segmented
-              label="Vitesse de barre, de 1 à 5 (facultatif)"
-              value={set.speed === null ? '' : String(set.speed)}
-              options={['1', '2', '3', '4', '5'].map((v) => ({ id: v, label: v }))}
-              onChange={(v) => void onSave({ speed: set.speed === Number(v) ? null : Number(v) })}
-            />
-          </div>
+      {field === 'bw' ? (
+        <div className="pf-kcells" style={{ gridTemplateColumns: '1fr' }}>
+          <span className="pf-cell pf-kcell is-focus">
+            {value('bw')}
+            <span className="pf-kunit">kg · poids du corps</span>
+          </span>
+        </div>
+      ) : (
+        <div className="pf-kcells" style={hasLoad ? undefined : { gridTemplateColumns: '1fr' }}>
+          {hasLoad && (
+            <button type="button" className={`pf-cell pf-kcell${field === 'weight' ? ' is-focus' : ''}`} aria-label={weighted ? 'Lest' : 'Charge'} onClick={() => field !== 'weight' && void switchTo('weight')}>
+              {signed('weight', value('weight'))}
+              <span className="pf-kunit">{weighted ? 'kg de lest' : 'kg'}</span>
+            </button>
+          )}
+          <button type="button" className={`pf-cell pf-kcell${field === 'reps' ? ' is-focus' : ''}`} aria-label="Reps" onClick={() => field !== 'reps' && void switchTo('reps')}>
+            {value('reps')}
+            <span className="pf-kunit">reps</span>
+          </button>
+        </div>
+      )}
+      {weighted && field !== 'bw' && (
+        <div className="row t-small">
+          <span className="grow muted">Poids du corps</span>
+          <button type="button" className="pf-chip is-neutral" onClick={() => void switchTo('bw')}>{`${show(doc.bodyweight) || '—'} kg · modifier`}</button>
+        </div>
+      )}
+      {field !== 'bw' && hasLoad && (
+        <div className="row" role="group" aria-label="Vitesse de barre, de 1 à 5 (facultatif)" style={{ gap: 6 }}>
+          <span className="t-small muted" style={{ width: 56 }}>
+            Vitesse
+          </span>
+          {['1', '2', '3', '4', '5'].map((v) => (
+            <button key={v} type="button" className={`pf-chip pf-speed${set.speed === Number(v) ? '' : ' is-neutral'}`} aria-pressed={set.speed === Number(v)} onClick={() => void onSave({ speed: set.speed === Number(v) ? null : Number(v) })}>
+              {v}
+            </button>
+          ))}
         </div>
       )}
       <div className="pf-keys">
-        {['1', '2', '3'].map((k) => (
-          <button key={k} type="button" className="btn btn-secondary pf-key" onClick={() => type(k)}>
-            {k}
-          </button>
-        ))}
-        <button type="button" className="btn btn-secondary pf-key is-alt" onClick={() => step(-(field === 'weight' ? item.increment : 1))}>
-          {field === 'weight' ? `−${show(item.increment)}` : '−1'}
-        </button>
-        {['4', '5', '6'].map((k) => (
-          <button key={k} type="button" className="btn btn-secondary pf-key" onClick={() => type(k)}>
-            {k}
-          </button>
-        ))}
-        <button type="button" className="btn btn-secondary pf-key is-alt" onClick={() => step(field === 'weight' ? item.increment : 1)}>
-          {field === 'weight' ? `+${show(item.increment)}` : '+1'}
-        </button>
-        {['7', '8', '9'].map((k) => (
-          <button key={k} type="button" className="btn btn-secondary pf-key" onClick={() => type(k)}>
-            {k}
-          </button>
-        ))}
-        <button type="button" className="btn btn-secondary pf-key is-alt" onClick={() => void switchTo(field === 'weight' ? 'reps' : 'weight')}>
-          {field === 'weight' ? 'Reps →' : '← Charge'}
-        </button>
-        <button type="button" className="btn btn-secondary pf-key" onClick={() => type(',')}>
-          ,
-        </button>
-        <button type="button" className="btn btn-secondary pf-key" onClick={() => type('0')}>
-          0
-        </button>
-        <button type="button" className="btn btn-secondary pf-key is-alt" aria-label="Effacer" onClick={() => type('⌫')}>
-          ⌫
-        </button>
-        <button type="button" className="btn btn-action pf-key" aria-label={field === 'bw' ? 'Enregistrer le poids du corps' : 'Valider la série'} onClick={validate}>
-          <Icon name="check" size={24} strong />
-        </button>
+        {keys.map(([k, aria]) => {
+          if (k === 'minus' || k === 'plus')
+            return (
+              <button key={k} type="button" className="btn btn-secondary pf-key is-alt" onClick={() => step(k === 'minus' ? -stepBy : stepBy)}>
+                {`${k === 'minus' ? '−' : '+'}${show(stepBy)}`}
+              </button>
+            );
+          if (k === 'switch')
+            return field === 'bw' || !hasLoad ? (
+              <span key={k} />
+            ) : (
+              <button key={k} type="button" className="btn btn-secondary pf-key is-alt" onClick={() => void switchTo(field === 'weight' ? 'reps' : 'weight')}>
+                {field === 'weight' ? 'Reps →' : '← Charge'}
+              </button>
+            );
+          if (k === 'ok')
+            return (
+              <button key={k} type="button" className="btn btn-action pf-key" aria-label={field === 'bw' ? 'Enregistrer le poids du corps' : 'Valider la série'} onClick={validate}>
+                <Icon name="check" size={24} strong />
+              </button>
+            );
+          return (
+            <button key={k} type="button" className={`btn btn-secondary pf-key${k === '⌫' ? ' is-alt' : ''}`} aria-label={aria ?? undefined} onClick={() => type(k)}>
+              {k}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -668,25 +898,35 @@ function ReplaceSheet({ item, onClose, onPick }: { item: SessionItem | null; onC
     <Sheet open={item !== null} title={adding ? 'Ajouter un exercice' : `Remplacer ${item?.name.toLowerCase() ?? ''}`} onClose={onClose}>
       <div className="stack" style={{ gap: 16 }}>
         <input className="input" aria-label="Chercher un exercice" placeholder="Chercher un exercice" value={q} onChange={(e) => setQ(e.target.value)} />
-        <div className="stack-0">
-          {shown.map((c) => (
-            <button key={c.id} type="button" className="pf-pick" aria-pressed={picked === c.id} onClick={() => setPicked(c.id)}>
-              <span className="grow">
-                {c.name}
-                {c.detail && (
-                  <>
-                    <br />
-                    <span className="t-small muted">{c.detail}</span>
-                  </>
-                )}
+        {[
+          { title: 'Déjà fait à la place', list: shown.filter((c) => c.detail.endsWith('à la place')) },
+          { title: q ? 'Résultats' : 'Autres exercices', list: shown.filter((c) => !c.detail.endsWith('à la place')) },
+        ]
+          .filter((g) => g.list.length > 0)
+          .map((g) => (
+            <div key={g.title} className="stack-0">
+              <span className="pf-sec" style={{ margin: '0 0 4px', padding: 0 }}>
+                {g.title}
               </span>
-              {picked === c.id && <Icon name="check" size={20} />}
-            </button>
+              {g.list.map((c) => (
+                <button key={c.id} type="button" className="pf-pick" aria-pressed={picked === c.id} onClick={() => setPicked(c.id)}>
+                  <span className="grow">
+                    {c.name}
+                    {c.detail && (
+                      <>
+                        <br />
+                        <span className="t-small muted">{c.detail}</span>
+                      </>
+                    )}
+                  </span>
+                  {picked === c.id && <span className="pf-chip">choisi</span>}
+                </button>
+              ))}
+            </div>
           ))}
-        </div>
         {!adding && (
           <div className="stack" style={{ gap: 8 }}>
-            <span className="t-label muted">Pour quand ?</span>
+            <span className="pf-sec" style={{ margin: 0, padding: 0 }}>Pour quand ?</span>
             <Segmented
               label="Pour quand"
               value={scope}

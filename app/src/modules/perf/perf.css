@@ -3,42 +3,55 @@
  * d'autre (docs/V5-MYPERF-TRAINING.md, « Interface : uniquement le kit MyLife »).
  */
 .pf-screen { display: flex; flex-direction: column; gap: 18px; padding-bottom: 200px; }
-.pf-head { display: flex; align-items: center; gap: 12px; }
-.pf-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); }
+.pf-head { display: flex; align-items: center; gap: 10px; }
+.pf-head .btn { min-height: 40px; padding: 0 12px; }
 .pf-card { display: flex; flex-direction: column; padding: 16px 0 8px; }
-.pf-card-head { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 6px; }
-.pf-cols { display: grid; grid-template-columns: 30px 40px minmax(0, 1fr) minmax(0, 1fr) 56px; align-items: center; gap: 8px; }
+.pf-card-head { padding: 0 16px 10px; display: flex; flex-direction: column; gap: 4px; }
+.pf-card-foot { padding: 8px 16px 6px; gap: 8px; }
+.pf-more { width: 36px; height: 36px; flex: none; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--tile); border: 1px solid var(--tile-border); color: var(--ink); font-weight: 800; letter-spacing: 1px; padding: 0; }
+.pf-link { background: none; border: 0; padding: 6px; font-weight: 700; font-size: 14px; color: var(--tone); }
+.pf-link.is-muted { color: var(--ink-2); font-weight: 600; }
+.pf-cols { display: grid; grid-template-columns: 34px 50px minmax(0, 1fr) minmax(0, 1fr) 52px; align-items: center; gap: 8px; }
+.pf-gcols { display: grid; grid-template-columns: 30px minmax(0, 1fr) minmax(0, 64px) minmax(0, 56px) 52px; align-items: center; gap: 8px; }
+.pf-gcols.is-noload { grid-template-columns: 30px minmax(0, 1fr) 64px 52px; }
+.pf-colhead { padding: 0 14px 4px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.pf-colhead span:nth-child(3), .pf-colhead span:nth-child(4) { text-align: center; }
 .pf-set { min-height: 56px; padding: 0 14px; }
-.pf-set + .pf-set { border-top: 1px solid var(--line); }
-.pf-set.is-done { opacity: 0.36; }
-.pf-set.is-now { background: var(--tile); margin: 4px 8px; padding: 6px 8px; border-radius: 18px; min-height: 70px; border-top: 0; }
-.pf-idx { font-size: 13px; font-weight: 700; color: var(--ink-2); }
-.pf-pc { font-size: 12.5px; color: var(--ink-2); }
-.pf-cell { height: 46px; border-radius: var(--r-control); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 19px; color: var(--ink); background: var(--tile); border: 1px solid transparent; padding: 0; width: 100%; }
-.is-now .pf-cell { background: var(--field); border-color: var(--field-border); box-shadow: var(--field-inset); height: 52px; font-size: 23px; }
-.pf-cell.is-focus { border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
+.pf-set.is-done { opacity: 0.4; }
+.pf-set.is-now { background: color-mix(in srgb, var(--tone-solid) 10%, transparent); margin: 2px 8px; padding: 6px 8px; border-radius: 18px; min-height: 68px; }
+.pf-idx { font-size: 14px; font-weight: 700; }
+.is-now .pf-idx { color: var(--tone); }
+.pf-tag { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 7px; padding: 2px 6px; color: var(--tone); background: color-mix(in srgb, var(--tone-solid) 18%, transparent); }
+.pf-pc { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.pf-cell { height: 46px; border-radius: var(--r-control); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 800; font-size: 18px; color: var(--ink); background: var(--field); border: 1px solid var(--field-border); box-shadow: var(--field-inset); padding: 0; width: 100%; }
+.is-now .pf-cell { height: 50px; font-size: 22px; }
+.pf-cell.is-focus { border-color: var(--tone-solid); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tone-solid) 30%, transparent); }
 .pf-ph { color: var(--placeholder); }
-.pf-ck { width: 54px; height: 50px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--tile-border); color: var(--ink-2); padding: 0; }
-.pf-ck.is-done { color: var(--ok); border-color: var(--ok-border); }
-.pf-ck.is-go { background: var(--action); border-color: var(--action-border); box-shadow: var(--action-shadow); color: #fff; height: 54px; }
-.pf-plates { padding: 2px 22px 6px; font-size: 13px; color: var(--ink-2); }
+.pf-ck { width: 52px; height: 48px; border-radius: 15px; display: flex; align-items: center; justify-content: center; background: none; border: 1px solid var(--tile-border); color: var(--ink-2); padding: 0; }
+.pf-ck.is-done { color: var(--ok); border-color: var(--ok-border); background: var(--ok-bg); }
+.pf-ck.is-go { color: #fff; background: var(--tone-grad); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 10px 22px -8px var(--glow); height: 52px; }
 .pf-fold { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; padding: 0; color: var(--ink-2); font-size: 13px; text-align: left; }
-.pf-dock { position: fixed; left: 12px; right: 12px; bottom: calc(max(10px, calc(var(--safe-bottom) - 10px)) + 74px); z-index: 35; padding: 12px 14px; border-radius: 26px; display: flex; flex-direction: column; gap: 9px; max-width: 560px; margin: 0 auto; }
-.pf-keypad { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; max-width: 560px; margin: 0 auto; padding: 14px 18px calc(20px + var(--safe-bottom)); border-radius: 30px 30px 0 0; display: flex; flex-direction: column; gap: 14px; }
+/* En bas, à portée de pouce : le repos en bandeau, puis Remplacer et Valider. La séance est plein écran (pas de barre). */
+.pf-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; display: flex; flex-direction: column; gap: 8px; max-width: 584px; margin: 0 auto; padding: 28px 12px max(12px, calc(var(--safe-bottom) + 4px)); background: linear-gradient(to bottom, transparent, var(--bg) 34px); }
+.pf-dock .btn { min-height: 50px; }
+.pf-rest { padding: 12px 14px; border-radius: 22px; display: flex; flex-direction: column; gap: 8px; }
+.pf-rest .btn { min-height: 40px; padding: 0 10px; }
+.pf-keypad { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; max-width: 560px; margin: 0 auto; padding: 14px 18px calc(20px + var(--safe-bottom)); border-radius: 30px 30px 0 0; display: flex; flex-direction: column; gap: 12px; }
+.pf-kcells { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; }
+.pf-kcell { height: 58px; font-size: 26px; justify-content: space-between; padding: 0 14px; }
+.pf-kunit { font-family: var(--font-text); font-weight: 500; font-size: 13px; color: var(--ink-2); }
+.pf-speed { flex: 1; justify-content: center; padding: 0; }
 .pf-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.pf-key { min-height: 54px; border-radius: var(--r-control); font-family: var(--font-display); font-size: 22px; font-weight: 700; padding: 0; }
-.pf-key.is-alt { font-family: var(--font-text); font-size: 14px; color: var(--ink-2); }
+.pf-key { min-height: 52px; border-radius: var(--r-control); font-family: var(--font-display); font-size: 21px; font-weight: 700; padding: 0; }
+.pf-key.is-alt { font-family: var(--font-text); font-size: 13px; color: var(--ink-2); }
 .pf-big { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; }
 .pf-minutes { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 3px; align-self: stretch; }
-.pf-minute { height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: var(--ink-2); background: none; border: 0; padding: 0; }
-.pf-minute.is-done { color: var(--ink); opacity: 0.45; }
-.pf-minute.is-now { background: var(--field); border: 1px solid var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); color: var(--ink); }
+.pf-minutes .pf-dot { width: auto; height: 34px; padding: 0; }
 .pf-pick { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; background: none; border: 0; padding: 0; text-align: left; color: var(--ink); }
 .pf-pick + .pf-pick { border-top: 1px solid var(--line); }
 @media (min-width: 900px) {
-  .pf-dock { left: calc(252px + 40px); bottom: 20px; }
+  .pf-dock { left: calc(252px + 28px); padding-bottom: 20px; }
 }
-.pf-dock .btn { min-height: 42px; padding: 0 12px; }
 .pf-nowrap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /*
@@ -53,6 +66,8 @@
 .pf-sec { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; font-weight: 600; color: var(--ink-2); padding: 0 4px; margin-bottom: -8px; }
 .pf-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 11px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--tone); border: 1px solid var(--edge-2); background: color-mix(in srgb, var(--tone-solid) 12%, transparent); white-space: nowrap; }
 .pf-chip.is-neutral { color: var(--ink); border-color: var(--control-border); background: var(--tile); }
+.pf-chip.is-ok { color: var(--ok); border-color: var(--ok-border); background: var(--ok-bg); }
+button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .pf-hero { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .pf-lines { display: flex; flex-direction: column; border-top: 1px solid var(--line); margin-top: 2px; }
 .pf-line { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 7px 0; }
