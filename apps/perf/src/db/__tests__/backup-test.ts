@@ -1,6 +1,6 @@
 import { finishWorkout, addExerciseToWorkout, startWorkout } from '@/services/workoutService';
 
-import { buildBackup, restoreBackup, setsCsv } from '../backup';
+import { BACKUP_LIMITS, buildBackup, checkBackupSize, restoreBackup, setsCsv } from '../backup';
 import { addBodyEntry } from '../repos/body';
 import { getWorkout, listSetsForWorkout, updateSet } from '../repos/workouts';
 import { seedIfEmpty } from '../seed';
@@ -37,6 +37,20 @@ describe('backup', () => {
     const id = seedWorkout();
     expect(() => restoreBackup({ foo: 1 })).toThrow();
     expect(() => restoreBackup({ app: 'myperf', schemaVersion: 999, tables: {} })).toThrow();
+    expect(getWorkout(id)).not.toBeNull();
+  });
+
+  it('refuses an oversized backup before erasing anything', () => {
+    createTestDb();
+    seedIfEmpty();
+    const id = seedWorkout();
+    const backup = buildBackup();
+    expect(() => checkBackupSize(BACKUP_LIMITS.bytes + 1)).toThrow(/trop gros/);
+    expect(() => checkBackupSize(1_000_000)).not.toThrow();
+    const many = { ...backup, tables: { ...backup.tables, body_entries: Array.from({ length: BACKUP_LIMITS.rows + 1 }, () => ({})) } };
+    expect(() => restoreBackup(many)).toThrow(/volumineuse/);
+    const long = { ...backup, tables: { ...backup.tables, workouts: [{ ...backup.tables.workouts![0], notes: 'x'.repeat(BACKUP_LIMITS.text + 1) }] } };
+    expect(() => restoreBackup(long)).toThrow(/démesuré/);
     expect(getWorkout(id)).not.toBeNull();
   });
 

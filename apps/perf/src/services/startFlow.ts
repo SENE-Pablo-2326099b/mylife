@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 
 import { today } from '@/domain/dates';
-import { getActiveWorkout, updateWorkoutMeta } from '@/db/repos/workouts';
+import { getActiveWorkout } from '@/db/repos/workouts';
 import { showToast } from '@/state/toastStore';
 import { useWorkoutStore } from '@/state/workoutStore';
 
@@ -22,7 +22,6 @@ export function beginWorkout(opts: Omit<StartOptions, 'date'>): void {
 
 /** Logs a session after the fact (forgotten in the gym): created as completed, opened for editing. */
 export function logPastWorkout(date: string, templateId: string | null = null): void {
-  const id = startWorkout({ date, templateId });
-  updateWorkoutMeta(id, { status: 'completed', endedAt: Date.now() });
+  const id = startWorkout({ date, templateId, status: 'completed' });
   router.push(`/workout/${id}`);
 }

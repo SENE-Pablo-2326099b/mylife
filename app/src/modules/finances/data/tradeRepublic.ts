@@ -1,5 +1,6 @@
 type PlanFrequency = 'weekly' | 'biweekly' | 'monthly';
 import { diffDays, toISO, type ISODate } from '../core/dates';
+import { decimalToCents } from '../bank/money';
 
 /**
  * Lecture d'un relevé de compte Trade Republic (PDF « Relevé de compte » exporté depuis l'app),
@@ -83,9 +84,9 @@ function parseDate(day: string, month: string, year: string): ISODate | null {
   return m ? toISO(Number(year), m, Number(day)) : null;
 }
 
+/** « 1.234,56 € » → 123456 centimes, lus comme du texte (le motif MONEY garantit la virgule décimale). */
 function parseMoney(s: string): number {
-  const clean = s.replace(/[\s\u202f\u00a0.]/g, '').replace(',', '.');
-  return Math.round(Math.abs(Number(clean)) * 100);
+  return Math.abs(decimalToCents(s.replace(/[\s\u202f\u00a0.]/g, '')));
 }
 
 function parseQuantity(s: string): number {

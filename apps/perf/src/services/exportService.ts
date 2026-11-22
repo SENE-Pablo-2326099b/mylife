@@ -3,7 +3,7 @@
  * fichiers du navigateur. Une sauvegarde exportée de l'ancienne app Android se restaure aussi ici.
  */
 import { today } from '@/domain/dates';
-import { buildBackup, restoreBackup, setsCsv } from '@/db/backup';
+import { buildBackup, checkBackupSize, restoreBackup, setsCsv } from '@/db/backup';
 import { markWebBackedUp } from './webBackup';
 
 function download(name: string, content: string, type: string): void {
@@ -37,8 +37,9 @@ export function importJson(): Promise<number | null> {
       settled = true;
       const file = input.files?.[0];
       if (!file) return resolve(null);
-      file
-        .text()
+      Promise.resolve()
+        .then(() => checkBackupSize(file.size))
+        .then(() => file.text())
         .then((text) => resolve(restoreBackup(JSON.parse(text) as unknown)))
         .catch(reject);
     });

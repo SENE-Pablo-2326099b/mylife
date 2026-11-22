@@ -1,9 +1,14 @@
+import { decimalToCents } from '../bank/money';
 import type { Category, EndPolicy } from '../engine/schema';
 
-/** « 300 » ou « 300,50 » → centimes ; null si ce n'est pas un montant. */
+/** « 300 » ou « 300,50 » → centimes, lus comme du texte (sans passer par un nombre à virgule) ; null si ce n'est pas un montant positif. */
 export const cents = (text: string): number | null => {
-  const n = Number(text.replace(/\s/g, '').replace(',', '.'));
-  return text.trim() && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+  try {
+    const c = decimalToCents(text);
+    return c >= 0 ? c : null;
+  } catch {
+    return null;
+  }
 };
 export const KIND = { INCOME: 'Revenu', CHARGE: 'Charge', SAVING: 'Épargne', INSTALLMENT: 'Échéance' } as const;
 export const END: readonly (readonly [EndPolicy, string])[] = [

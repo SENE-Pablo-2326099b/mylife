@@ -273,6 +273,8 @@ export interface StartOptions {
   templateId?: string | null;
   plannedId?: string | null;
   name?: string;
+  /** `completed` : séance notée après coup (oubliée à la salle), créée terminée. Par défaut : en cours. */
+  status?: 'active' | 'completed';
 }
 
 /**
@@ -281,6 +283,12 @@ export interface StartOptions {
  * done earlier or later; the workout itself is dated the day it is really done.
  */
 export function startWorkout(opts: StartOptions): string {
+  const status = opts.status ?? 'active';
+  // Une seule séance en cours à la fois : en démarrer une autre (double appui, deux écrans) rend celle qui est en cours.
+  if (status === 'active') {
+    const active = getActiveWorkout();
+    if (active !== null) return active.id;
+  }
   // A session type started on a day it is planned is that planned session (ticked off, same week).
   const planned = opts.plannedId
     ? getPlanned(opts.plannedId)
@@ -302,8 +310,8 @@ export function startWorkout(opts: StartOptions): string {
     isDeload: ctx.phase?.kind === 'deload',
     bodyweight: latestBodyweight(opts.date),
     startedAt: Date.now(),
-    endedAt: null,
-    status: 'active',
+    endedAt: status === 'completed' ? Date.now() : null,
+    status,
     notes: '',
   };
 
@@ -438,12 +446,20 @@ export function removeWorkoutExercise(id: string): void {
   deleteWorkoutExercise(id);
 }
 
-export function finishWorkout(id: string): void {
+/**
+ * Termine une séance en cours. Rien ne se passe pour une séance inconnue ou déjà terminée (double appui, autre
+ * écran) : ses séries et son heure de fin restent celles du premier appel. Renvoie si la séance a été terminée ici.
+ */
+export function finishWorkout(id: string): boolean {
+  let done = false;
   db().transaction(() => {
+    if (getWorkout(id)?.status !== 'active') return;
     const now = Date.now();
     settleSetsOnFinish(id, now);
     updateWorkoutMeta(id, { status: 'completed', endedAt: now });
+    done = true;
   });
+  return done;
 }
 
 export interface WeekPreview {

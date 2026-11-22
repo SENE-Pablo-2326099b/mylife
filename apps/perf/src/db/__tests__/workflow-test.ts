@@ -112,6 +112,7 @@ describe('workout lifecycle', () => {
     const id = startWorkout({ date: '2026-01-06', plannedId: planned });
     expect(listPlanned('2026-01-06', '2026-01-06')[0]?.workoutId).toBe(id);
     expect(getWorkout(id)?.templateId).toBe(template);
+    finishWorkout(id);
 
     const free = startWorkout({ date: '2026-01-07' });
     expect(loadWorkoutDoc(free)?.items).toHaveLength(0);
@@ -121,6 +122,30 @@ describe('workout lifecycle', () => {
     const doc = loadWorkoutDoc(free);
     expect(doc?.items.map((i) => i.exercise.id)).toEqual(['ex_front_squat']);
     expect(doc?.items[0]?.sets.every((s) => s.setType === 'working')).toBe(true);
+  });
+
+  it('one active workout at a time; finishing twice changes nothing; a past session is logged as completed', () => {
+    const { template } = setup();
+    const id = startWorkout({ date: '2026-01-05', templateId: template });
+    // Second start (double tap, another screen): the session in progress, not a new one.
+    expect(startWorkout({ date: '2026-01-05' })).toBe(id);
+    // Logging a forgotten session meanwhile creates it completed and leaves the active one alone.
+    const past = startWorkout({ date: '2026-01-03', status: 'completed' });
+    expect(past).not.toBe(id);
+    expect(getWorkout(past)?.status).toBe('completed');
+    expect(getWorkout(past)?.endedAt).not.toBeNull();
+    expect(getWorkout(id)?.status).toBe('active');
+
+    expect(finishWorkout(id)).toBe(true);
+    const first = getWorkout(id);
+    const sets = JSON.stringify(listSetsForWorkout(id));
+    expect(finishWorkout(id)).toBe(false);
+    expect(getWorkout(id)).toEqual(first);
+    expect(JSON.stringify(listSetsForWorkout(id))).toBe(sets);
+    expect(finishWorkout('inconnue')).toBe(false);
+    expect(getWorkout('inconnue')).toBeNull();
+    // Once finished, a new session can start.
+    expect(startWorkout({ date: '2026-01-06' })).not.toBe(id);
   });
 
   it('keeps completed sets when replacing an exercise mid-way', () => {

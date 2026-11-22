@@ -4,6 +4,8 @@ import type { MyLifeAction } from '@mylife/lumen';
 import { completeBankConnection, getPendingAuth, parseCallback, startBankConnection } from '../app/src/modules/finances/bank/connect';
 import { assignIds, mergeTransactions } from '../app/src/modules/finances/bank/dedup';
 import { mapEbTransaction } from '../app/src/modules/finances/bank/mapping';
+import { decimalToCents } from '../app/src/modules/finances/bank/money';
+import { cents } from '../app/src/modules/finances/pages/labels';
 import type { IncomingTransaction, Relay } from '../app/src/modules/finances/bank/relay';
 import { SourceError } from '../app/src/modules/finances/bank/relay';
 import { computeSince, syncAccount, syncAll, type Fetcher } from '../app/src/modules/finances/bank/sync';
@@ -48,6 +50,22 @@ describe('banque', () => {
     expect(assignIds('eb:a', lot).map((x) => x.id)).toEqual(old.assignIds('eb:a', lot).map((x) => x.id));
   });
 
+  it('les montants sont lus en centimes comme du texte : pas d’erreur d’arrondi, rien d’absurde accepté', () => {
+    expect(decimalToCents('1.005')).toBe(101); // en nombre à virgule : 100,4999… → 100
+    expect(decimalToCents('1 234,56 €')).toBe(123456);
+    expect(decimalToCents('-0,07')).toBe(-7);
+    expect(decimalToCents(19.99)).toBe(1999);
+    expect(() => decimalToCents('9007199254740993')).toThrow();
+    expect(() => decimalToCents(Number.NaN)).toThrow();
+    expect(() => decimalToCents(Number.POSITIVE_INFINITY)).toThrow();
+    // La saisie dans les écrans : positif seulement, null sinon.
+    expect(cents('300')).toBe(30000);
+    expect(cents('300,50')).toBe(30050);
+    expect(cents('1,005')).toBe(101);
+    expect(cents(' 1 200 ')).toBe(120000);
+    for (const bad of ['', '  ', 'abc', '-5', '1e3', '12,3,4x', '99999999999999999']) expect(cents(bad)).toBeNull();
+  });
+
   it('une opération de la banque est normalisée ; une opération annulée est écartée', () => {
     const t = mapEbTransaction({ transaction_amount: { amount: '12.50', currency: 'EUR' }, credit_debit_indicator: 'DBIT', status: 'BOOK', booking_date: '2026-11-10', creditor: { name: 'CB EPICERIE DU COIN 12/11' }, entry_reference: 'ref1' });
     expect(t).toMatchObject({ amount: -1250, date: '2026-11-10', label: 'EPICERIE DU COIN', pending: false, externalId: 'ref1' });
@@ -73,6 +91,26 @@ describe('banque', () => {
     await store.apply([{ tbl: 'transactions', rid: 'x', deleted: false, row: { ...(await d.transactions.toArray())[0], id: 'x' } }]);
     expect(await d.transactions.count()).toBe(3);
     expect(factsPending()).toBe(0);
+  });
+
+  it('deux opérations identiques le même jour, renvoyées dans un autre ordre : aucune perdue, aucune en double', () => {
+    // Le matin, un café (référence a) ; le soir, la banque renvoie le second café (b) avant le premier.
+    const first = mergeTransactions('eb:a', [], [incoming({ externalId: 'a' })], 'enablebanking', 1).toAdd;
+    const evening = mergeTransactions('eb:a', first, [incoming({ externalId: 'b' }), incoming({ externalId: 'a' })], 'enablebanking', 2);
+    expect(evening).toMatchObject({ duplicates: 1, newBooked: 1 });
+    expect(evening.toAdd.map((t) => t.externalId)).toEqual(['b']);
+    const ids = [...first, ...evening.toAdd].map((t) => t.id);
+    expect(new Set(ids).size).toBe(2);
+    // Le lendemain, dans l'ordre d'origine ou non, plus rien de nouveau.
+    const all = [...first, ...evening.toAdd];
+    expect(mergeTransactions('eb:a', all, [incoming({ externalId: 'a' }), incoming({ externalId: 'b' })], 'enablebanking', 3)).toMatchObject({ duplicates: 2, newBooked: 0 });
+    expect(mergeTransactions('eb:a', all, [incoming({ externalId: 'b' }), incoming({ externalId: 'a' })], 'enablebanking', 3)).toMatchObject({ duplicates: 2, newBooked: 0 });
+    // Sans référence bancaire (anciennes données, banque qui n'en donne pas), l'identifiant suffit, comme avant.
+    const legacy = first.map((t) => ({ ...t, externalId: null }));
+    expect(mergeTransactions('eb:a', legacy, [incoming({ externalId: 'a' })], 'enablebanking', 4)).toMatchObject({ duplicates: 1, newBooked: 0 });
+    // Trois nouvelles dont deux qui tombent sur des rangs déjà pris : identifiants tous distincts.
+    const three = mergeTransactions('eb:a', first, [incoming({ externalId: 'c' }), incoming({ externalId: 'd' }), incoming({ externalId: 'a' })], 'enablebanking', 5).toAdd;
+    expect(new Set([...first, ...three].map((t) => t.id)).size).toBe(3);
   });
 
   it('une opération en attente devient définitive : elle garde ce qui a été décidé à la main', () => {

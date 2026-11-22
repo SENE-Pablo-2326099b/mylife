@@ -1,7 +1,8 @@
 /** Convertit un montant décimal texte ("12.50", "-3", "1 234,56", "+0,5") en centimes. */
 export function decimalToCents(input: string | number): number {
   if (typeof input === 'number') {
-    if (Number.isInteger(input)) return input * 100;
+    if (!Number.isFinite(input)) throw new Error(`Montant invalide : ${input}`);
+    if (Number.isInteger(input) && Number.isSafeInteger(input * 100)) return input * 100;
     input = input.toFixed(2);
   }
   let s = input.trim().replace(/[\s\u00a0\u202f€]/g, '');
@@ -50,5 +51,6 @@ export function decimalToCents(input: string | number): number {
     cents = firstTwo + (parseInt(fracPart.charAt(2), 10) >= 5 ? 1 : 0);
   }
   const total = euros * 100 + cents;
+  if (!Number.isSafeInteger(total)) throw new Error(`Montant trop grand : "${input}"`);
   return negative ? -total : total;
 }

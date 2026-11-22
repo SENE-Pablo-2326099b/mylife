@@ -46,6 +46,17 @@ function isSqlValue(v: unknown): v is SqlValue {
 }
 
 /**
+ * Bornes d'une restauration, larges pour des années d'historique (≈ 20 000 lignes par an d'entraînement assidu) mais
+ * qui arrêtent un fichier démesuré avant qu'il fige l'app : taille du fichier, nombre de lignes, longueur d'un texte.
+ */
+export const BACKUP_LIMITS = { bytes: 50_000_000, rows: 500_000, text: 20_000 } as const;
+
+/** Vérifie la taille d'un fichier de sauvegarde avant de le lire. */
+export function checkBackupSize(bytes: number): void {
+  if (bytes > BACKUP_LIMITS.bytes) throw new Error('Fichier trop gros pour une sauvegarde MyPerf (50 Mo au plus)');
+}
+
+/**
  * Replaces all data with a backup, atomically: on any error nothing changes.
  * Only columns that exist in the current schema are restored (forward compatible).
  * Returns the number of restored rows.
@@ -55,6 +66,18 @@ export function restoreBackup(raw: unknown): number {
   const version = typeof raw.schemaVersion === 'number' ? raw.schemaVersion : 0;
   if (version > SCHEMA_VERSION) throw new Error('Sauvegarde créée par une version plus récente de l’app');
   const tables = raw.tables;
+  // Bornes vérifiées avant d'effacer quoi que ce soit.
+  let total = 0;
+  for (const table of TABLES) {
+    const rows = tables[table];
+    if (!Array.isArray(rows)) continue;
+    total += rows.length;
+    if (total > BACKUP_LIMITS.rows) throw new Error('Sauvegarde trop volumineuse (500 000 lignes au plus)');
+    for (const row of rows) {
+      if (!isRecord(row)) continue;
+      for (const v of Object.values(row)) if (typeof v === 'string' && v.length > BACKUP_LIMITS.text) throw new Error('Sauvegarde invalide : un texte est démesuré');
+    }
+  }
   let count = 0;
   db().transaction(() => {
     for (const table of [...TABLES].reverse()) db().run(`DELETE FROM ${table}`);

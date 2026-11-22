@@ -36,6 +36,16 @@ export interface MergeResult {
   renamed: [string, string][];
 }
 
+/** `compte:date:empreinte:rang` → le même avec le premier rang libre après celui-ci. */
+function freeId(id: string, taken: (candidate: string) => boolean): string {
+  const at = id.lastIndexOf(':');
+  const stem = id.slice(0, at + 1);
+  let rank = Number(id.slice(at + 1));
+  let candidate = id;
+  while (taken(candidate)) candidate = `${stem}${++rank}`;
+  return candidate;
+}
+
 const CARRY_FIELDS = ['categoryId', 'categorySource', 'ruleId', 'person', 'note'] as const;
 
 function sameOperation(a: Pick<Transaction, 'amount' | 'label' | 'date'>, b: Pick<IncomingTransaction, 'amount' | 'label' | 'date'>): boolean {
@@ -58,17 +68,35 @@ export function mergeTransactions(
   now = Date.now(),
 ): MergeResult {
   const known = existing.filter((t) => t.accountId === accountId);
-  const bookedIds = new Set(known.filter((t) => !t.pending).map((t) => t.id));
+  // Opérations définitives connues : identifiant → référence bancaire (null si la banque n'en donnait pas).
+  const bookedIds = new Map(known.filter((t) => !t.pending).map((t) => [t.id, t.externalId ?? null] as const));
   const bookedRefs = new Set(known.filter((t) => !t.pending && t.externalId).map((t) => t.externalId as string));
   const oldPending = known.filter((t) => t.pending);
   const unclaimedPending = [...oldPending];
 
   const result: MergeResult = { toAdd: [], toDelete: oldPending.map((t) => t.id), duplicates: 0, newBooked: 0, newPending: 0, settled: 0, renamed: [] };
 
-  for (const { id, tx } of assignIds(accountId, incoming)) {
-    if (!tx.pending && (bookedIds.has(id) || (tx.externalId && bookedRefs.has(tx.externalId)))) {
-      result.duplicates++;
-      continue;
+  const assigned = assignIds(accountId, incoming);
+  const batchIds = new Set(assigned.map((a) => a.id));
+  for (const a of assigned) {
+    const { tx } = a;
+    let { id } = a;
+    if (!tx.pending) {
+      if (tx.externalId && bookedRefs.has(tx.externalId)) {
+        result.duplicates++;
+        continue;
+      }
+      if (bookedIds.has(id)) {
+        const ref = bookedIds.get(id);
+        // Même identifiant, mais une autre référence bancaire : deux opérations identiques (même jour, montant et
+        // libellé) arrivées dans un autre ordre. C'est une nouvelle opération : elle prend le rang libre suivant.
+        if (!tx.externalId || !ref) {
+          result.duplicates++;
+          continue;
+        }
+        id = freeId(id, (c) => bookedIds.has(c) || batchIds.has(c));
+        batchIds.add(id);
+      }
     }
     const row: Transaction = {
       id,
@@ -108,7 +136,7 @@ export function mergeTransactions(
     if (tx.pending) result.newPending++;
     else {
       result.newBooked++;
-      bookedIds.add(id);
+      bookedIds.set(id, tx.externalId ?? null);
       if (tx.externalId) bookedRefs.add(tx.externalId);
     }
     result.toAdd.push(row);
