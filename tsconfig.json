@@ -19,5 +19,5 @@
       "@legacy/*": ["web/src/*"]
     }
   },
-  "include": ["api", "server", "tests", "packages/sync-client", "packages/lumen"]
+  "include": ["api", "server", "tests", "packages/sync-client", "packages/lumen", "packages/training"]
 }

@@ -11,7 +11,9 @@ export default defineConfig({
       { find: '@mylife/kit', replacement: here('./packages/kit/src/index.ts') },
       { find: '@mylife/lumen', replacement: here('./packages/lumen/src/index.ts') },
       { find: /^@mylife\/core\/(.*)$/, replacement: `${here('./packages/sync-client/src/')}$1` },
+      // Le code de l'app MyPerf d'avant (alias `@/` de apps/perf), lu par le test de référence du moteur.
+      { find: /^@\/(.*)$/, replacement: `${here('./apps/perf/src/')}$1` },
     ],
   },
-  test: { include: ['tests/*.test.ts'] },
+  test: { include: ['tests/*.test.ts', 'packages/*/tests/*.test.ts'] },
 });
