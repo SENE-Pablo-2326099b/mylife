@@ -1,5 +1,5 @@
 import type { PendingChange, RemoteRow, SyncState } from '@mylife/core/engine';
-import { addBodyweight, createExercise, dayView, type NewExercise } from './day';
+import { addBodyweight, createExercise, dayView, moveSession, type NewExercise } from './day';
 import { overview } from './queries';
 import { sessionOps } from './session';
 import { migrate, SCHEMA_VERSION } from './schema';
@@ -33,6 +33,7 @@ export function createBackend(d: Db) {
     // La page Jour.
     dayView: (date: string) => dayView(d, date),
     addBodyweight: (date: string, value: number) => addBodyweight(d, date, value),
+    moveSession: (templateId: string, from: string, to: string) => moveSession(d, templateId, from, to),
     createExercise: (e: NewExercise) => createExercise(d, e),
     // La séance (étape P2).
     activeSession: () => session.active(),

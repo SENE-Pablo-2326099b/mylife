@@ -280,6 +280,18 @@ export const MIGRATIONS: readonly string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+  // 11 : une séance de la semaine type décalée à un autre jour (« Décaler » de la page Jour), pour cette fois-là.
+  `
+  CREATE TABLE IF NOT EXISTS session_moves (
+    id TEXT PRIMARY KEY NOT NULL,
+    template_id TEXT NOT NULL,
+    from_date TEXT NOT NULL,
+    to_date TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_moves_from ON session_moves(from_date);
+  CREATE INDEX IF NOT EXISTS idx_moves_to ON session_moves(to_date);
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

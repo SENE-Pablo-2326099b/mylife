@@ -58,7 +58,7 @@ beforeEach(() => {
 describe('MyPerf, Jour', () => {
   it('la séance du jour avec ses charges (lest net pour un lesté), sa durée, et le bloc en cours', () => {
     const v = b.dayView(MONDAY);
-    expect(v.block).toEqual({ name: 'Accumulation', week: 3, of: 5, deload: false });
+    expect(v.block).toEqual({ name: 'Accumulation', week: 3, of: 5, deload: false, index: 1, total: 1 });
     expect(v.today.map((s) => s.name)).toEqual(['Force A']);
     const [squat, pullup] = v.today[0]!.lines;
     expect(squat!.detail).toMatch(/@ \d+(,\d)? %/);
@@ -77,9 +77,9 @@ describe('MyPerf, Jour', () => {
     expect(v.next).toMatchObject({ date: '2026-01-22', session: { name: 'Volume' } });
     const week = b.dayView('2026-01-15').week;
     expect(week.map((d) => d.date)).toEqual(['2026-01-12', '2026-01-13', '2026-01-14', '2026-01-15', '2026-01-16', '2026-01-17', '2026-01-18']);
-    expect(week[0]).toEqual({ date: '2026-01-12', done: ['Force A'], planned: ['Force A'] });
+    expect(week[0]).toMatchObject({ date: '2026-01-12', done: ['Force A'], planned: [{ name: 'Force A' }] });
     expect(week[1]!.done).toEqual(['Volume']);
-    expect(week[3]).toEqual({ date: '2026-01-15', done: ['Volume'], planned: ['Volume'] });
+    expect(week[3]).toMatchObject({ date: '2026-01-15', done: ['Volume'], planned: [{ name: 'Volume' }] });
   });
 
   it('la dernière séance, ses chiffres et ses records', () => {
@@ -88,6 +88,28 @@ describe('MyPerf, Jour', () => {
     expect(last.sets).toBeGreaterThan(0);
     expect(last.tonnage).toBeGreaterThan(0);
     expect(last.records.map((r) => r.name)).toEqual([getExercise('ex_barbell_curl')!.name]);
+    // La série qui bat le record, comme saisie (35 kg au curl ce jour-là).
+    expect(last.records[0]!.text).toMatch(/^35 × \d+$/);
+  });
+
+  it('« Décaler » : la séance part à un autre jour cette semaine-là, la semaine type ne bouge pas', () => {
+    // Volume, prévue jeudi 22, passe au vendredi 23.
+    const volume = b.dayView(MONDAY).week[3]!.planned[0]!;
+    b.moveSession(volume.id, '2026-01-22', '2026-01-23');
+    const week = b.dayView(MONDAY).week;
+    expect(week[3]!.planned).toEqual([]);
+    expect(week[4]!.planned).toEqual([volume]);
+    // Ce vendredi-là, c'est la séance du jour, notée décalée ; le mercredi, la prochaine est vendredi.
+    expect(b.dayView('2026-01-23').today[0]).toMatchObject({ name: 'Volume', movedFrom: '2026-01-22' });
+    expect(b.dayView('2026-01-21').next).toMatchObject({ date: '2026-01-23', session: { name: 'Volume' } });
+    // La semaine suivante, la semaine type reprend : jeudi.
+    expect(b.dayView('2026-01-29').today.map((s) => s.name)).toEqual(['Volume']);
+    // Re-décaler remplace le décalage (pas de doublon) ; revenir au jour d'origine l'annule.
+    b.moveSession(volume.id, '2026-01-23', '2026-01-24');
+    expect(b.dayView(MONDAY).week.map((d) => d.planned.length)).toEqual([1, 0, 0, 0, 0, 1, 0]);
+    b.moveSession(volume.id, '2026-01-24', '2026-01-22');
+    expect(b.dayView(MONDAY).week.map((d) => d.planned.length)).toEqual([1, 0, 0, 1, 0, 0, 0]);
+    expect(() => b.moveSession('inconnue', '2026-01-22', '2026-01-23')).toThrow(/introuvable/);
   });
 
   it('le « + » : poids du jour (borné), nouvel exercice (pas de doublon), aussitôt utilisables', () => {

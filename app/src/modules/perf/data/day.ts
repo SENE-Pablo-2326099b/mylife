@@ -11,7 +11,6 @@ import {
   type Program,
 } from '@mylife/training';
 import { historyView, readProgram } from './queries';
-import { summarize } from './session';
 import { newId, type Db } from './sql';
 
 /**
@@ -31,12 +30,14 @@ export interface PlannedSession {
   name: string;
   minutes: number;
   lines: PlannedLine[];
+  /** Décalée depuis un autre jour (« Décaler »). */
+  movedFrom: string | null;
 }
 
 export interface WeekDay {
   date: string;
   done: string[];
-  planned: string[];
+  planned: { id: string; name: string }[];
 }
 
 export interface LastSession {
@@ -50,7 +51,8 @@ export interface LastSession {
 
 export interface DayView {
   active: { id: string; name: string; done: number; total: number } | null;
-  block: { name: string; week: number; of: number; deload: boolean } | null;
+  /** Bloc en cours (périodisé) ou semaine du cycle (cycle libre) ; rien pour une routine. */
+  block: { name: string | null; week: number; of: number; deload: boolean; index: number | null; total: number | null } | null;
   capabilities: string[];
   today: PlannedSession[];
   /** Rien de prévu aujourd'hui : la prochaine séance de la semaine type. */
@@ -75,7 +77,41 @@ function preview(d: Db, program: Program, templateId: string, date: string): Pla
     const label = item.prescription.label.replace(/^Deload · /, 'Décharge · ').replace(/ @/g, ' @ ').replace(/(\d)%/g, '$1 %');
     return { name: item.exercise.name, detail: label, load: first?.targetWeight != null ? kg(first.targetWeight, weighted) : null };
   });
-  return { id: plan.session.id, name: plan.session.name, minutes: Math.max(5, Math.round(seconds / 60 / 5) * 5), lines };
+  return { id: plan.session.id, name: plan.session.name, minutes: Math.max(5, Math.round(seconds / 60 / 5) * 5), lines, movedFrom: null };
+}
+
+interface Move {
+  template_id: string;
+  from_date: string;
+  to_date: string;
+}
+
+/** Les séances d'un jour : la semaine type, moins celles décalées ailleurs, plus celles décalées vers ce jour. */
+function plannedOn(program: Program, live: Set<string>, moves: readonly Move[], date: string): { id: string; movedFrom: string | null }[] {
+  const away = new Set(moves.filter((m) => m.from_date === date).map((m) => m.template_id));
+  const base = sessionsOn(program.structure.pattern, date)
+    .filter((id) => live.has(id) && !away.has(id))
+    .map((id) => ({ id, movedFrom: null as string | null }));
+  const moved = moves.filter((m) => m.to_date === date && live.has(m.template_id) && !base.some((b) => b.id === m.template_id));
+  return [...base, ...moved.map((m) => ({ id: m.template_id, movedFrom: m.from_date }))];
+}
+
+const readMoves = (d: Db, from: string, to: string) =>
+  d.all<Move>('SELECT template_id, from_date, to_date FROM session_moves WHERE (from_date BETWEEN ? AND ?) OR (to_date BETWEEN ? AND ?) ORDER BY created_at', [from, to, from, to]);
+
+/**
+ * « Décaler » : la séance prévue tel jour se fait tel autre jour, cette fois-là (la semaine type ne change pas).
+ * Re-décaler une séance déjà décalée remplace le décalage ; la remettre à son jour d'origine l'annule.
+ */
+export function moveSession(d: Db, templateId: string, from: string, to: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new Error('Date invalide');
+  if (!d.first('SELECT 1 FROM templates WHERE id = ? AND archived = 0', [templateId])) throw new Error('Séance introuvable');
+  const prior = d.first<{ id: string; from_date: string }>('SELECT id, from_date FROM session_moves WHERE template_id = ? AND to_date = ?', [templateId, from]);
+  const origin = prior?.from_date ?? from;
+  d.transaction(() => {
+    if (prior) d.run('DELETE FROM session_moves WHERE id = ?', [prior.id]);
+    if (origin !== to) d.run('INSERT INTO session_moves (id, template_id, from_date, to_date, created_at) VALUES (?, ?, ?, ?, ?)', [newId(), templateId, origin, to, Date.now()]);
+  });
 }
 
 export function dayView(d: Db, date: string): DayView {
@@ -83,15 +119,21 @@ export function dayView(d: Db, date: string): DayView {
   const day = dayContext(program.structure, date);
   const live = new Set(d.all<{ id: string }>('SELECT id FROM templates WHERE archived = 0').map((r) => r.id));
   const sessions = program.sessions.filter((s) => live.has(s.id));
-  const todayIds = sessionsOn(program.structure.pattern, date).filter((id) => live.has(id));
-  const today = todayIds.flatMap((id) => preview(d, program, id, date) ?? []);
+  const monday = addDays(date, -weekday(date));
+  const moves = readMoves(d, addDays(monday, -7), addDays(date, 14));
+  const todayPlan = plannedOn(program, live, moves, date);
+  const todayIds = todayPlan.map((p) => p.id);
+  const today = todayPlan.flatMap((p) => {
+    const s = preview(d, program, p.id, date);
+    return s ? [{ ...s, movedFrom: p.movedFrom }] : [];
+  });
   let next: DayView['next'] = null;
   if (!today.length) {
     for (let i = 1; i <= 7 && !next; i++) {
       const on = addDays(date, i);
-      const id = sessionsOn(program.structure.pattern, on).find((x) => live.has(x));
-      const p = id ? preview(d, program, id, on) : null;
-      if (p) next = { date: on, session: p };
+      const p = plannedOn(program, live, moves, on)[0];
+      const s = p ? preview(d, program, p.id, on) : null;
+      if (s) next = { date: on, session: { ...s, movedFrom: p!.movedFrom } };
     }
   }
   const activeRow = d.first<{ id: string; name: string }>("SELECT id, name FROM workouts WHERE status = 'active' ORDER BY started_at DESC LIMIT 1");
@@ -101,21 +143,20 @@ export function dayView(d: Db, date: string): DayView {
         [activeRow.id],
       )
     : null;
-  // La semaine du lundi au dimanche : faites, prévues.
-  const monday = addDays(date, -weekday(date));
+  // La semaine du lundi au dimanche : faites, prévues (décalages compris).
   const week = Array.from({ length: 7 }, (_, i): WeekDay => {
     const on = addDays(monday, i);
     return {
       date: on,
       done: d.all<{ name: string }>("SELECT name FROM workouts WHERE date = ? AND status = 'completed' ORDER BY started_at", [on]).map((r) => r.name),
-      planned: sessionsOn(program.structure.pattern, on)
-        .filter((id) => live.has(id))
-        .map((id) => sessions.find((s) => s.id === id)?.name ?? ''),
+      planned: plannedOn(program, live, moves, on).map((p) => ({ id: p.id, name: sessions.find((s) => s.id === p.id)?.name ?? '' })),
     };
   });
   return {
     active: activeRow ? { id: activeRow.id, name: activeRow.name, done: Number(counts?.done ?? 0), total: Number(counts?.total ?? 0) } : null,
-    block: day.block && day.week ? { name: day.block.name, week: day.week.index, of: day.week.of, deload: day.week.deload } : null,
+    block: day.week
+      ? { name: day.block?.name ?? null, week: day.week.index, of: day.week.of, deload: day.week.deload, index: day.block?.index ?? null, total: day.block?.total ?? null }
+      : null,
     capabilities: [...capabilities(program)],
     today,
     next,
@@ -139,7 +180,7 @@ function lastSession(d: Db, program: Program): LastSession | null {
   );
   const h = historyView(d);
   let tonnage = 0;
-  const best = new Map<string, number>();
+  const best = new Map<string, { e1rm: number; weight: number; reps: number }>();
   for (const r of rows) {
     const ex = program.exercises.find((e) => e.id === r.exercise_id);
     const bw = ex?.loadType === 'bodyweight' ? (w.bodyweight ?? 0) : 0;
@@ -148,15 +189,17 @@ function lastSession(d: Db, program: Program): LastSession | null {
     if (r.progression_type === 'top_set_backoff' && r.reps! > 6) continue;
     // Masse totale (poids du corps + lest pour un lesté), comme l'historique de référence.
     const e1rm = estimate1RM(r.weight! + bw, r.reps!);
-    best.set(r.exercise_id, Math.max(best.get(r.exercise_id) ?? 0, e1rm));
+    if (e1rm > (best.get(r.exercise_id)?.e1rm ?? 0)) best.set(r.exercise_id, { e1rm, weight: r.weight!, reps: r.reps! });
   }
-  const records = [...best.entries()].flatMap(([id, e1rm]) => {
+  // Comparé en masse totale (le bon calcul), affiché comme saisi : lest net pour un lesté (« +40 × 4 »).
+  const records = [...best.entries()].flatMap(([id, { e1rm, weight, reps }]) => {
     const before = h.refSets(id).filter((s) => s.date < w.date);
     const prev = before.length ? Math.max(...before.map((s) => estimate1RM(s.load, s.reps))) : null;
     if (prev === null || e1rm <= prev + 1e-6) return [];
     const ex = program.exercises.find((e) => e.id === id);
-    const set = rows.filter((r) => r.exercise_id === id).sort((a, b) => b.weight! - a.weight!)[0]!;
-    return [{ name: ex?.name ?? id, text: summarize([{ weight: set.weight!, reps: set.reps! }], ex?.loadType === 'bodyweight') ?? '' }];
+    const weighted = ex?.loadType === 'bodyweight';
+    const w8 = `${weighted && weight > 0 ? '+' : ''}${weight.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}`;
+    return [{ name: ex?.name ?? id, text: `${w8} × ${reps}` }];
   });
   return {
     name: w.name,

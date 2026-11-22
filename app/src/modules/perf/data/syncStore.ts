@@ -29,6 +29,7 @@ export const SYNC_TABLES = [
   'body_entries',
   'formats',
   'cycles',
+  'session_moves',
 ] as const;
 type Table = (typeof SYNC_TABLES)[number];
 
@@ -50,6 +51,7 @@ const KEY_COLUMNS: Record<Table, string[]> = {
   body_entries: ['id'],
   formats: ['id'],
   cycles: ['id'],
+  session_moves: ['id'],
 };
 /** Réglages propres à l'appareil (clé de la table settings). */
 const DEVICE_ONLY_SETTINGS = ['rest_timer', 'auto_backup_last'];
