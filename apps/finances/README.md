@@ -49,7 +49,6 @@ Au premier lancement, l'accueil guidé propose « Essayer avec la démo » (6 mo
 | `npm run preview` | sert le build de production (relais inclus) sur http://localhost:4173 |
 | `npm test` | tests unitaires (Vitest) |
 | `npm run lint` / `npm run typecheck` | ESLint / TypeScript |
-| `npm run e2e` | construit l'app puis la parcourt de bout en bout avec la démo (320 et 390 px) : chaque écran sans erreur ni débordement, actions rapides, onglets du patrimoine, lanceur MyLife, indépendance financière, journal d'erreurs, relance hors ligne (Chrome ; `CHROME_PATH` pour un autre binaire) |
 | `npm run screenshots` | captures de chaque écran avec la démo, thèmes Nuit et Perle, 320 / 390 / 430 / 1 280 px, + contrôle des erreurs console, des débordements, du clavier et du hors-ligne (nécessite `npm run build` et Chrome ; `CHROME_PATH` pour un autre binaire) |
 | `node scripts/make-icons.mjs` | régénère les icônes PNG de la PWA à partir de `public/favicon.svg` |
 

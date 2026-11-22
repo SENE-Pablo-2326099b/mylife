@@ -5,7 +5,8 @@
 export async function pdfPages(file: Blob): Promise<string[]> {
   const [pdfjs, worker] = await Promise.all([import('pdfjs-dist/legacy/build/pdf.mjs'), import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url')]);
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), disableFontFace: true }).promise;
+  const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), disableFontFace: true });
+  const doc = await task.promise;
   try {
     const pages: string[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
@@ -14,6 +15,6 @@ export async function pdfPages(file: Blob): Promise<string[]> {
     }
     return pages;
   } finally {
-    void doc.destroy();
+    void task.destroy();
   }
 }

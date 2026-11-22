@@ -1,0 +1,49 @@
+# Vérification à chaque envoi : ce qu'on lance à la main avant de conclure (CLAUDE.md), sans base réelle ni secret
+# (tests sur PGlite en mémoire). Aucun déploiement ici : il se fait depuis la machine de l'utilisateur.
+name: Vérification
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: verification-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/finances/package-lock.json
+            apps/raveloc/package-lock.json
+            apps/perf/package-lock.json
+      - name: Dépendances
+        run: |
+          npm ci --no-audit --no-fund
+          npm --prefix apps/finances ci --no-audit --no-fund
+          npm --prefix apps/raveloc ci --no-audit --no-fund
+          npm --prefix apps/perf ci --no-audit --no-fund
+      - name: Copies du code partagé à jour
+        run: npm run vendor && git diff --exit-code
+      - name: Types
+        run: npm run typecheck:all
+      - name: Lint
+        run: npm run lint:all
+      - name: Construction
+        run: npm run build:all
+      - name: Tests
+        run: npm run test:all
+      - name: Parcours de bout en bout
+        # Chrome est déjà installé sur les machines Ubuntu de GitHub, à /usr/bin/google-chrome.
+        run: npm run e2e:all

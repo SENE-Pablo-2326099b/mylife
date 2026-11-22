@@ -22,9 +22,10 @@ pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances�
 - Le code partagé se modifie dans `packages/`, **jamais dans les copies** (`*/src/vendor/*`, `*/src/ui` des apps
   web) ; ensuite `npm run vendor`, et commiter les copies avec.
 - Toute UI web passe par le kit `packages/ui` ; tout en français, tutoiement.
-- Avant de conclure : `npm run build:all`, `npm run lint`, `npm run test:all`, et pour ce qui touche aux écrans
+- Avant de conclure : `npm run build:all`, `npm run lint:all`, `npm run typecheck:all`, `npm run test:all`, et pour ce qui touche aux écrans
   `npm run e2e:all` (Chrome attendu à `/usr/bin/google-chrome`, ou `CHROME_PATH`). Les tests du serveur et de bout en
-  bout tournent sur une base Postgres en mémoire (PGlite) : aucune base réelle ni secret nécessaire.
+  bout tournent sur une base Postgres en mémoire (PGlite) : aucune base réelle ni secret nécessaire. GitHub refait
+  ces vérifications à chaque envoi (`.github/workflows/verification.yml`).
 - Noter chaque évolution importante dans `docs/V5.md` (et `CONTEXTE.md` si l'architecture change).
 - Messages de commit en français, descriptifs, terminés par
   la ligne `Co-Authored-By` du modèle utilisé (`Claude Fable 5.2 <noreply@anthropic.com>` ou `Claude Opus 5.5 <noreply@anthropic.com>`).

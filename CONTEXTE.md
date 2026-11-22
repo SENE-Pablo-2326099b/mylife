@@ -60,9 +60,11 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 | Dépendances (racine + 3 apps) | `npm run setup` |
 | Copier les paquets partagés | `npm run vendor` |
 | Tout construire | `npm run build:all` |
-| Lint de l'accueil | `npm run lint` |
+| Lint (accueil, coquille, serveur, paquets, tests) / de tout | `npm run lint` / `npm run lint:all` |
+| Types de tout le dépôt | `npm run typecheck:all` |
 | Tests serveur + paquets (Postgres en mémoire, PGlite) | `npm test` |
 | Tous les tests unitaires | `npm run test:all` |
+| Vérification automatique | à chaque envoi sur GitHub (`.github/workflows/verification.yml`) : copies, types, lint, construction, tests, bout en bout |
 | Parcours de bout en bout de l'accueil / de tout | `npm run e2e` / `npm run e2e:all` (Chrome à `/usr/bin/google-chrome` ou `CHROME_PATH` ; `SHOTS=dossier` pour des captures) |
 | Tout MyLife en local | `npm run local` → http://localhost:4300 (vraies API, base en mémoire) |
 | Accueil en développement | `npm run dev` (port 4310, `/api` relayé vers `npm run local`) |

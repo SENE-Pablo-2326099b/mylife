@@ -5,7 +5,8 @@ import * as core from '../server/core';
 import { authDispatch } from '../server/auth';
 import { createGroup, dispatch as ravelocDispatch, ensureRavelocSchema } from '../server/raveloc';
 import { ensurePushSchema, pushDispatch } from '../server/push';
-import { spaceDispatch } from '../server/space';
+import { createInvite as createSpaceInvite, createSpace, ensureSpaceSchema, spaceDispatch } from '../server/space';
+import { ensureSupportSchema } from '../server/support';
 import { supportDispatch } from '../server/support';
 import { syncDispatch } from '../server/sync';
 import { seedUsers } from './seedUsers';
@@ -507,6 +508,73 @@ describe('sessions révocables et suppression de compte tout ou rien', () => {
     expect(core.verifyToken(session.token, env.secret)).toBe(uid);
     expect(await core.verifySession(db, session.token, env.secret)).toBeNull();
     expect(await statuses(db, session.token)).toEqual([401, 401, 401, 401, 401, 401]);
+  }, 60_000);
+
+  /**
+   * Garde-fou de la suppression de compte (plutôt qu'un effacement en cascade dans la base, qui demanderait de migrer
+   * la production) : toute table connue est soit vidée du compte, soit sans donnée de compte. Une table ajoutée sans
+   * passer par ici fait échouer le test ; et après suppression, l'identifiant du compte n'apparaît plus nulle part.
+   */
+  it('suppression : aucune table ne garde trace du compte, et toute nouvelle table doit être déclarée ici', async () => {
+    const srv = await server();
+    const db = srv.db as unknown as core.Db;
+    await ensurePushSchema(db);
+    await ensureSpaceSchema(db);
+    await ensureSupportSchema(db);
+    const TABLES: Record<string, string> = {
+      users: 'le compte',
+      records: 'ses données synchronisées',
+      records_purge: 'ses curseurs de purge',
+      raveloc_groups: 'ses groupes MyRave (effacés quand il était seul)',
+      raveloc_members: 'ses adhésions MyRave',
+      raveloc_positions: 'ses positions MyRave',
+      raveloc_invites: 'les liens de ses groupes',
+      spaces: 'ses espaces (effacés quand il était seul)',
+      space_members: 'ses adhésions aux espaces',
+      space_records: 'ses lignes dans les espaces',
+      space_invites: 'les liens de ses espaces',
+      support_messages: 'ses messages au support',
+      push_subscriptions: 'ses abonnements aux notifications',
+      push_wakeups: 'les heures de réveil de ses abonnements',
+      auth_rate: 'sans donnée de compte : compteurs d’essais par empreinte',
+      space_rate: 'sans donnée de compte : compteurs par empreinte',
+      raveloc_rate: 'sans donnée de compte : compteurs par empreinte',
+      push_state: 'sans donnée de compte : état de l’envoi',
+    };
+    const tables = (await db.query<{ table_name: string }>(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`)).rows.map((r) => r.table_name);
+    expect(tables.filter((t) => !(t in TABLES)), 'nouvelle table : l’effacer à la suppression du compte (server/auth.ts), puis la déclarer ici').toEqual([]);
+
+    // Un compte qui a tout utilisé, et un autre qui reste.
+    const a = new Device();
+    const plat = { api: srv.api, sessions: a.sessions, random };
+    const { session } = await createAccount(plat, { login: 'lou', password: PW });
+    await createAccount({ api: srv.api, sessions: new Device().sessions, random }, { login: 'reste', password: PW });
+    a.write('transactions', 't1', { label: 'x' });
+    await join(a, srv.api, session, random);
+    const uid = core.verifyToken(session.token, env.secret)!;
+    const blob = (seed: string, n = 60) => Buffer.from(seed.repeat(n)).toString('base64').slice(0, n);
+    await createGroup(db, uid, { gid: 'b'.repeat(32), name: blob('name'), profile: blob('lou'), wrappedKey: blob('key', 80), durationMs: 3_600_000 });
+    await createSpace(db, uid, { id: 'c'.repeat(32), kind: 'crew', name: blob('crew'), profile: blob('lou'), wrappedKey: blob('key', 80) });
+    await createSpaceInvite(db, uid, { sid: 'c'.repeat(32) });
+    await db.query(`INSERT INTO space_records (space_id, tbl, rid, author, open, seq, updated_at, deleted, payload) VALUES ($1, 'notes', 'n1', $2, false, 1, 0, false, 'x')`, ['c'.repeat(32), uid]);
+    await supportDispatch(db, env.secret, bearer(session.token), { action: 'send', kind: 'bug', message: 'Ça plante' });
+    await db.query(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES ('https://push.exemple.test/abonnement-2', $1, 'p', 'a', 0)`, [uid]);
+    await db.query(`INSERT INTO push_wakeups (endpoint, minute) VALUES ('https://push.exemple.test/abonnement-2', 480)`);
+
+    /** Les colonnes texte où figure l'identifiant du compte (ou l'adresse de son abonnement), table par table. */
+    const traces = async () => {
+      const cols = (await db.query<{ table_name: string; column_name: string }>(`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public' AND data_type = 'text'`)).rows;
+      const found: string[] = [];
+      for (const c of cols) {
+        const { rows } = await db.query(`SELECT 1 FROM ${c.table_name} WHERE ${c.column_name} IN ($1, $2) LIMIT 1`, [uid, 'https://push.exemple.test/abonnement-2']);
+        if (rows.length) found.push(`${c.table_name}.${c.column_name}`);
+      }
+      return found.sort();
+    };
+    expect(await traces()).toEqual(expect.arrayContaining(['users.id', 'records.user_id', 'raveloc_members.user_id', 'space_members.user_id', 'space_records.author', 'support_messages.user_id', 'push_subscriptions.user_id', 'push_wakeups.endpoint']));
+    await deleteAccount(plat, session, PW);
+    expect(await traces()).toEqual([]);
+    expect((await db.query('SELECT 1 FROM users')).rows.length).toBe(1);
   }, 60_000);
 });
 
