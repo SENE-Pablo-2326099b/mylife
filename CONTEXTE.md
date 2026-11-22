@@ -159,6 +159,7 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
 |---|---|---|
 | `sync-client` | `src/vendor/mylife-sync` | Compte, chiffrement, moteur de synchro (`join`, `autoJoin`, `syncNow`, lecture seule `readAccountApp`), session web, espaces, clé d'API commune (`aiKey.ts`). TypeScript pur (web et React Native). |
 | `lumen` | `src/vendor/lumen` | Jetons (thèmes, styles, couleurs), registre des apps (`MYLIFE_APPS`, `HOME_APPS` : les Sorties), destinations de la palette, aperçus, apparence commune, fiches Copilot ; moteurs purs : `sortie.ts`, `agenda.ts` (agenda commun), `actions.ts` (actions validées), `dates.ts` ; MyChef gelé (`chef.ts`, `recipes.ts`, `mealplan.ts`, `ticket.ts`). |
+| `training` | non copié (alias `@mylife/training` dans la coquille et les tests) | Le métier de MyPerf, pur : le calcul éprouvé de l'app d'avant (prescription, référence 1RM, cycles, volume, stagnation) et le moteur composable de la phase 4 (formats, progressions, structures, capacités, modèles, `planSession`/`reviewSession`/`capabilities`, lecture des tables de l'app d'avant). Détail : `docs/V5-MYPERF-TRAINING.md`. |
 | `ui` | `src/ui` (accueil, MyFinances, MyRave) | Kit d'interface web : `lumen.css`, thème, coque (`boot.ts`, `Navigation`, `Screen`, `Sheet`, `PageTransition`), compte (`account.tsx`, `AccountGate`), Espaces, palette, aperçus, collections synchronisées (`collectionSync.ts`, gardé pour MyChef), synchro de l'apparence (`prefsSync.ts`). MyPerf (React Native) ne peut pas l'utiliser et le reproduit. |
 
 Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut). La V5 n'en garde qu'un clair et un sombre
@@ -196,6 +197,11 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
 - **Données personnelles de l'auteur** : seulement dans le build privé (`EXPO_PUBLIC_PERSONAL_DATA=1`,
   `src/import/personal.ts`). `PERSONAL_IMPORT_VERSION` reconstruit l'historique importé avec des identifiants fixes.
 - Web seulement depuis le 21/11/2026 (`app.json` : `platforms: ["web"]`, plus de projet Android ni d'APK) ; la phase 4 la refait comme module de la coquille.
+- **Le module de la coquille** (phase 4, en construction) : `app/src/modules/perf`, adresse `/sport` (l'app d'avant reste
+  à `/perf/` jusqu'à la bascule, P8). Base : SQLite WebAssembly (`@sqlite.org/sqlite-wasm`) dans un Worker, fichier
+  OPFS en mode « pool d'accès synchrones » (pas besoin de COOP/COEP ; `'wasm-unsafe-eval'` dans la CSP de la coquille),
+  schéma de l'app d'avant plus une migration en ajout ; synchro `perf` au même format de lignes que l'app d'avant (les
+  deux lisent et écrivent le même compte). Métier : `packages/training`.
 
 ### MyRave (`apps/raveloc`)
 - Retrouver ses amis en festival : groupes temporaires (14 jours max), partage de position limité dans le temps, flèche

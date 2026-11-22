@@ -1,7 +1,7 @@
 # MyLife : consignes pour Claude
 
 Dépôt unique de l'écosystème MyLife : l'accueil (`web/`, la seule PWA installable), l'API (`api/`, `server/`),
-les paquets partagés (`packages/`) et trois apps (`apps/finances`, `apps/perf`, `apps/raveloc`).
+les paquets partagés (`packages/`, dont `packages/training`, le métier de MyPerf) et trois apps (`apps/finances`, `apps/perf`, `apps/raveloc`).
 
 **Au début d'une tâche, lire `docs/VISION.md`** (la direction de la V5, décidée le 13/11/2026 : elle prime sur
 tout le reste), puis `CONTEXTE.md` (état technique actuel : architecture, commandes, règles, ce qui part en phase 1)

@@ -185,6 +185,31 @@ describe('MyLife, une seule app', () => {
     expect(json.sessions.map((s) => s.name)).toEqual(expect.arrayContaining(['Lundi – Push', 'Jeudi – Pull', 'Full body A', 'Full body B']));
   });
 
+  it('MyPerf refait (/sport, phase 4 P1) : sa base dans le navigateur retrouve, par le compte, ce que l’app d’avant a enregistré', async () => {
+    // L'app d'avant a tout envoyé (programmes importés juste avant).
+    await page.goto(`${server.url}/perf/account`);
+    const syncLine = page.getByText(/Synchronisé/).first();
+    await expect.poll(async () => ((await syncLine.isVisible()) ? await syncLine.textContent() : ''), { timeout: 40_000, interval: 500 }).toMatch(/^Synchronisé(?!.*à envoyer)/);
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
+    // Les quatre séances types importées dans l'app d'avant, la bibliothèque d'exercices, aucune séance encore.
+    const templates = page.locator('.list-row', { hasText: 'Séances types' });
+    await expect.poll(() => templates.textContent(), { timeout: 40_000, interval: 500 }).toMatch(/4$/);
+    await page.locator('.list-row', { hasText: 'Structure' }).getByText('routine').waitFor();
+    await page.getByText(/SQLite 3\.\d+/).waitFor();
+    // La base est un vrai fichier du navigateur (OPFS), pas de la mémoire perdue au rechargement.
+    expect(await page.getByText('en mémoire').count()).toBe(0);
+    await shot(page, '07d-sport-verification');
+    // Rechargée, serveur injoignable : tout est encore là, lu dans la base du navigateur.
+    await page.route('**/api/**', (route) => route.abort());
+    try {
+      await page.reload();
+      await expect.poll(() => page.locator('.list-row', { hasText: 'Séances types' }).textContent(), { timeout: 20_000, interval: 500 }).toMatch(/4$/);
+    } finally {
+      await page.unroute('**/api/**');
+    }
+  });
+
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
     await page.goto(`${server.url}/reglages`);
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
@@ -400,6 +425,11 @@ describe('MyLife, une seule app', () => {
     await page.goto(`${server.url}/perf/account`);
     await page.getByText(other).first().waitFor({ timeout: 40_000 });
     await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
+    // MyPerf refait (/sport) : la base du navigateur gardait les séances types du compte principal ; elles partent
+    // avant toute lecture, rien du précédent n'apparaît.
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
+    await expect.poll(() => page.locator('.list-row', { hasText: 'Séances types' }).textContent(), { timeout: 30_000, interval: 500 }).toMatch(/0$/);
     // Le premier compte, lui, a toujours ses données : il les retrouve en se reconnectant ailleurs.
     const [, back] = await device();
     await back.goto(`${server.url}/`);

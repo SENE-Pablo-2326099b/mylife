@@ -25,6 +25,7 @@ import { useHomeAgenda } from '@legacy/agendaHome';
 // adresse provisoire, le temps que l'ancienne app garde `/finances/` (bascule à l'étape M6).
 const FinancesRoutes = lazy(() => import('./modules/finances/Routes').then((m) => ({ default: m.FinancesRoutes })));
 const LegacyFinances = lazy(() => import('./modules/finances/pages/BankReturn').then((m) => ({ default: m.LegacyFinances })));
+const PerfRoutes = lazy(() => import('./modules/perf/Routes').then((m) => ({ default: m.PerfRoutes })));
 const CopilotPage = lazy(() => import('./pages/Copilot').then((m) => ({ default: m.CopilotPage })));
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -255,6 +256,15 @@ function Shell({ login }: { login: string }) {
                 element={
                   <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
                     <FinancesRoutes />
+                  </Suspense>
+                }
+              />
+              {/* MyPerf refait (phase 4) : l'app d'avant reste à /perf/ jusqu'à la bascule. */}
+              <Route
+                path="/sport/*"
+                element={
+                  <Suspense fallback={<span className="t-small muted">Chargement…</span>}>
+                    <PerfRoutes />
                   </Suspense>
                 }
               />

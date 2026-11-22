@@ -1,4 +1,4 @@
-# MyPerf V5 : l'architecture de `packages/training` (P0 révisé, 22/11/2026, à valider)
+# MyPerf V5 : l'architecture de `packages/training` (validée le 22/11/2026 ; P1 fait)
 
 Réponse aux retours du 22/11 sur le plan de la phase 4 (`docs/V5-MYPERF-PHASE4.pdf`). L'architecture technique
 (SQLite WebAssembly, synchro chiffrée `perf`, écran allumé, minuteur à heure de fin + Web Push, Copilot, rien de

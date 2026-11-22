@@ -44,7 +44,8 @@ describe('isolation des modules', () => {
     expect(folders.sort()).toEqual(['finances', 'perf', 'rave']);
     // Tous les fichiers du module, sous-dossiers compris.
     const files = (d: string): string[] => readdirSync(new URL(`../${d}`, import.meta.url), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(`${d}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${d}/${e.name}`] : []));
-    const PACKAGES = /^(react|react-router-dom|dexie|dexie-react-hooks|@mylife\/(kit|lumen|core\/.+))$/;
+    // Le métier de MyPerf (packages/training) et SQLite WebAssembly sont des paquets, pas des modules.
+    const PACKAGES = /^(react|react-router-dom|dexie|dexie-react-hooks|@sqlite\.org\/sqlite-wasm|@mylife\/(kit|lumen|training|core\/.+))$/;
     const SHARED = ['app/src/contract', 'app/src/legacy/glance'];
     for (const folder of folders)
       for (const f of files(`${dir}/${folder}`)) {

@@ -52,7 +52,9 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest,wasm}'],
+        // SQLite en WebAssembly (MyPerf) : environ 1 Mo, mis en cache une fois pour toutes.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // L'ancien accueil et les apps ont leurs propres fichiers : ce service worker ne sert que la coquille.
         globIgnores: ['ancien/**', 'finances/**', 'perf/**', 'raveloc/**', 'screenshots/**'],
         navigateFallback: '/index.html',
@@ -80,6 +82,9 @@ export default defineConfig({
       { find: /^@mylife\/core\/(.*)$/, replacement: `${here('../packages/sync-client/src/')}$1` },
     ],
   },
+  // SQLite WebAssembly (MyPerf) : servi tel quel (le pré-empaquetage casserait le chemin de son .wasm), Worker en module.
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  worker: { format: 'es' },
   server: { port: 4310, proxy: { '/api': 'http://localhost:4300' } },
   // Construite en dernier : elle possède web/dist (l'ancien accueil s'est déjà posé dans web/dist/ancien).
   build: { outDir: here('../web/dist'), emptyOutDir: false, chunkSizeWarningLimit: 700 },
