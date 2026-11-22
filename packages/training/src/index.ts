@@ -18,3 +18,4 @@ export { DEFAULT_REST, restSeconds, type RestSettings } from './rest';
 export { DEFAULT_PLATES, barbellPlates, beltPlates, describePlates } from './plates';
 export { recalcBackoffs, typeForNewSet } from './sets';
 export { addDays, today, weekday } from './dates';
+export { estimate1RM } from './math';

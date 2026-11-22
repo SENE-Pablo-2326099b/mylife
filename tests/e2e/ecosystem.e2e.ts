@@ -192,8 +192,8 @@ describe('MyLife, une seule app', () => {
     await page.goto(`${server.url}/perf/account`);
     const syncLine = page.getByText(/Synchronisé/).first();
     await expect.poll(async () => ((await syncLine.isVisible()) ? await syncLine.textContent() : ''), { timeout: 40_000, interval: 500 }).toMatch(/^Synchronisé(?!.*à envoyer)/);
-    await page.goto(`${server.url}/sport`);
-    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
+    await page.goto(`${server.url}/sport/donnees`);
+    await page.getByRole('heading', { name: 'Tes données' }).waitFor();
     // Les quatre séances types importées dans l'app d'avant, la bibliothèque d'exercices, aucune séance encore.
     const templates = page.locator('.list-row', { hasText: 'Séances types' });
     await expect.poll(() => templates.textContent(), { timeout: 40_000, interval: 500 }).toMatch(/4$/);
@@ -213,15 +213,17 @@ describe('MyLife, une seule app', () => {
   });
 
   it('MyPerf refait (/sport, P2) : une vraie séance — saisie au clavier, repos, rechargée en plein milieu, remplacer, terminer, synchronisée', async () => {
+    // Jour : la séance du jour avec ses charges, « Démarrer » en haut ; « Full body A » directe ou parmi les autres.
     await page.goto(`${server.url}/sport`);
-    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
-    // Démarrer « Full body A » : prévue aujourd'hui (bouton direct) ou parmi les autres séances.
-    const direct = page.getByRole('button', { name: 'Démarrer Full body A' });
-    await direct.or(page.getByRole('button', { name: 'Séance libre' })).first().waitFor({ timeout: 20_000 });
-    if (await direct.isVisible()) await direct.click();
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    const mainTitle = page.locator('.pf-big').first();
+    await mainTitle.waitFor({ timeout: 20_000 });
+    await shot(page, '07d2-sport-jour');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    if ((await mainTitle.textContent()) === 'Full body A') await page.getByRole('button', { name: /^(Démarrer|La faire maintenant)$/ }).click();
     else {
-      if (await page.getByRole('button', { name: 'Autre séance' }).isVisible()) await page.getByRole('button', { name: 'Autre séance' }).click();
-      await page.locator('.list-row', { hasText: 'Full body A' }).click();
+      await page.getByRole('button', { name: /^(Autre séance|Une de mes séances)$/ }).click();
+      await page.getByRole('dialog', { name: 'Une autre séance' }).locator('.list-row', { hasText: 'Full body A' }).click();
     }
     await page.waitForURL(/\/sport\/seance$/);
     await page.getByText('Full body A', { exact: true }).waitFor();
@@ -267,9 +269,22 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
     await page.getByRole('dialog', { name: 'Terminer la séance' }).getByRole('button', { name: 'Terminer', exact: true }).click();
     await page.waitForURL(/\/sport$/);
+    // De retour sur Jour : la séance faite apparaît comme dernière séance.
+    await page.locator('.list-row', { hasText: 'Full body A' }).first().waitFor({ timeout: 20_000 });
+    // Le « + » : toujours le même petit menu ; le poids du jour.
+    await page.getByRole('link', { name: /^Ajouter/ }).click();
+    const add = page.getByRole('dialog', { name: 'Ajouter' });
+    await add.locator('.list-row', { hasText: 'Poids du jour' }).click();
+    await page.getByLabel('Poids (kg)').fill('79,5');
+    await page.getByRole('button', { name: 'Noter' }).click();
+    await page.getByText('Poids du jour noté : 79,5 kg').waitFor();
+    await page.getByRole('button', { name: 'Fermer' }).click();
+    // Tes données : la séance comptée, partie au compte.
+    await page.goto(`${server.url}/sport/donnees`);
     await page.getByText('Tes séances, retrouvées').waitFor();
     await expect.poll(() => page.locator('.display').first().textContent(), { timeout: 20_000 }).toBe('1');
     await expect.poll(() => page.locator('.list-row', { hasText: 'Synchro' }).textContent(), { timeout: 30_000, interval: 500 }).toMatch(/à jour$/);
+    await page.locator('.list-row', { hasText: 'Mesures' }).getByText(/poids du corps 79,5 kg/).waitFor();
   });
 
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
@@ -429,7 +444,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
@@ -489,8 +504,8 @@ describe('MyLife, une seule app', () => {
     await page.getByText(/Synchronisé/).first().waitFor({ timeout: 30_000 });
     // MyPerf refait (/sport) : la base du navigateur gardait les séances types du compte principal ; elles partent
     // avant toute lecture, rien du précédent n'apparaît.
-    await page.goto(`${server.url}/sport`);
-    await page.getByRole('heading', { name: 'Vérification' }).waitFor();
+    await page.goto(`${server.url}/sport/donnees`);
+    await page.getByRole('heading', { name: 'Tes données' }).waitFor();
     await expect.poll(() => page.locator('.list-row', { hasText: 'Séances types' }).textContent(), { timeout: 30_000, interval: 500 }).toMatch(/0$/);
     // Le premier compte, lui, a toujours ses données : il les retrouve en se reconnectant ailleurs.
     const [, back] = await device();

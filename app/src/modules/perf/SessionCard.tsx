@@ -6,7 +6,7 @@ import { useGlance } from '../../legacy/glance';
 export function SessionCard() {
   const glance = useGlance('perf');
   return (
-    <ModuleCard tone="perf" href="/perf/" label="Ouvrir MyPerf">
+    <ModuleCard tone="perf" href="/sport" label="Ouvrir MyPerf">
       <div className="pad stack" style={{ gap: 6 }}>
         <ModuleLabel tone="perf">MyPerf</ModuleLabel>
         <span className="t-card">{glance?.title ?? 'Ta séance du jour'}</span>
