@@ -10,6 +10,7 @@ export default defineConfig({
       { find: '@legacy', replacement: here('./web/src') },
       { find: '@mylife/kit', replacement: here('./packages/kit/src/index.ts') },
       { find: '@mylife/lumen', replacement: here('./packages/lumen/src/index.ts') },
+      { find: '@mylife/training', replacement: here('./packages/training/src/index.ts') },
       { find: /^@mylife\/core\/(.*)$/, replacement: `${here('./packages/sync-client/src/')}$1` },
       // Le code de l'app MyPerf d'avant (alias `@/` de apps/perf), lu par le test de référence du moteur.
       { find: /^@\/(.*)$/, replacement: `${here('./apps/perf/src/')}$1` },
