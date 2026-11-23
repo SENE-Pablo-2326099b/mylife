@@ -1,4 +1,4 @@
-# MyPerf V5 : l'architecture de `packages/training` (validée le 22/11/2026 ; P1 fait)
+# MyPerf V5 : l'architecture de `packages/training` (validée le 22/11/2026 ; mise à jour le 23/11 : § 14)
 
 Réponse aux retours du 22/11 sur le plan de la phase 4 (`docs/V5-MYPERF-PHASE4.pdf`). L'architecture technique
 (SQLite WebAssembly, synchro chiffrée `perf`, écran allumé, minuteur à heure de fin + Web Push, Copilot, rien de
@@ -265,3 +265,43 @@ sans les nouvelles valeurs). Elle est retirée à la bascule (P8), comme prévu.
 | P5 | + carte anatomique réelle interactive, records par grandeur, plateau masquable, filtre de période |
 
 Le reste du plan (P3, P6 à P8, risques, transition) est inchangé.
+
+## 14. Groupes de séries libres et format d'échange (23/11/2026)
+
+**Sa demande** : ne pas limiter une semaine à « 1 top set + des backoffs ». Une semaine d'un bloc, ou l'exception d'un
+exercice pour une semaine, est une **liste libre de groupes de séries**, dans l'ordre voulu.
+
+**Le groupe** (`SetGroup`, `src/types.ts` ; outils dans `src/groups.ts`) :
+
+| Champ | Sens |
+|---|---|
+| `type` | `top_set`, `backoff`, `working` (séries droites), `warmup`, `drop` |
+| `sets`, `reps`, `repsMax` | séries × reps, ou une fourchette |
+| `seconds` | série au temps (gainage, isométrie) |
+| `percent` | % du 1RM de référence (fraction) ; absent : charge libre |
+| `restSec`, `everySec` | repos après chaque série ; EMOM (une série toutes les N secondes) |
+| `note` | consigne libre (« pause 2 s », « tempo 3-1-1 », « vague 1 ») |
+
+**L'écriture lisible**, lue et réécrite à l'identique (`parseGroup`, `groupToSpec`) :
+`[type] [EMOM|E2MOM] séries x reps[-max][s] [@pourcentage%] [consigne] [repos durée]`, par exemple « top 1x4 @80% »,
+« backoff 4x6 @70% », « 2x3 @75% pause 2 s », « backoff EMOM 5x2 @72% », « 3x45s », « top 1x3-5 @85% repos 3 min ».
+Un objet (`{ type, sets, reps, percent, rest, every, note }`) et le raccourci `{ top, backoff }` se lisent aussi.
+
+**La prescription** (`prescribe`, stratégie `percent_reference`) suit, dans l'ordre : les groupes de l'exception de
+l'exercice, un réglage chiffré de l'exercice (qui redonne la forme top set + backoffs), les groupes de la semaine, la
+forme top set + backoffs. Chaque `PlannedSet` porte alors son `percent`, sa `note`, son `restSec` et ses `seconds`.
+`weekFromGroups` déduit la forme top set + backoffs (pour les écrans qui n'affichent qu'elle, et pour l'app d'avant) ;
+`groupsOfWeek` fait l'inverse.
+
+**Le format d'échange** (`src/program/format.ts`, `plan.ts`, `prompt.ts`), en ajout au § 11 :
+
+- `macrocycles: [{ id, name, notes, blocks: [...] }]`, et `blocks` hors macrocycle ;
+- un bloc : `id`, `name`, `type`, `start`, `notes`, `weeks` (un nombre : la forme du type de bloc ; ou la liste des
+  semaines, chacune une liste de groupes), `deload` (`weeks`, `sets`, `accessories: { load, volume }`), `lifts`
+  (exceptions : nom → `[{ week, sets }]`, la décharge comprise dans la numérotation) ;
+- séances types et créneaux avec leur `id` (export) : un réimport les met à jour au lieu d'en créer d'autres ;
+- un fichier de cycles seuls se lit (sans séances) ;
+- la consigne donnée à une IA (« Copier le prompt », conversion par Claude) décrit tout cela.
+
+L'export complet et la fusion de l'historique sont propres au module (`app/src/modules/perf/data/full.ts`) : voir
+`docs/ARCHITECTURE.md` § 6.12.

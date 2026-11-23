@@ -246,7 +246,7 @@ export function JourPage() {
 
       {view && (
         <a className="btn btn-quiet" href="/perf/" style={{ alignSelf: 'center' }}>
-          Programme et progrès : app d’avant
+          L’app d’avant
         </a>
       )}
 

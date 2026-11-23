@@ -1,6 +1,6 @@
 # MyLife : contexte technique
 
-> **État du code au 21/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
+> **État du code au 23/11/2026.** Ce fichier décrit ce qui existe et comment s'en servir. La direction (ce que MyLife
 > devient, et dans quel ordre) est dans **`docs/VISION.md`**, qui prime en cas de désaccord. Le journal de la V5 est
 > `docs/V5.md` ; l'historique d'avant la V5 est dans `docs/archives/`.
 >
@@ -16,8 +16,11 @@
   en usage réel** : MyFinances est un module de la coquille à `/argent` (moteur, écrans, banques, synchro, placements) ;
   l'ancienne app est retirée (17/11) ; le module lit et écrit sa base de faits ; export et import de données
   (Réglages de MyFinances → Tes données). Copilot a des conversations
-  synchronisées et des domaines. **Phase 4 (MyPerf) préparée** : `docs/V5-MYPERF-PHASE4.pdf`, en attente de validation.
-  Phase 5 (MyRave, Sorties) : à faire.
+  synchronisées, des domaines et le choix du modèle (Opus 5.5 ou Sonnet 5.5). **Phase 4 (MyPerf) : toutes les pages
+  refaites** dans le module `/sport` (Jour, séance, Programme et Réglages, Importer, Exercices, Progrès, bilans,
+  calendrier, séance sur ordinateur, carte d'accueil et Copilot Sport, notification de fin de repos, cycles complets en
+  groupes de séries libres, export complet réimportable) ; **à valider et à essayer en usage réel**, puis la bascule
+  (P8 : `/perf/` mène à `/sport`, deux semaines d'usage, retrait de l'app d'avant). Phase 5 (MyRave, Sorties) : à faire.
 - **Interface** : l'effet de verre se règle (Réglages → Apparence : sobre, subtil, prononcé ; `data-glass`), avec une
   seule source de lumière pour tout l'écran (`packages/kit/src/glassLight.ts`). Navigation : barre du bas sur
   téléphone, rail d'icônes sur tablette, barre latérale à trois étages sur ordinateur ; le « + » suit l'écran.
@@ -32,15 +35,16 @@
 ## 2. Vue d'ensemble (architecture actuelle)
 
 Une seule origine, une seule PWA installable, mais **quatre projets Vercel** recollés par des réécritures
-(`vercel.json`). La V5 les remplace par une seule app et un seul déploiement (phase 2).
+(`vercel.json`). La coquille V5 sert `/` ; les apps d'avant (MyPerf, MyRave) gardent leur projet jusqu'à leur bascule (phases 4 et 5), le projet de MyFinances ne sert plus que le relais bancaire.
 
 | Chemin | Partie | Dossier | Projet Vercel | Techno |
 |---|---|---|---|---|
-| `/` | **Accueil** : « Ta journée », Copilot, Sorties, apps et aperçus, compte, apparence, installation ; **seul manifeste** | `web/` | `mylife` | React 18 + Vite + kit `packages/ui` |
+| `/` | **La coquille V5** : accueil (cartes des modules, agenda), Copilot, modules, réglages et compte, installation ; les modules `/argent` (MyFinances) et `/sport` (MyPerf) ; **seul manifeste** | `app/` | `mylife` | React 18 + Vite + kit `packages/kit` |
+| `/ancien/` | L'accueil d'avant la V5 (encore là pour les Sorties : `/ancien/sorties`) | `web/` | `mylife` (construit dans `web/dist/ancien`) | React 18 + Vite + kit `packages/ui` |
 | `/api/*` | Comptes, synchro chiffrée, espaces partagés, MyRave, notifications, support | `api/`, `server/` | `mylife` | Fonctions Vercel + Neon Postgres |
 | `/finances/` | **Retirée le 17/11/2026** : ses adresses mènent au module `/argent` (la coquille sert `/finances/connexion/retour`, retour de la banque ; `/finances/sw.js` désinscrit l'ancien service worker). Le code reste dans `apps/finances`, et son projet Vercel sert encore le relais `/api/eb` | `apps/finances` | `myfinances` (base des faits, lue et écrite par le module) | React 18 + Vite + Tailwind + Dexie |
 | `/api/eb` | Relais Enable Banking + cours des placements | `apps/finances/api/eb.ts` | `myfinances` | Fonction Vercel |
-| `/perf/` | **MyPerf** | `apps/perf` | `myperf` | Expo / React Native (React 19), export web seulement + SQLite (sql.js) |
+| `/perf/` | **MyPerf, l'app d'avant** (jusqu'à la bascule ; le nouveau MyPerf est le module `/sport` de la coquille) | `apps/perf` | `myperf` | Expo / React Native (React 19), export web seulement + SQLite (sql.js) |
 | `/raveloc/` | **MyRave** (ex-myRaveLoc ; chemin et identifiants inchangés) | `apps/raveloc` | `myraveloc` | React 18 + Vite + kit `packages/ui` |
 
 - Pas d'espace de travail npm : chaque dossier a ses `node_modules` (React 18 contre 19).
@@ -162,7 +166,8 @@ liée à `app/table/identifiant`. Clé de secours = second emballage. Détails :
 |---|---|---|
 | `sync-client` | `src/vendor/mylife-sync` | Compte, chiffrement, moteur de synchro (`join`, `autoJoin`, `syncNow`, lecture seule `readAccountApp`), session web, espaces, clé d'API commune (`aiKey.ts`). TypeScript pur (web et React Native). |
 | `lumen` | `src/vendor/lumen` | Jetons (thèmes, styles, couleurs), registre des apps (`MYLIFE_APPS`, `HOME_APPS` : les Sorties), destinations de la palette, aperçus, apparence commune, fiches Copilot ; moteurs purs : `sortie.ts`, `agenda.ts` (agenda commun), `actions.ts` (actions validées), `dates.ts` ; MyChef gelé (`chef.ts`, `recipes.ts`, `mealplan.ts`, `ticket.ts`). |
-| `training` | non copié (alias `@mylife/training` dans la coquille et les tests) | Le métier de MyPerf, pur : le calcul éprouvé de l'app d'avant (prescription, référence 1RM, cycles, volume, stagnation) et le moteur composable de la phase 4 (formats, progressions, structures, capacités, modèles, `planSession`/`reviewSession`/`capabilities`, lecture des tables de l'app d'avant). Détail : `docs/V5-MYPERF-TRAINING.md`. |
+| `kit` | non copié (alias `@mylife/kit` dans la coquille) | Le kit d'interface de la coquille V5 : jetons, verre réglable et lumière unique, navigation (barre, rail, barre latérale), composants (`Glass`, `List`, `Sheet`, `Switch`…). |
+| `training` | non copié (alias `@mylife/training` dans la coquille et les tests) | Le métier de MyPerf, pur : le calcul éprouvé de l'app d'avant (prescription, référence 1RM, cycles, volume, stagnation) et le moteur composable de la phase 4 (formats, progressions, structures, capacités, modèles, `planSession`/`reviewSession`/`capabilities`, lecture des tables de l'app d'avant) ; les **groupes de séries libres** d'une semaine (`groups.ts`) ; le **format d'échange** des programmes (`program/` : lecture tolérante, macrocycles, blocs, semaines, exceptions, identifiants ; consigne pour une IA). Détail : `docs/V5-MYPERF-TRAINING.md`. |
 | `ui` | `src/ui` (accueil, MyFinances, MyRave) | Kit d'interface web : `lumen.css`, thème, coque (`boot.ts`, `Navigation`, `Screen`, `Sheet`, `PageTransition`), compte (`account.tsx`, `AccountGate`), Espaces, palette, aperçus, collections synchronisées (`collectionSync.ts`, gardé pour MyChef), synchro de l'apparence (`prefsSync.ts`). MyPerf (React Native) ne peut pas l'utiliser et le reproduit. |
 
 Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut). La V5 n'en garde qu'un clair et un sombre
@@ -188,7 +193,7 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
   restauration automatiques (`src/domain/restorePoints.ts`).
 - Décisions et hypothèses d'origine : `docs/archives/finances/`.
 
-### MyPerf (`apps/perf`)
+### MyPerf, l'app d'avant (`apps/perf`, jusqu'à la bascule)
 - Onglets Aujourd'hui (séance prévue), Planning (macro- et mésocycles), Exercices (fiche, 1RM, carte musculaire), Stats.
   Séance en direct : séries, minuteur de repos, remplacement, notes. Import de programme (texte, IA gratuite, programmes
   prêts). Coach IA (`src/services/coach/`).
@@ -200,16 +205,35 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
 - **Données personnelles de l'auteur** : seulement dans le build privé (`EXPO_PUBLIC_PERSONAL_DATA=1`,
   `src/import/personal.ts`). `PERSONAL_IMPORT_VERSION` reconstruit l'historique importé avec des identifiants fixes.
 - Web seulement depuis le 21/11/2026 (`app.json` : `platforms: ["web"]`, plus de projet Android ni d'APK) ; la phase 4 la refait comme module de la coquille.
-- **Le module de la coquille** (phase 4, en construction) : `app/src/modules/perf`, adresse `/sport` (l'app d'avant reste
-  à `/perf/` jusqu'à la bascule, P8). Base : SQLite WebAssembly (`@sqlite.org/sqlite-wasm`) dans un Worker, fichier
-  OPFS en mode « pool d'accès synchrones » (pas besoin de COOP/COEP ; `'wasm-unsafe-eval'` dans la CSP de la coquille),
-  schéma de l'app d'avant plus une migration en ajout ; synchro `perf` au même format de lignes que l'app d'avant (les
-  deux lisent et écrivent le même compte). Métier : `packages/training`. Écrans refaits : Jour, la séance (plein écran :
-  `nav.focus` du contrat des modules efface la barre du bas), Programme (bloc en cours et blocs en liste, séances types, créneaux :
-  format, progression, groupe, repos, consigne ; formats à soi dans la table `formats`) et Réglages d'entraînement (un
-  seul endroit : semaines du bloc, semaines ajustées par lift, 1RM de référence en lest net, blocs, valeurs de base ;
-  `data/plan.ts`). Tout s'écrit au format de l'app d'avant (`mesocycles`, `cycle_week_overrides`, `exercise_one_rm`,
-  réglage `app`).
+- **Le module de la coquille** (phase 4, toutes les pages refaites, à valider) : `app/src/modules/perf`, adresse
+  `/sport` (l'app d'avant reste à `/perf/` jusqu'à la bascule, P8). Base : SQLite WebAssembly (`@sqlite.org/sqlite-wasm`)
+  dans un Worker, fichier OPFS en mode « pool d'accès synchrones » (pas besoin de COOP/COEP ; `'wasm-unsafe-eval'` dans
+  la CSP de la coquille ; un verrou Web Locks évite d'ouvrir le fichier deux fois), schéma de l'app d'avant plus des
+  migrations en ajout (`data/schema.ts` : décalages, variantes, forme notée, groupes des exceptions) ; synchro `perf` au
+  même format de lignes que l'app d'avant (les deux lisent et écrivent le même compte). Métier : `packages/training`.
+  - **Pages** (`pages/`) : Jour (séance du jour, semaine, décaler, dernière séance, « + »), la séance (plein écran :
+    `nav.focus` ; sur ordinateur, pleine largeur : `nav.wide`, panneau de repos et de saisie, clavier physique),
+    bilans de séance et de bloc, Programme (bloc en cours, blocs, séances types, créneaux : format, progression,
+    groupe, repos, consigne), Réglages d'entraînement (un seul endroit : semaines du bloc, semaines par lift, 1RM de
+    référence en lest net, blocs, valeurs de base, notification de fin de repos), Importer ou partager, calendrier,
+    Exercices (catalogue, fiche avec le corps), Progrès (volume par muscle sur la carte du corps, lifts, plateaux,
+    régularité, poids), Tes données (synchro, stockage, export).
+  - **Cycles complets** : macrocycle → blocs → semaines → exceptions par exercice ; une semaine (ou une exception) est une
+    liste libre de groupes de séries (`SetGroup` : top, backoffs, séries pausées, vagues, EMOM, séries droites, au
+    temps), gardée dans le JSON des semaines et dans `cycle_week_overrides.groups` ; la séance suit les groupes série
+    par série (%, consigne, repos).
+  - **Import et export** (`data/importer.ts`, `data/full.ts`) : texte, JSON d'une IA, PDF ou photo convertis par Claude
+    (clé de l'utilisateur, depuis le navigateur) ; aperçu avant toute écriture, tout ou rien. « Partager mon programme »
+    (programme et cycles) et « Tout exporter (JSON complet) » (plus la bibliothèque, les réglages, l'historique séance par
+    séance et série par série, les mesures, les décalages) ; réimporter met à jour par identifiant (séances types sur
+    place, blocs, historique ; une séance sans identifiant est retrouvée par sa date et son nom), sans doublon, sans
+    rien effacer de l'historique. Séries pour un tableur : CSV.
+  - **Avec le reste de MyLife** (`bridge.ts`, `SessionCard.tsx`) : carte d'accueil (séance du jour), fiche de Copilot
+    Sport et agenda commun déposés sur l'appareil ; action « décaler » (`perf.moveSession`) validée dans Copilot et
+    exécutée par le module ; notification de fin de repos (`session/restPush.ts`, `/api/push` action `rest`).
+  - Tout s'écrit au format de l'app d'avant (`mesocycles`, `cycle_week_overrides`, `exercise_one_rm`, réglage `app`) ;
+    elle ignore les colonnes ajoutées. **Ne pas retoucher dans l'app d'avant un bloc dont les semaines sont en groupes
+    libres** : elle ne les connaît pas.
 - **Liens de la coquille** : les liens internes (les `<a>` du kit) naviguent sans recharger la page (`useInAppLinks`,
   `app/src/App.tsx`) ; ceux des apps servies à part (`/perf/`, `/raveloc/`, `/finances/`, `/api`) restent de vrais liens.
 
@@ -221,10 +245,12 @@ Aujourd'hui : 12 thèmes dont 4 « identités » (Circuit, Ardoise, Argile, Brut
 - Accueillera les Sorties (phase 5).
 
 ### Copilot (accueil, gardé)
-- `web/src/copilot.ts`, `web/src/pages/Copilot.tsx` : une IA pour toutes les apps, avec la clé de l'utilisateur, depuis
-  l'appareil. Outils : vue d'ensemble, fiches de MyFinances et MyPerf (posées par chaque app : `Today.tsx`,
-  `services/copilotCard.ts`), agenda commun, sorties ; **actions validées** (sauter un récurrent, décaler une séance :
-  carte « Valider », exécutée par l'app concernée, annulable : `packages/lumen/src/actions.ts`).
+- `web/src/copilot.ts` (le moteur, partagé), `app/src/pages/Copilot.tsx` (l'écran de la coquille) : une IA pour tous
+  les modules, avec la clé de l'utilisateur, depuis l'appareil ; modèle au choix (Opus 5.5 par défaut, ou Sonnet 5.5 :
+  `aiKey.ts`). Outils : vue d'ensemble, fiches de MyFinances et de MyPerf (posées par chaque module ; MyPerf :
+  `app/src/modules/perf/bridge.ts`), agenda commun, sorties ; **actions validées** (sauter un récurrent, décaler une
+  séance : carte « Valider », exécutée par le module concerné, annulable : `packages/lumen/src/actions.ts` ; boîte
+  `sport` pour le module MyPerf, `perf` pour l'app d'avant).
 
 ---
 

@@ -1,12 +1,13 @@
 # MyLife — Documentation technique et architecturale
 
-> Version du 22/10/2026. Périmètre : l'écosystème MyLife dans son ensemble — l'accueil (`web/`), le serveur
-> (`api/`, `server/`), les paquets partagés (`packages/`) et les trois applications (`apps/finances`,
-> `apps/perf`, `apps/raveloc`). Les diagrammes sont en Mermaid.js (rendus par GitHub et la plupart des
-> éditeurs Markdown).
+> Version du 22/10/2026, **mise à jour le 23/11/2026** (coquille V5, module MyPerf, § 6.11 à 6.13). Périmètre :
+> l'écosystème MyLife dans son ensemble — la coquille V5 (`app/`) et ses modules, l'accueil d'avant (`web/`), le
+> serveur (`api/`, `server/`), les paquets partagés (`packages/`) et les apps d'avant (`apps/finances`, `apps/perf`,
+> `apps/raveloc`). Les diagrammes sont en Mermaid.js (rendus par GitHub et la plupart des éditeurs Markdown).
 >
-> **Décrit l'architecture actuelle**, celle qui tourne en production. L'architecture cible de la V5 (une seule app web,
-> un seul déploiement, des modules isolés) est dans `docs/VISION.md` § 4 ; ce document sera réécrit en phase 2.
+> **Décrit l'architecture actuelle**, celle qui tourne en production. Les principes (local-first, serveur « zéro
+> connaissance », chiffrement, synchro) n'ont pas changé ; la cible de la V5 (une seule app web, un seul déploiement,
+> des modules isolés) est dans `docs/VISION.md` § 4, et `CONTEXTE.md` dit où on en est.
 
 ## Sommaire
 
@@ -29,7 +30,7 @@ adossé à un serveur « zéro connaissance »**. Quatre patterns se superposent
 | Niveau | Pattern | Où on le voit |
 |---|---|---|
 | Système | **Local-first + serveur de blocs chiffrés** (end-to-end encryption) | Chaque appareil possède la vérité de ses données (IndexedDB/SQLite) ; le serveur ne stocke que des enregistrements chiffrés qu'il ne sait pas lire. |
-| Déploiement | **Micro-frontends sur une origine unique** (*multi-zones* par réécritures Vercel) | `/`, `/finances/`, `/perf/`, `/raveloc/` sont quatre déploiements indépendants servis sous la même origine (`vercel.json`) : stockage, session et manifeste de PWA partagés. |
+| Déploiement | **Micro-frontends sur une origine unique** (*multi-zones* par réécritures Vercel), en cours de regroupement | La coquille V5 (`/`, avec les modules `/argent` et `/sport`) et l'accueil d'avant (`/ancien/`) forment un déploiement ; `/perf/` (MyPerf d'avant, jusqu'à la bascule) et `/raveloc/` (MyRave) en sont deux autres, servis sous la même origine (`vercel.json`) : stockage, session et manifeste de PWA partagés. |
 | Code | **Architecture en couches** (domaine pur → données → services → interface) dans chaque app, avec un **noyau partagé « vendorisé »** | `domain/` (logique pure et testée) ← `db/` ← `sync/` ← `ui/`. Le noyau partagé (`packages/`) est copié dans chaque app par `npm run vendor` (pas de paquet publié). |
 | Serveur | **Hexagonal minimal** (ports et adaptateurs) | `server/core.ts` ne dépend que d'une interface `Db { query() }` : `pg.Pool` en production, PGlite (Postgres en mémoire) en test et en local. Les handlers `api/*.ts` ne sont que des adaptateurs HTTP. |
 
@@ -41,8 +42,11 @@ MyPerf) le traduit avec ses moyens.
 
 ```text
 MyLife/
-├── web/                       Accueil (React 18 + Vite) — SEULE PWA installable (manifeste, portée "/")
-│   └── src/pages/             Home (apps + aperçus), Account, Appearance, Install, Welcome
+├── app/                       La coquille V5 (React 18 + Vite) — SEULE PWA installable (manifeste, portée "/")
+│   ├── src/pages/             Accueil, Modules, Copilot, Réglages, Compte, Tes données, Installer, Confidentialité
+│   ├── src/contract.ts        Contrat des modules (cartes, ajouts rapides, navigation, focus, pleine largeur)
+│   └── src/modules/           finances/ (MyFinances, /argent), perf/ (MyPerf, /sport : base SQLite dans un Worker)
+├── web/                       L'accueil d'avant (/ancien/), gardé pour les Sorties
 ├── api/                       Adaptateurs HTTP Vercel (Fluid compute) : auth.ts, sync.ts, raveloc.ts
 ├── server/                    Cœur métier serveur, indépendant de la plate-forme
 │   ├── core.ts                Comptes, sessions signées, garde-fous, synchronisation chiffrée
@@ -50,14 +54,17 @@ MyLife/
 │   ├── raveloc.ts             Groupes, invitations, positions chiffrées, anti-abus
 │   ├── http.ts                Pool Postgres, environnement, gestion d'erreurs, IP client
 │   └── local.ts               Serveur tout-en-un pour le développement et les tests e2e
-├── packages/                  Noyau partagé (source unique, copié dans les apps)
-│   ├── lumen/                 Jetons : thèmes, identités, registre MYLIFE_APPS/DESTINATIONS, aperçus, apparence
+├── packages/                  Noyau partagé (source unique ; copié dans les apps d'avant, alias dans la coquille)
+│   ├── kit/                   Kit d'interface de la coquille V5 : jetons, verre, navigation, composants
+│   ├── training/              Métier de MyPerf (pur) : prescription, 1RM, cycles, groupes de séries, moteur
+│   │                          composable, format d'échange des programmes
+│   ├── lumen/                 Jetons, aperçus, agenda commun, actions validées, fiches Copilot, apparence
 │   ├── sync-client/           Cryptographie, compte, moteur de synchronisation, session web (TypeScript pur)
-│   └── ui/                    Kit d'interface web : verre, dock, écrans, compte, palette, Espaces, thème
+│   └── ui/                    Kit d'interface web des apps d'avant : verre, dock, écrans, compte, palette, Espaces
 ├── apps/
 │   ├── finances/              MyFinances — React 18 + Dexie (IndexedDB) + Tailwind
 │   │   └── src/{domain,db,sync,pages,components,assistant}
-│   ├── perf/                  MyPerf — Expo / React Native (web + Android) + SQLite
+│   ├── perf/                  MyPerf d'avant — Expo / React Native (web seulement) + SQLite, jusqu'à la bascule
 │   │   └── src/{domain,db,services,state,features,ui,app}
 │   └── raveloc/               MyRave — React 18 + Vite
 │       └── src/{domain,lib,services,state,screens,components}
@@ -79,8 +86,9 @@ Responsabilités détaillées :
 | `apps/*/(ui, pages, screens)` | Présentation. | tout ce qui précède |
 
 Règle de dépendance : **le sens est toujours interface → services/données → domaine** ; le domaine
-n'importe jamais d'I/O, ce qui le rend entièrement testable (332 tests MyFinances, 214 MyPerf, 83
-MyRave, 42 serveur).
+n'importe jamais d'I/O, ce qui le rend entièrement testable. Dans la coquille, un module n'importe jamais un autre module :
+seulement le kit, le cœur (`@mylife/core`), `lumen`, son métier (`@mylife/training` pour MyPerf), le contrat, la
+passerelle des aperçus et son propre dossier (vérifié par `tests/shellV5.test.ts`).
 
 ---
 
@@ -351,7 +359,9 @@ erDiagram
 ```
 
 Tables techniques : `auth_rate (k, win, n, at)` et `raveloc_rate` (compteurs de fenêtres pour la
-limitation de débit). Les liens `RAVELOC_MEMBERS.user_id → USERS` et `RECORDS.user_id → USERS` portent la
+limitation de débit) ; notifications : `push_subscriptions` (adresse d'abonnement du navigateur, clés), `push_wakeups`
+(heures de réveil d'un appareil), `push_rest` (la fin du repos en cours d'un appareil, effacée une fois partie),
+`push_state` ; toutes suivent l'abonnement ou le compte à sa suppression. Les liens `RAVELOC_MEMBERS.user_id → USERS` et `RECORDS.user_id → USERS` portent la
 suppression en cascade côté `records` ; la sortie des groupes à la suppression d'un compte est faite
 explicitement (`forgetUser`).
 
@@ -367,7 +377,7 @@ explicitement (`forgetUser`).
 | `Fix` / `FriendFix` | `{ lat, lon, acc, at }` | Position GPS et sa précision (m) ; `at` = instant de la mesure. |
 | `Group`, `Member` (MyRave) | nom, rôle, partage, position déchiffrée, état « illisible » | État en mémoire de l'écran. |
 | MyFinances : `Transaction`, `Account`, `Category`, `Portfolio`, `Settings`… | montants **en centimes entiers** | Domaine budgétaire (jamais de flottants). |
-| MyPerf : `workouts`, `sets`, `exercises`, `templates`, `mesocycles`, `exercise_one_rm`… | SQL (migrations *append-only*) | Domaine d'entraînement. |
+| MyPerf : `workouts`, `workout_exercises`, `sets`, `exercises`, `templates`, `template_exercises`, `week_pattern`, `macrocycles`, `mesocycles`, `cycle_week_overrides`, `exercise_one_rm`, `body_entries`, `formats`, `session_moves`… | SQL (migrations *append-only*, les mêmes tables pour l'app d'avant et le module) | Domaine d'entraînement. Le module ajoute des colonnes que l'app d'avant ignore (grandeurs des séries, format et progression des créneaux, variantes, forme notée, groupes de séries des exceptions). |
 
 ### 5.3 Cardinalités logiques
 
@@ -510,6 +520,52 @@ envoyée au serveur de MyLife (principe de la V5). Sur le web, elle est dans le 
 | Appareil partagé : la personne suivante utilise la clé | Effacée à la déconnexion et quand un autre compte se connecte (`web.ts`, `claimDevice` ; MyPerf : `platform.ts`). |
 | Vol de l'appareil déverrouillé, extension malveillante du navigateur | Non couvert : hors de portée d'une app web (un chiffrement local serait déchiffré par l'app elle-même au moment de s'en servir). Parade côté utilisateur : une clé dédiée à MyLife, avec un plafond de dépense dans la console Anthropic, révocable à tout moment. |
 | Relais par le serveur de MyLife | Écarté : la clé quitterait l'appareil, contraire au principe. |
+
+### 6.11 MyPerf : une semaine en groupes de séries libres
+
+Un bloc (mésocycle) a des semaines de travail et de décharge. Chaque semaine est une **liste ordonnée de groupes**
+(`SetGroup` : type parmi top, backoff, séries, échauffement, dégressives ; séries × reps ou fourchette, ou au temps ;
+% du 1RM de référence ; consigne libre ; repos ; EMOM). L'exception d'un exercice pour une semaine est une autre liste.
+La prescription d'un exercice au % du 1RM se lit dans cet ordre :
+
+1. les groupes de l'exception de cet exercice cette semaine ;
+2. sinon, un réglage chiffré de l'exercice (forme top set + backoffs, réglé dans l'app) ;
+3. sinon, les groupes de la semaine du bloc ;
+4. sinon, la forme top set + backoffs de la semaine.
+
+Chaque série reçoit sa charge `arrondi(1RM × % − poids du corps si lesté, incrément)` (le lest net pour un exercice
+lesté, le 1RM étant tenu en masse totale), sa consigne et son repos. Une ligne lisible (« top 1x4 @80% », « 2x3 @75%
+pause 2 s », « backoff EMOM 5x2 @72% ») se relit et se réécrit à l'identique (`parseGroup` ∘ `groupToSpec` = identité,
+vérifié par les tests). Les groupes vivent dans le JSON des semaines (`mesocycles.scheme`, `deload_main`) et dans
+`cycle_week_overrides.groups` ; les colonnes chiffrées gardent la forme top set + backoffs qu'on en déduit, pour l'app
+d'avant.
+
+### 6.12 MyPerf : import, export et fusion sans doublon
+
+Le format d'échange (`packages/training/src/program`) se lit tolérant (JSON entouré de texte, clés en français, virgules
+en trop) ; ce qui n'est pas compris est signalé, jamais inventé. Rien n'est écrit avant « Valider » et l'import se fait
+en une transaction (tout ou rien). L'export complet ajoute au programme la bibliothèque, les réglages, l'historique,
+les mesures et les décalages. La fusion à l'import :
+
+- **par identifiant** pour tout ce qui en a (séances types et créneaux, blocs, macrocycles, exercices, séances faites,
+  exercices d'une séance, séries, mesures, décalages) : ce qui existe est mis à jour sur place, le reste est créé avec
+  l'identifiant du fichier ;
+- **sans identifiant** (une séance écrite par une IA) : même date et même nom pour une séance, même mesure le même jour,
+  même séance au même jour d'origine pour un décalage ; exercices par nom (synonymes et fautes de frappe tolérés), créés
+  une seule fois s'ils sont inconnus ;
+- **jamais d'effacement d'historique** : une séance absente du fichier reste ; seuls les exercices et séries d'une séance
+  présente suivent le fichier ; « Remplacer » n'archive que les séances types absentes du fichier.
+
+Importer deux fois le même fichier laisse la base identique (vérifié par les tests, sur un compte neuf et sur le même).
+
+### 6.13 MyPerf : la notification de fin de repos
+
+Le repos est une heure de fin absolue, gardée sur l'appareil. Quand l'écran se met en veille pendant un repos,
+l'appareil envoie au serveur cette heure seule (`/api/push`, action `rest`, requête `keepalive`) ; au retour sur l'app,
+il l'annule. Le serveur garde une ligne par abonnement (`push_rest` : heure, jeton) et attend : par tranches de
+4 min 30 sur Vercel (`waitUntil`), la fonction se relançant elle-même avant d'expirer avec le même compte et le même
+repos ; une relance dont le jeton ne correspond plus (repos annulé ou remplacé) ne fait rien. À l'heure dite : un
+signal `{ type: 'rest' }`, dont le service worker de l'accueil écrit le texte (rien si la séance est à l'écran).
 
 ## Annexe — Invariants de sécurité vérifiés par les tests
 

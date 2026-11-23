@@ -1,12 +1,14 @@
 # MyLife : consignes pour Claude
 
-Dépôt unique de l'écosystème MyLife : l'accueil (`web/`, la seule PWA installable), l'API (`api/`, `server/`),
-les paquets partagés (`packages/`, dont `packages/training`, le métier de MyPerf) et trois apps (`apps/finances`, `apps/perf`, `apps/raveloc`).
+Dépôt unique de l'écosystème MyLife : la coquille V5 (`app/`, la seule PWA installable, avec les modules MyFinances
+`/argent` et MyPerf `/sport`), l'accueil d'avant (`web/`, `/ancien/`), l'API (`api/`, `server/`), les paquets partagés
+(`packages/`, dont `packages/kit` et `packages/training`, le métier de MyPerf) et les apps d'avant (`apps/finances`,
+`apps/perf`, `apps/raveloc`).
 
 **Au début d'une tâche, lire `docs/VISION.md`** (la direction de la V5, décidée le 13/11/2026 : elle prime sur
 tout le reste), puis `CONTEXTE.md` (état technique actuel : architecture, commandes, règles, ce qui part en phase 1)
-et `docs/V5.md` (journal de la V5 : **sa tête dit où on en est exactement et ce qu'il faut garder obligatoirement**). Selon le sujet : `docs/ARCHITECTURE.md` (détail technique), `apps/perf/CLAUDE.md`
-pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances…) est dans `docs/archives/`.
+et `docs/V5.md` (journal de la V5 : **sa tête dit où on en est exactement et ce qu'il faut garder obligatoirement**). Selon le sujet : `docs/ARCHITECTURE.md` (détail technique), `docs/V5-MYPERF-TRAINING.md`
+et `CONTEXTE.md` § 6 pour MyPerf (`apps/perf/CLAUDE.md` : l'app d'avant). L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances…) est dans `docs/archives/`.
 
 ## Règles qui ne se négocient pas
 - **Rien de personnel** : aucune donnée de l'utilisateur ne doit apparaître pour un autre compte ni dans ce qui est
@@ -21,7 +23,7 @@ pour MyPerf. L'historique d'avant la V5 (journaux V3 et V4, refonte MyFinances�
 ## Comment travailler
 - Le code partagé se modifie dans `packages/`, **jamais dans les copies** (`*/src/vendor/*`, `*/src/ui` des apps
   web) ; ensuite `npm run vendor`, et commiter les copies avec.
-- Toute UI web passe par le kit `packages/ui` ; tout en français, tutoiement.
+- Toute UI web passe par le kit : `packages/kit` dans la coquille V5 (`app/`), `packages/ui` dans les apps d'avant ; tout en français, tutoiement.
 - Avant de conclure : `npm run build:all`, `npm run lint:all`, `npm run typecheck:all`, `npm run test:all`, et pour ce qui touche aux écrans
   `npm run e2e:all` (Chrome attendu à `/usr/bin/google-chrome`, ou `CHROME_PATH`). Les tests du serveur et de bout en
   bout tournent sur une base Postgres en mémoire (PGlite) : aucune base réelle ni secret nécessaire. GitHub refait

@@ -12,7 +12,7 @@ npm run typecheck       # TypeScript strict
 npm run lint
 ```
 
-MyPerf n'existe plus qu'en web (l'app Android a été retirée le 21/11/2026) ; la phase 4 de la V5 la refait comme module de la coquille MyLife.
+MyPerf n'existe plus qu'en web (l'app Android a été retirée le 21/11/2026). **Le nouveau MyPerf est le module `/sport` de la coquille MyLife** (`app/src/modules/perf`, toutes les pages refaites le 23/11/2026) : cette app reste à `/perf/` jusqu'à la bascule (phase 4, P8), puis sera retirée. Les deux lisent et écrivent le même compte ; cette app ignore ce que le module ajoute (groupes de séries libres, décalages, forme notée…) : **ne pas y retoucher un bloc dont les semaines sont en groupes libres**.
 
 ## Stack — et pourquoi
 
