@@ -5,6 +5,8 @@ import { BlocPage, LiftPage, ReglagesPage } from './pages/Reglages';
 import { ImportPage } from './pages/Import';
 import { ExercisePage, ExercisesPage } from './pages/Exercices';
 import { ProgresPage } from './pages/Progres';
+import { BilanPage } from './pages/Bilan';
+import { CyclePage } from './pages/Cycle';
 import { SessionPage } from './pages/Session';
 import { VerifyPage } from './pages/Verify';
 
@@ -30,6 +32,8 @@ export function PerfRoutes() {
       <Route path="exercices" element={<ExercisesPage />} />
       <Route path="exercices/:id" element={<ExercisePage />} />
       <Route path="progres" element={<ProgresPage />} />
+      <Route path="bilan/:id" element={<BilanPage />} />
+      <Route path="programme/bilan-bloc/:id" element={<CyclePage />} />
       <Route path="*" element={<Navigate to="/sport" replace />} />
     </Routes>
   );

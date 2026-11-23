@@ -296,6 +296,10 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE exercises ADD COLUMN variant_of TEXT;
   `,
+  // 13 : la forme ressentie d'une séance, de 1 à 5 (le bilan), à côté de sa note.
+  `
+  ALTER TABLE workouts ADD COLUMN rating INTEGER;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

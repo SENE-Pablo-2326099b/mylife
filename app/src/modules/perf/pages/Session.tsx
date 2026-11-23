@@ -35,6 +35,20 @@ interface Editing {
   field: Field;
 }
 
+/** Ordinateur (au moins 1000 px) : le panneau de repos à droite remplace le bandeau du bas. */
+function useWide(): boolean {
+  const query = '(min-width: 1000px)';
+  const [wide, setWide] = useState(() => typeof matchMedia === 'function' && matchMedia(query).matches);
+  useEffect(() => {
+    if (typeof matchMedia !== 'function') return;
+    const m = matchMedia(query);
+    const on = () => setWide(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
+
 /** L'heure qui avance, à la seconde (le chrono de la séance). */
 function useNow(): number {
   const [now, setNow] = useState(() => Date.now());
@@ -69,6 +83,7 @@ export function SessionPage() {
   const [ending, setEnding] = useState(false);
   const awake = useWakeLock(doc?.status === 'active');
   const now = useNow();
+  const wide = useWide();
 
   const reload = useCallback(async (sid: string) => {
     const next = await call('sessionDoc', sid);
@@ -113,6 +128,14 @@ export function SessionPage() {
     if (openWasDone.current === false && done) setOpen(null);
     else openWasDone.current = done;
   }, [doc, open]);
+  // Au clavier (ordinateur), clavier de saisie fermé : un chiffre ouvre la saisie de la série en cours, Entrée la valide.
+  const keys = useRef<(e: KeyboardEvent) => void>(() => {});
+  const [seed, setSeed] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keys.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   // Le clavier couvre le bas de l'écran : la série qu'on saisit remonte au-dessus.
   const editingId = editing?.setId ?? null;
   useEffect(() => {
@@ -183,7 +206,7 @@ export function SessionPage() {
     skipRest();
     // La synchro part tout de suite à la fin d'une séance.
     void syncCloud();
-    navigate('/sport', { replace: true });
+    navigate(`/sport/bilan/${id}`, { replace: true });
   };
 
   const editItem = editing ? doc.items.find((i) => i.sets.some((s) => s.id === editing.setId)) : null;
@@ -201,12 +224,47 @@ export function SessionPage() {
       })()
     : null;
   const allDone = doc.items.length > 0 && doc.items.every(isDone);
+  keys.current = (e: KeyboardEvent) => {
+    const t = e.target as HTMLElement | null;
+    if (editing || e.metaKey || e.ctrlKey || e.altKey || (t && (t.closest('input, textarea, select, [role="dialog"]') || t.isContentEditable))) return;
+    if (/^[0-9]$/.test(e.key) && nextRow) {
+      e.preventDefault();
+      setSeed(e.key);
+      setEditing({ setId: nextRow.set.id, field: nextRow.item.format.metrics.includes('load') ? 'weight' : 'reps' });
+    } else if (e.key === 'Enter' && nextRow && !(t && t.closest('button, a'))) {
+      e.preventDefault();
+      void complete(nextRow.item, nextRow.set);
+    }
+  };
   const blockLabel = doc.block ? ` · ${doc.block.name} S${doc.block.week}${doc.block.deload ? ' · décharge' : ''}` : '';
 
+  const keypad =
+    editing && editItem && editSet ? (
+        <Keypad
+          doc={doc}
+          item={editItem}
+          set={editSet}
+          field={editing.field}
+          onField={(field) => setEditing({ setId: editSet.id, field })}
+          onSave={(patch) => act(call('updateSet', editSet.id, patch))}
+          onBodyweight={(v) => act(call('setBodyweight', id, v))}
+          onComplete={(patch) => void complete(editItem, editSet, patch)}
+          onClose={() => {
+            setEditing(null);
+            setSeed(null);
+          }}
+          docked={wide}
+          seed={seed}
+          onSeeded={() => setSeed(null)}
+        />
+    ) : null;
+
   return (
-    <div className="pf-screen tone-perf pf-session" style={editing ? { paddingBottom: 560 } : undefined}>
+    <div className="pf-screen tone-perf pf-session" style={editing && !wide ? { paddingBottom: 560 } : undefined}>
       <div className="pf-amb" aria-hidden="true" />
       <StorageWarning />
+      <div className="pf-sgrid">
+      <div className="pf-smain">
       <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="pf-head">
           <IconButton icon="back" label="Réduire la séance" href="/sport" />
@@ -216,6 +274,23 @@ export function SessionPage() {
               {elapsedClock(now - doc.startedAt)}
             </span>
           </div>
+          {wide && (
+          <div className="pf-desk">
+            {current && !allDone && <Button onClick={() => setReplacing(current)}>Remplacer</Button>}
+            {allDone ? (
+              <Button variant="action" onClick={() => setEnding(true)}>
+                Terminer la séance
+              </Button>
+            ) : (
+              nextRow &&
+              validateLabel && (
+                <Button variant="action" onClick={() => void complete(nextRow.item, nextRow.set)}>
+                  {validateLabel}
+                </Button>
+              )
+            )}
+          </div>
+          )}
           <Button onClick={() => setEnding(true)}>Terminer</Button>
         </div>
         <div className="progress">
@@ -278,20 +353,34 @@ export function SessionPage() {
       <Button variant={doc.items.length === 0 ? 'action' : 'quiet'} onClick={() => setReplacing({ ...(doc.items[0] ?? ({} as SessionItem)), weId: '' })}>
         Ajouter un exercice
       </Button>
+      </div>
+      {wide && (
+      <aside className="pf-saside" aria-label="Repos et repères">
+        {keypad ?? <RestBanner big />}
+        {current && (current.lastTime || current.lastComment) && (
+          <Glass className="pf-sidecard">
+            <span className="t-label muted">Dernière fois</span>
+            {current.lastTime && <span className="t-small">{current.lastTime}</span>}
+            {current.lastComment && <span className="t-small muted">{`« ${current.lastComment} »`}</span>}
+          </Glass>
+        )}
+        {current && (current.note || current.comment) && (
+          <Glass className="pf-sidecard">
+            <span className="t-label muted">Notes</span>
+            {current.note && <span className="t-small">{current.note}</span>}
+            {current.comment && <span className="t-small c-tone">{current.comment}</span>}
+          </Glass>
+        )}
+        <span className="t-small muted" style={{ padding: '0 4px' }}>
+          Clavier : chiffres pour saisir, Entrée pour valider, flèches pour changer de case, Échap pour fermer.
+        </span>
+      </aside>
+      )}
+      </div>
 
-      {editing && editItem && editSet ? (
-        <Keypad
-          doc={doc}
-          item={editItem}
-          set={editSet}
-          field={editing.field}
-          onField={(field) => setEditing({ setId: editSet.id, field })}
-          onSave={(patch) => act(call('updateSet', editSet.id, patch))}
-          onBodyweight={(v) => act(call('setBodyweight', id, v))}
-          onComplete={(patch) => void complete(editItem, editSet, patch)}
-          onClose={() => setEditing(null)}
-        />
-      ) : (
+      {keypad && !wide ? (
+        keypad
+      ) : wide ? null : (
         <div className="pf-dock">
           <RestBanner />
           {(validateLabel || allDone || current) && (
@@ -742,11 +831,11 @@ function AmrapBlock(p: CardProps) {
 // ---------------------------------------------------------------- repos et clavier
 
 /** Le repos en bandeau, au-dessus de « Valider » : heure de fin absolue (il survit à l'app fermée). */
-function RestBanner() {
+function RestBanner({ big }: { big?: boolean }) {
   const { rest, left } = useRest();
   if (!rest) return null;
   return (
-    <Glass className="pf-rest">
+    <Glass className={`pf-rest${big ? ' is-big' : ''}`}>
       <div className="row" style={{ gap: 6 }}>
         <span className="grow" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <span className="t-label muted pf-nowrap">{`Repos avant ${rest.next}`}</span>
@@ -778,6 +867,11 @@ interface KeypadProps {
   onBodyweight: (v: number | null) => Promise<unknown>;
   onComplete: (patch: SetPatch) => void;
   onClose: () => void;
+  /** Un chiffre tapé au clavier qui a ouvert la saisie : il commence la valeur. */
+  seed?: string | null;
+  onSeeded?: () => void;
+  /** Ordinateur : dans le panneau de droite, pas en feuille par-dessus la séance. */
+  docked?: boolean;
 }
 
 const parse = (s: string): number | null => {
@@ -786,7 +880,7 @@ const parse = (s: string): number | null => {
 };
 const show = (v: number | null) => (v === null ? '' : String(v).replace('.', ','));
 
-function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComplete, onClose }: KeypadProps) {
+function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComplete, onClose, seed, onSeeded, docked }: KeypadProps) {
   const weighted = item.loadType === 'bodyweight';
   const initial = field === 'weight' ? (set.weight ?? set.targetWeight) : field === 'reps' ? (set.reps ?? set.targetReps) : doc.bodyweight;
   const [buffer, setBuffer] = useState(show(initial));
@@ -823,6 +917,36 @@ function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComple
     if (field === 'bw') return void commit().then(() => onField('weight'));
     onComplete(field === 'weight' ? { weight: v } : { reps: v === null ? null : Math.round(v) });
   };
+  // Au clavier (ordinateur) : chiffres, virgule, effacer, Entrée pour valider, Échap pour fermer, flèches pour changer
+  // de case (gauche, droite) ou ajuster (haut, bas).
+  const live = useRef({ type, validate, step, switchTo, commit, onClose, field });
+  live.current = { type, validate, step, switchTo, commit, onClose, field };
+  useEffect(() => {
+    if (seed) {
+      setBuffer(seed);
+      setFresh(false);
+      onSeeded?.();
+    }
+  }, [seed]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = live.current;
+      if (/^[0-9]$/.test(e.key)) k.type(e.key);
+      else if (e.key === ',' || e.key === '.') k.type(',');
+      else if (e.key === 'Backspace') k.type('⌫');
+      else if (e.key === 'Enter') k.validate();
+      else if (e.key === 'Escape') void k.commit().then(k.onClose);
+      else if (e.key === 'ArrowRight' && k.field === 'weight') void k.switchTo('reps');
+      else if (e.key === 'ArrowLeft' && k.field === 'reps') void k.switchTo('weight');
+      else if (e.key === 'ArrowUp') k.step(k.field === 'weight' ? item.increment : 1);
+      else if (e.key === 'ArrowDown') k.step(-(k.field === 'weight' ? item.increment : 1));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [item.increment]);
   const hasLoad = item.format.metrics.includes('load');
   const value = (f: Field) => {
     if (f === field) return buffer || '0';
@@ -839,7 +963,7 @@ function Keypad({ doc, item, set, field, onField, onSave, onBodyweight, onComple
   const stepBy = field === 'weight' ? item.increment : field === 'bw' ? 0.5 : 1;
 
   return (
-    <div className="sheet card-module pf-keypad" role="dialog" aria-label="Saisie de la série">
+    <div className={docked ? 'card-module pf-keypad is-docked' : 'sheet card-module pf-keypad'} role="dialog" aria-label="Saisie de la série">
       <div className="row t-small" style={{ gap: 2 }}>
         {rest ? (
           <>

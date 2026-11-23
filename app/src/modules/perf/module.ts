@@ -20,6 +20,7 @@ export const perf: ModuleManifest = {
       { to: '/sport/progres', label: 'Progrès', icon: 'chart' },
     ],
     focus: ['/sport/seance'],
+    wide: ['/sport/seance'],
   },
   cards: [{ id: 'perf.seance', title: 'Séance du jour', Component: SessionCard }],
   quickAdds: [{ id: 'perf.demarrer', label: 'Une séance', detail: 'MyPerf · la séance prévue, ou une séance libre', icon: 'barbell', href: '/sport' }],

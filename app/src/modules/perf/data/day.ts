@@ -41,6 +41,7 @@ export interface WeekDay {
 }
 
 export interface LastSession {
+  id: string;
   name: string;
   date: string;
   sets: number;
@@ -202,6 +203,7 @@ function lastSession(d: Db, program: Program): LastSession | null {
     return [{ name: ex?.name ?? id, text: `${w8} × ${reps}` }];
   });
   return {
+    id: w.id,
     name: w.name,
     date: w.date,
     sets: rows.length,

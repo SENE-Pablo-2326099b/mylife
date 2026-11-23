@@ -107,14 +107,14 @@ export function ProgrammePage() {
           </span>
           <Glass className="pf-blocks">
             {v.blocks.map((b) => (
-              <a key={b.id} href={`/sport/programme/bloc/${b.id}`} className={`pf-bl is-${b.state}`}>
+              <a key={b.id} href={b.state === 'past' ? `/sport/programme/bilan-bloc/${b.id}` : `/sport/programme/bloc/${b.id}`} className={`pf-bl is-${b.state}`}>
                 <span className="pf-bl-bar" style={{ background: BLOCK_TONE[b.kind] ?? BLOCK_TONE.custom }} />
                 <span className="grow" style={{ minWidth: 0 }}>
                   <span className="t-strong">{b.name}</span>
                   <br />
                   <span className="t-small muted">{`${b.dates} · ${b.state === 'future' && b.kind !== 'accumulation' ? b.kindLabel : b.weeks}`}</span>
                 </span>
-                {b.state === 'current' ? <span className="pf-chip">en cours</span> : b.state === 'past' ? <span className="t-small muted">fait</span> : <span className="t-small muted">›</span>}
+                {b.state === 'current' ? <span className="pf-chip">en cours</span> : b.state === 'past' ? <span className="t-small muted">bilan ›</span> : <span className="t-small muted">›</span>}
               </a>
             ))}
           </Glass>

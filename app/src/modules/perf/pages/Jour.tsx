@@ -39,6 +39,7 @@ export function JourPage() {
   const [clean, setClean] = useState(false);
   const [choosing, setChoosing] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [ended, setEnded] = useState<{ id: string; name: string } | null>(null);
   const date = today();
 
   useEffect(() => {
@@ -52,6 +53,9 @@ export function JourPage() {
   useEffect(() => {
     if (clean) void reload();
   }, [clean, reload, cloud.lastSyncAt, cloud.synced]);
+  useEffect(() => {
+    if (clean) void call('justEnded', date).then(setEnded, () => setEnded(null));
+  }, [clean, date]);
 
   const begin = async (templateId: string | null) => {
     await call('startSession', templateId, date);
@@ -157,6 +161,16 @@ export function JourPage() {
         </div>
       )}
 
+      {ended && (
+        <Glass className="row pf-alert">
+          <span className="grow t-small">
+            <b>{`${ended.name} terminé`}</b>
+            <span className="muted"> · nouveaux 1RM proposés</span>
+          </span>
+          <Button href={`/sport/programme/bilan-bloc/${ended.id}`}>Le bilan</Button>
+        </Glass>
+      )}
+
       {conflict && (
         <Glass className="row pf-alert">
           <span className="pf-alert-ico" aria-hidden="true">
@@ -204,7 +218,7 @@ export function JourPage() {
             <span>{daysBetween(view.last.date, date) < 7 ? longDay(view.last.date) : shortDate(view.last.date)}</span>
           </span>
           <List>
-            <ListRow title={view.last.name} detail={`${view.last.sets} séries · ${tonnage(view.last.tonnage)}${view.last.minutes ? ` · ${view.last.minutes} min` : ''}`} />
+            <ListRow href={`/sport/bilan/${view.last.id}`} title={view.last.name} detail={`${view.last.sets} séries · ${tonnage(view.last.tonnage)}${view.last.minutes ? ` · ${view.last.minutes} min` : ''}`} />
             {view.last.records.map((r) => (
               <ListRow
                 key={r.name}

@@ -277,9 +277,28 @@ describe('MyLife, une seule app', () => {
     } finally {
       await page.context().setOffline(false);
     }
-    // Terminer : la séance part au compte tout de suite.
+    // Sur ordinateur : la séance au centre, le repos et les repères à droite ; un chiffre tapé ouvre la saisie.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('complementary', { name: 'Repos et repères' }).waitFor();
+    await page.locator('.pf-desk').getByRole('button', { name: /^Valider / }).waitFor();
+    await page.locator('.pf-smain .pf-kick').first().click();
+    await page.keyboard.press('7');
+    const desk = page.getByRole('dialog', { name: 'Saisie de la série' });
+    await desk.getByRole('button', { name: /^Charge|^Lest/ }).filter({ hasText: /^7/ }).waitFor();
+    await shot(page, '07q-sport-seance-ordinateur');
+    await page.keyboard.press('Escape');
+    await desk.waitFor({ state: 'detached' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Terminer : la séance part au compte tout de suite, puis son bilan.
     await page.getByRole('button', { name: 'Terminer', exact: true }).click();
     await page.getByRole('dialog', { name: 'Terminer la séance' }).getByRole('button', { name: 'Terminer', exact: true }).click();
+    // Le bilan : séries, forme, puis retour à Jour.
+    await page.waitForURL(/\/sport\/bilan\//);
+    await page.getByRole('heading', { name: 'Bien joué.' }).waitFor();
+    await page.getByRole('button', { name: '4', exact: true }).click();
+    await shot(page, '07r-sport-bilan');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.getByRole('link', { name: 'Terminer' }).click();
     await page.waitForURL(/\/sport$/);
     // De retour sur Jour : la séance faite apparaît comme dernière séance.
     await page.locator('.list-row', { hasText: 'Full body A' }).first().waitFor({ timeout: 20_000 });

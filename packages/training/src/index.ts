@@ -29,3 +29,4 @@ export { BODY_REGIONS, loadLevel, regionAt, regionById, regionLoads, type BodyRe
 export { isIndirect, type VolumeSet } from './analytics';
 export { bestPerCycle, detectStagnation, e1rmSeries, PROGRESS_THRESHOLD, recordEvents, weeklyConsistency, type SetRecord } from './analytics';
 export { bodyTrend } from './bodyTrend';
+export { summarizeSession, type SessionSummary, type SummarySet } from './summary';

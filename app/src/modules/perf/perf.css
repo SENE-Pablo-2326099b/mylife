@@ -224,3 +224,23 @@ button.pf-stat-big { cursor: pointer; }
 .pf-wkbar.is-l2 { background: color-mix(in srgb, var(--tone-solid) 75%, transparent); }
 .pf-wkbar.is-l3 { background: var(--tone-solid); }
 .pf-wkbar.is-now { outline: 2px solid var(--ink); outline-offset: 1px; }
+.pf-copilot { width: 26px; height: 26px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; background: var(--action); }
+.pf-propose { width: 100%; background: none; border: 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; gap: 8px; }
+.pf-check { width: 22px; height: 22px; flex: none; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; border: 1px solid var(--tile-border); color: #fff; }
+.pf-check.is-on { background: var(--action); border-color: var(--action-border); }
+
+/* La séance sur ordinateur (maquette V3-Ordinateur) : deux colonnes, le repos et les repères à droite. */
+.pf-sgrid { display: flex; flex-direction: column; gap: 18px; }
+.pf-smain { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.pf-saside, .pf-desk { display: none; }
+@media (min-width: 1000px) {
+  .pf-sgrid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+  .pf-saside { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 20px; }
+  .pf-desk { display: flex; gap: 8px; }
+  .pf-session .pf-dock { display: none; }
+  .pf-session { padding-bottom: 40px; }
+  .pf-keypad { left: calc(252px + 28px); }
+}
+.pf-sidecard { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.pf-rest.is-big .pf-big { font-size: 40px !important; }
+.pf-keypad.is-docked { position: static; max-width: none; margin: 0; border-radius: 24px; padding: 14px; }

@@ -35,7 +35,7 @@ function snapshotOf(read: (sql: string, p?: string[]) => Row[], workoutId: strin
   const exercises = read('SELECT * FROM workout_exercises WHERE workout_id = ? ORDER BY position', [workoutId]);
   const sets = read('SELECT s.* FROM sets s JOIN workout_exercises we ON we.id = s.workout_exercise_id WHERE we.workout_id = ? ORDER BY we.position, s.position', [workoutId]);
   return {
-    workout: strip(workout, 'id', 'started_at'),
+    workout: strip(workout, 'id', 'started_at', 'rating'),
     exercises: exercises.map((e) => strip(e, 'id', 'workout_id')),
     sets: sets.map((s) => strip(s, 'id', 'workout_exercise_id', 'duration_s', 'distance_m', 'rounds', 'rpe', 'rir', 'speed')),
   };

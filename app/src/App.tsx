@@ -267,7 +267,7 @@ function Shell({ login }: { login: string }) {
       <div className="shell">
         <Sidebar onAdd={() => setAdding(true)} />
         <main className="shell-main" id="contenu">
-          <div className={`shell-content${WIDE.includes(pathname) ? '' : ' is-narrow'}`}>
+          <div className={`shell-content${WIDE.includes(pathname) || MODULES.some((m) => m.nav?.wide?.includes(pathname)) ? '' : ' is-narrow'}`}>
             <RecoveryReminder />
             <Routes>
               <Route path="/" element={<TodayPage />} />

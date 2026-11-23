@@ -67,6 +67,8 @@ export interface ModuleManifest {
     tabs: readonly { to: string; label: string; icon: IconName; end?: boolean; add?: ModuleAdd }[];
     /** Écrans plein écran (une séance en cours) : la barre du bas s'efface, l'écran a sa propre sortie. */
     focus?: readonly string[];
+    /** Écrans larges sur ordinateur (une séance et son panneau de repos) : pas de colonne de lecture étroite. */
+    wide?: readonly string[];
   };
   /** Lu sur l'appareil, à chaque affichage. */
   todos?: () => TodoItem[];
