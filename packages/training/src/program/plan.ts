@@ -22,6 +22,8 @@ export interface PlanExercise {
 }
 
 export interface PlanSession {
+  /** Identifiant de la séance type venu du fichier (export) : elle sera mise à jour si elle existe. */
+  id: string | null;
   name: string;
   weekdays: number[];
   notes: string;
@@ -66,6 +68,7 @@ export function buildPlan(program: ParsedProgram, library: readonly LibraryEntry
     name: program.name,
     notes: program.notes,
     sessions: program.sessions.map((s) => ({
+      id: s.id,
       name: uniqueName(s.name, taken),
       weekdays: s.weekdays,
       notes: s.notes,
@@ -119,9 +122,11 @@ export function summarizePlan(plan: ImportPlan): PlanSummary {
 export interface ExportInput {
   name: string;
   sessions: {
+    id?: string;
     name: string;
     notes: string;
     exercises: {
+      id?: string;
       name: string;
       sets: number;
       repMin: number | null;
@@ -187,10 +192,12 @@ export function programToFile(input: ExportInput): ProgramFile {
     sessions: input.sessions.map((s) => {
       const days = input.pattern.filter((p) => p.session === s.name).map((p) => WEEKDAY_NAMES[p.weekday]!);
       return {
+        ...(s.id ? { id: s.id } : {}),
         name: s.name,
         ...(days.length ? { days: [...new Set(days)] } : {}),
         ...(s.notes ? { notes: s.notes } : {}),
         exercises: s.exercises.map((e) => ({
+          ...(e.id ? { id: e.id } : {}),
           name: e.name,
           sets: e.sets,
           ...(e.seconds ? { reps: `${e.seconds}s` } : e.repMin !== null ? { reps: e.repMax !== null && e.repMax !== e.repMin ? `${e.repMin}-${e.repMax}` : String(e.repMin) } : {}),

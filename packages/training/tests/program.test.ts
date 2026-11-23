@@ -118,7 +118,7 @@ describe('plan d’import', () => {
     expect(summarizePlan(plan)).toMatchObject({ sessions: 2, exercises: 3, recognized: 2, created: 1 });
   });
   it('consignes d’un exercice lesté et chronométré', () => {
-    expect(slotNotes({ name: 'x', sets: 3, repMin: null, repMax: null, amrap: false, seconds: 45, kg: 20, percent: null, rpe: null, restSeconds: 90, notes: '', equipment: null, muscles: [], bodyweight: true, format: null, minutes: null, everySeconds: null, group: null, progression: null })).toBe('45 s · +20 kg · repos 1 min 30');
+    expect(slotNotes({ id: null, name: 'x', sets: 3, repMin: null, repMax: null, amrap: false, seconds: 45, kg: 20, percent: null, rpe: null, restSeconds: 90, notes: '', equipment: null, muscles: [], bodyweight: true, format: null, minutes: null, everySeconds: null, group: null, progression: null })).toBe('45 s · +20 kg · repos 1 min 30');
   });
 });
 

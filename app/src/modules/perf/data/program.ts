@@ -371,10 +371,10 @@ function setGroup(d: Db, row: SlotRow, group: { kind: 'superset' | 'circuit'; ro
 
 // ---------------------------------------------------------------- écrire les séances types
 
-export function createTemplate(d: Db, name: string): string {
+export function createTemplate(d: Db, name: string, createAs?: string): string {
   const clean = name.trim();
   if (!clean || clean.length > 60) throw new Error('Nom invalide');
-  const id = newId();
+  const id = createAs ?? newId();
   const pos = d.first<{ p: number | null }>('SELECT MAX(position) AS p FROM templates')?.p ?? -1;
   d.run('INSERT INTO templates (id, name, notes, position, archived, created_at) VALUES (?, ?, ?, ?, 0, ?)', [id, clean, '', pos + 1, Date.now()]);
   return id;
@@ -411,11 +411,11 @@ export function setTemplateDays(d: Db, id: string, days: readonly number[]): voi
 }
 
 /** Un exercice de plus dans la séance type, réglé comme l'app d'avant (intention de l'exercice, sa progression). */
-export function addSlot(d: Db, templateId: string, exerciseId: string): string {
+export function addSlot(d: Db, templateId: string, exerciseId: string, createAs?: string): string {
   const ex = d.first<{ progression_type: string; category: string }>('SELECT progression_type, category FROM exercises WHERE id = ? AND archived = 0', [exerciseId]);
   if (!ex) throw new Error('Exercice introuvable');
   if (!d.first('SELECT 1 FROM templates WHERE id = ? AND archived = 0', [templateId])) throw new Error('Séance introuvable');
-  const id = newId();
+  const id = createAs ?? newId();
   const pos = d.first<{ p: number | null }>('SELECT MAX(position) AS p FROM template_exercises WHERE template_id = ?', [templateId])?.p ?? -1;
   const intention = ex.progression_type === 'top_set_backoff' || ex.category === 'main' ? 'strength' : 'hypertrophy';
   d.run(

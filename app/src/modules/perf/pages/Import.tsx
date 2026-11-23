@@ -184,7 +184,7 @@ export function ImportPage() {
       {ok && preview && (
         <>
           <div className="card-module pf-hero" style={{ gap: 8 }}>
-            <span className="pf-kick c-tone">{by ? `Converti par Claude ${by} · vérifié` : preview.source === 'json' ? 'Programme lu · vérifié' : 'Texte lu · vérifié'}</span>
+            <span className="pf-kick c-tone">{by ? `Converti par Claude ${by} · vérifié` : preview.full ? 'Toutes tes données · vérifié' : preview.source === 'json' ? 'Programme lu · vérifié' : 'Texte lu · vérifié'}</span>
             <span className="pf-big" style={{ fontSize: 25 }}>
               {preview.name}
             </span>
@@ -193,7 +193,31 @@ export function ImportPage() {
               {preview.summary.sessions > 0 && <span className="pf-chip is-neutral">{`${preview.summary.exercises} exercice${preview.summary.exercises > 1 ? 's' : ''}`}</span>}
               {preview.summary.created > 0 && <span className="pf-chip">{`${preview.summary.created} nouveau${preview.summary.created > 1 ? 'x' : ''}`}</span>}
               {preview.blocks.length > 0 && <span className="pf-chip is-neutral">{`${preview.blocks.length} bloc${preview.blocks.length > 1 ? 's' : ''}`}</span>}
+              {preview.updatedSessions > 0 && <span className="pf-chip is-neutral">{`${preview.updatedSessions} mise${preview.updatedSessions > 1 ? 's' : ''} à jour`}</span>}
+              {preview.full && preview.full.sessions.added + preview.full.sessions.updated > 0 && <span className="pf-chip is-neutral">{((n) => `${n} séance${n > 1 ? 's' : ''} faite${n > 1 ? 's' : ''}`)(preview.full.sessions.added + preview.full.sessions.updated)}</span>}
             </div>
+            {preview.full && (
+              <div className="pf-lines">
+                <div className="pf-line" style={{ alignItems: 'flex-start' }}>
+                  <span className="grow" style={{ minWidth: 0 }}>
+                    <span className="t-strong">Historique</span>
+                    <br />
+                    <span className="t-small muted">
+                      {[
+                        `${preview.full.sessions.added} séance${preview.full.sessions.added > 1 ? 's' : ''} ajoutée${preview.full.sessions.added > 1 ? 's' : ''}`,
+                        `${preview.full.sessions.updated} déjà là, mise${preview.full.sessions.updated > 1 ? 's' : ''} à jour`,
+                        preview.full.sessions.ignored ? `${preview.full.sessions.ignored} illisible${preview.full.sessions.ignored > 1 ? 's' : ''}` : '',
+                        preview.full.measures ? `${preview.full.measures} mesure${preview.full.measures > 1 ? 's' : ''}` : '',
+                        preview.full.library.added ? `${preview.full.library.added} exercice${preview.full.library.added > 1 ? 's' : ''} ajouté${preview.full.library.added > 1 ? 's' : ''}` : '',
+                        preview.full.settings ? 'tes réglages' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="pf-lines">
               {preview.sessions.map((s, i) => (
                 <div key={i} className="pf-line" style={{ alignItems: 'flex-start' }}>
@@ -287,8 +311,15 @@ export function ImportPage() {
                 Les blocs
               </button>
             )}
+            {preview.full && preview.full.sessions.added + preview.full.sessions.updated + preview.full.measures > 0 && (
+              <button type="button" className={`pf-chip${options.history !== false ? '' : ' is-neutral'}`} aria-pressed={options.history !== false} onClick={() => setOptions({ ...options, history: options.history === false })}>
+                L’historique
+              </button>
+            )}
           </div>
-          {options.mode === 'replace' && <span className="t-small muted">Tes séances types actuelles sont archivées (tes séances passées restent).</span>}
+          {options.mode === 'replace' && preview.summary.sessions > 0 && (
+            <span className="t-small muted">{preview.updatedSessions > 0 ? 'Les séances types absentes du fichier sont archivées (tes séances passées restent).' : 'Tes séances types actuelles sont archivées (tes séances passées restent).'}</span>
+          )}
           <Button variant="action" block disabled={busy} onClick={() => void apply()}>
             Valider l’import
           </Button>
@@ -317,6 +348,19 @@ export function ImportPage() {
             const a = document.createElement('a');
             a.href = url;
             a.download = 'mon-programme.json';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }}
+        />
+        <ListRow
+          title="Tout exporter"
+          detail="JSON complet · programme, cycles, historique"
+          onClick={async () => {
+            const json = await call('exportFull');
+            const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `myperf-tout-${today()}.json`;
             a.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
           }}

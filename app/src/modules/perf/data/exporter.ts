@@ -1,47 +1,10 @@
 import { estimate1RM } from '@mylife/training';
-import { SCHEMA_VERSION } from './schema';
 import type { Db } from './sql';
 
 /**
- * « Exporter mes données » (23/11) : la sauvegarde complète de MyPerf (toutes les tables, toutes les colonnes, y
- * compris ce que l'app d'avant ne connaît pas : décalages, formats, progressions, variantes, forme notée) et le CSV
- * des séries pour un tableur. Seulement tes données d'entraînement : ni l'état de la synchro, ni aucune clé.
+ * Les séries pour un tableur (23/11). La sauvegarde complète, elle, est « Tout exporter (JSON complet) » (full.ts) :
+ * lisible, réimportable, fusionnée sans doublon.
  */
-
-/** Ordre des clés étrangères (l'app d'avant restaure dans cet ordre) ; les tables du moteur composable à la suite. */
-export const EXPORT_TABLES = [
-  'settings',
-  'exercises',
-  'exercise_one_rm',
-  'exercise_substitutions',
-  'macrocycles',
-  'mesocycles',
-  'cycle_week_overrides',
-  'templates',
-  'template_exercises',
-  'week_pattern',
-  'workouts',
-  'planned_sessions',
-  'workout_exercises',
-  'sets',
-  'body_entries',
-  'formats',
-  'cycles',
-  'session_moves',
-] as const;
-
-export interface PerfBackup {
-  app: 'myperf';
-  schemaVersion: number;
-  exportedAt: string;
-  tables: Record<string, Record<string, unknown>[]>;
-}
-
-export function exportAll(d: Db, now = new Date()): PerfBackup {
-  const tables: PerfBackup['tables'] = {};
-  for (const t of EXPORT_TABLES) tables[t] = d.all<Record<string, unknown>>(`SELECT * FROM ${t} ORDER BY rowid`);
-  return { app: 'myperf', schemaVersion: SCHEMA_VERSION, exportedAt: now.toISOString(), tables };
-}
 
 const cell = (v: unknown): string => {
   if (v === null || v === undefined) return '';

@@ -18,11 +18,15 @@ export interface ProgramFile {
   name: string;
   notes?: string;
   sessions: {
+    /** Identifiant de la séance type (export) : un réimport la met à jour au lieu d'en créer une autre. */
+    id?: string;
     name: string;
     /** Jours de la semaine (« lundi »…). */
     days?: string[];
     notes?: string;
     exercises: {
+      /** Identifiant du créneau (export). */
+      id?: string;
       name: string;
       sets: number;
       /** « 8 », « 6-8 », « max », « 30s ». */
@@ -75,6 +79,8 @@ export interface FileBlock {
 
 /** Un exercice lu, prêt à être rapproché de la bibliothèque. */
 export interface ParsedExercise {
+  /** Identifiant du créneau, s'il vient d'un export. */
+  id: string | null;
   name: string;
   sets: number;
   repMin: number | null;
@@ -120,6 +126,7 @@ export interface ParsedBlock {
 }
 
 export interface ParsedSession {
+  id: string | null;
   name: string;
   /** 0 = lundi … 6 = dimanche. */
   weekdays: number[];
@@ -335,6 +342,7 @@ function readExercise(raw: unknown, where: string, issues: string[]): ParsedExer
   const muscles = pick(o, K.muscles);
   const bw = pick(o, K.bodyweight);
   return {
+    id: idOf(o),
     name,
     sets,
     ...reps,
@@ -469,7 +477,7 @@ function readSession(raw: unknown, index: number, issues: string[]): ParsedSessi
     issues.push(`« ${name} » : aucun exercice reconnu, séance ignorée.`);
     return null;
   }
-  return { name, weekdays: [...new Set([...days, ...weekdaysIn(name)])].sort((a, b) => a - b), notes: str(pick(o, K.notes)), exercises };
+  return { id: idOf(o), name, weekdays: [...new Set([...days, ...weekdaysIn(name)])].sort((a, b) => a - b), notes: str(pick(o, K.notes)), exercises };
 }
 
 /** Un programme à partir d'un objet JSON déjà lu (clés tolérées en français, versions inconnues refusées). */
@@ -524,6 +532,7 @@ export function parseExerciseLine(line: string): ParsedExercise | null {
     const every = tail.match(/(?:toutes les|every)\s*([\d.,:'’]+\s*(?:s|sec|min)?)/i);
     const minutes = Number(timed[3]);
     return {
+      id: null,
       name,
       sets: kind === 'amrap' ? 1 : Math.min(60, Math.max(1, minutes)),
       repMin: reps ? Number(reps[1]) : null,
@@ -562,6 +571,7 @@ export function parseExerciseLine(line: string): ParsedExercise | null {
     .replace(/^[\s@,;·()-]+|[\s@,;·()-]+$/g, '')
     .trim();
   return {
+    id: null,
     name,
     sets: Math.min(12, Math.max(1, Number(m[2]))),
     ...repsOf(m[3]!),
@@ -592,7 +602,7 @@ export function parseProgramText(text: string): ParseResult {
     const ex = parseExerciseLine(line);
     if (ex) {
       if (!current) {
-        current = { name: 'Séance A', weekdays: [], notes: '', exercises: [] };
+        current = { id: null, name: 'Séance A', weekdays: [], notes: '', exercises: [] };
         sessions.push(current);
       }
       current.exercises.push(ex);
@@ -600,7 +610,7 @@ export function parseProgramText(text: string): ParseResult {
     }
     const header = line.replace(/^#+\s*/, '').replace(/[:：]\s*$/, '').trim();
     if (header.length <= 60 && !/\d+\s*[x×]\s*\d+/.test(header)) {
-      current = { name: header, weekdays: weekdaysIn(header), notes: '', exercises: [] };
+      current = { id: null, name: header, weekdays: weekdaysIn(header), notes: '', exercises: [] };
       sessions.push(current);
     } else {
       issues.push(`Ligne non comprise : « ${line.slice(0, 60)} »`);

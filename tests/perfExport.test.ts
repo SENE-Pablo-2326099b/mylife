@@ -1,8 +1,7 @@
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 /**
- * « Exporter mes données » : la sauvegarde complète (toutes les tables d'entraînement, toutes les colonnes, nouveautés
- * comprises ; ni synchro ni clé) et le CSV des séries (lest net, 1RM estimé net).
+ * « Exporter mes données » : le CSV des séries (lest net, 1RM estimé net). Le JSON complet : tests/perfFull.test.ts.
  */
 import { createTestDb } from '@/db/__tests__/testDb';
 import { addBodyEntry } from '@/db/repos/body';
@@ -17,16 +16,12 @@ import { finishWorkout, startWorkout } from '@/services/workoutService';
 import { DEFAULT_DELOAD } from '../packages/training/src/mesocycle';
 import { schemeForKind } from '../packages/training/src/mesoTypes';
 import type { StrengthWeek } from '../packages/training/src/types';
-import { TABLES as LEGACY_TABLES } from '@/db/backup';
-import { EXPORT_TABLES } from '../app/src/modules/perf/data/exporter';
 import { estimate1RM } from '../packages/training/src/math';
 import { createBackend, type Backend } from '../app/src/modules/perf/data/backend';
 import { wrapOo1, type Db, type Oo1Db } from '../app/src/modules/perf/data/sql';
 
 let rows: { tbl: string; rid: string; row: unknown }[] = [];
 let sqlite3: Awaited<ReturnType<typeof sqlite3InitModule>>;
-// Lundi 19 janvier 2026 : « Force A » est prévue le lundi, « Volume » le jeudi.
-const MONDAY = '2026-01-19';
 
 beforeAll(async () => {
   sqlite3 = await sqlite3InitModule();
@@ -61,29 +56,6 @@ beforeEach(() => {
 
 
 describe('Exporter mes données', () => {
-  it('sauvegarde complète : toutes les tables d’entraînement, nouveautés comprises ; ni synchro ; aucune table oubliée', () => {
-    const r = b.dayView(MONDAY);
-    b.moveSession(r.week[3]!.planned[0]!.id, '2026-01-22', '2026-01-23');
-    const last = d.first<{ id: string }>("SELECT id FROM workouts WHERE status = 'completed' ORDER BY date DESC")!;
-    b.rateSession(last.id, 4, 'genou ok, virgule');
-    const all = b.exportAll();
-    expect(all).toMatchObject({ app: 'myperf' });
-    expect(all.schemaVersion).toBeGreaterThanOrEqual(13);
-    expect(Object.keys(all.tables)).toEqual([...EXPORT_TABLES]);
-    expect(all.tables.workouts!.filter((w) => w.status === 'completed')).toHaveLength(3);
-    expect(all.tables.workouts!.find((w) => w.id === last.id)).toMatchObject({ rating: 4, notes: 'genou ok, virgule' });
-    expect(all.tables.session_moves).toHaveLength(1);
-    expect(all.tables.sets!.length).toBeGreaterThan(0);
-    expect(Object.keys(all.tables.sets![0]!)).toEqual(expect.arrayContaining(['duration_s', 'rounds', 'speed', 'note']));
-    // Les tables de l'app d'avant y sont toutes (sa restauration les retrouve) ; la synchro n'y est pas.
-    expect(EXPORT_TABLES).toEqual(expect.arrayContaining([...LEGACY_TABLES]));
-    expect(Object.keys(all.tables)).not.toContain('sync_queue');
-    expect(JSON.stringify(all)).not.toMatch(/sync_state|applying/);
-    // Toute nouvelle table de la base de MyPerf doit être exportée (ou être de la synchro).
-    const tables = d.all<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").map((t) => t.name);
-    expect(tables.filter((t) => !t.startsWith('sync_') && !(EXPORT_TABLES as readonly string[]).includes(t))).toEqual([]);
-  });
-
   it('CSV des séries : une ligne par série faite, lest net et 1RM estimé net, textes protégés', () => {
     const last = d.first<{ id: string }>("SELECT id FROM workouts WHERE status = 'completed' ORDER BY date DESC")!;
     b.rateSession(last.id, 5, '');
@@ -103,6 +75,6 @@ describe('Exporter mes données', () => {
     expect(csv.find((l) => l.startsWith('2026-01-15'))).toMatch(/,5,"dur, ""vraiment"""$/);
     const fresh = createBackend(wrapOo1(new sqlite3.oo1.DB(':memory:') as unknown as Oo1Db));
     expect(fresh.setsCsv().split('\n')).toHaveLength(1);
-    expect(fresh.exportAll().tables.workouts).toEqual([]);
+    expect(JSON.parse(fresh.exportFull()).history.sessions).toEqual([]);
   });
 });

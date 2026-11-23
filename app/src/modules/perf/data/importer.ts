@@ -5,6 +5,7 @@ import {
   matchExercise,
   mesoKindInfo,
   newExercises,
+  parseJsonLoose,
   parseProgramInput,
   programToFile,
   READY_PROGRAMS,
@@ -18,9 +19,10 @@ import {
   type ProgramFile,
 } from '@mylife/training';
 import { createExercise } from './day';
-import { addSlot, archiveTemplate, createTemplate, setTemplateDays, updateSlot, type FormatChoice, type SlotPatch } from './program';
+import { addSlot, archiveTemplate, createTemplate, removeSlot, setTemplateDays, updateSlot, type FormatChoice, type SlotPatch } from './program';
 import { readProgram } from './queries';
 import { deleteBlock, ensureMacro, saveBlock, setBlockPlan, setLiftGroups } from './plan';
+import { applyHistory, applyLibrary, applySettings, fileLibrary, previewFull, readFull, type FullPreview, type FullRaw } from './full';
 import type { Db } from './sql';
 
 /**
@@ -72,15 +74,28 @@ export interface ImportPreview {
     lifts: { name: string; week: number; text: string }[];
   }[];
   oneRms: { name: string; kg: number }[];
+  /** Fichier « tout » : bibliothèque, réglages, historique (ce qui sera ajouté ou mis à jour). */
+  full: FullPreview | null;
+  /** Séances types qui existent déjà sous le même identifiant (mises à jour sur place). */
+  updatedSessions: number;
 }
 
-function planOf(d: Db, input: string): { plan: ImportPlan | null; issues: string[]; source: ImportPreview['source']; cycles: ParsedBlock[]; liftOf: (name: string) => string | null } {
+function planOf(d: Db, input: string): { plan: ImportPlan | null; issues: string[]; source: ImportPreview['source']; cycles: ParsedBlock[]; liftOf: (name: string) => string | null; full: FullRaw | null } {
   const parsed = parseProgramInput(input);
   const none = () => null;
-  if (!parsed.program) return { plan: null, issues: parsed.issues, source: parsed.source, cycles: [], liftOf: none };
+  const full = parsed.source === 'json' ? readFull(parseJsonLoose(input)) : null;
+  if (!parsed.program) {
+    // Un fichier « tout » sans séance ni cycle (seulement de l'historique) reste importable.
+    if (full) return { plan: { name: 'Toutes mes données', notes: '', sessions: [], oneRms: [] }, issues: [], source: 'json', cycles: [], liftOf: none, full };
+    return { plan: null, issues: parsed.issues, source: parsed.source, cycles: [], liftOf: none, full: null };
+  }
   const program = readProgram(d);
-  const library = program.exercises.filter((e) => !e.archived).map((e) => ({ id: e.id, name: e.name }));
-  const taken = d.all<{ name: string }>('SELECT name FROM templates WHERE archived = 0').map((r) => r.name);
+  // La bibliothèque du fichier compte déjà (ses exercices seront créés avec leurs identifiants).
+  const known = new Set(program.exercises.map((e) => e.id));
+  const library = [...program.exercises.filter((e) => !e.archived).map((e) => ({ id: e.id, name: e.name })), ...fileLibrary(full).filter((e) => !known.has(e.id))];
+  // Une séance type reprise par identifiant garde son nom (pas de « (2) ») : elle sera mise à jour.
+  const fileIds = new Set(parsed.program.sessions.map((s) => s.id).filter(Boolean));
+  const taken = d.all<{ id: string; name: string }>('SELECT id, name FROM templates WHERE archived = 0').filter((r) => !fileIds.has(r.id)).map((r) => r.name);
   const plan = buildPlan(parsed.program, library, taken);
   // Les exceptions par exercice visent la bibliothèque, ou un exercice que ce programme crée.
   const created = new Set(newExercises(plan).map((e) => e.name.trim().toLowerCase()));
@@ -88,12 +103,12 @@ function planOf(d: Db, input: string): { plan: ImportPlan | null; issues: string
   const issues = [...parsed.issues];
   for (const b of parsed.program.blocks)
     for (const name of new Set(b.lifts.map((l) => l.name))) if (!liftOf(name)) issues.push(`${b.name} : « ${name} » n’est ni dans ta bibliothèque ni dans ce programme, son exception est ignorée.`);
-  return { plan, issues, source: parsed.source, cycles: parsed.program.blocks, liftOf };
+  return { plan, issues, source: parsed.source, cycles: parsed.program.blocks, liftOf, full };
 }
 
 export function importPreview(d: Db, input: string): ImportPreview {
-  const { plan, issues, source, cycles, liftOf } = planOf(d, input);
-  if (!plan) return { ok: false, name: '', source, issues, summary: { sessions: 0, exercises: 0, created: 0, days: 0 }, sessions: [], blocks: [], oneRms: [] };
+  const { plan, issues, source, cycles, liftOf, full } = planOf(d, input);
+  if (!plan) return { ok: false, name: '', source, issues, summary: { sessions: 0, exercises: 0, created: 0, days: 0 }, sessions: [], blocks: [], oneRms: [], full: null, updatedSessions: 0 };
   const names = new Map(readProgram(d).exercises.map((e) => [e.id, e.name]));
   const summary = summarizePlan(plan);
   return {
@@ -123,6 +138,8 @@ export function importPreview(d: Db, input: string): ImportPreview {
       lifts: b.lifts.filter((l) => liftOf(l.name)).map((l) => ({ name: l.name, week: l.week, text: describeGroups(l.groups) })),
     })),
     oneRms: plan.oneRms.map((r) => ({ name: r.name, kg: r.kg })),
+    full: full ? previewFull(d, full) : null,
+    updatedSessions: plan.sessions.filter((s) => s.id && d.first('SELECT 1 FROM templates WHERE id = ?', [s.id])).length,
   };
 }
 
@@ -135,9 +152,15 @@ export interface ImportOptions {
   oneRms: boolean;
   /** Créer les blocs écrits (ils s'enchaînent). */
   blocks: boolean;
+  /** Fichier « tout » : fusionner l'historique (séances, mesures, décalages). */
+  history?: boolean;
 }
 
 export interface ImportResult {
+  /** Séances types mises à jour sur place (même identifiant). */
+  updated: number;
+  /** Historique fusionné. */
+  sessions: { added: number; updated: number };
   templates: number;
   created: number;
   days: number;
@@ -176,13 +199,20 @@ function slotPatchOf(e: ParsedExercise): SlotPatch {
 }
 
 export function applyImport(d: Db, input: string, options: ImportOptions, date: string): ImportResult {
-  const { plan, cycles, liftOf } = planOf(d, input);
+  const { plan, cycles, liftOf, full } = planOf(d, input);
   if (!plan) throw new Error('Rien à importer');
-  const result: ImportResult = { templates: 0, created: 0, days: 0, oneRms: 0, blocks: 0 };
+  const result: ImportResult = { updated: 0, sessions: { added: 0, updated: 0 }, templates: 0, created: 0, days: 0, oneRms: 0, blocks: 0 };
   d.transaction(() => {
+    // 0. Fichier « tout » : la bibliothèque à toi (avec ses identifiants) et les réglages, avant le reste.
+    if (full) {
+      applyLibrary(d, full);
+      applySettings(d, full);
+    }
+    const fileSessions = new Set(plan.sessions.map((s) => s.id).filter(Boolean));
     if (options.mode === 'replace') {
-      // Remplacer ne touche qu'à ce que le fichier apporte : des cycles seuls laissent les séances en place.
-      if (plan.sessions.length) for (const t of d.all<{ id: string }>('SELECT id FROM templates WHERE archived = 0')) archiveTemplate(d, t.id);
+      // Remplacer ne touche qu'à ce que le fichier apporte : des cycles seuls laissent les séances en place ; une
+      // séance type reprise par identifiant est mise à jour, les autres sont archivées.
+      if (plan.sessions.length) for (const t of d.all<{ id: string }>('SELECT id FROM templates WHERE archived = 0')) if (!fileSessions.has(t.id)) archiveTemplate(d, t.id);
       // Les blocs pas encore commencés laissent la place aux nouveaux (les blocs passés et en cours restent), sauf ceux
       // que le fichier reprend (même identifiant) : ils sont mis à jour.
       const kept = new Set(cycles.map((b) => b.id).filter(Boolean));
@@ -197,18 +227,38 @@ export function applyImport(d: Db, input: string, options: ImportOptions, date: 
     }
     // 2. Les séances types, leurs créneaux, les supersets, la semaine type.
     for (const s of plan.sessions) {
-      const templateId = createTemplate(d, s.name.slice(0, 60));
-      result.templates += 1;
-      if (s.notes) d.run('UPDATE templates SET notes = ? WHERE id = ?', [s.notes.slice(0, 1000), templateId]);
+      // Une séance type reprise par identifiant est mise à jour sur place (ses séances passées la citent toujours).
+      const existing = s.id ? d.first<{ id: string }>('SELECT id FROM templates WHERE id = ?', [s.id]) : null;
+      let templateId: string;
+      if (existing) {
+        templateId = existing.id;
+        d.run('UPDATE templates SET name = ?, archived = 0 WHERE id = ?', [s.name.slice(0, 60), templateId]);
+        d.run('UPDATE template_exercises SET group_json = NULL WHERE template_id = ?', [templateId]);
+        result.updated += 1;
+      } else {
+        templateId = createTemplate(d, s.name.slice(0, 60), s.id ?? undefined);
+        result.templates += 1;
+      }
+      if (s.notes || existing) d.run('UPDATE templates SET notes = ? WHERE id = ?', [s.notes.slice(0, 1000), templateId]);
+      const before = existing ? d.all<{ id: string; exercise_id: string }>('SELECT id, exercise_id FROM template_exercises WHERE template_id = ?', [templateId]) : [];
       const slots: { id: string; group: string | null; sets: number }[] = [];
       for (const pe of s.exercises) {
         const exerciseId = pe.exerciseId ?? created.get(pe.parsed.name.trim().toLowerCase());
         if (!exerciseId) continue;
-        const slotId = addSlot(d, templateId, exerciseId);
-        d.run('UPDATE template_exercises SET intention = ? WHERE id = ?', [pe.intention, slotId]);
+        // Le créneau du fichier (même identifiant, même exercice) est repris ; sinon un nouveau.
+        const old = pe.parsed.id ? before.find((x) => x.id === pe.parsed.id) : undefined;
+        let slotId: string;
+        if (old && old.exercise_id === exerciseId) slotId = old.id;
+        else {
+          if (old) removeSlot(d, old.id);
+          const free = pe.parsed.id && !old && !d.first('SELECT 1 FROM template_exercises WHERE id = ?', [pe.parsed.id]) ? pe.parsed.id : undefined;
+          slotId = addSlot(d, templateId, exerciseId, free);
+        }
+        d.run('UPDATE template_exercises SET intention = ?, position = ? WHERE id = ?', [pe.intention, slots.length, slotId]);
         updateSlot(d, slotId, slotPatchOf(pe.parsed));
         slots.push({ id: slotId, group: pe.parsed.group, sets: pe.parsed.sets });
       }
+      for (const x of before) if (!slots.some((y) => y.id === x.id)) removeSlot(d, x.id);
       // Des créneaux qui se suivent avec la même lettre s'enchaînent (superset à deux, circuit au-delà).
       for (let i = 0; i < slots.length; ) {
         let j = i;
@@ -219,7 +269,7 @@ export function applyImport(d: Db, input: string, options: ImportOptions, date: 
         }
         i = j + 1;
       }
-      if (options.days && s.weekdays.length) {
+      if (options.days && (s.weekdays.length || existing)) {
         setTemplateDays(d, templateId, s.weekdays);
         result.days += s.weekdays.length;
       }
@@ -228,7 +278,8 @@ export function applyImport(d: Db, input: string, options: ImportOptions, date: 
     if (options.oneRms) {
       for (const r of plan.oneRms) {
         const exerciseId = r.exerciseId ?? created.get(r.name.trim().toLowerCase()) ?? null;
-        if (!exerciseId || d.first("SELECT 1 FROM exercise_one_rm WHERE exercise_id = ? AND mode = 'manual'", [exerciseId])) continue;
+        // Un fichier « tout » fait foi (tes 1RM retouchés) ; un programme partagé n'écrase jamais un 1RM saisi.
+        if (!exerciseId || (!full && d.first("SELECT 1 FROM exercise_one_rm WHERE exercise_id = ? AND mode = 'manual'", [exerciseId]))) continue;
         d.run("INSERT INTO exercise_one_rm (exercise_id, value, mode, set_on, updated_at) VALUES (?, ?, 'manual', ?, ?) ON CONFLICT(exercise_id) DO UPDATE SET value = excluded.value, mode = excluded.mode, set_on = excluded.set_on, updated_at = excluded.updated_at", [exerciseId, r.kg, date, Date.now()]);
         result.oneRms += 1;
       }
@@ -254,6 +305,11 @@ export function applyImport(d: Db, input: string, options: ImportOptions, date: 
         result.blocks += 1;
       }
     }
+    // 5. L'historique d'un fichier « tout », fusionné (jamais effacé).
+    if (full && options.history !== false) {
+      const h = applyHistory(d, full);
+      result.sessions = { added: h.added, updated: h.updated };
+    }
   });
   return result;
 }
@@ -273,6 +329,7 @@ export function exportProgram(d: Db, name = 'Mon programme MyPerf'): ProgramFile
   const input: ExportInput = {
     name,
     sessions: sessions.map((s) => ({
+      id: s.id,
       name: s.name,
       notes: '',
       exercises: s.slots.flatMap((slot) => {
@@ -286,6 +343,7 @@ export function exportProgram(d: Db, name = 'Mon programme MyPerf'): ProgramFile
         const sets = scheme === 'interval' && timer?.kind === 'interval' ? Math.round(timer.totalSec / timer.everySec) : (p.sets ?? (slot.strategy.id === 'percent_reference' ? (p.topSets ?? 1) + (p.backoffSets ?? 3) : 3));
         return [
           {
+            id: slot.id,
             name: ex.name,
             sets: slot.group ? slot.group.rounds : sets,
             repMin: p.repMin ?? p.reps ?? ex.repRangeMin,

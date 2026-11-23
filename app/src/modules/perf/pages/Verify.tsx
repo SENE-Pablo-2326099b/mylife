@@ -8,7 +8,7 @@ import { cloudBoot, dropForeign, resolveChoice, useCloud } from '../data/cloud';
 /**
  * Tes données : ce que la base de MyPerf sur cet appareil contient (séances, séances types, références, mesures), la
  * synchro avec le compte (app `perf`, la même que l'app d'avant) et le stockage (protégé ou non). Né à l'étape P1.
- * Et l'export : la sauvegarde complète (JSON) et les séries pour un tableur (CSV).
+ * Et l'export : tout (JSON complet, réimportable sans doublon) et les séries pour un tableur (CSV).
  */
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 const day = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -108,12 +108,12 @@ export function VerifyPage() {
           {failed && <Notice tone="bad">{failed}</Notice>}
           <List>
             <ListRow
-              title="Sauvegarde complète"
-              detail="JSON · tout, programme et historique"
+              title="Tout exporter"
+              detail="JSON complet · programme, cycles, historique"
               value="Télécharger"
               onClick={async () => {
                 try {
-                  download(`myperf-${today()}.json`, JSON.stringify(await call('exportAll'), null, 2), 'application/json');
+                  download(`myperf-tout-${today()}.json`, await call('exportFull'), 'application/json');
                 } catch (e) {
                   setFailed(`Export impossible : ${e instanceof Error ? e.message : String(e)}`);
                 }

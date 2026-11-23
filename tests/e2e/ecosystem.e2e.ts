@@ -339,6 +339,23 @@ describe('MyLife, une seule app', () => {
     await expect.poll(() => page.locator('.display').first().textContent(), { timeout: 20_000 }).toBe('1');
     await expect.poll(() => page.locator('.list-row', { hasText: 'Synchro' }).textContent(), { timeout: 30_000, interval: 500 }).toMatch(/à jour$/);
     await page.locator('.list-row', { hasText: 'Mesures' }).getByText(/poids du corps 79,5 kg/).waitFor();
+    // Tout exporter (JSON complet) : la séance faite, ses séries ; recollé dans Importer, rien n'est dupliqué.
+    const [full] = await Promise.all([page.waitForEvent('download'), page.locator('.list-row', { hasText: 'Tout exporter' }).click()]);
+    const fullText = await (await full.createReadStream())!.toArray().then((c) => Buffer.concat(c as Buffer[]).toString('utf8'));
+    const all = JSON.parse(fullText);
+    expect(all.history.sessions).toHaveLength(1);
+    expect(all.history.sessions[0].exercises[0].sets.length).toBeGreaterThan(0);
+    expect(all.history.measures.some((m: { value: number }) => m.value === 79.5)).toBe(true);
+    await page.goto(`${server.url}/sport/programme/importer`);
+    await page.getByRole('heading', { name: 'Importer' }).waitFor();
+    await page.getByLabel('Programme à importer').fill(fullText);
+    await page.getByText('Toutes tes données · vérifié').waitFor();
+    await page.getByText(/0 séance ajoutée · 1 déjà là, mise à jour/).waitFor();
+    await shot(page, '07u-sport-import-tout');
+    await page.getByRole('button', { name: 'Valider l’import' }).click();
+    await page.waitForURL(/\/sport\/programme$/);
+    await page.goto(`${server.url}/sport/donnees`);
+    await expect.poll(() => page.locator('.display').first().textContent(), { timeout: 20_000 }).toBe('1');
   });
 
   it('MyPerf refait : Programme — semaine type, séance type, créneau passé en EMOM, sans recharger la page', async () => {
