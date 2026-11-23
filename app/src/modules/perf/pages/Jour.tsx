@@ -6,6 +6,7 @@ import type { DayView, PlannedSession } from '../data/day';
 import { call } from '../data/client';
 import { cloudBoot, dropForeign, useCloud } from '../data/cloud';
 import { NewExerciseSheet } from './Reglages';
+import { publishPerf, startPerfInbox } from '../bridge';
 import { StorageWarning } from './common';
 import '../perf.css';
 
@@ -56,6 +57,12 @@ export function JourPage() {
   useEffect(() => {
     if (clean) void call('justEnded', date).then(setEnded, () => setEnded(null));
   }, [clean, date]);
+  // L'accueil, Copilot et l'agenda commun suivent ce que MyPerf sait ; les actions validées dans Copilot s'exécutent.
+  useEffect(() => {
+    if (!clean || !view) return;
+    startPerfInbox();
+    void publishPerf().catch(() => {});
+  }, [clean, view]);
 
   const begin = async (templateId: string | null) => {
     await call('startSession', templateId, date);

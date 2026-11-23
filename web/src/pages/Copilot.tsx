@@ -46,7 +46,7 @@ function saveProposals(list: Proposal[]) {
   }
 }
 
-const APP_PATH = { finances: '/finances/', perf: '/perf/' } as const;
+const APP_PATH = { finances: '/finances/', perf: '/perf/', sport: '/sport' } as const;
 
 /** Une action proposée : la valider ou la refuser ; ensuite son état en direct (l'app concernée l'exécute). */
 function ActionCard({ p, onChange }: { p: Proposal; onChange: (next: Proposal) => void }) {

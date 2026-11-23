@@ -300,6 +300,11 @@ describe('MyLife, une seule app', () => {
     expect(await overflow(page)).toBeLessThanOrEqual(0);
     await page.getByRole('link', { name: 'Terminer' }).click();
     await page.waitForURL(/\/sport$/);
+    // L'accueil : la carte MyPerf vient du module (sa séance, son invite).
+    await page.goto(`${server.url}/`);
+    await page.locator('.card-module', { hasText: /^MyPerf · / }).first().waitFor({ timeout: 20_000 });
+    await shot(page, '07s-accueil-myperf');
+    await page.goto(`${server.url}/sport`);
     // De retour sur Jour : la séance faite apparaît comme dernière séance.
     await page.locator('.list-row', { hasText: 'Full body A' }).first().waitFor({ timeout: 20_000 });
     // Le « + » : toujours le même petit menu ; le poids du jour.

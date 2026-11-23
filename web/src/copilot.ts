@@ -44,7 +44,7 @@ export const COPILOT_SYSTEM = `Tu es Copilot, l'assistant de MyLife : une app qu
 Ce que tu fais :
 - Tu réponds aux questions de l'utilisateur sur sa vie à partir de SES données, que tu lis avec tes outils. Lis avant de répondre : ne devine jamais un chiffre.
 - Tu croises les apps : un achat face au budget et à l'épargne, une semaine d'entraînement face à une sortie prévue.
-- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
+- Tu proposes, tu ne fais rien seul. Pour quelques gestes, tu peux préparer une **action** avec l'outil propose_action : sauter un récurrent ce mois (MyFinances), décaler une séance prévue (MyPerf). L'action s'affiche comme une carte que l'utilisateur valide ou refuse ; elle n'est faite qu'après sa validation, par l'app concernée. Ne dis jamais qu'une action est faite : dis qu'elle attend sa validation. Prends les identifiants dans tes lectures (recurring de get_finances, planned de get_training : son champ « action » dit quel kind utiliser), n'en invente jamais. Une action par geste, seulement si l'utilisateur le demande ou si c'est la suite évidente de sa question. Pour le reste, dis précisément où le faire (« dans MyFinances, Réglages → … »).
 
 Règles :
 - Réponds en français, tutoie, sois concret et bref : quelques phrases ou une courte liste. Les montants en euros, les dates en clair.
@@ -61,7 +61,7 @@ const TOOLS: Anthropic.Beta.BetaTool[] = [
   {
     name: 'propose_action',
     description:
-      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.movePlanned (params : plannedId de get_training → planned, date AAAA-MM-JJ). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
+      'Prépare une action que l’utilisateur validera (elle n’est faite qu’après sa validation, par l’app concernée). kind : finances.skipRecurring (params : itemId de get_finances → recurring, skip true pour sauter ce mois / false pour l’attendre de nouveau) ; perf.moveSession (params : plannedId de get_training → planned, date AAAA-MM-JJ) — ou perf.movePlanned si la fiche l’indique (app d’avant). summary : la phrase montrée à l’utilisateur, au tutoiement (« Sauter le plan Bitcoin ce mois »).',
     input_schema: {
       type: 'object',
       properties: {

@@ -18,7 +18,7 @@ import { adoptOldHistory, compact, conversations, DOMAINS, domainOf, newConversa
  */
 const PROPOSALS_KEY = 'mylife:copilot:proposals';
 const READ_LABEL: Record<string, string> = { get_overview: 'tes modules', get_finances: 'ton budget', get_training: 'ton entraînement', list_sorties: 'tes sorties', get_agenda: 'ton agenda', propose_action: 'une action à valider' };
-const APP_PATH = { finances: '/argent', perf: '/perf/' } as const;
+const APP_PATH = { finances: '/argent', perf: '/perf/', sport: '/sport' } as const;
 
 interface Proposal {
   id: string;

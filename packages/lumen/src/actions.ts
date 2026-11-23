@@ -6,9 +6,10 @@
  * Rien ne s'exécute sans validation : une proposition de Copilot n'entre jamais seule dans la boîte.
  */
 
-export type ActionApp = 'finances' | 'perf';
+/** `sport` : le module MyPerf de la coquille (phase 4) ; `perf` : l'app d'avant, tant qu'elle existe. */
+export type ActionApp = 'finances' | 'perf' | 'sport';
 
-export type ActionKind = 'finances.skipRecurring' | 'perf.movePlanned';
+export type ActionKind = 'finances.skipRecurring' | 'perf.movePlanned' | 'perf.moveSession';
 
 export interface ActionSpec {
   kind: ActionKind;
@@ -32,9 +33,10 @@ export interface MyLifeAction extends ActionSpec {
 export const ACTION_APP: Record<ActionKind, ActionApp> = {
   'finances.skipRecurring': 'finances',
   'perf.movePlanned': 'perf',
+  'perf.moveSession': 'sport',
 };
 
-export const ACTION_APP_NAME: Record<ActionApp, string> = { finances: 'MyFinances', perf: 'MyPerf' };
+export const ACTION_APP_NAME: Record<ActionApp, string> = { finances: 'MyFinances', perf: 'MyPerf', sport: 'MyPerf' };
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[A-Za-z0-9_:.+-]{1,200}$/;
@@ -60,6 +62,13 @@ export function parseActionSpec(raw: unknown): ParsedAction {
       const plannedId = str(p.plannedId, 80);
       const date = str(p.date, 10);
       if (!ID.test(plannedId) || !DATE.test(date)) return { error: 'perf.movePlanned : plannedId (de get_training → planned) et date (AAAA-MM-JJ).' };
+      return { action: { kind, summary, params: { plannedId, date } } };
+    }
+    case 'perf.moveSession': {
+      // Une séance de la semaine type, ce jour-là (« modèle:AAAA-MM-JJ », de get_training → planned), décalée à `date`.
+      const plannedId = str(p.plannedId, 120);
+      const date = str(p.date, 10);
+      if (!/^[A-Za-z0-9_.+-]{1,100}:\d{4}-\d{2}-\d{2}$/.test(plannedId) || !DATE.test(date)) return { error: 'perf.moveSession : plannedId (de get_training → planned) et date (AAAA-MM-JJ).' };
       return { action: { kind, summary, params: { plannedId, date } } };
     }
     default:

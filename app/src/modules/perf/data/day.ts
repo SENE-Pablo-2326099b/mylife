@@ -88,7 +88,7 @@ interface Move {
 }
 
 /** Les séances d'un jour : la semaine type, moins celles décalées ailleurs, plus celles décalées vers ce jour. */
-function plannedOn(program: Program, live: Set<string>, moves: readonly Move[], date: string): { id: string; movedFrom: string | null }[] {
+export function plannedOn(program: Program, live: Set<string>, moves: readonly Move[], date: string): { id: string; movedFrom: string | null }[] {
   const away = new Set(moves.filter((m) => m.from_date === date).map((m) => m.template_id));
   const base = sessionsOn(program.structure.pattern, date)
     .filter((id) => live.has(id) && !away.has(id))
@@ -97,7 +97,7 @@ function plannedOn(program: Program, live: Set<string>, moves: readonly Move[], 
   return [...base, ...moved.map((m) => ({ id: m.template_id, movedFrom: m.from_date }))];
 }
 
-const readMoves = (d: Db, from: string, to: string) =>
+export const readMoves = (d: Db, from: string, to: string) =>
   d.all<Move>('SELECT template_id, from_date, to_date FROM session_moves WHERE (from_date BETWEEN ? AND ?) OR (to_date BETWEEN ? AND ?) ORDER BY created_at', [from, to, from, to]);
 
 /**
