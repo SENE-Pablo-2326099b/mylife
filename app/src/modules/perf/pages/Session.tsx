@@ -9,6 +9,7 @@ import type { SessionDoc, SessionItem, SessionSet } from '../data/session';
 
 type SetPatch = NonNullable<Parameters<Backend['completeSet']>[1]>;
 import { adjustRest, signal, skipRest, startRest, useClock, useRest, useWakeLock } from '../session/timers';
+import { StorageWarning } from './common';
 import '../perf.css';
 
 /**
@@ -205,6 +206,7 @@ export function SessionPage() {
   return (
     <div className="pf-screen tone-perf pf-session" style={editing ? { paddingBottom: 560 } : undefined}>
       <div className="pf-amb" aria-hidden="true" />
+      <StorageWarning />
       <header style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div className="pf-head">
           <IconButton icon="back" label="Réduire la séance" href="/sport" />

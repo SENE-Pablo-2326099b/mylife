@@ -66,37 +66,39 @@ beforeEach(() => {
 });
 
 describe('Exercices : la bibliothèque', () => {
-  it('ceux du programme d’abord, avec leur repère ; les autres à part ; filtres', () => {
+  it('le programme séance par séance, chaque ligne avec sa pastille et un repère ; le reste par muscle ; filtres', () => {
     const v = b.exercisesView(DATE);
-    expect(v.inProgram.map((l) => l.id).sort()).toEqual(['ex_barbell_curl', 'ex_squat', 'ex_weighted_pullup']);
-    const pull = v.inProgram.find((l) => l.id === 'ex_weighted_pullup')!;
-    expect(pull).toMatchObject({ value: '+30 kg', valueLabel: '1RM réf.' });
-    expect(pull.kinds).toEqual(expect.arrayContaining(['bodyweight', 'weighted']));
-    expect(v.inProgram.find((l) => l.id === 'ex_barbell_curl')).toMatchObject({ value: '35 × 8', valueLabel: 'meilleure série' });
-    expect(v.inProgram.find((l) => l.id === 'ex_squat')!.kinds).toContain('barbell');
-    expect(v.others.length).toBeGreaterThan(10);
-    expect(v.total).toBe(v.inProgram.length + v.others.length);
+    expect(v.inProgram).toBe(3);
+    expect(v.sessions).toMatchObject([{ day: 'lun', name: 'Force A' }]);
+    const lines = v.sessions[0]!.lines;
+    const pull = lines.find((l) => l.id === 'ex_weighted_pullup')!;
+    expect(pull).toMatchObject({ tile: 'DOS', region: 'pull', value: '+30 kg', valueLabel: '1RM réf.' });
+    expect(pull.kinds).toEqual(expect.arrayContaining(['program', 'bodyweight', 'weighted']));
+    // Sans 1RM, la dernière série et quand (séance du 12, aujourd'hui le 19).
+    expect(lines.find((l) => l.id === 'ex_barbell_curl')).toMatchObject({ tile: 'BI', value: '35 × 8', valueLabel: 'il y a 7 j' });
+    expect(lines.find((l) => l.id === 'ex_squat')).toMatchObject({ tile: 'QUAD', region: 'legs' });
+    // Un exercice jamais fait le dit.
+    const never = v.all.find((l) => !l.kinds.includes('program'))!;
+    expect(never).toMatchObject({ value: null, valueLabel: 'jamais fait' });
+    expect(v.library.map((g) => g.label)).toEqual(expect.arrayContaining(['Pectoraux', 'Dos', 'Jambes']));
+    expect(v.library.flatMap((g) => g.lines).some((l) => l.kinds.includes('program'))).toBe(false);
+    expect(v.total).toBe(v.all.length);
   });
 
-  it('variantes et formats à soi : une variante, un créneau en EMOM', () => {
+  it('une variante va dans « tes exercices » ; un créneau en EMOM porte son étiquette', () => {
     const variant = b.createVariant('ex_squat', 'Squat pause 2 s');
     const slot = b.templateDetail(force, DATE)!.slots.find((s) => s.exerciseId === 'ex_barbell_curl')!;
     b.updateSlot(slot.id, { format: { base: 'emom', everySec: 60, totalSec: 600 }, strategy: { id: 'linear', params: { sets: 1, reps: 5 } } });
     const v = b.exercisesView(DATE);
-    expect(v.variants).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: variant, name: 'Squat pause 2 s', detail: expect.stringMatching(/^variante de /), chip: 'variante' }),
-        expect.objectContaining({ href: `/sport/programme/creneau/${slot.id}`, detail: 'dans Force A · 5 reps / min', chip: 'EMOM' }),
-      ]),
-    );
-    expect(v.others.find((l) => l.id === variant)!.kinds).toContain('mine');
+    expect(v.library.find((g) => g.id === 'mine')!.lines.map((l) => l.id)).toEqual([variant]);
+    expect(v.sessions[0]!.lines.find((l) => l.id === 'ex_barbell_curl')).toMatchObject({ tag: 'EMOM' });
   });
 });
 
 describe('Exercices : la fiche', () => {
   it('lesté : référence et estimé en lest net, proposition, courbe, charges de travail, records, historique', () => {
     const e = b.exerciseDetail('ex_weighted_pullup', DATE)!;
-    expect(e).toMatchObject({ weighted: true, usesReference: true, kicker: expect.stringMatching(/^lest|^poids du corps/) });
+    expect(e).toMatchObject({ weighted: true, usesReference: true, context: 'Force A · au % du 1RM', inTemplates: ['Force A'] });
     expect(e.reference).toMatchObject({ value: 30, text: '+30 kg', source: 'saisi' });
     // Estimé : (80 + 40) × (1 + 4/30) − 80 = 56 kg de lest.
     expect(e.estimate!.value).toBe(56);
@@ -126,7 +128,7 @@ describe('Exercices : modifier, archiver, variante', () => {
     expect(() => b.updateExercise('ex_squat', { variantOf: 'ex_squat' })).toThrow(/propre variante/);
     expect(() => b.archiveExercise('ex_squat')).toThrow(/Force A/);
     b.archiveExercise(v);
-    expect(b.exercisesView(DATE).others.some((l) => l.id === v)).toBe(false);
+    expect(b.exercisesView(DATE).all.some((l) => l.id === v)).toBe(false);
   });
 
   it('une variante reprend les muscles et la charge, avec son propre 1RM', () => {
@@ -134,7 +136,7 @@ describe('Exercices : modifier, archiver, variante', () => {
     const row = d.first<{ load_type: string; category: string; variant_of: string; primary_muscles: string }>('SELECT load_type, category, variant_of, primary_muscles FROM exercises WHERE id = ?', [v])!;
     const parent = d.first<{ load_type: string; category: string; primary_muscles: string }>('SELECT load_type, category, primary_muscles FROM exercises WHERE id = ?', ['ex_weighted_pullup'])!;
     expect(row).toMatchObject({ load_type: parent.load_type, category: parent.category, variant_of: 'ex_weighted_pullup', primary_muscles: parent.primary_muscles });
-    expect(b.exerciseDetail(v, DATE)).toMatchObject({ variantOf: { id: 'ex_weighted_pullup' }, reference: null, sessions: 0 });
+    expect(b.exerciseDetail(v, DATE)).toMatchObject({ variantOf: { id: 'ex_weighted_pullup' }, reference: null, sessions: 0, context: 'Pas encore au programme', createdOn: expect.any(String) });
     expect(b.exerciseDetail('ex_weighted_pullup', DATE)!.variants.map((x) => x.id)).toEqual([v]);
   });
 });

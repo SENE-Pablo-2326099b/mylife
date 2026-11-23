@@ -96,7 +96,7 @@ export function VerifyPage() {
           <SectionTitle>Appareil</SectionTitle>
           <List>
             <ListRow title="Synchro" value={cloud.syncing ? 'en cours' : cloud.lastSyncAt ? 'à jour' : cloud.signedIn ? 'pas encore' : 'hors compte'} detail={o.pending > 0 ? `${o.pending} modifications à envoyer` : undefined} />
-            <ListRow title="Stockage" value={<Badge tone={storage?.vfs === 'opfs-sahpool' && persisted === 'protégé' ? 'ok' : 'warn'}>{storage?.vfs === 'memory' ? 'en mémoire' : persisted}</Badge>} detail={storage ? `SQLite ${storage.sqlite}` : undefined} />
+            <ListRow title="Stockage" value={<Badge tone={storage?.vfs === 'opfs-sahpool' && persisted === 'protégé' ? 'ok' : 'warn'}>{storage?.vfs === 'memory' ? 'en mémoire' : storage?.vfs === 'busy' ? 'ouvert ailleurs' : persisted}</Badge>} detail={storage ? `SQLite ${storage.sqlite}` : undefined} />
           </List>
           <span className="t-small muted">Lu comme : {o.capabilities.join(' · ') || '—'}</span>
         </>

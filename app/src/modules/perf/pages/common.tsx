@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { IconButton } from '@mylife/kit';
+import { useEffect, useState, type ReactNode } from 'react';
+import { IconButton, Notice } from '@mylife/kit';
+import { storageInfo } from '../data/client';
 
 export function Head({ back, kicker, title, right }: { back: string; kicker?: string; title: string; right?: ReactNode }) {
   return (
@@ -29,4 +30,15 @@ export function NumberRow({ label, value, unit, onChange, step = 1, min = 1, max
       </button>
     </div>
   );
+}
+
+/** Prévient quand la base n'est pas gardée sur l'appareil : ouverte dans un autre onglet, ou navigateur sans stockage. */
+export function StorageWarning() {
+  const [vfs, setVfs] = useState<string | null>(null);
+  useEffect(() => {
+    storageInfo().then((i) => setVfs(i.vfs), () => setVfs(null));
+  }, []);
+  if (vfs === 'busy') return <Notice tone="warn">MyPerf est ouvert dans un autre onglet : ce que tu fais ici ne sera pas gardé. Ferme l’autre onglet, puis recharge.</Notice>;
+  if (vfs === 'memory') return <Notice tone="warn">Ce navigateur ne garde pas tes séances sur l’appareil : elles partent au compte à la synchro.</Notice>;
+  return null;
 }

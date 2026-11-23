@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Button, Field, Glass, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
+import { Button, Field, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
 import { call } from '../data/client';
-import type { ExerciseDetail, ExercisesView } from '../data/exercises';
+import { Body } from '../body/Body';
+import type { ExerciseDetail, ExerciseLine, ExercisesView, Region } from '../data/exercises';
+import type { TemplateSummary } from '../data/program';
 import { Head } from './common';
 import { NewExerciseSheet } from './Reglages';
 import { errorText, MUSCLES, today, useData } from './util';
@@ -15,112 +17,137 @@ import '../perf.css';
  * variantes. Lest net partout pour un lesté.
  */
 const FILTERS: readonly { id: string; label: string }[] = [
-  { id: 'all', label: 'Tous' },
-  { id: 'barbell', label: 'Barre' },
-  { id: 'bodyweight', label: 'Poids du corps' },
+  { id: 'program', label: 'Au programme' },
   { id: 'weighted', label: 'Lestés' },
+  { id: 'barbell', label: 'Barre' },
+  { id: 'dumbbell', label: 'Haltères' },
+  { id: 'bodyweight', label: 'Poids du corps' },
   { id: 'time', label: 'Au temps' },
-  { id: 'mine', label: 'À moi' },
+  { id: 'mine', label: 'À toi' },
 ];
+/** La teinte d'un groupe musculaire : celle d'un module du kit (poussée, tirage, jambes, abdos). */
+const TONE: Record<Region, string> = { push: 'tone-perf', pull: 'tone-finances', legs: 'tone-rave', core: 'tone-chef' };
 const norm = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+function Tile({ label, region, small }: { label: string; region: Region; small?: boolean }) {
+  return (
+    <span className={`pf-mt ${TONE[region]}${small ? ' is-small' : ''}`} aria-hidden="true">
+      {label}
+    </span>
+  );
+}
+
+function ExRow({ l }: { l: ExerciseLine }) {
+  return (
+    <a className="pf-ex" href={`/sport/exercices/${l.id}`}>
+      <Tile label={l.tile} region={l.region} />
+      <span className="grow" style={{ minWidth: 0 }}>
+        <span className="t-strong">{l.name}</span>
+        {l.tag && <span className="pf-tag" style={{ marginLeft: 6 }}>{l.tag}</span>}
+        <br />
+        <span className="t-small muted">{l.detail}</span>
+      </span>
+      <span className="pf-val">
+        {l.value && <b>{l.value}</b>}
+        <small>{l.valueLabel}</small>
+      </span>
+    </a>
+  );
+}
 
 export function ExercisesPage() {
   const date = today();
   const { data: v, error, reload } = useData<ExercisesView>(() => call('exercisesView', date), [date]);
   const [q, setQ] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [all, setAll] = useState(false);
+  const [filter, setFilter] = useState<string | null>(null);
+  const [allSessions, setAllSessions] = useState(false);
+  const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
-  const keep = useMemo(() => (l: { name: string; detail: string; kinds: string[] }) => (filter === 'all' || l.kinds.includes(filter)) && (!q || norm(`${l.name} ${l.detail}`).includes(norm(q))), [q, filter]);
   if (error) return <Notice tone="bad">{error}</Notice>;
   if (!v) return <span className="t-small muted">Lecture des exercices…</span>;
-  const program = v.inProgram.filter(keep);
-  const others = v.others.filter(keep);
-  const searching = q !== '' || filter !== 'all';
-  const shownOthers = all || searching ? others : [];
+  const searching = q.trim() !== '' || filter !== null;
+  const found = searching ? v.all.filter((l) => (!filter || l.kinds.includes(filter)) && (!q || norm(`${l.name} ${l.detail}`).includes(norm(q)))) : [];
+  const sessions = allSessions ? v.sessions : v.sessions.slice(0, 2);
+  const hidden = v.sessions.slice(2);
   return (
     <div className="pf-screen tone-perf" style={{ paddingBottom: 110 }}>
       <div className="pf-amb" aria-hidden="true" />
-      <Head
-        back="/"
-        kicker={`${v.total} exercices · ${v.formats} format${v.formats > 1 ? 's' : ''}`}
-        title="Exercices"
-        right={
-          <Button variant="action" onClick={() => setCreating(true)}>
-            + Nouveau
-          </Button>
-        }
-      />
-      <input className="input" aria-label="Chercher un exercice" placeholder="Chercher : nom, muscle, matériel" value={q} onChange={(e) => setQ(e.target.value)} />
-      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+      <Head back="/" kicker={`${v.total} exercices · ${v.inProgram} au programme`} title="Exercices" right={<IconButton icon="plus" label="Nouvel exercice" onClick={() => setCreating(true)} />} />
+      <label className="glass pf-search">
+        <Icon name="search" size={18} />
+        <input aria-label="Chercher un exercice" placeholder="Chercher un exercice, un muscle" value={q} onChange={(e) => setQ(e.target.value)} />
+      </label>
+      <div className="pf-scrollchips" role="group" aria-label="Filtres">
         {FILTERS.map((f) => (
-          <button key={f.id} type="button" className={`pf-chip${filter === f.id ? '' : ' is-neutral'}`} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+          <button key={f.id} type="button" className={`pf-chip${filter === f.id ? '' : ' is-neutral'}`} aria-pressed={filter === f.id} onClick={() => setFilter(filter === f.id ? null : f.id)}>
             {f.label}
           </button>
         ))}
       </div>
 
-      {program.length > 0 && (
-        <>
-          <span className="pf-sec">
-            <span>Dans ton programme</span>
-            <span>{program.length}</span>
+      {searching ? (
+        found.length ? (
+          <>
+            <span className="pf-sec">
+              <span>Résultats</span>
+              <span>{found.length}</span>
+            </span>
+            <Glass className="pf-grp">
+              {found.map((l) => (
+                <ExRow key={l.id} l={l} />
+              ))}
+            </Glass>
+          </>
+        ) : (
+          <span className="t-small muted" style={{ textAlign: 'center' }}>
+            Aucun exercice ne correspond.
           </span>
-          <List>
-            {program.map((l) => (
-              <ListRow
-                key={l.id}
-                href={`/sport/exercices/${l.id}`}
-                title={<span className="t-strong">{l.name}</span>}
-                detail={l.detail}
-                value={
-                  l.value ? (
-                    <span className="pf-val">
-                      <b>{l.value}</b>
-                      <small>{l.valueLabel}</small>
-                    </span>
-                  ) : undefined
-                }
-              />
+        )
+      ) : (
+        <>
+          {v.sessions.length > 0 && (
+            <>
+              <span className="pf-sec">
+                <span>Au programme · par séance</span>
+                <span>{v.inProgram}</span>
+              </span>
+              {sessions.map((s) => (
+                <Glass key={s.id} className="pf-grp">
+                  <div className="pf-gh">
+                    {s.day && <span>{s.day}</span>}
+                    <b>{s.name}</b>
+                  </div>
+                  {s.lines.map((l) => (
+                    <ExRow key={l.id} l={l} />
+                  ))}
+                </Glass>
+              ))}
+              {!allSessions && hidden.length > 0 && (
+                <button type="button" className="pf-link is-muted" style={{ alignSelf: 'center', marginTop: -6 }} onClick={() => setAllSessions(true)}>
+                  {`+ ${hidden.length} séance${hidden.length > 1 ? 's' : ''} · ${hidden.map((x) => x.name).join(', ')}`}
+                </button>
+              )}
+            </>
+          )}
+          <span className="pf-sec">
+            <span>Bibliothèque · par muscle</span>
+            <span>{v.library.reduce((n, g) => n + g.lines.length, 0)}</span>
+          </span>
+          <Glass className="pf-grp">
+            {v.library.map((g) => (
+              <div key={g.id} className="pf-fold-wrap">
+                <button type="button" className="pf-fold" aria-expanded={open === g.id} onClick={() => setOpen(open === g.id ? null : g.id)}>
+                  <Tile label={g.tile} region={g.region} small />
+                  <span className="grow t-strong">{g.label}</span>
+                  <span className="t-small muted">{`${g.lines.length} ${open === g.id ? '⌃' : '›'}`}</span>
+                </button>
+                {open === g.id && g.lines.map((l) => <ExRow key={l.id} l={l} />)}
+              </div>
             ))}
-          </List>
+          </Glass>
         </>
       )}
-
-      {!searching && v.variants.length > 0 && (
-        <>
-          <span className="pf-sec">
-            <span>Variantes et formats</span>
-            <span>à toi</span>
-          </span>
-          <List>
-            {v.variants.map((x) => (
-              <ListRow key={x.id} href={x.href} title={<span className="t-strong">{x.name}</span>} detail={x.detail} value={<span className="pf-chip is-neutral">{x.chip}</span>} />
-            ))}
-          </List>
-        </>
-      )}
-
-      {shownOthers.length > 0 && (
-        <>
-          <span className="pf-sec">
-            <span>{searching ? 'Les autres' : 'Tous les autres'}</span>
-            <span>{others.length}</span>
-          </span>
-          <List>
-            {shownOthers.map((l) => (
-              <ListRow key={l.id} href={`/sport/exercices/${l.id}`} title={l.name} detail={l.detail} />
-            ))}
-          </List>
-        </>
-      )}
-      {!searching && others.length > 0 && (
-        <button type="button" className="pf-link is-muted" style={{ alignSelf: 'center' }} onClick={() => setAll(!all)}>
-          {all ? 'Moins' : `Autres : ${others.length} exercices · tout voir`}
-        </button>
-      )}
-      {searching && program.length + others.length === 0 && <span className="t-small muted">Aucun exercice ne correspond.</span>}
 
       <NewExerciseSheet
         open={creating}
@@ -144,36 +171,30 @@ const PERIODS = [
   { id: '6M', days: 183 },
   { id: 'Tout', days: 100_000 },
 ] as const;
+const MUSCLE_NAME = Object.fromEntries(MUSCLES) as Record<string, string>;
 
 function Curve({ points, reference }: { points: { date: string; value: number }[]; reference: number | null }) {
-  if (points.length < 2) return <span className="t-small muted">Pas encore assez de séances pour tracer la courbe.</span>;
   const values = [...points.map((p) => p.value), ...(reference !== null ? [reference] : [])];
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
-  const y = (v: number) => 104 - ((v - min) / span) * 84;
-  const x = (i: number) => (i / (points.length - 1)) * 320;
+  const y = (v: number) => 90 - ((v - min) / span) * 76;
+  const x = (i: number) => (points.length < 2 ? 160 : (i / (points.length - 1)) * 320);
   const line = points.map((p, i) => `${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
   const last = points[points.length - 1]!;
   return (
-    <>
-      <svg viewBox="0 0 320 120" width="100%" height="120" role="img" aria-label={`Courbe du 1RM estimé, de ${points[0]!.value} à ${last.value} kg`}>
-        <defs>
-          <linearGradient id="pf-curve" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="var(--tone-solid)" stopOpacity=".35" />
-            <stop offset="1" stopColor="var(--tone-solid)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {reference !== null && <line x1="0" x2="320" y1={y(reference)} y2={y(reference)} stroke="var(--ink-2)" strokeOpacity=".5" strokeDasharray="4 5" />}
-        <path d={`M0 ${y(points[0]!.value)} L${line.replace(/ /g, ' L')} L320 120 L0 120 Z`} fill="url(#pf-curve)" />
-        <polyline points={line} fill="none" stroke="var(--tone-solid)" strokeWidth="2.5" />
-        <circle cx="320" cy={y(last.value)} r="4" fill="var(--tone-solid)" />
-      </svg>
-      <div className="row t-small muted">
-        <span className="grow">{new Date(`${points[0]!.date}T12:00:00`).toLocaleDateString('fr-FR', { month: 'long' })}</span>
-        <span>{new Date(`${last.date}T12:00:00`).toLocaleDateString('fr-FR', { month: 'long' })}</span>
-      </div>
-    </>
+    <svg viewBox="0 0 320 100" width="100%" height="100" role="img" aria-label={`1RM estimé, de ${points[0]!.value} à ${last.value} kg`}>
+      <defs>
+        <linearGradient id="pf-curve" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="var(--tone-solid)" stopOpacity=".35" />
+          <stop offset="1" stopColor="var(--tone-solid)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {reference !== null && <line x1="0" x2="320" y1={y(reference)} y2={y(reference)} stroke="var(--ink-2)" strokeOpacity=".5" strokeDasharray="4 5" />}
+      <path d={`M${x(0)} ${y(points[0]!.value)} L${line.replace(/ /g, ' L')} L320 100 L0 100 Z`} fill="url(#pf-curve)" />
+      <polyline points={line} fill="none" stroke="var(--tone-solid)" strokeWidth="2.5" />
+      <circle cx={x(points.length - 1)} cy={y(last.value)} r="4" fill="var(--tone-solid)" />
+    </svg>
   );
 }
 
@@ -183,9 +204,9 @@ export function ExercisePage() {
   const navigate = useNavigate();
   const { data: e, error, reload } = useData<ExerciseDetail | null>(() => call('exerciseDetail', id, date), [id, date]);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]['id']>('3M');
-  const [sheet, setSheet] = useState<'edit' | 'reference' | 'variant' | null>(null);
+  const [panel, setPanel] = useState<'loads' | 'records' | 'history'>('loads');
+  const [sheet, setSheet] = useState<'edit' | 'reference' | 'variant' | 'add' | null>(null);
   const [kept, setKept] = useState(false);
-  const [history, setHistory] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
   useEffect(() => setKept(false), [id]);
   if (error) return <Notice tone="bad">{error}</Notice>;
@@ -204,111 +225,161 @@ export function ExercisePage() {
   const cutoff = new Date(Date.now() - PERIODS.find((p) => p.id === period)!.days * 86_400_000).toISOString().slice(0, 10);
   const points = e.curve.filter((p) => p.date >= cutoff);
   const unit = e.weighted ? 'kg de lest' : 'kg';
+  const values: Record<string, number> = {};
+  for (const m of e.secondary) values[m] = 0.5;
+  for (const m of e.primary) values[m] = 1;
+  const panels = [
+    { id: 'loads' as const, label: 'Charges', show: e.loads.length > 0 },
+    { id: 'records' as const, label: 'Records', show: e.records.length > 0 },
+    { id: 'history' as const, label: 'Historique', show: e.history.length > 0 },
+  ].filter((x) => x.show);
+  const shown = panels.find((x) => x.id === panel) ? panel : panels[0]?.id;
+  const best = e.records.find((r) => r.label === 'Meilleure série');
+  const hasRef = e.reference?.source === 'saisi' || e.estimate !== null;
+  const loadBased = e.loads.length > 0 || e.usesReference || e.category === 'main';
   return (
     <div className="pf-screen tone-perf" style={{ paddingBottom: 110 }}>
       <div className="pf-amb" aria-hidden="true" />
-      <Head back="/sport/exercices" kicker={e.kicker} title={e.name} right={<IconButton icon="settings" label="Modifier l’exercice" onClick={() => setSheet('edit')} />} />
+      <Head back="/sport/exercices" kicker={e.context} title={e.name} right={<IconButton icon="settings" label="Modifier l’exercice" onClick={() => setSheet('edit')} />} />
       {failed && <Notice tone="bad">{failed}</Notice>}
-      {e.variantOf && <span className="t-small muted" style={{ marginTop: -8 }}>{`variante de ${e.variantOf.name}`}</span>}
 
-      <div className="card-module pf-hero">
-        <div className="pf-two">
-          <button type="button" className="pf-stat-big" onClick={() => setSheet('reference')}>
-            <span className="t-label muted">1RM de référence</span>
-            <span className="pf-big" style={{ fontSize: 30 }}>
-              {e.reference?.source === 'saisi' ? e.reference.text.replace(' kg', '') : '—'}
-            </span>
-            <span className="t-small muted">{e.reference?.source === 'saisi' ? `${unit} · le ${e.reference.when}` : 'à saisir'}</span>
-          </button>
-          <span className="pf-stat-big">
-            <span className="t-label muted">Estimé</span>
-            <span className="pf-big c-tone" style={{ fontSize: 30 }}>
-              {e.estimate ? e.estimate.text.replace(' kg', '') : '—'}
-            </span>
-            <span className="t-small muted">{e.estimate ? `${unit}${e.estimate.delta ? ` · ${e.estimate.delta}` : ''}` : 'pas encore de séries'}</span>
+      <div className="card-module pf-exhero">
+        <Body values={values} label={`Muscles : ${e.primary.map((m) => MUSCLE_NAME[m]).join(', ')}${e.secondary.length ? ` ; secondaires : ${e.secondary.map((m) => MUSCLE_NAME[m]).join(', ')}` : ''}`} />
+        <div className="pf-facts">
+          <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+            {e.chips.map((c, i) => (
+              <span key={c} className={`pf-chip${i ? ' is-neutral' : ''}`}>
+                {c}
+              </span>
+            ))}
           </span>
+          <span className="t-small">
+            <b>{e.primary.map((m) => MUSCLE_NAME[m]).join(', ')}</b>
+            {e.secondary.length > 0 && <span className="muted">{` · ${e.secondary.map((m) => MUSCLE_NAME[m]?.toLowerCase()).join(', ')}`}</span>}
+          </span>
+          {e.variantOf && (
+            <a className="t-small c-tone" href={`/sport/exercices/${e.variantOf.id}`}>
+              {`variante de ${e.variantOf.name}`}
+            </a>
+          )}
+          <span className="t-small muted">{e.inTemplates.length ? `Dans : ${e.inTemplates.join(', ')}` : e.createdOn ? `Créé le ${e.createdOn}` : 'Pas encore dans tes séances'}</span>
+          {e.variants.length > 0 && <span className="t-small muted">{`Variantes : ${e.variants.map((v) => v.name).join(', ')}`}</span>}
         </div>
-        {e.proposal && !kept && (
-          <div className="row pf-proposal">
-            <span className="grow t-small">
-              Passer la référence à <b>{e.proposal.text}</b> ?
-            </span>
-            <Button onClick={() => setKept(true)}>Garder</Button>
-            <Button variant="action" onClick={() => void act(call('setReference', e.id, e.proposal!.value, date))}>
-              Appliquer
-            </Button>
-          </div>
-        )}
       </div>
 
-      <Glass className="pf-curvecard">
-        <div className="row">
-          <span className="grow t-strong">1RM estimé</span>
-          <div className="segmented" role="group" aria-label="Période">
+      {hasRef ? (
+        <Glass className="pf-refcard">
+          <div className="pf-two">
+            <button type="button" className="pf-stat-big" onClick={() => setSheet('reference')}>
+              <span className="t-label muted">1RM de référence</span>
+              <span className="pf-big" style={{ fontSize: 30 }}>
+                {e.reference?.source === 'saisi' ? e.reference.text.replace(' kg', '') : 'à saisir'}
+              </span>
+              <span className="t-small muted">{e.reference?.source === 'saisi' ? `${unit} · ${e.reference.when}` : 'toucher pour saisir'}</span>
+            </button>
+            <span className="pf-stat-big">
+              <span className="t-label muted">Estimé</span>
+              <span className="pf-big c-tone" style={{ fontSize: 30 }}>
+                {e.estimate ? e.estimate.text.replace(' kg', '') : '…'}
+              </span>
+              <span className="t-small muted">{e.estimate ? `${unit}${e.estimate.delta ? ` · ${e.estimate.delta}` : ''}` : ''}</span>
+            </span>
+          </div>
+          {e.proposal && !kept && (
+            <div className="row pf-proposal">
+              <span className="grow t-small">
+                Passer à <b>{e.proposal.text}</b> ?
+              </span>
+              <Button onClick={() => setKept(true)}>Garder</Button>
+              <Button variant="action" onClick={() => void act(call('setReference', e.id, e.proposal!.value, date))}>
+                Appliquer
+              </Button>
+            </div>
+          )}
+        </Glass>
+      ) : (
+        <Glass className="pf-refcard" >
+          <span className="t-strong">Pas encore de repère</span>
+          <span className="t-small muted">{loadBased ? 'Saisis ton 1RM, ou fais une séance : il s’estimera tout seul.' : 'Il apparaîtra après ta première séance.'}</span>
+          {loadBased && (
+            <Button variant="action" block onClick={() => setSheet('reference')}>
+              Saisir mon 1RM
+            </Button>
+          )}
+        </Glass>
+      )}
+
+      {e.curve.length >= 2 && (
+        <Glass className="pf-curvecard">
+          <div className="row" style={{ gap: 4 }}>
+            <span className="grow t-strong">Progression</span>
             {PERIODS.map((p) => (
-              <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
+              <button key={p.id} type="button" className={`pf-chip${period === p.id ? '' : ' is-neutral'}`} aria-pressed={period === p.id} onClick={() => setPeriod(p.id)}>
                 {p.id}
               </button>
             ))}
           </div>
-        </div>
-        <Curve points={points} reference={e.reference?.source === 'saisi' ? e.reference.value : null} />
-      </Glass>
-
-      {e.loads.length > 0 && (
-        <>
-          <span className="pf-sec">
-            <span>Charges de travail</span>
-            <span>{e.weighted ? 'lest' : 'kg'}</span>
-          </span>
-          <Glass className="pf-tablewrap">
-            <table className="pf-table">
-              <thead>
-                <tr>
-                  <th />
-                  {e.loads.map((l) => (
-                    <th key={l.reps}>{l.reps}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className="pf-tl">reps</td>
-                  {e.loads.map((l) => (
-                    <td key={l.reps}>{l.text}</td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </Glass>
-        </>
+          {points.length >= 2 ? <Curve points={points} reference={e.reference?.source === 'saisi' ? e.reference.value : null} /> : <span className="t-small muted">Pas de séance sur cette période.</span>}
+          <span className="t-small muted">{`${points.length} séance${points.length > 1 ? 's' : ''}${period === 'Tout' ? '' : ` en ${period === '1M' ? '1 mois' : `${period[0]} mois`}`}${best ? ` · meilleure série ${best.value}${best.when ? ` (${best.when})` : ''}` : ''}`}</span>
+        </Glass>
       )}
 
-      {e.records.length > 0 && (
+      {panels.length > 0 && shown && (
         <>
-          <span className="pf-sec">
-            <span>Records</span>
-            <span />
-          </span>
-          <List>
-            {e.records.map((r) => (
-              <ListRow key={r.label} title={r.label} value={<span className="row" style={{ gap: 8 }}><b>{r.value}</b>{r.when && <span className="pf-chip">{r.when}</span>}</span>} />
+          <div className="glass segmented" role="group" aria-label="Détail">
+            {panels.map((x) => (
+              <button key={x.id} type="button" aria-pressed={shown === x.id} onClick={() => setPanel(x.id)}>
+                {x.label}
+              </button>
             ))}
-          </List>
+          </div>
+          {shown === 'loads' && (
+            <Glass className="pf-tablewrap">
+              <table className="pf-table">
+                <thead>
+                  <tr>
+                    <th />
+                    {e.loads.map((l) => (
+                      <th key={l.reps}>{l.reps}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="pf-tl">{e.weighted ? 'lest' : 'kg'}</td>
+                    {e.loads.map((l) => (
+                      <td key={l.reps}>{l.text}</td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </Glass>
+          )}
+          {shown === 'records' && (
+            <List>
+              {e.records.map((r) => (
+                <ListRow key={r.label} title={r.label} value={<span className="row" style={{ gap: 8 }}><b>{r.value}</b>{r.when && <span className="pf-chip">{r.when}</span>}</span>} />
+              ))}
+            </List>
+          )}
+          {shown === 'history' && (
+            <List>
+              {e.history.slice(0, 12).map((x, i) => (
+                <ListRow key={i} title={x.summary} detail={`${x.when} · ${x.name}`} />
+              ))}
+            </List>
+          )}
         </>
       )}
 
-      <List>
-        <ListRow title="Variantes" value={<span className="t-small muted">{e.variants.length ? e.variants.map((x) => x.name).join(', ') : '+ créer'}</span>} onClick={() => setSheet('variant')} />
-        <ListRow title="Historique" value={<span className="t-small muted">{`${e.sessions} séance${e.sessions > 1 ? 's' : ''}`}</span>} onClick={e.sessions ? () => setHistory(!history) : undefined} />
-      </List>
-      {history && (
-        <List>
-          {e.history.map((x, i) => (
-            <ListRow key={i} title={x.summary} detail={`${x.when} · ${x.name}`} />
-          ))}
-        </List>
-      )}
+      <div className="row" style={{ gap: 8 }}>
+        <div className="grow">
+          <Button variant={e.inTemplates.length ? 'secondary' : 'action'} block onClick={() => setSheet('add')}>
+            Ajouter à une séance
+          </Button>
+        </div>
+        <Button onClick={() => setSheet('variant')}>+ Variante</Button>
+      </div>
 
       <EditExerciseSheet
         open={sheet === 'edit'}
@@ -340,7 +411,31 @@ export function ExercisePage() {
           }
         }}
       />
+      <AddToSessionSheet open={sheet === 'add'} exercise={e} onClose={() => setSheet(null)} onPick={(templateId) => void act(call('addSlot', templateId, e.id))} />
     </div>
+  );
+}
+
+function AddToSessionSheet({ open, exercise, onClose, onPick }: { open: boolean; exercise: ExerciseDetail; onClose: () => void; onPick: (templateId: string) => void }) {
+  const [list, setList] = useState<TemplateSummary[]>([]);
+  useEffect(() => {
+    if (open) void call('templatesView').then(setList);
+  }, [open]);
+  return (
+    <Sheet open={open} title="Ajouter à une séance" onClose={onClose}>
+      <div className="stack">
+        {list.length ? (
+          <List>
+            {list.map((t) => {
+              const already = exercise.inTemplates.includes(t.name);
+              return <ListRow key={t.id} title={t.name} detail={already ? 'déjà dedans · l’ajouter encore' : `${t.exercises.length} exercice${t.exercises.length > 1 ? 's' : ''}`} onClick={() => onPick(t.id)} />;
+            })}
+          </List>
+        ) : (
+          <span className="t-small muted">Pas encore de séance type : crée-en une dans Programme.</span>
+        )}
+      </div>
+    </Sheet>
   );
 }
 

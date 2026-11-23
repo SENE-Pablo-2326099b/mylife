@@ -67,22 +67,49 @@ function bestSet(sets: readonly DoneSet[], weighted: boolean): DoneSet | null {
   return best;
 }
 
+/** Les groupes musculaires de la bibliothèque, avec leur pastille et leur teinte (couleurs des modules du kit). */
+export type Region = 'push' | 'pull' | 'legs' | 'core';
+const GROUPS: readonly { id: string; label: string; region: Region; muscles: string[] }[] = [
+  { id: 'chest', label: 'Pectoraux', region: 'push', muscles: ['chest'] },
+  { id: 'back', label: 'Dos', region: 'pull', muscles: ['back', 'lats', 'traps', 'lower_back'] },
+  { id: 'legs', label: 'Jambes', region: 'legs', muscles: ['quads', 'hamstrings', 'glutes', 'adductors', 'calves'] },
+  { id: 'shoulders', label: 'Épaules', region: 'push', muscles: ['shoulders', 'rear_delts'] },
+  { id: 'arms', label: 'Bras', region: 'pull', muscles: ['biceps', 'triceps', 'forearms'] },
+  { id: 'core', label: 'Abdos et gainage', region: 'core', muscles: ['abs'] },
+];
+const TILE: Record<string, string> = { chest: 'PECS', back: 'DOS', lats: 'DOS', traps: 'TRAP', shoulders: 'ÉPA', rear_delts: 'ÉPA', biceps: 'BI', triceps: 'TRI', forearms: 'AVB', abs: 'ABDO', lower_back: 'LOMB', glutes: 'FESS', quads: 'QUAD', hamstrings: 'ISCH', adductors: 'ADD', calves: 'MOL' };
+const REGION: Record<string, Region> = { chest: 'push', shoulders: 'push', triceps: 'push', back: 'pull', lats: 'pull', traps: 'pull', rear_delts: 'pull', biceps: 'pull', forearms: 'pull', quads: 'legs', hamstrings: 'legs', glutes: 'legs', adductors: 'legs', calves: 'legs', abs: 'core', lower_back: 'core' };
+const DAYS = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+const daysAgo = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00`) - Date.parse(`${from}T12:00:00`)) / 86_400_000);
+const ago = (iso: string, today: string) => {
+  const n = daysAgo(iso, today);
+  return n <= 0 ? 'aujourd’hui' : n === 1 ? 'hier' : n < 14 ? `il y a ${n} j` : n < 60 ? `il y a ${Math.round(n / 7)} sem.` : shortDate(iso);
+};
+
 export interface ExerciseLine {
   id: string;
   name: string;
   detail: string;
-  /** Pour les filtres : barbell, bodyweight, weighted, time, mine. */
+  tile: string;
+  region: Region;
+  /** Format autre que des séries, tel qu'il est réglé dans le programme (EMOM, AMRAP, au temps). */
+  tag: string | null;
+  /** Pour les filtres : program, weighted, barbell, dumbbell, bodyweight, time, mine. */
   kinds: string[];
+  /** Le repère : 1RM, sinon la dernière série, sinon « jamais fait ». */
   value: string | null;
-  valueLabel: string | null;
+  valueLabel: string;
 }
 
 export interface ExercisesView {
   total: number;
-  formats: number;
-  inProgram: ExerciseLine[];
-  variants: { id: string; href: string; name: string; detail: string; chip: string }[];
-  others: ExerciseLine[];
+  inProgram: number;
+  /** Les exercices du programme, séance par séance (dans l'ordre de la semaine). */
+  sessions: { id: string; day: string; name: string; lines: ExerciseLine[] }[];
+  /** Le reste de la bibliothèque, par groupe musculaire, puis les tiens. */
+  library: { id: string; label: string; region: Region; tile: string; lines: ExerciseLine[] }[];
+  /** Tout, à plat, pour chercher et filtrer. */
+  all: ExerciseLine[];
 }
 
 export function exercisesView(d: Db, date: string): ExercisesView {
@@ -94,49 +121,76 @@ export function exercisesView(d: Db, date: string): ExercisesView {
   const formats = [...BUILTIN_FORMATS, ...program.formats];
   const variantOf = new Map(d.all<{ id: string; variant_of: string | null }>('SELECT id, variant_of FROM exercises').map((r) => [r.id, r.variant_of]));
   const exercises = program.exercises.filter((e) => !e.archived).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const used = new Set(slots.map((x) => x.slot.exerciseId));
+  const lineOf = new Map<string, ExerciseLine>();
   const line = (e: Exercise): ExerciseLine => {
+    const known = lineOf.get(e.id);
+    if (known) return known;
     const mine = slots.filter((x) => x.slot.exerciseId === e.id);
     const weighted = e.loadType === 'bodyweight';
-    const timed = mine.some((x) => formats.find((f) => f.id === x.slot.formatId)?.scheme === 'hold');
-    const kinds = [e.equipment === 'barbell' ? 'barbell' : '', weighted ? 'bodyweight' : '', weighted && (e.category === 'main' || /lest/i.test(e.name)) ? 'weighted' : '', timed ? 'time' : '', e.isCustom || variantOf.get(e.id) ? 'mine' : ''].filter(Boolean);
+    const schemes = mine.map((x) => formats.find((f) => f.id === x.slot.formatId)?.scheme ?? 'sets');
+    const timed = schemes.includes('hold');
+    const tag = schemes.includes('interval') ? 'EMOM' : schemes.includes('amrap') ? 'AMRAP' : timed ? 'au temps' : schemes.includes('for_time') ? 'chrono' : null;
+    const primary = e.primaryMuscles[0] ?? 'chest';
+    const kinds = [
+      used.has(e.id) ? 'program' : '',
+      weighted && (e.category === 'main' || /lest/i.test(e.name)) ? 'weighted' : '',
+      e.equipment === 'barbell' ? 'barbell' : '',
+      e.equipment === 'dumbbell' ? 'dumbbell' : '',
+      weighted || e.equipment === 'bodyweight' ? 'bodyweight' : '',
+      timed ? 'time' : '',
+      e.isCustom || variantOf.get(e.id) ? 'mine' : '',
+    ].filter(Boolean);
+    const sets = doneSets(d, e.id);
     let value: string | null = null;
-    let valueLabel: string | null = null;
-    if (mine.length) {
-      if (mine.some((x) => x.slot.strategy.id === 'percent_reference')) {
-        const ref = reference(program, h, e, date);
-        if (ref) [value, valueLabel] = [`${kg(ref.value, weighted)} kg`, ref.source === 'saisi' ? '1RM réf.' : '1RM estimé'];
-      } else if (timed) {
-        const longest = Math.max(0, ...doneSets(d, e.id).map((s) => s.duration ?? 0));
-        if (longest > 0) [value, valueLabel] = [clock(longest), 'record'];
-      } else {
-        const best = bestSet(doneSets(d, e.id), weighted);
-        if (best) [value, valueLabel] = [`${kg(best.weight!, weighted)} × ${best.reps}`, 'meilleure série'];
-      }
+    let valueLabel = 'jamais fait';
+    if (mine.some((x) => x.slot.strategy.id === 'percent_reference')) {
+      const ref = reference(program, h, e, date);
+      if (ref) [value, valueLabel] = [`${kg(ref.value, weighted)} kg`, ref.source === 'saisi' ? '1RM réf.' : '1RM estimé'];
     }
-    return { id: e.id, name: e.name, detail: kicker(e), kinds, value, valueLabel };
+    const last = sets[sets.length - 1];
+    if (value === null && last) {
+      const day = sets.filter((s) => s.workout === last.workout);
+      if (timed || (last.duration !== null && last.duration > 0)) value = clock(Math.max(...day.map((s) => s.duration ?? 0)));
+      else if (tag === 'EMOM' || last.weight === null) value = `${day.reduce((n, s) => n + (s.reps ?? 0), 0)} reps`;
+      else {
+        const top = day.reduce((a, s) => ((s.weight ?? 0) > (a.weight ?? 0) ? s : a), day[0]!);
+        value = `${kg(top.weight!, weighted)} × ${top.reps ?? '?'}`;
+      }
+      valueLabel = ago(last.date, date);
+    }
+    const out: ExerciseLine = { id: e.id, name: e.name, detail: kicker(e), tile: TILE[primary] ?? 'EX', region: REGION[primary] ?? 'push', tag, kinds, value, valueLabel };
+    lineOf.set(e.id, out);
+    return out;
   };
-  const used = new Set(slots.map((x) => x.slot.exerciseId));
-  const variants: ExercisesView['variants'] = [];
-  for (const e of exercises) {
-    const parent = variantOf.get(e.id);
-    if (parent) variants.push({ id: e.id, href: `/sport/exercices/${e.id}`, name: e.name, detail: `variante de ${program.exercises.find((x) => x.id === parent)?.name ?? '?'}`, chip: 'variante' });
-  }
-  // Les formats autres que des séries, tels qu'ils sont réglés dans le programme (« Tractions · EMOM 10 min »).
-  for (const { slot, session } of slots) {
-    const f = formats.find((x) => x.id === slot.formatId);
-    if (!f || f.scheme === 'sets') continue;
-    const e = program.exercises.find((x) => x.id === slot.exerciseId);
-    if (!e) continue;
-    const reps = (slot.strategy.params as { reps?: number }).reps;
-    variants.push({ id: slot.id, href: `/sport/programme/creneau/${slot.id}`, name: `${e.name} · ${f.name}`, detail: `dans ${session.name}${f.scheme === 'interval' && reps ? ` · ${reps} reps / min` : ''}`, chip: f.scheme === 'interval' ? 'EMOM' : f.scheme === 'amrap' ? 'AMRAP' : f.scheme === 'hold' ? 'au temps' : 'chrono' });
-  }
-  return {
-    total: exercises.length,
-    formats: new Set(slots.map((x) => x.slot.formatId)).size,
-    inProgram: exercises.filter((e) => used.has(e.id)).map(line),
-    variants,
-    others: exercises.filter((e) => !used.has(e.id)).map(line),
+  // Le programme, séance par séance : les jours de la semaine type d'abord.
+  const dayOf = (id: string) => {
+    const days = program.structure.pattern.filter((p) => p.templateId === id).map((p) => p.weekday).sort();
+    return days.length ? days[0]! : 7;
   };
+  const bySession = [...sessions]
+    .sort((a, b) => dayOf(a.id) - dayOf(b.id))
+    .map((s) => ({
+      id: s.id,
+      day: program.structure.pattern.filter((p) => p.templateId === s.id).map((p) => DAYS[p.weekday]).sort((x, y) => DAYS.indexOf(x!) - DAYS.indexOf(y!)).join(' · '),
+      name: s.name,
+      lines: [...new Set(s.slots.map((x) => x.exerciseId))].flatMap((id) => {
+        const e = exercises.find((x) => x.id === id);
+        return e ? [line(e)] : [];
+      }),
+    }))
+    .filter((s) => s.lines.length > 0);
+  const rest = exercises.filter((e) => !used.has(e.id));
+  const mineOnes = rest.filter((e) => e.isCustom || variantOf.get(e.id));
+  const library = GROUPS.map((g) => ({
+    id: g.id,
+    label: g.label,
+    region: g.region,
+    tile: TILE[g.muscles[0]!] ?? 'EX',
+    lines: rest.filter((e) => !mineOnes.includes(e) && g.muscles.includes(e.primaryMuscles[0] ?? '')).map(line),
+  }));
+  library.push({ id: 'mine', label: 'Tes exercices et variantes', region: 'pull', tile: 'À TOI', lines: mineOnes.map(line) });
+  return { total: exercises.length, inProgram: used.size, sessions: bySession, library: library.filter((g) => g.lines.length > 0), all: exercises.map(line) };
 }
 
 // ---------------------------------------------------------------- la fiche
@@ -168,6 +222,10 @@ export interface ExerciseDetail {
   sessions: number;
   bodyweight: number | null;
   inTemplates: string[];
+  /** « Tirage + biceps · au % du 1RM », ou « Pas encore au programme ». */
+  context: string;
+  chips: string[];
+  createdOn: string | null;
 }
 
 export function exerciseDetail(d: Db, id: string, date: string): ExerciseDetail | null {
@@ -253,6 +311,17 @@ export function exerciseDetail(d: Db, id: string, date: string): ExerciseDetail 
     sessions: workouts.length,
     bodyweight: h.bodyweight(date),
     inTemplates: sessions.filter((s) => s.slots.some((x) => x.exerciseId === id)).map((s) => s.name),
+    context: (() => {
+      const first = sessions.find((s) => s.slots.some((x) => x.exerciseId === id));
+      if (!first) return 'Pas encore au programme';
+      const slot = first.slots.find((x) => x.exerciseId === id)!;
+      return `${first.name} · ${STRATEGY_LABEL[slot.strategy.id] ?? 'au programme'}`;
+    })(),
+    chips: [weighted ? (e.category === 'main' ? 'Lest' : 'Poids du corps') : (EQUIPMENT[e.equipment] ?? 'Charge').replace(/^./, (c) => c.toUpperCase()), CATEGORY_LABEL[e.category] ?? ''].filter(Boolean),
+    createdOn: (() => {
+      const r = d.first<{ created_at: number }>('SELECT created_at FROM exercises WHERE id = ? AND is_custom = 1', [id]);
+      return r ? new Date(r.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : null;
+    })(),
   };
 }
 
@@ -270,6 +339,8 @@ export interface ExercisePatch {
 }
 
 const MUSCLES = Object.keys(MUSCLE);
+const STRATEGY_LABEL: Record<string, string> = { percent_reference: 'au % du 1RM', double_progression: 'double progression', linear: 'linéaire', free: 'libre', autoregulated: 'RPE ou RIR' };
+const CATEGORY_LABEL: Record<string, string> = { main: 'Force · au %', compound: 'Polyarticulaire', isolation: 'Isolation' };
 
 export function updateExercise(d: Db, id: string, patch: ExercisePatch): void {
   const row = d.first<{ category: string }>('SELECT category FROM exercises WHERE id = ?', [id]);

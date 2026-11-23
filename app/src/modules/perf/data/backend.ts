@@ -112,6 +112,7 @@ export type Response = { id: number; ok: true; result: unknown } | { id: number;
 
 /** Où vit la base : fichier persistant (OPFS) ou, à défaut, en mémoire (perdue au rechargement). */
 export interface StorageInfo {
-  vfs: 'opfs-sahpool' | 'memory';
+  /** `busy` : la base est ouverte ailleurs (un autre onglet) ; cet écran travaille en mémoire, rien n'est gardé. */
+  vfs: 'opfs-sahpool' | 'memory' | 'busy';
   sqlite: string;
 }

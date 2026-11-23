@@ -163,3 +163,30 @@ button.pf-stat-big { cursor: pointer; }
 .pf-proposal .btn { min-height: 38px; padding: 0 12px; }
 .pf-curvecard { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .pf-curvecard .segmented button { padding: 0 9px; min-height: 32px; }
+
+/* Exercices revus (maquettes F1 à F3). La pastille d'un groupe musculaire prend la teinte d'un module du kit. */
+.pf-search { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 16px; color: var(--ink-2); }
+.pf-search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--ink); font: inherit; }
+.pf-scrollchips { display: flex; gap: 6px; overflow-x: auto; margin: 0 calc(-1 * var(--pad, 16px)); padding: 2px var(--pad, 16px); scrollbar-width: none; }
+.pf-scrollchips::-webkit-scrollbar { display: none; }
+.pf-scrollchips .pf-chip { flex: none; }
+.pf-grp { display: flex; flex-direction: column; padding: 4px 14px 6px; }
+.pf-gh { display: flex; align-items: baseline; gap: 8px; padding: 10px 0 6px; font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.pf-gh b { color: var(--ink); font-size: 14px; }
+.pf-ex { display: flex; align-items: center; gap: 12px; min-height: 60px; color: var(--ink); }
+.pf-ex + .pf-ex, .pf-gh + .pf-ex { border-top: 1px solid var(--line); }
+.pf-mt { width: 40px; height: 40px; flex: none; border-radius: 13px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; letter-spacing: 0.02em; color: var(--tone); background: color-mix(in srgb, var(--tone-solid) 20%, transparent); border: 1px solid color-mix(in srgb, var(--tone-solid) 45%, transparent); }
+.pf-mt.is-small { width: 34px; height: 34px; border-radius: 11px; font-size: 9px; }
+.pf-fold-wrap + .pf-fold-wrap { border-top: 1px solid var(--line); }
+.pf-fold { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; background: none; border: 0; padding: 0; color: var(--ink); text-align: left; cursor: pointer; }
+.pf-fold-wrap .pf-ex { border-top: 1px solid var(--line); padding-left: 6px; }
+.pf-val { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; flex: none; max-width: 40%; text-align: right; }
+.pf-val b { font-size: 14.5px; }
+.pf-exhero { padding: 14px 14px 14px 6px; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; align-items: center; }
+.pf-body { display: flex; gap: 6px; justify-content: center; }
+.pf-facts { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.pf-refcard { padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+@media (max-width: 360px) {
+  .pf-exhero { grid-template-columns: 120px minmax(0, 1fr); }
+}
+.pf-body svg { flex: 1; min-width: 0; height: auto; max-height: 170px; }

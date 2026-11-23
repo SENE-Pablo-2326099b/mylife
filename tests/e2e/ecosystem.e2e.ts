@@ -410,31 +410,37 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Exercices' }).click();
     await page.getByRole('heading', { name: 'Exercices' }).waitFor();
-    await page.getByText('Dans ton programme').waitFor({ timeout: 20_000 });
+    await page.getByText('Au programme · par séance').waitFor({ timeout: 20_000 });
     await shot(page, '07m-sport-exercices');
     expect(await overflow(page)).toBeLessThanOrEqual(0);
-    // La recherche, puis la fiche du squat.
+    // La recherche, puis la fiche du squat : le corps anatomique, ses repères.
     await page.getByLabel('Chercher un exercice').fill('squat');
-    await page.locator('.list-row', { hasText: /^Squat/ }).first().click();
-    await page.getByText('1RM de référence').waitFor();
-    await page.getByText('1RM estimé').waitFor();
+    await page.locator('.pf-ex', { hasText: /^QUADSquat/ }).first().click();
+    await page.getByRole('img', { name: /^Muscles : / }).waitFor();
+    await page.getByRole('button', { name: 'Ajouter à une séance' }).waitFor();
     await shot(page, '07n-sport-fiche');
     expect(await overflow(page)).toBeLessThanOrEqual(0);
     // Une variante : créée depuis la fiche, elle a la sienne.
-    await page.locator('.list-row', { hasText: 'Variantes' }).click();
+    await page.getByRole('button', { name: '+ Variante' }).click();
     await page.getByLabel('Nouvelle variante').fill('Squat pause 2 s');
     await page.getByRole('button', { name: 'Créer la variante' }).click();
     await page.getByRole('heading', { name: 'Squat pause 2 s' }).waitFor();
-    await page.getByText(/^variante de Squat/).waitFor();
+    await page.getByRole('link', { name: /^variante de Squat/ }).waitFor();
+    await page.getByText('Pas encore de repère').waitFor();
     // La modifier : un muscle secondaire de plus.
     await page.getByRole('button', { name: 'Modifier l’exercice' }).click();
     const edit = page.getByRole('dialog', { name: 'Modifier l’exercice' });
     await edit.getByRole('button', { name: 'Lombaires' }).click();
     await edit.getByRole('button', { name: 'Enregistrer' }).click();
     await edit.waitFor({ state: 'detached' });
-    // De retour dans la bibliothèque : la variante est rangée avec les variantes.
+    // L'ajouter à une séance type, d'un toucher.
+    await page.getByRole('button', { name: 'Ajouter à une séance' }).click();
+    await page.getByRole('dialog', { name: 'Ajouter à une séance' }).locator('.list-row', { hasText: 'Full body A' }).click();
+    await page.getByText(/^Dans : Full body A/).waitFor();
+    await shot(page, '07o-sport-fiche-variante');
+    // De retour dans la bibliothèque : elle est au programme maintenant.
     await page.getByRole('link', { name: 'Retour' }).click();
-    await page.locator('.list-row', { hasText: 'Squat pause 2 s' }).getByText(/^variante de /).waitFor();
+    await page.locator('.pf-ex', { hasText: 'Squat pause 2 s' }).first().waitFor();
   });
 
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {

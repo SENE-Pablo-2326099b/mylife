@@ -6,6 +6,7 @@ import type { DayView, PlannedSession } from '../data/day';
 import { call } from '../data/client';
 import { cloudBoot, dropForeign, useCloud } from '../data/cloud';
 import { NewExerciseSheet } from './Reglages';
+import { StorageWarning } from './common';
 import '../perf.css';
 
 /**
@@ -80,6 +81,7 @@ export function JourPage() {
   return (
     <div className="pf-screen tone-perf" style={{ paddingBottom: 110 }}>
       <div className="pf-amb" aria-hidden="true" />
+      <StorageWarning />
       <header className="row" style={{ alignItems: 'flex-end' }}>
         <IconButton icon="back" label="Retour à MyLife" href="/" />
         <div className="grow" style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
