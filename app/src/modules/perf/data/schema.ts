@@ -292,6 +292,10 @@ export const MIGRATIONS: readonly string[] = [
   CREATE INDEX IF NOT EXISTS idx_moves_from ON session_moves(from_date);
   CREATE INDEX IF NOT EXISTS idx_moves_to ON session_moves(to_date);
   `,
+  // 12 : une variante d'un exercice (« Squat pause 2 s », variante du squat : son propre 1RM, sa propre progression).
+  `
+  ALTER TABLE exercises ADD COLUMN variant_of TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

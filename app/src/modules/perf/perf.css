@@ -152,3 +152,14 @@ button.pf-chip { font: inherit; font-size: 12px; font-weight: 600; cursor: point
 .pf-paste { width: 100%; resize: vertical; min-height: 130px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
 .pf-drop { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px 16px; cursor: pointer; text-align: center; }
 .pf-imp-ex { display: flex; align-items: center; gap: 8px; padding: 6px 0 2px; }
+
+/* Exercices et fiche (maquettes V3-Exercices, V3-Fiche). */
+.pf-val { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+.pf-val small { font-size: 11.5px; color: var(--ink-2); font-weight: 500; }
+.pf-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pf-stat-big { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; background: none; border: 0; padding: 0; color: var(--ink); text-align: left; }
+button.pf-stat-big { cursor: pointer; }
+.pf-proposal { gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.pf-proposal .btn { min-height: 38px; padding: 0 12px; }
+.pf-curvecard { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.pf-curvecard .segmented button { padding: 0 9px; min-height: 32px; }

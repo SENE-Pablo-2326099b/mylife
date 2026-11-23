@@ -224,6 +224,8 @@ export interface NewExercise {
   equipment: string;
   primary: string[];
   secondary?: string[];
+  /** Variante de cet exercice (son propre 1RM, sa propre progression). */
+  variantOf?: string | null;
 }
 
 /** Un exercice à soi : au % du 1RM s'il est principal, sinon double progression ; tout se règle ensuite. */
@@ -250,5 +252,6 @@ export function createExercise(d: Db, e: NewExercise): string {
       Date.now(),
     ],
   );
+  if (e.variantOf && d.first('SELECT 1 FROM exercises WHERE id = ?', [e.variantOf])) d.run('UPDATE exercises SET variant_of = ? WHERE id = ?', [e.variantOf, id]);
   return id;
 }

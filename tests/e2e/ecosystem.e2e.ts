@@ -405,6 +405,38 @@ describe('MyLife, une seule app', () => {
     expect(circuit.exercises.find((e: { format?: string }) => e.format === 'emom')).toMatchObject({ minutes: 10, reps: '5' });
   });
 
+  it('MyPerf refait : Exercices — la bibliothèque, une fiche, une variante créée et modifiée', async () => {
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Exercices' }).click();
+    await page.getByRole('heading', { name: 'Exercices' }).waitFor();
+    await page.getByText('Dans ton programme').waitFor({ timeout: 20_000 });
+    await shot(page, '07m-sport-exercices');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // La recherche, puis la fiche du squat.
+    await page.getByLabel('Chercher un exercice').fill('squat');
+    await page.locator('.list-row', { hasText: /^Squat/ }).first().click();
+    await page.getByText('1RM de référence').waitFor();
+    await page.getByText('1RM estimé').waitFor();
+    await shot(page, '07n-sport-fiche');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Une variante : créée depuis la fiche, elle a la sienne.
+    await page.locator('.list-row', { hasText: 'Variantes' }).click();
+    await page.getByLabel('Nouvelle variante').fill('Squat pause 2 s');
+    await page.getByRole('button', { name: 'Créer la variante' }).click();
+    await page.getByRole('heading', { name: 'Squat pause 2 s' }).waitFor();
+    await page.getByText(/^variante de Squat/).waitFor();
+    // La modifier : un muscle secondaire de plus.
+    await page.getByRole('button', { name: 'Modifier l’exercice' }).click();
+    const edit = page.getByRole('dialog', { name: 'Modifier l’exercice' });
+    await edit.getByRole('button', { name: 'Lombaires' }).click();
+    await edit.getByRole('button', { name: 'Enregistrer' }).click();
+    await edit.waitFor({ state: 'detached' });
+    // De retour dans la bibliothèque : la variante est rangée avec les variantes.
+    await page.getByRole('link', { name: 'Retour' }).click();
+    await page.locator('.list-row', { hasText: 'Squat pause 2 s' }).getByText(/^variante de /).waitFor();
+  });
+
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
     await page.goto(`${server.url}/reglages`);
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
@@ -564,7 +596,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer', '/sport/exercices']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);
