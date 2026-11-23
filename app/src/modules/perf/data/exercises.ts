@@ -243,7 +243,7 @@ export interface BodyVolume {
 }
 
 export function bodyVolume(d: Db, date: string, windowDays: number): BodyVolume {
-  const days = windowDays === 7 ? 7 : 28;
+  const days = Math.max(7, Math.min(120, Math.round(windowDays) || 28));
   const from = addDaysIso(date, -Math.max(days, 56));
   const loads = regionLoads(volumeSets(d, from), date, days, 8);
   const targets = volumeTargets(d);

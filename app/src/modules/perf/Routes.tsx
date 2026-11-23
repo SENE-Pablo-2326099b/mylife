@@ -4,6 +4,7 @@ import { ProgrammePage, SlotPage, TemplatePage, TemplatesPage } from './pages/Pr
 import { BlocPage, LiftPage, ReglagesPage } from './pages/Reglages';
 import { ImportPage } from './pages/Import';
 import { ExercisePage, ExercisesPage } from './pages/Exercices';
+import { ProgresPage } from './pages/Progres';
 import { SessionPage } from './pages/Session';
 import { VerifyPage } from './pages/Verify';
 
@@ -28,6 +29,7 @@ export function PerfRoutes() {
       <Route path="programme/importer" element={<ImportPage />} />
       <Route path="exercices" element={<ExercisesPage />} />
       <Route path="exercices/:id" element={<ExercisePage />} />
+      <Route path="progres" element={<ProgresPage />} />
       <Route path="*" element={<Navigate to="/sport" replace />} />
     </Routes>
   );

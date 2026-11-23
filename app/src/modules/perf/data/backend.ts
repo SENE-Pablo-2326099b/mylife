@@ -2,6 +2,7 @@ import type { StrengthWeek } from '@mylife/training';
 import type { PendingChange, RemoteRow, SyncState } from '@mylife/core/engine';
 import { addBodyweight, createExercise, dayView, moveSession, type NewExercise } from './day';
 import { archiveExercise, bodyVolume, createVariant, exerciseDetail, exercisesView, regionDetail, updateExercise, type ExercisePatch } from './exercises';
+import { progressView, type ProgressWindow } from './progress';
 import { applyImport, exportProgram, importPreview, readyPrograms, readyProgramText, type ImportOptions } from './importer';
 import { baseValues, blockDetail, deleteBlock, liftView, saveBlock, setBase, setBlockWeek, setLiftWeek, setReference, settingsView, type BasePatch, type BlockPatch } from './plan';
 import { addSlot, archiveTemplate, createTemplate, moveSlot, programView, removeSlot, renameTemplate, setTemplateDays, slotDetail, templateDetail, templatesView, updateSlot, type SlotPatch } from './program';
@@ -78,6 +79,7 @@ export function createBackend(d: Db) {
     createVariant: (parentId: string, name: string) => createVariant(d, parentId, name),
     bodyVolume: (date: string, windowDays: number) => bodyVolume(d, date, windowDays),
     regionDetail: (id: Parameters<typeof regionDetail>[1], date: string, windowDays: number) => regionDetail(d, id, date, windowDays),
+    progressView: (date: string, window: ProgressWindow, hidden: string[]) => progressView(d, date, window, hidden),
     createExercise: (e: NewExercise) => createExercise(d, e),
     // La séance (étape P2).
     activeSession: () => session.active(),

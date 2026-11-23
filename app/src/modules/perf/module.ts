@@ -9,7 +9,7 @@ export const perf: ModuleManifest = {
   tone: 'perf',
   status: 'active',
   entry: { href: '/sport' },
-  // Refait page par page (phase 4) : Jour, la séance, Programme, Exercices ; l'app d'avant reste à /perf/ pour ce qui n'est pas encore refait.
+  // Refait page par page (phase 4) : Jour, la séance, Programme, Exercices, Progrès ; l'app d'avant reste à /perf/ pour ce qui n'est pas encore refait.
   nav: {
     base: '/sport',
     add: { to: '/sport?ajouter=1', label: 'Ajouter' },
@@ -17,6 +17,7 @@ export const perf: ModuleManifest = {
       { to: '/sport', label: 'Jour', icon: 'today', end: true },
       { to: '/sport/programme', label: 'Programme', icon: 'calendar' },
       { to: '/sport/exercices', label: 'Exercices', icon: 'barbell' },
+      { to: '/sport/progres', label: 'Progrès', icon: 'chart' },
     ],
     focus: ['/sport/seance'],
   },

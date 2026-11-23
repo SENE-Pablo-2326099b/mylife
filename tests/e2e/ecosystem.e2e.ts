@@ -459,6 +459,22 @@ describe('MyLife, une seule app', () => {
     await page.locator('.pf-ex', { hasText: 'Squat pause 2 s' }).first().waitFor();
   });
 
+  it('MyPerf refait : Progrès — la période, la régularité, le poids du jour', async () => {
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
+    await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Progrès' }).click();
+    await page.getByRole('heading', { name: 'Progrès' }).waitFor();
+    await page.getByText('Régularité · 14 semaines').waitFor({ timeout: 20_000 });
+    await page.getByRole('button', { name: '7 jours' }).click();
+    await expect.poll(() => page.getByRole('button', { name: '7 jours' }).getAttribute('aria-pressed')).toBe('true');
+    await shot(page, '07p-sport-progres');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.locator('.list-row', { hasText: 'Poids du corps' }).click();
+    await page.getByLabel('Poids (kg)').fill('78,4');
+    await page.getByRole('dialog', { name: 'Poids du jour' }).getByRole('button', { name: 'Noter' }).click();
+    await page.locator('.list-row', { hasText: 'Poids du corps' }).getByText('78,4 kg').waitFor();
+  });
+
   it('un thème choisi dans les réglages habille les apps d’avant', async () => {
     await page.goto(`${server.url}/reglages`);
     await page.getByRole('button', { name: 'Clair', exact: true }).click();
@@ -618,7 +634,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer', '/sport/exercices']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer', '/sport/exercices', '/sport/progres']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

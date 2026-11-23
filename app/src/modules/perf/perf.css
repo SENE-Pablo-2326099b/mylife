@@ -209,3 +209,18 @@ button.pf-stat-big { cursor: pointer; }
 .pf-exhero > .pf-facts { grid-area: facts; }
 .pf-zoneinfo, .pf-zonechips { grid-area: zone; font-size: 13px; padding: 0 0 0 8px; }
 .pf-zonechips { margin: 0; padding: 0 0 0 8px; }
+
+/* Progrès (maquettes V3-Progres, V3-Progres-libre). */
+.pf-stats3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pf-statbox { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 16px; background: var(--tile); border: 1px solid var(--edge-2); min-width: 0; }
+.pf-statbox .pf-big { font-size: 24px; white-space: nowrap; }
+.pf-plateau { align-items: center; gap: 4px; }
+.pf-plateau .btn { min-height: 34px; padding: 0 6px; color: var(--warn); }
+.pf-bars { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+.pf-bar { display: flex; flex-direction: column; gap: 5px; }
+.pf-weeksgrid { padding: 12px; display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 3px; }
+.pf-wkbar { height: 18px; border-radius: 5px; background: rgba(255, 255, 255, 0.07); }
+.pf-wkbar.is-l1 { background: color-mix(in srgb, var(--tone-solid) 40%, transparent); }
+.pf-wkbar.is-l2 { background: color-mix(in srgb, var(--tone-solid) 75%, transparent); }
+.pf-wkbar.is-l3 { background: var(--tone-solid); }
+.pf-wkbar.is-now { outline: 2px solid var(--ink); outline-offset: 1px; }

@@ -27,3 +27,5 @@ export { guessExercise, matchExercise, type LibraryEntry } from './program/match
 export { READY_PROGRAMS, type ReadyProgram } from './program/ready';
 export { BODY_REGIONS, loadLevel, regionAt, regionById, regionLoads, type BodyRegion, type BodyView, type RegionId, type RegionLoad } from './bodyMap';
 export { isIndirect, type VolumeSet } from './analytics';
+export { bestPerCycle, detectStagnation, e1rmSeries, PROGRESS_THRESHOLD, recordEvents, weeklyConsistency, type SetRecord } from './analytics';
+export { bodyTrend } from './bodyTrend';
