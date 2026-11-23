@@ -195,7 +195,9 @@ export function JourPage() {
         <>
           <span className="pf-sec">
             <span>Ta semaine</span>
-            <span>{plannedCount ? `${plannedCount} séance${plannedCount > 1 ? 's' : ''} prévue${plannedCount > 1 ? 's' : ''}` : ''}</span>
+            <a href="/sport/programme/calendrier" className="c-tone" style={{ textDecoration: 'none' }}>
+              {`${plannedCount ? `${plannedCount} séance${plannedCount > 1 ? 's' : ''} prévue${plannedCount > 1 ? 's' : ''} · ` : ''}le mois ›`}
+            </a>
           </span>
           <Glass className="pf-week">
             {view.week.map((d, i) => {

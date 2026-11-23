@@ -307,6 +307,24 @@ describe('MyLife, une seule app', () => {
     await page.goto(`${server.url}/sport`);
     // De retour sur Jour : la séance faite apparaît comme dernière séance.
     await page.locator('.list-row', { hasText: 'Full body A' }).first().waitFor({ timeout: 20_000 });
+    // Le calendrier (depuis « Ta semaine ») : aujourd'hui, la séance faite et son bilan ; une séance prévue, décalée puis remise.
+    await page.getByRole('link', { name: /le mois ›$/ }).click();
+    await page.locator('.pf-cal-d.is-today.is-done').waitFor({ timeout: 20_000 });
+    await page.locator('.pf-cal-day', { hasText: 'Full body A' }).getByText('Bilan').waitFor();
+    if (!(await page.locator('.pf-cal-d.is-plan').count())) await page.getByRole('button', { name: 'Mois suivant' }).click();
+    await page.locator('.pf-cal-d.is-plan').first().click();
+    const planned = (await page.locator('.pf-cal-day .t-strong').first().textContent())!;
+    await shot(page, '07t-sport-calendrier');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.locator('.pf-cal-day').getByRole('button', { name: 'Décaler' }).first().click();
+    await page.getByText(`« ${planned} »`).waitFor();
+    await page.locator('.pf-cal-d.is-rest:not(.is-off):not(.is-past):not(.is-out)').last().click();
+    await page.getByText(/^décalée au /).waitFor();
+    await expect.poll(() => page.locator('.pf-cal-d.is-sel.is-plan').count()).toBe(1);
+    await page.locator('.pf-cal-hint').getByRole('button', { name: 'Annuler' }).click();
+    await page.locator('.pf-cal-day', { hasText: planned }).waitFor();
+    await page.goto(`${server.url}/sport`);
+    await page.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
     // Le « + » : toujours le même petit menu ; le poids du jour.
     await page.getByRole('link', { name: /^Ajouter/ }).click();
     const add = page.getByRole('dialog', { name: 'Ajouter' });
@@ -658,7 +676,7 @@ describe('MyLife, une seule app', () => {
     await small.getByLabel('Mot de passe', { exact: true }).fill(PASSWORD);
     await small.getByRole('button', { name: 'Se connecter' }).click();
     await small.getByRole('heading', { name: 'Aujourd’hui' }).waitFor();
-    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer', '/sport/exercices', '/sport/progres']) {
+    for (const path of ['/', '/modules', '/copilot', '/compte', '/reglages', '/installer', '/donnees', '/confidentialite', '/kit', '/argent', '/argent/operations', '/argent/plan', '/argent/patrimoine', '/argent/reglages', '/ancien/sorties', '/raveloc/', '/raveloc/groupes', '/perf/', '/sport', '/sport/donnees', '/sport/programme', '/sport/programme/seances', '/sport/programme/reglages', '/sport/programme/bloc/nouveau', '/sport/programme/importer', '/sport/programme/calendrier', '/sport/exercices', '/sport/progres']) {
       await small.goto(`${server.url}${path}`);
       await small.waitForTimeout(1200);
       expect(await overflow(small), path).toBeLessThanOrEqual(0);

@@ -244,3 +244,33 @@ button.pf-stat-big { cursor: pointer; }
 .pf-sidecard { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
 .pf-rest.is-big .pf-big { font-size: 40px !important; }
 .pf-keypad.is-docked { position: static; max-width: none; margin: 0; border-radius: 24px; padding: 14px; }
+
+/* Calendrier (maquette G1 bis) */
+.pf-cal-top { align-items: flex-end; gap: 12px; }
+.pf-cal-mo { display: flex; flex-direction: column; min-width: 0; line-height: 1; }
+.pf-cal-mo small { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--tone); margin-bottom: 8px; }
+.pf-cal-mo h1 { margin: 0; font-family: Manrope, Inter, sans-serif; font-weight: 800; font-size: 40px; letter-spacing: -.02em; line-height: 1; }
+.pf-cal-nav { display: flex; gap: 6px; margin-bottom: 2px; }
+.pf-cal-nav button { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: inherit; font-size: 18px; color: var(--ink); background: color-mix(in srgb, #fff 6%, transparent); border: 1px solid color-mix(in srgb, #fff 10%, transparent); cursor: pointer; }
+.pf-cal { padding: 16px 12px 14px; display: flex; flex-direction: column; gap: 12px; border-radius: 28px; }
+.pf-cal-wd, .pf-cal-g { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.pf-cal-wd { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; color: var(--ink-2); text-align: center; opacity: .8; }
+.pf-cal-g { row-gap: 8px; column-gap: 4px; }
+.pf-cal-d { height: 48px; min-width: 0; border-radius: 15px; border: 0; font: inherit; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); background: color-mix(in srgb, #fff 4%, transparent); cursor: pointer; padding: 0; }
+.pf-cal-d.is-past { color: color-mix(in srgb, var(--ink) 40%, transparent); }
+.pf-cal-d.is-out { opacity: .18; background: none; }
+.pf-cal-d.is-done { background: color-mix(in srgb, var(--tone-solid) 26%, transparent); color: #ffd9c2; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone-solid) 40%, transparent); }
+.pf-cal-d.is-plan { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone-solid) 85%, transparent); }
+.pf-cal-d.is-today { background: #fff; color: #14110f; font-weight: 800; }
+.pf-cal-d.is-sel { background: var(--tone-grad); color: #fff; font-weight: 800; box-shadow: 0 8px 24px -6px color-mix(in srgb, var(--tone-solid) 70%, transparent), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.pf-cal-d.is-off { opacity: .25; cursor: default; }
+.pf-cal-d:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pf-cal-day { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 24px; color: inherit; text-decoration: none; }
+.pf-cal-pill { width: 52px; height: 56px; flex: none; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; background: color-mix(in srgb, var(--tone-solid) 14%, transparent); border: 1px solid color-mix(in srgb, var(--tone-solid) 30%, transparent); }
+.pf-cal-pill small { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--tone); }
+.pf-cal-pill b { font-family: Manrope, Inter, sans-serif; font-size: 22px; font-weight: 800; margin-top: 4px; }
+.pf-cal-what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pf-cal-what .t-strong { font-size: 16px; }
+.pf-cal-act { font: inherit; font-size: 13.5px; font-weight: 700; color: var(--tone); background: none; border: 0; padding: 8px 2px; cursor: pointer; white-space: nowrap; }
+.pf-cal-hint { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 20px; }
+@media (max-width: 340px) { .pf-cal-d { height: 40px; font-size: 14px; border-radius: 12px; } .pf-cal-mo h1 { font-size: 32px; } .pf-cal-g { column-gap: 2px; } }

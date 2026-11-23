@@ -165,6 +165,7 @@ export function ProgrammePage() {
 
       {v.hasProgram && (
         <List>
+          <ListRow title="Calendrier" href="/sport/programme/calendrier" />
           <ListRow title="Réglages d’entraînement" value={`${v.lifts} exercice${v.lifts > 1 ? 's' : ''}`} href="/sport/programme/reglages" />
           <ListRow title="Séances types" value={String(v.templates)} href="/sport/programme/seances" />
           <ListRow title="Importer ou partager" href="/sport/programme/importer" />

@@ -8,6 +8,7 @@ import { ProgresPage } from './pages/Progres';
 import { BilanPage } from './pages/Bilan';
 import { CyclePage } from './pages/Cycle';
 import { SessionPage } from './pages/Session';
+import { CalendrierPage } from './pages/Calendrier';
 import { VerifyPage } from './pages/Verify';
 
 /**
@@ -29,6 +30,7 @@ export function PerfRoutes() {
       <Route path="programme/lift/:id" element={<LiftPage />} />
       <Route path="programme/bloc/:id" element={<BlocPage />} />
       <Route path="programme/importer" element={<ImportPage />} />
+      <Route path="programme/calendrier" element={<CalendrierPage />} />
       <Route path="exercices" element={<ExercisesPage />} />
       <Route path="exercices/:id" element={<ExercisePage />} />
       <Route path="progres" element={<ProgresPage />} />

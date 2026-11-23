@@ -3,6 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 /**
  * MyPerf et le reste de MyLife (maquette V3-Accueil) : l'aperçu de la carte d'accueil, la fiche de Copilot Sport (séances
  * prévues décalables, lifts en lest net), l'agenda commun, et l'action « décaler » validée dans Copilot (et son retour).
+ * Et le calendrier (maquette G1 bis) : le mois en semaines complètes, séances faites et prévues, décalages suivis.
  */
 import { createTestDb } from '@/db/__tests__/testDb';
 import { addBodyEntry } from '@/db/repos/body';
@@ -89,5 +90,33 @@ describe('MyPerf dans MyLife', () => {
     expect(ACTION_APP['perf.moveSession']).toBe('sport');
     expect(parseActionSpec({ kind: 'perf.moveSession', summary: 'Décaler', params: { plannedId: volume.id, date: '2026-01-23' } }).action).toBeDefined();
     expect(parseActionSpec({ kind: 'perf.moveSession', summary: 'Décaler', params: { plannedId: 'abc', date: '2026-01-23' } }).error).toMatch(/plannedId/);
+  });
+});
+
+describe('Calendrier', () => {
+  it('le mois en semaines complètes : faites (avec leur bilan), prévues à partir d’aujourd’hui, décalages suivis', () => {
+    const v = b.calendarView('2026-01', MONDAY);
+    expect(v).toMatchObject({ month: '2026-01', label: 'Janvier', year: 2026 });
+    expect(v.days[0]!.date).toBe('2025-12-29');
+    expect(v.days.at(-1)!.date).toBe('2026-02-01');
+    expect(v.days).toHaveLength(35);
+    const on = (date: string) => v.days.find((d) => d.date === date)!;
+    expect(on('2025-12-29').inMonth).toBe(false);
+    expect(on('2026-01-12')).toMatchObject({ state: 'done', items: [{ kind: 'done', name: 'Force A' }] });
+    expect(on('2026-01-12').items[0]!.detail).toMatch(/^\d+ séries/);
+    expect(on('2026-01-15').state).toBe('done');
+    // Un jeudi passé sans séance : rien (le calendrier ne marque pas le manqué).
+    expect(on('2026-01-08')).toMatchObject({ state: 'rest', items: [] });
+    expect(on(MONDAY)).toMatchObject({ state: 'plan', items: [{ kind: 'plan', name: 'Force A' }] });
+    expect(on(MONDAY).items[0]!.detail).toMatch(/^2 exercices · \d+ min$/);
+    expect(on('2026-01-22').items.map((i) => i.name)).toEqual(['Volume']);
+    const volume = on('2026-01-22').items[0]!.id;
+    b.moveSession(volume, '2026-01-22', '2026-01-23');
+    const after = b.calendarView('2026-01', MONDAY);
+    expect(after.days.find((d) => d.date === '2026-01-22')!.state).toBe('rest');
+    expect(after.days.find((d) => d.date === '2026-01-23')!.items.map((i) => i.name)).toEqual(['Volume']);
+    expect(() => b.calendarView('2026-13', MONDAY)).toThrow(/Mois/);
+    const fresh = createBackend(wrapOo1(new sqlite3.oo1.DB(':memory:') as unknown as Oo1Db));
+    expect(fresh.calendarView('2026-01', MONDAY).days.every((d) => d.state === 'rest')).toBe(true);
   });
 });
