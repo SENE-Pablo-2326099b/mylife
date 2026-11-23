@@ -1,1 +1,0 @@
-import{a as o}from"./client-pgm9U9S5.js";import"./index-BEF-ECIs.js";function n(e){return new Proxy({},{get(i,t){if(typeof t!="symbol")throw new o(`\`${e}.${t}\` is not available in this environment; it needs a Node.js-compatible runtime`)}})}const s=n("fs"),f=n("path");export{s as fs,f as path};

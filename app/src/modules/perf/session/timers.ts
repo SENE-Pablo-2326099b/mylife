@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { armRest, prepareRestPush } from './restPush';
 
 /**
  * Le minuteur de repos et les petits services de la séance. Le repos est une heure de fin absolue (pas un compte à
  * rebours) : il reste juste quand l'onglet dort, et survit à un rechargement (gardée sur l'appareil). À la fin, si
- * l'app est à l'écran : vibration et son. Écran verrouillé, la notification envoyée par le serveur arrive à l'étape P3.
+ * l'app est à l'écran : vibration et son. Écran en veille : la notification envoyée par le serveur (restPush.ts), si elle
+ * est activée sur cet appareil.
  */
 const KEY = 'mylife:perf:rest';
 
@@ -51,10 +53,24 @@ export function adjustRest(deltaSeconds: number): void {
 
 export const skipRest = (): void => write(null);
 
+let watching = false;
+/** Écran en veille pendant un repos : l'heure de fin part au serveur ; au retour, elle est annulée. */
+export function watchVisibility(): void {
+  if (watching || typeof document === 'undefined') return;
+  watching = true;
+  prepareRestPush();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (rest && rest.endAt > Date.now() + 2000) armRest(rest.endAt);
+    } else armRest(null);
+  });
+}
+
 /** Le repos en cours et les secondes restantes, rafraîchies chaque seconde ; signal à la fin. */
 export function useRest(): { rest: Rest | null; left: number } {
   const [, tick] = useState(0);
   useEffect(() => {
+    watchVisibility();
     const l = () => tick((n) => n + 1);
     listeners.add(l);
     const t = setInterval(() => {

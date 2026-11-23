@@ -387,6 +387,8 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('heading', { name: 'Programme' }).waitFor();
     await page.locator('.list-row', { hasText: 'Réglages d’entraînement' }).click();
     await page.getByRole('heading', { name: 'Réglages d’entraînement' }).waitFor();
+    // La notification de fin de repos, sur cet appareil : proposée, éteinte tant qu'on ne l'a pas activée.
+    expect(await page.getByRole('switch', { name: 'Notification à la fin du repos' }).getAttribute('aria-checked')).toBe('false');
     // Pas encore de bloc (routine) : on en crée un, il commence cette semaine.
     await page.getByRole('link', { name: '+ Créer un bloc' }).click();
     await page.getByRole('heading', { name: 'Cycle 1' }).waitFor();

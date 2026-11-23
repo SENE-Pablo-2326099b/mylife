@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import webpush from 'web-push';
 import { HttpError, requireSession, type Db } from './core.js';
 
@@ -40,6 +41,54 @@ export async function ensurePushSchema(db: Db): Promise<void> {
     PRIMARY KEY (endpoint, minute)
   )`);
   await db.query(`CREATE TABLE IF NOT EXISTS push_state (k TEXT PRIMARY KEY, v BIGINT NOT NULL)`);
+  // La fin du repos en cours d'un appareil (MyPerf, écran en veille) : une heure, rien d'autre ; effacée une fois partie.
+  await db.query(`CREATE TABLE IF NOT EXISTS push_rest (
+    endpoint TEXT PRIMARY KEY REFERENCES push_subscriptions(endpoint) ON DELETE CASCADE,
+    at BIGINT NOT NULL,
+    token TEXT NOT NULL
+  )`);
+}
+
+/**
+ * Fin de repos (MyPerf) : l'appareil donne l'heure de fin quand son écran se met en veille, l'annule au retour. À l'heure
+ * dite, un signal `{ type: 'rest' }` ; le texte est écrit par le service worker. Sur une plateforme à fonctions courtes,
+ * l'attente se fait par tranches (`limitMs`) : la fonction se relance elle-même (`relay`) avant d'expirer.
+ */
+export interface RestRuntime {
+  /** Garde la fonction en vie le temps de la tâche (sur Vercel : waitUntil). */
+  wait: (task: Promise<unknown>) => void;
+  limitMs: number;
+  relay: ((resume: { endpoint: string; at: number; token: string }) => Promise<void>) | null;
+  send: PushSender | null;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
+/** Le plus long repos suivi : au-delà, ce n'est plus un repos. */
+export const MAX_REST_MS = 20 * 60_000;
+
+export const localRestRuntime = (env: PushEnv | null): RestRuntime => ({ wait: (t) => void t.catch(() => undefined), limitMs: Infinity, relay: null, send: env ? (sub, payload) => webPushSender(env)(sub, payload) : null });
+
+async function restTask(db: Db, rt: RestRuntime, endpoint: string, at: number, token: string): Promise<void> {
+  const sleep = rt.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  const clock = rt.now ?? Date.now;
+  await sleep(Math.max(0, Math.min(at - clock(), rt.limitMs)));
+  const { rows } = await db.query<{ at: string | number; token: string; p256dh: string; auth: string }>(
+    'SELECT r.at, r.token, s.p256dh, s.auth FROM push_rest r JOIN push_subscriptions s ON s.endpoint = r.endpoint WHERE r.endpoint = $1',
+    [endpoint],
+  );
+  const r = rows[0];
+  // Annulé, remplacé par un autre repos, ou déjà parti : rien.
+  if (!r || r.token !== token || Number(r.at) !== at) return;
+  if (at - clock() > 1000) return rt.relay ? rt.relay({ endpoint, at, token }) : restTask(db, rt, endpoint, at, token);
+  await db.query('DELETE FROM push_rest WHERE endpoint = $1 AND token = $2', [endpoint, token]);
+  if (!rt.send) return;
+  try {
+    await rt.send({ endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }, JSON.stringify({ type: 'rest' }));
+  } catch (e) {
+    const status = (e as { statusCode?: number }).statusCode;
+    if (status === 404 || status === 410) await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1', [endpoint]);
+  }
 }
 
 /** Heures de réveil gardées au plus par appareil. */
@@ -48,7 +97,7 @@ export const MAX_WAKEUPS = 48;
 const ENDPOINT = /^https:\/\/[A-Za-z0-9.-]+(:\d+)?\/[\x21-\x7e]{8,1000}$/;
 const KEY = /^[A-Za-z0-9_-]{10,200}$/;
 
-export async function pushDispatch(db: Db, secret: string, auth: string | undefined, body: Record<string, unknown>, env = pushEnv(), now = Date.now()): Promise<unknown> {
+export async function pushDispatch(db: Db, secret: string, auth: string | undefined, body: Record<string, unknown>, env = pushEnv(), now = Date.now(), rest: RestRuntime = localRestRuntime(env)): Promise<unknown> {
   if (body.action === 'key') return { publicKey: env?.publicKey ?? null };
   const uid = await requireSession(db, auth, secret, now);
   await ensurePushSchema(db);
@@ -95,6 +144,28 @@ export async function pushDispatch(db: Db, secret: string, auth: string | undefi
       await db.query('DELETE FROM push_wakeups WHERE endpoint = $1', [endpoint]);
       for (const m of minutes) await db.query('INSERT INTO push_wakeups (endpoint, minute) VALUES ($1, $2)', [endpoint, m]);
       return { ok: true, count: minutes.length };
+    }
+    case 'rest': {
+      if (!endpoint) throw new HttpError(400, 'Abonnement invalide.');
+      const { rows } = await db.query('SELECT 1 FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, uid]);
+      if (!rows.length) throw new HttpError(404, 'Cet appareil n’est pas abonné aux notifications.');
+      if (body.at === null) {
+        await db.query('DELETE FROM push_rest WHERE endpoint = $1', [endpoint]);
+        return { ok: true };
+      }
+      const at = body.at;
+      if (typeof at !== 'number' || !Number.isInteger(at) || at <= now || at > now + MAX_REST_MS) throw new HttpError(400, 'Fin de repos invalide.');
+      // La suite d'une attente (relance) : seulement si c'est toujours ce repos-là.
+      if (typeof body.resume === 'string') {
+        const { rows: held } = await db.query<{ token: string; at: string | number }>('SELECT token, at FROM push_rest WHERE endpoint = $1', [endpoint]);
+        if (!held[0] || held[0].token !== body.resume || Number(held[0].at) !== at) return { ok: true, stale: true };
+        rest.wait(restTask(db, rest, endpoint, at, body.resume));
+        return { ok: true };
+      }
+      const token = randomBytes(16).toString('base64url');
+      await db.query('INSERT INTO push_rest (endpoint, at, token) VALUES ($1, $2, $3) ON CONFLICT (endpoint) DO UPDATE SET at = EXCLUDED.at, token = EXCLUDED.token', [endpoint, at, token]);
+      rest.wait(restTask(db, rest, endpoint, at, token));
+      return { ok: true };
     }
     case 'unsubscribe':
       if (endpoint) await db.query('DELETE FROM push_subscriptions WHERE endpoint = $1 AND user_id = $2', [endpoint, uid]);

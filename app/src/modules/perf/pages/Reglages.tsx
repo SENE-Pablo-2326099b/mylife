@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Button, Field, Glass, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
+import { Button, Field, Glass, List, ListRow, Notice, Segmented, Sheet, Switch } from '@mylife/kit';
+import { disableRestPush, enableRestPush, restPushOn, restPushSupported } from '../session/restPush';
 import type { StrengthWeek } from '@mylife/training';
 import { call } from '../data/client';
 import type { BlockDetail, LiftCell, LiftView, SettingsView, WeekScheme } from '../data/plan';
@@ -160,6 +161,7 @@ export function ReglagesPage() {
         <ListRow title="Repos par défaut" value={<span className="t-small muted">{v.base.rest}</span>} onClick={() => setBase('rest')} />
         <ListRow title="Poids du corps" value={v.base.bodyweight ?? 'à noter'} onClick={() => setBase('bodyweight')} />
       </List>
+      <RestPushRow />
 
       {v.block && (
         <WeekSheet
@@ -677,5 +679,42 @@ export function NewExerciseSheet({ open, name, templateId, onClose, onCreated }:
         </Button>
       </div>
     </Sheet>
+  );
+}
+
+/** Sur cet appareil : la notification de fin de repos, écran en veille. */
+function RestPushRow() {
+  const [on, setOn] = useState(() => restPushOn());
+  const [failed, setFailed] = useState<string | null>(null);
+  if (!restPushSupported()) return null;
+  return (
+    <>
+      {failed && <Notice tone="bad">{failed}</Notice>}
+      <List>
+        <ListRow
+          title="Fin du repos"
+          detail="notification, écran en veille"
+          value={
+            <Switch
+              checked={on}
+              label="Notification à la fin du repos"
+              onChange={async (next) => {
+                setFailed(null);
+                if (!next) {
+                  disableRestPush();
+                  return setOn(false);
+                }
+                try {
+                  await enableRestPush();
+                  setOn(true);
+                } catch (e) {
+                  setFailed(errorText(e));
+                }
+              }}
+            />
+          }
+        />
+      </List>
+    </>
   );
 }

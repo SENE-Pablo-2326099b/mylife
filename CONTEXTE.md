@@ -100,7 +100,10 @@ Une seule origine, une seule PWA installable, mais **quatre projets Vercel** rec
 - `/api/space` (`server/space.ts`) : espaces partagés chiffrés (les Sorties ; les anciens Crew et foyers restent stockés).
 - `/api/raveloc` : groupes, invitations, positions chiffrées de MyRave.
 - `/api/push`, `/api/cron-reminders` : rappels écrits par l'appareil (le serveur n'envoie qu'un signal vide, le service
-  worker écrit le rappel depuis les données locales ; aucune app n'en prévoit pour l'instant).
+  worker écrit le rappel depuis les données locales ; aucune app n'en prévoit pour l'instant). Fin de repos de MyPerf
+  (action `rest`) : l'appareil donne l'heure de fin quand l'écran se met en veille, l'annule au retour (table
+  `push_rest`, une ligne par abonnement, effacée une fois partie) ; la fonction attend par tranches de 4 min 30 et se
+  relance elle-même (même compte, même repos) ; signal `{ type: 'rest' }`, texte écrit par `app/public/push-sw.js`.
 - `/api/cron-weekly` : purge des traces de suppression, le dimanche.
 - `/api/support` : messages au support.
 - Le même code sert en local (`server/local.ts`) et dans les tests. Cœur indépendant de Vercel : `server/core.ts` ne

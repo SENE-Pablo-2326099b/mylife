@@ -536,6 +536,7 @@ describe('sessions révocables et suppression de compte tout ou rien', () => {
       support_messages: 'ses messages au support',
       push_subscriptions: 'ses abonnements aux notifications',
       push_wakeups: 'les heures de réveil de ses abonnements',
+      push_rest: 'la fin du repos en cours d’un abonnement',
       auth_rate: 'sans donnée de compte : compteurs d’essais par empreinte',
       space_rate: 'sans donnée de compte : compteurs par empreinte',
       raveloc_rate: 'sans donnée de compte : compteurs par empreinte',
@@ -560,6 +561,7 @@ describe('sessions révocables et suppression de compte tout ou rien', () => {
     await supportDispatch(db, env.secret, bearer(session.token), { action: 'send', kind: 'bug', message: 'Ça plante' });
     await db.query(`INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at) VALUES ('https://push.exemple.test/abonnement-2', $1, 'p', 'a', 0)`, [uid]);
     await db.query(`INSERT INTO push_wakeups (endpoint, minute) VALUES ('https://push.exemple.test/abonnement-2', 480)`);
+    await db.query(`INSERT INTO push_rest (endpoint, at, token) VALUES ('https://push.exemple.test/abonnement-2', 1, 't')`);
 
     /** Les colonnes texte où figure l'identifiant du compte (ou l'adresse de son abonnement), table par table. */
     const traces = async () => {
@@ -571,7 +573,7 @@ describe('sessions révocables et suppression de compte tout ou rien', () => {
       }
       return found.sort();
     };
-    expect(await traces()).toEqual(expect.arrayContaining(['users.id', 'records.user_id', 'raveloc_members.user_id', 'space_members.user_id', 'space_records.author', 'support_messages.user_id', 'push_subscriptions.user_id', 'push_wakeups.endpoint']));
+    expect(await traces()).toEqual(expect.arrayContaining(['users.id', 'records.user_id', 'raveloc_members.user_id', 'space_members.user_id', 'space_records.author', 'support_messages.user_id', 'push_subscriptions.user_id', 'push_wakeups.endpoint', 'push_rest.endpoint']));
     await deleteAccount(plat, session, PW);
     expect(await traces()).toEqual([]);
     expect((await db.query('SELECT 1 FROM users')).rows.length).toBe(1);

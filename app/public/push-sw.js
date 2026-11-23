@@ -1,7 +1,9 @@
 /* Notifications (Web Push), chargé par le service worker de l'accueil (workbox importScripts).
    - Un message générique envoyé par le serveur (le rappel du dimanche, retiré en V5, en était un) : affiché tel quel.
    - Les rappels écrits par l'appareil (V4) : le serveur n'envoie qu'un signal vide { type: 'wake' } ; on lit ici le plan
-     que l'appareil a rangé dans sa base locale (web/src/reminders.ts) et on écrit le rappel du moment. */
+     que l'appareil a rangé dans sa base locale (web/src/reminders.ts) et on écrit le rappel du moment.
+   - La fin d'un repos (MyPerf, écran en veille) : signal { type: 'rest' }. Rien si la séance est à l'écran (le bip et la
+     vibration de l'app suffisent). */
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -53,6 +55,15 @@ self.addEventListener('push', (event) => {
     data = { ...data, ...(event.data ? event.data.json() : {}) };
   } catch {
     /* message illisible : texte par défaut */
+  }
+  if (data.type === 'rest') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+        if (list.some((c) => c.visibilityState === 'visible' && c.focused && String(c.url).includes('/sport/seance'))) return undefined;
+        return self.registration.showNotification('Repos terminé', { body: 'À toi : la série suivante.', icon: '/pwa-192x192.png', badge: '/pwa-192x192.png', data: { url: '/sport/seance' }, tag: 'mylife-rest', renotify: true, vibrate: [180, 90, 180] });
+      }),
+    );
+    return;
   }
   if (data.type === 'wake') {
     event.waitUntil(
