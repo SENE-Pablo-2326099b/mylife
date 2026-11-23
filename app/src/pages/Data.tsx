@@ -20,7 +20,7 @@ function download(name: string, data: unknown) {
 
 const LINKS: { href: string; icon: IconName; title: string; detail: string }[] = [
   { href: '/argent/reglages', icon: 'card', title: 'MyFinances', detail: 'Réglages → Tes données → Exporter ou importer' },
-  { href: '/perf/settings', icon: 'barbell', title: 'MyPerf', detail: 'Réglages → Exporter mes données' },
+  { href: '/sport/donnees', icon: 'barbell', title: 'MyPerf', detail: 'Tes données → Exporter' },
 ];
 
 const KINDS = [

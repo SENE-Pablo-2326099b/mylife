@@ -8,10 +8,20 @@ import { cloudBoot, dropForeign, resolveChoice, useCloud } from '../data/cloud';
 /**
  * Tes données : ce que la base de MyPerf sur cet appareil contient (séances, séances types, références, mesures), la
  * synchro avec le compte (app `perf`, la même que l'app d'avant) et le stockage (protégé ou non). Né à l'étape P1.
+ * Et l'export : la sauvegarde complète (JSON) et les séries pour un tableur (CSV).
  */
 const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 const day = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
 const kg = (v: number, signed: boolean) => `${signed && v > 0 ? '+' : ''}${v.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} kg`;
+function download(name: string, text: string, type: string) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
 const STRUCTURE: Record<Overview['structure'], string> = { periodized: 'blocs', cycle: 'cycle libre', routine: 'routine' };
 
 export function VerifyPage() {
@@ -20,6 +30,7 @@ export function VerifyPage() {
   const [storage, setStorage] = useState<StorageInfo | null>(null);
   const [persisted, setPersisted] = useState<string>('…');
   const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
   // Rien d'un autre compte n'est lu : ses données partent avant la première lecture.
   const [clean, setClean] = useState(false);
 
@@ -92,6 +103,35 @@ export function VerifyPage() {
               </List>
             </>
           )}
+
+          <SectionTitle>Exporter</SectionTitle>
+          {failed && <Notice tone="bad">{failed}</Notice>}
+          <List>
+            <ListRow
+              title="Sauvegarde complète"
+              detail="JSON · tout, programme et historique"
+              value="Télécharger"
+              onClick={async () => {
+                try {
+                  download(`myperf-${today()}.json`, JSON.stringify(await call('exportAll'), null, 2), 'application/json');
+                } catch (e) {
+                  setFailed(`Export impossible : ${e instanceof Error ? e.message : String(e)}`);
+                }
+              }}
+            />
+            <ListRow
+              title="Séries pour un tableur"
+              detail="CSV · une ligne par série"
+              value="Télécharger"
+              onClick={async () => {
+                try {
+                  download(`myperf-series-${today()}.csv`, `\ufeff${await call('setsCsv')}`, 'text/csv;charset=utf-8');
+                } catch (e) {
+                  setFailed(`Export impossible : ${e instanceof Error ? e.message : String(e)}`);
+                }
+              }}
+            />
+          </List>
 
           <SectionTitle>Appareil</SectionTitle>
           <List>

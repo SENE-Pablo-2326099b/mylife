@@ -7,6 +7,7 @@ import { rateSession, sessionReport } from './report';
 import { cycleReport, justEnded } from './cycleReport';
 import { agendaEvents, copilotCard, executeMove, homeCard } from './bridge';
 import { calendarView } from './calendar';
+import { exportAll, setsCsv } from './exporter';
 import { applyImport, exportProgram, importPreview, readyPrograms, readyProgramText, type ImportOptions } from './importer';
 import { baseValues, blockDetail, deleteBlock, liftView, saveBlock, setBase, setBlockWeek, setLiftWeek, setReference, settingsView, type BasePatch, type BlockPatch } from './plan';
 import { addSlot, archiveTemplate, createTemplate, moveSlot, programView, removeSlot, renameTemplate, setTemplateDays, slotDetail, templateDetail, templatesView, updateSlot, type SlotPatch } from './program';
@@ -89,6 +90,8 @@ export function createBackend(d: Db) {
     cycleReport: (id: string, date: string) => cycleReport(d, id, date),
     justEnded: (date: string) => justEnded(d, date),
     calendarView: (month: string, today: string) => calendarView(d, month, today),
+    exportAll: () => exportAll(d),
+    setsCsv: () => setsCsv(d),
     homeCard: (date: string) => homeCard(d, date),
     copilotCard: (date: string) => copilotCard(d, date),
     agendaEvents: (date: string) => agendaEvents(d, date),
