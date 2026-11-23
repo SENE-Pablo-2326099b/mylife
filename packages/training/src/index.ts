@@ -25,3 +25,5 @@ export { parseProgramInput, programPrompt, PROGRAM_FORMAT, type ParsedBlock, typ
 export { buildPlan, newExercises, programToFile, slotNotes, summarizePlan, type ExportInput, type ImportPlan, type PlanExercise } from './program/plan';
 export { guessExercise, matchExercise, type LibraryEntry } from './program/match';
 export { READY_PROGRAMS, type ReadyProgram } from './program/ready';
+export { BODY_REGIONS, loadLevel, regionAt, regionById, regionLoads, type BodyRegion, type BodyView, type RegionId, type RegionLoad } from './bodyMap';
+export { isIndirect, type VolumeSet } from './analytics';

@@ -413,11 +413,26 @@ describe('MyLife, une seule app', () => {
     await page.getByText('Au programme · par séance').waitFor({ timeout: 20_000 });
     await shot(page, '07m-sport-exercices');
     expect(await overflow(page)).toBeLessThanOrEqual(0);
+    // Le volume par muscle : un muscle choisi montre son volume et ses exercices.
+    await page.getByText('Volume par muscle').waitFor();
+    await page.locator('.pf-volume .pf-scrollchips .pf-chip').first().click();
+    await page.locator('.pf-region').getByText(/séries \/ sem\. sur 28 j/).waitFor();
+    await shot(page, '07m2-sport-volume');
+    // Une séance se replie et se déplie.
+    const head = page.locator('button.pf-gh').first();
+    await expect.poll(() => head.getAttribute('aria-expanded')).toBe('true');
+    await head.click();
+    await expect.poll(() => head.getAttribute('aria-expanded')).toBe('false');
+    await head.click();
+    await expect.poll(() => head.getAttribute('aria-expanded')).toBe('true');
     // La recherche, puis la fiche du squat : le corps anatomique, ses repères.
     await page.getByLabel('Chercher un exercice').fill('squat');
     await page.locator('.pf-ex', { hasText: /^QUADSquat/ }).first().click();
     await page.getByRole('img', { name: /^Muscles : / }).waitFor();
     await page.getByRole('button', { name: 'Ajouter à une séance' }).waitFor();
+    // Toucher un muscle : ce que l'exercice lui apporte.
+    await page.locator('.pf-zonechips .pf-chip').first().click();
+    await page.locator('.pf-zoneinfo').getByText(/au total/).waitFor();
     await shot(page, '07n-sport-fiche');
     expect(await overflow(page)).toBeLessThanOrEqual(0);
     // Une variante : créée depuis la fiche, elle a la sienne.
@@ -440,6 +455,7 @@ describe('MyLife, une seule app', () => {
     await shot(page, '07o-sport-fiche-variante');
     // De retour dans la bibliothèque : elle est au programme maintenant.
     await page.getByRole('link', { name: 'Retour' }).click();
+    await page.getByLabel('Chercher un exercice').fill('pause');
     await page.locator('.pf-ex', { hasText: 'Squat pause 2 s' }).first().waitFor();
   });
 

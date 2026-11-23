@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Field, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
 import { call } from '../data/client';
 import { Body } from '../body/Body';
-import type { ExerciseDetail, ExerciseLine, ExercisesView, Region } from '../data/exercises';
+import type { BodyVolume, ExerciseDetail, ExerciseLine, ExercisesView, Region, RegionDetail } from '../data/exercises';
+import type { RegionId } from '@mylife/training';
 import type { TemplateSummary } from '../data/program';
 import { Head } from './common';
 import { NewExerciseSheet } from './Reglages';
@@ -28,6 +29,100 @@ const FILTERS: readonly { id: string; label: string }[] = [
 /** La teinte d'un groupe musculaire : celle d'un module du kit (poussée, tirage, jambes, abdos). */
 const TONE: Record<Region, string> = { push: 'tone-perf', pull: 'tone-finances', legs: 'tone-rave', core: 'tone-chef' };
 const norm = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+/** Les séances repliées, gardées sur l'appareil (simple confort d'affichage). */
+const FOLD_KEY = 'mylife:perf:exercices:replies';
+const readFolded = (): string[] | null => {
+  try {
+    const v = JSON.parse(localStorage.getItem(FOLD_KEY) ?? 'null') as unknown;
+    return Array.isArray(v) ? v.map(String) : null;
+  } catch {
+    return null;
+  }
+};
+const writeFolded = (ids: string[]) => {
+  try {
+    localStorage.setItem(FOLD_KEY, JSON.stringify(ids));
+  } catch {
+    /* stockage indisponible : le choix vaut pour cette visite */
+  }
+};
+const LEVEL = [0, 0.35, 0.7, 1];
+
+/** Le volume par muscle (comme l'ancien MyPerf) : séries dures par semaine, sur 7 ou 28 jours ; toucher une zone. */
+function VolumeCard({ date }: { date: string }) {
+  const [days, setDays] = useState(28);
+  const [selected, setSelected] = useState<RegionId | null>(null);
+  const [detail, setDetail] = useState<RegionDetail | null>(null);
+  const [more, setMore] = useState(false);
+  const { data: v } = useData<BodyVolume>(() => call('bodyVolume', date, days), [date, days]);
+  useEffect(() => {
+    setMore(false);
+    if (!selected) return setDetail(null);
+    void call('regionDetail', selected, date, days).then(setDetail);
+  }, [selected, date, days]);
+  if (!v) return null;
+  const values = Object.fromEntries(v.regions.map((r) => [r.id, LEVEL[r.level]!])) as Partial<Record<RegionId, number>>;
+  const trained = [...v.regions].filter((r) => r.perWeek > 0).sort((a, b) => b.perWeek - a.perWeek);
+  const pick = (id: RegionId) => setSelected(selected === id ? null : id);
+  return (
+    <div className="card-module pf-volume">
+      <div className="row" style={{ gap: 6 }}>
+        <span className="grow t-strong">Volume par muscle</span>
+        {[7, 28].map((n) => (
+          <button key={n} type="button" className={`pf-chip${days === n ? '' : ' is-neutral'}`} aria-pressed={days === n} onClick={() => setDays(n)}>
+            {`${n} j`}
+          </button>
+        ))}
+      </div>
+      <Body values={values} selected={selected} onSelect={pick} label={`Séries dures par semaine sur ${days} jours : ${trained.map((r) => `${r.label} ${r.perWeek}`).join(', ') || 'aucune'}`} />
+      <div className="row t-label muted pf-legend">
+        <span>0</span>
+        <span className="pf-legend-bar" />
+        <span>10+ séries / sem.</span>
+      </div>
+      <div className="pf-scrollchips" role="group" aria-label="Choisir un muscle">
+        {(trained.length ? trained : v.regions).map((r) => (
+          <button key={r.id} type="button" className={`pf-chip${selected === r.id ? '' : ' is-neutral'}`} aria-pressed={selected === r.id} onClick={() => pick(r.id)}>
+            {r.perWeek > 0 ? `${r.label} ${r.perWeek.toLocaleString('fr-FR')}` : r.label}
+          </button>
+        ))}
+      </div>
+      {detail && (
+        <div className="pf-region">
+          <div className="row" style={{ alignItems: 'baseline', gap: 8 }}>
+            <span className="grow pf-big" style={{ fontSize: 19 }}>
+              {detail.label}
+            </span>
+            {detail.target && <span className="t-small muted">{`cible ${detail.target}`}</span>}
+          </div>
+          <span className="t-small">
+            <b className="pf-big" style={{ fontSize: 22 }}>
+              {detail.perWeek.toLocaleString('fr-FR')}
+            </b>{' '}
+            <span className="muted">{`séries / sem. sur ${days} j`}</span>
+            {detail.indirect > 0 && <span className="muted">{` · + ${detail.indirect.toLocaleString('fr-FR')} en indirect`}</span>}
+          </span>
+          {detail.target && (
+            <div className="progress">
+              <span style={{ width: `${Math.min(100, Math.round((detail.perWeek / detail.target) * 100))}%`, background: 'var(--tone-grad)' }} />
+            </div>
+          )}
+          <div className="pf-grp is-flat">
+            {(more ? detail.exercises : detail.exercises.slice(0, 5)).map((l) => (
+              <ExRow key={l.id} l={{ ...l, detail: `${l.role} · ${l.detail}` }} />
+            ))}
+          </div>
+          {detail.exercises.length > 5 && (
+            <button type="button" className="pf-link is-muted" style={{ alignSelf: 'center' }} onClick={() => setMore(!more)}>
+              {more ? 'Moins' : `+ ${detail.exercises.length - 5} exercices`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Tile({ label, region, small }: { label: string; region: Region; small?: boolean }) {
   return (
@@ -60,7 +155,7 @@ export function ExercisesPage() {
   const { data: v, error, reload } = useData<ExercisesView>(() => call('exercisesView', date), [date]);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<string | null>(null);
-  const [allSessions, setAllSessions] = useState(false);
+  const [folded, setFolded] = useState<string[] | null>(() => readFolded());
   const [open, setOpen] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
@@ -68,8 +163,13 @@ export function ExercisesPage() {
   if (!v) return <span className="t-small muted">Lecture des exercices…</span>;
   const searching = q.trim() !== '' || filter !== null;
   const found = searching ? v.all.filter((l) => (!filter || l.kinds.includes(filter)) && (!q || norm(`${l.name} ${l.detail}`).includes(norm(q)))) : [];
-  const sessions = allSessions ? v.sessions : v.sessions.slice(0, 2);
-  const hidden = v.sessions.slice(2);
+  // Par défaut, la première séance ouverte, les autres repliées ; ensuite, ton choix.
+  const closed = folded ?? v.sessions.slice(1).map((x) => x.id);
+  const toggle = (sid: string) => {
+    const next = closed.includes(sid) ? closed.filter((x) => x !== sid) : [...closed, sid];
+    setFolded(next);
+    writeFolded(next);
+  };
   return (
     <div className="pf-screen tone-perf" style={{ paddingBottom: 110 }}>
       <div className="pf-amb" aria-hidden="true" />
@@ -85,6 +185,8 @@ export function ExercisesPage() {
           </button>
         ))}
       </div>
+
+      {!searching && <VolumeCard date={date} />}
 
       {searching ? (
         found.length ? (
@@ -112,22 +214,22 @@ export function ExercisesPage() {
                 <span>Au programme · par séance</span>
                 <span>{v.inProgram}</span>
               </span>
-              {sessions.map((s) => (
-                <Glass key={s.id} className="pf-grp">
-                  <div className="pf-gh">
-                    {s.day && <span>{s.day}</span>}
-                    <b>{s.name}</b>
-                  </div>
-                  {s.lines.map((l) => (
-                    <ExRow key={l.id} l={l} />
-                  ))}
-                </Glass>
-              ))}
-              {!allSessions && hidden.length > 0 && (
-                <button type="button" className="pf-link is-muted" style={{ alignSelf: 'center', marginTop: -6 }} onClick={() => setAllSessions(true)}>
-                  {`+ ${hidden.length} séance${hidden.length > 1 ? 's' : ''} · ${hidden.map((x) => x.name).join(', ')}`}
-                </button>
-              )}
+              {v.sessions.map((s) => {
+                const isOpen = !closed.includes(s.id);
+                return (
+                  <Glass key={s.id} className="pf-grp">
+                    <button type="button" className="pf-gh" aria-expanded={isOpen} onClick={() => toggle(s.id)}>
+                      {s.day && <span>{s.day}</span>}
+                      <b className="grow">{s.name}</b>
+                      <span className="pf-gh-count">{isOpen ? '' : `${s.lines.length} exercice${s.lines.length > 1 ? 's' : ''}`}</span>
+                      <span className={`pf-chev${isOpen ? ' is-open' : ''}`} aria-hidden="true">
+                        ›
+                      </span>
+                    </button>
+                    {isOpen && s.lines.map((l) => <ExRow key={l.id} l={l} />)}
+                  </Glass>
+                );
+              })}
             </>
           )}
           <span className="pf-sec">
@@ -207,8 +309,12 @@ export function ExercisePage() {
   const [panel, setPanel] = useState<'loads' | 'records' | 'history'>('loads');
   const [sheet, setSheet] = useState<'edit' | 'reference' | 'variant' | 'add' | null>(null);
   const [kept, setKept] = useState(false);
+  const [region, setRegion] = useState<RegionId | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  useEffect(() => setKept(false), [id]);
+  useEffect(() => {
+    setKept(false);
+    setRegion(null);
+  }, [id]);
   if (error) return <Notice tone="bad">{error}</Notice>;
   if (e === null) return <Notice>Cet exercice n’existe plus.</Notice>;
   if (!e) return <span className="t-small muted">Lecture…</span>;
@@ -225,9 +331,9 @@ export function ExercisePage() {
   const cutoff = new Date(Date.now() - PERIODS.find((p) => p.id === period)!.days * 86_400_000).toISOString().slice(0, 10);
   const points = e.curve.filter((p) => p.date >= cutoff);
   const unit = e.weighted ? 'kg de lest' : 'kg';
-  const values: Record<string, number> = {};
-  for (const m of e.secondary) values[m] = 0.5;
-  for (const m of e.primary) values[m] = 1;
+  // Le corps de la fiche : chaque zone selon le volume fait avec cet exercice (28 jours) ; sans séance, selon son rôle.
+  const values = Object.fromEntries(e.regions.map((r) => [r.id, r.perWeek > 0 ? Math.min(1, 0.3 + r.perWeek / 10) : r.role === 'principal' ? 0.45 : 0.2])) as Partial<Record<RegionId, number>>;
+  const zone = e.regions.find((r) => r.id === region) ?? null;
   const panels = [
     { id: 'loads' as const, label: 'Charges', show: e.loads.length > 0 },
     { id: 'records' as const, label: 'Records', show: e.records.length > 0 },
@@ -244,7 +350,7 @@ export function ExercisePage() {
       {failed && <Notice tone="bad">{failed}</Notice>}
 
       <div className="card-module pf-exhero">
-        <Body values={values} label={`Muscles : ${e.primary.map((m) => MUSCLE_NAME[m]).join(', ')}${e.secondary.length ? ` ; secondaires : ${e.secondary.map((m) => MUSCLE_NAME[m]).join(', ')}` : ''}`} />
+        <Body values={values} selected={region} onSelect={(r) => setRegion(region === r ? null : r)} label={`Muscles : ${e.primary.map((m) => MUSCLE_NAME[m]).join(', ')}${e.secondary.length ? ` ; secondaires : ${e.secondary.map((m) => MUSCLE_NAME[m]).join(', ')}` : ''}`} />
         <div className="pf-facts">
           <span className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             {e.chips.map((c, i) => (
@@ -265,6 +371,24 @@ export function ExercisePage() {
           <span className="t-small muted">{e.inTemplates.length ? `Dans : ${e.inTemplates.join(', ')}` : e.createdOn ? `Créé le ${e.createdOn}` : 'Pas encore dans tes séances'}</span>
           {e.variants.length > 0 && <span className="t-small muted">{`Variantes : ${e.variants.map((v) => v.name).join(', ')}`}</span>}
         </div>
+        {zone ? (
+          <div className="pf-zoneinfo">
+            <b>{zone.label}</b>
+            <span className="muted">{` · ${zone.role}${zone.indirect ? ' (indirect)' : ''} · `}</span>
+            {zone.perWeek > 0 ? `${zone.perWeek.toLocaleString('fr-FR')} séries / sem. avec cet exercice` : 'pas de série ces 28 jours'}
+            <span className="muted">{` · ${zone.total.toLocaleString('fr-FR')} au total`}</span>
+          </div>
+        ) : (
+          e.regions.length > 0 && (
+            <div className="pf-scrollchips pf-zonechips" role="group" aria-label="Muscles travaillés">
+              {e.regions.map((r) => (
+                <button key={r.id} type="button" className={`pf-chip${r.role === 'principal' ? '' : ' is-neutral'}`} onClick={() => setRegion(r.id)}>
+                  {r.perWeek > 0 ? `${r.label} ${r.perWeek.toLocaleString('fr-FR')}` : r.label}
+                </button>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       {hasRef ? (

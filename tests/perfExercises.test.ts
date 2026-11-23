@@ -140,3 +140,27 @@ describe('Exercices : modifier, archiver, variante', () => {
     expect(b.exerciseDetail('ex_weighted_pullup', DATE)!.variants.map((x) => x.id)).toEqual([v]);
   });
 });
+
+describe('Exercices : le corps et le volume par muscle (comme l’ancien MyPerf)', () => {
+  it('séries dures par semaine par zone (principal 1, secondaire ½ ; bras : isolations en direct, le reste en indirect)', () => {
+    // Deux séances (5 et 12 janvier), une série par exercice : sur 28 jours, 2 séries = 0,5 par semaine.
+    const v = b.bodyVolume(DATE, 28);
+    const at = (id: string) => v.regions.find((r) => r.id === id)!;
+    expect(at('back')).toMatchObject({ perWeek: 0.5, level: 1 });
+    expect(at('biceps')).toMatchObject({ perWeek: 0.5, indirect: 0.3 }); // arrondi au dixième, comme l'ancienne app
+    expect(at('rear_delts')).toMatchObject({ perWeek: 0.3 });
+    expect(at('chest')).toMatchObject({ perWeek: 0, level: 0 });
+    // Sur 7 jours, la séance du 12 est juste en dehors.
+    expect(b.bodyVolume(DATE, 7).regions.find((r) => r.id === 'back')!.perWeek).toBe(0);
+  });
+
+  it('toucher une zone : son volume et ses exercices, principal d’abord ; la fiche dit ce que l’exercice travaille', () => {
+    const back = b.regionDetail('back', DATE, 28)!;
+    expect(back).toMatchObject({ label: 'Dos', perWeek: 0.5 });
+    expect(back.exercises[0]).toMatchObject({ id: 'ex_weighted_pullup', role: 'principal' });
+    expect(back.exercises.every((e, i, a) => i === 0 || a[i - 1]!.role === 'principal' || e.role === 'secondaire')).toBe(true);
+    const regions = b.exerciseDetail('ex_weighted_pullup', DATE)!.regions;
+    expect(regions.find((r) => r.id === 'back')).toMatchObject({ role: 'principal', perWeek: 0.5, indirect: false, total: 0.5 });
+    expect(regions.find((r) => r.id === 'biceps')).toMatchObject({ role: 'secondaire', indirect: true, perWeek: 0.3 });
+  });
+});

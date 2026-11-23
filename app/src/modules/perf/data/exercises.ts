@@ -1,4 +1,4 @@
-import { BUILTIN_FORMATS, estimate1RM, referenceFor, type Exercise, type HistoryView, type Program } from '@mylife/training';
+import { BODY_REGIONS, BUILTIN_FORMATS, estimate1RM, isIndirect, loadLevel, referenceFor, regionLoads, type Exercise, type HistoryView, type Muscle, type Program, type RegionId, type VolumeSet } from '@mylife/training';
 import { createExercise } from './day';
 import { historyView, readProgram } from './queries';
 import { summarize } from './session';
@@ -193,6 +193,99 @@ export function exercisesView(d: Db, date: string): ExercisesView {
   return { total: exercises.length, inProgram: used.size, sessions: bySession, library: library.filter((g) => g.lines.length > 0), all: exercises.map(line) };
 }
 
+// ---------------------------------------------------------------- le corps : volume par muscle
+
+const parseList = (v: unknown): string[] => {
+  try {
+    const x: unknown = JSON.parse(String(v ?? '[]'));
+    return Array.isArray(x) ? x.map(String) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** Les séries dures faites depuis `from` (muscles et catégorie de leur exercice), pour le volume par muscle. */
+function volumeSets(d: Db, from: string, exerciseId?: string): VolumeSet[] {
+  return d
+    .all<{ date: string; set_type: string; primary_muscles: string; secondary_muscles: string; category: string }>(
+      `SELECT w.date, s.set_type, e.primary_muscles, e.secondary_muscles, e.category FROM sets s
+       JOIN workout_exercises we ON we.id = s.workout_exercise_id JOIN workouts w ON w.id = we.workout_id JOIN exercises e ON e.id = we.exercise_id
+       WHERE w.status = 'completed' AND s.completed = 1 AND w.date >= ? ${exerciseId ? 'AND we.exercise_id = ?' : ''}`,
+      exerciseId ? [from, exerciseId] : [from],
+    )
+    .map((r) => ({ date: r.date, setType: r.set_type as VolumeSet['setType'], primaryMuscles: parseList(r.primary_muscles) as Muscle[], secondaryMuscles: parseList(r.secondary_muscles) as Muscle[], category: r.category as VolumeSet['category'] }));
+}
+
+/** Les cibles de séries par semaine réglées dans l'app d'avant (réglage `app`, clé `volumeTargets`). */
+function volumeTargets(d: Db): Record<string, number> {
+  try {
+    const app = JSON.parse(d.first<{ value: string }>("SELECT value FROM settings WHERE key = 'app'")?.value ?? '{}') as { volumeTargets?: Record<string, unknown> };
+    return Object.fromEntries(Object.entries(app.volumeTargets ?? {}).filter(([, v]) => typeof v === 'number' && v > 0)) as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+export interface RegionView {
+  id: RegionId;
+  label: string;
+  /** Séries dures par semaine sur la fenêtre (principal 1, secondaire ½ ; bras : isolations seulement). */
+  perWeek: number;
+  /** Bras : les polyarticulaires qui les travaillent aussi, à part. */
+  indirect: number;
+  level: 0 | 1 | 2 | 3;
+  target: number | null;
+}
+
+export interface BodyVolume {
+  windowDays: number;
+  regions: RegionView[];
+}
+
+export function bodyVolume(d: Db, date: string, windowDays: number): BodyVolume {
+  const days = windowDays === 7 ? 7 : 28;
+  const from = addDaysIso(date, -Math.max(days, 56));
+  const loads = regionLoads(volumeSets(d, from), date, days, 8);
+  const targets = volumeTargets(d);
+  return {
+    windowDays: days,
+    regions: BODY_REGIONS.map((r) => {
+      const l = loads.find((x) => x.region === r.id)!;
+      const target = r.muscles.reduce((n, m) => n + (targets[m] ?? 0), 0);
+      return { id: r.id, label: r.label, perWeek: l.perWeek, indirect: l.indirectPerWeek, level: loadLevel(l.perWeek), target: target > 0 ? target : null };
+    }),
+  };
+}
+
+export interface RegionDetail extends RegionView {
+  exercises: (ExerciseLine & { role: 'principal' | 'secondaire' })[];
+}
+
+/** Une zone touchée sur le corps : son volume, sa cible, et ses exercices (principal d'abord, les plus récents d'abord). */
+export function regionDetail(d: Db, id: RegionId, date: string, windowDays: number): RegionDetail | null {
+  const region = BODY_REGIONS.find((r) => r.id === id);
+  if (!region) return null;
+  const view = bodyVolume(d, date, windowDays).regions.find((r) => r.id === id)!;
+  const lines = new Map(exercisesView(d, date).all.map((l) => [l.id, l]));
+  const program = readProgram(d);
+  const exercises = program.exercises
+    .filter((e) => !e.archived)
+    .flatMap((e) => {
+      const primary = e.primaryMuscles.some((m) => region.muscles.includes(m));
+      const secondary = !primary && e.secondaryMuscles.some((m) => region.muscles.includes(m));
+      const line = lines.get(e.id);
+      return (primary || secondary) && line ? [{ ...line, role: primary ? ('principal' as const) : ('secondaire' as const) }] : [];
+    })
+    .sort((a, b) => (a.role !== b.role ? (a.role === 'principal' ? -1 : 1) : Number(b.kinds.includes('program')) - Number(a.kinds.includes('program')) || a.name.localeCompare(b.name, 'fr')));
+  return { ...view, exercises };
+}
+
+const addDaysIso = (iso: string, n: number) => {
+  const dt = new Date(`${iso}T12:00:00`);
+  dt.setDate(dt.getDate() + n);
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+};
+
 // ---------------------------------------------------------------- la fiche
 
 export interface ExerciseDetail {
@@ -226,6 +319,8 @@ export interface ExerciseDetail {
   context: string;
   chips: string[];
   createdOn: string | null;
+  /** Ce que cet exercice travaille, zone par zone : rôle, séries par semaine sur 28 jours (avec lui, et au total). */
+  regions: { id: RegionId; label: string; role: 'principal' | 'secondaire'; perWeek: number; indirect: boolean; total: number }[];
 }
 
 export function exerciseDetail(d: Db, id: string, date: string): ExerciseDetail | null {
@@ -318,6 +413,19 @@ export function exerciseDetail(d: Db, id: string, date: string): ExerciseDetail 
       return `${first.name} · ${STRATEGY_LABEL[slot.strategy.id] ?? 'au programme'}`;
     })(),
     chips: [weighted ? (e.category === 'main' ? 'Lest' : 'Poids du corps') : (EQUIPMENT[e.equipment] ?? 'Charge').replace(/^./, (c) => c.toUpperCase()), CATEGORY_LABEL[e.category] ?? ''].filter(Boolean),
+    regions: (() => {
+      const mine = regionLoads(volumeSets(d, addDaysIso(date, -56), id), date, 28, 8);
+      const all = bodyVolume(d, date, 28).regions;
+      return BODY_REGIONS.flatMap((r) => {
+        const primary = e.primaryMuscles.find((m) => r.muscles.includes(m));
+        const secondary = primary ? undefined : e.secondaryMuscles.find((m) => r.muscles.includes(m));
+        const muscle = primary ?? secondary;
+        if (!muscle) return [];
+        const l = mine.find((x) => x.region === r.id)!;
+        const indirect = isIndirect(muscle, e.category);
+        return [{ id: r.id, label: r.label, role: primary ? ('principal' as const) : ('secondaire' as const), perWeek: indirect ? l.indirectPerWeek : l.perWeek, indirect, total: all.find((x) => x.id === r.id)?.perWeek ?? 0 }];
+      });
+    })(),
     createdOn: (() => {
       const r = d.first<{ created_at: number }>('SELECT created_at FROM exercises WHERE id = ? AND is_custom = 1', [id]);
       return r ? new Date(r.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : null;
