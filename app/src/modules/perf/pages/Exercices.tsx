@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Field, Glass, Icon, IconButton, List, ListRow, Notice, Segmented, Sheet } from '@mylife/kit';
 import { call } from '../data/client';
 import { Body } from '../body/Body';
-import { ExRow, Tile, VolumeCard } from './Volume';
+import { ExRow, Tile } from './Volume';
 import type { ExerciseDetail, ExercisesView } from '../data/exercises';
 import type { RegionId } from '@mylife/training';
 import type { TemplateSummary } from '../data/program';
@@ -81,8 +81,6 @@ export function ExercisesPage() {
           </button>
         ))}
       </div>
-
-      {!searching && <VolumeCard date={date} choose />}
 
       {searching ? (
         found.length ? (

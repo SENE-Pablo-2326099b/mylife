@@ -430,13 +430,9 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Exercices' }).click();
     await page.getByRole('heading', { name: 'Exercices' }).waitFor();
     await page.getByText('Au programme · par séance').waitFor({ timeout: 20_000 });
+    expect(await page.locator('.pf-volume').count()).toBe(0);
     await shot(page, '07m-sport-exercices');
     expect(await overflow(page)).toBeLessThanOrEqual(0);
-    // Le volume par muscle : un muscle choisi montre son volume et ses exercices.
-    await page.getByText('Volume par muscle').waitFor();
-    await page.locator('.pf-volume .pf-scrollchips .pf-chip').first().click();
-    await page.locator('.pf-region').getByText(/séries \/ sem\. sur 28 j/).waitFor();
-    await shot(page, '07m2-sport-volume');
     // Une séance se replie et se déplie.
     const head = page.locator('button.pf-gh').first();
     await expect.poll(() => head.getAttribute('aria-expanded')).toBe('true');
@@ -484,6 +480,10 @@ describe('MyLife, une seule app', () => {
     await page.getByRole('navigation', { name: 'Navigation de MyPerf' }).getByRole('link', { name: 'Progrès' }).click();
     await page.getByRole('heading', { name: 'Progrès' }).waitFor();
     await page.getByText('Régularité · 14 semaines').waitFor({ timeout: 20_000 });
+    // Le volume par muscle vit ici (et pas dans Exercices) : un muscle choisi montre son volume et ses exercices.
+    await page.locator('.pf-volume .pf-scrollchips .pf-chip').first().click();
+    await page.locator('.pf-region').getByText(/séries \/ sem\. sur \d+ j/).waitFor();
+    await shot(page, '07m2-sport-volume');
     await page.getByRole('button', { name: '7 jours' }).click();
     await expect.poll(() => page.getByRole('button', { name: '7 jours' }).getAttribute('aria-pressed')).toBe('true');
     await shot(page, '07p-sport-progres');

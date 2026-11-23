@@ -11,7 +11,7 @@ const TONE: Record<Region, string> = { push: 'tone-perf', pull: 'tone-finances',
 const LEVEL = [0, 0.35, 0.7, 1];
 
 /** Le volume par muscle (comme l'ancien MyPerf) : séries dures par semaine, sur 7 ou 28 jours ; toucher une zone. */
-/** `days` imposé de l'extérieur (Progrès) ; sinon `choose` affiche le choix 7 / 28 jours. */
+/** Le volume par muscle de la page Progrès. `days` : la période de la page ; sinon `choose` affiche le choix 7 / 28 jours. */
 export function VolumeCard({ date, days: fixed, choose }: { date: string; days?: number; choose?: boolean }) {
   const [own, setDays] = useState(28);
   const days = fixed ?? own;
