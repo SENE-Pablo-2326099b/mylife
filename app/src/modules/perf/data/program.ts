@@ -154,7 +154,7 @@ export function templateDetail(d: Db, id: string, date: string): TemplateDetail 
         exerciseId: slot.exerciseId,
         name: program.exercises.find((e) => e.id === slot.exerciseId)?.name ?? slot.exerciseId,
         format: format.name,
-        prescription: item?.prescription.label.replace(/ @/g, ' @ ').replace(/(\d)%/g, '$1 %') ?? '',
+        prescription: item?.prescription.label.replace(/ @(?! )/g, ' @ ').replace(/(\d)%/g, '$1 %') ?? '',
         group: slot.group ? `${slot.group.kind === 'superset' ? 'superset' : 'circuit'} ${letters.get(slot.group.id)} · ${slot.group.rounds} tours` : null,
         notes: slot.notes,
       };
@@ -286,7 +286,7 @@ export function slotDetail(d: Db, id: string, date: string): SlotDetail | null {
     restSec: slot.restSec,
     defaultRest: restSeconds(DEFAULT_REST, exercise.category, slot.intention ?? (slot.strategy.id === 'percent_reference' ? 'strength' : 'hypertrophy'), 'working'),
     notes: slot.notes,
-    preview: item?.prescription.label.replace(/ @/g, ' @ ').replace(/(\d)%/g, '$1 %') ?? '',
+    preview: item?.prescription.label.replace(/ @(?! )/g, ' @ ').replace(/(\d)%/g, '$1 %') ?? '',
   };
 }
 

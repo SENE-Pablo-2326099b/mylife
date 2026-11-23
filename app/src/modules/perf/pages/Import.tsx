@@ -189,8 +189,8 @@ export function ImportPage() {
               {preview.name}
             </span>
             <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-              <span className="pf-chip is-neutral">{`${preview.summary.sessions} séance${preview.summary.sessions > 1 ? 's' : ''}`}</span>
-              <span className="pf-chip is-neutral">{`${preview.summary.exercises} exercice${preview.summary.exercises > 1 ? 's' : ''}`}</span>
+              {preview.summary.sessions > 0 && <span className="pf-chip is-neutral">{`${preview.summary.sessions} séance${preview.summary.sessions > 1 ? 's' : ''}`}</span>}
+              {preview.summary.sessions > 0 && <span className="pf-chip is-neutral">{`${preview.summary.exercises} exercice${preview.summary.exercises > 1 ? 's' : ''}`}</span>}
               {preview.summary.created > 0 && <span className="pf-chip">{`${preview.summary.created} nouveau${preview.summary.created > 1 ? 'x' : ''}`}</span>}
               {preview.blocks.length > 0 && <span className="pf-chip is-neutral">{`${preview.blocks.length} bloc${preview.blocks.length > 1 ? 's' : ''}`}</span>}
             </div>
@@ -221,7 +221,39 @@ export function ImportPage() {
                 </div>
               ))}
             </div>
-            {preview.blocks.length > 0 && detail && <span className="t-small muted">{`Blocs : ${preview.blocks.map((b) => `${b.name} (${b.kind}, ${b.weeks}${b.deloadWeeks ? ` + ${b.deloadWeeks}` : ''} sem.)`).join(' · ')}`}</span>}
+            {preview.blocks.length > 0 && (
+              <div className="pf-lines">
+                {preview.blocks.map((b, i) => (
+                  <div key={i} className="pf-line" style={{ alignItems: 'flex-start' }}>
+                    <span className="grow" style={{ minWidth: 0 }}>
+                      <span className="t-strong">{b.macro ? `${b.macro} · ${b.name}` : b.name}</span>
+                      <br />
+                      <span className="t-small muted">{[b.kind, b.start ? new Date(`${b.start}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : 'à la suite', `${b.weeks}${b.deloadWeeks ? ` + ${b.deloadWeeks}` : ''} sem.`, b.lifts.length ? `${b.lifts.length} exception${b.lifts.length > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</span>
+                      {detail && (
+                        <>
+                          {(b.plan ?? []).map((w, k) => (
+                            <span key={k} className="pf-imp-ex">
+                              <span className="grow t-small">{`S${k + 1} · ${w}`}</span>
+                            </span>
+                          ))}
+                          {b.deload && (
+                            <span className="pf-imp-ex">
+                              <span className="grow t-small">{`Décharge · ${b.deload}`}</span>
+                            </span>
+                          )}
+                          {b.lifts.map((l, k) => (
+                            <span key={`l${k}`} className="pf-imp-ex">
+                              <span className="grow t-small">{`${l.name}, S${l.week} · ${l.text}`}</span>
+                            </span>
+                          ))}
+                        </>
+                      )}
+                    </span>
+                    {b.update && <span className="pf-chip is-neutral">mis à jour</span>}
+                  </div>
+                ))}
+              </div>
+            )}
             <button type="button" className="pf-link" style={{ alignSelf: 'flex-start', padding: 0 }} aria-expanded={detail} onClick={() => setDetail(!detail)}>
               {detail ? 'Moins de détail' : 'Voir le détail ›'}
             </button>

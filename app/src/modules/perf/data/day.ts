@@ -75,7 +75,7 @@ export function preview(d: Db, program: Program, templateId: string, date: strin
     const sets = item.prescription.sets;
     for (const s of sets) seconds += 40 + restSeconds(DEFAULT_REST, item.exercise.category, item.slot.intention ?? (item.slot.strategy.id === 'percent_reference' ? 'strength' : 'hypertrophy'), s.setType);
     const first = sets.find((s) => s.setType === 'top_set') ?? sets[0];
-    const label = item.prescription.label.replace(/^Deload · /, 'Décharge · ').replace(/ @/g, ' @ ').replace(/(\d)%/g, '$1 %');
+    const label = item.prescription.label.replace(/^Deload · /, 'Décharge · ').replace(/ @(?! )/g, ' @ ').replace(/(\d)%/g, '$1 %');
     return { name: item.exercise.name, detail: label, load: first?.targetWeight != null ? kg(first.targetWeight, weighted) : null };
   });
   return { id: plan.session.id, name: plan.session.name, minutes: Math.max(5, Math.round(seconds / 60 / 5) * 5), lines, movedFrom: null };

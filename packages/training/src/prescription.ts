@@ -1,6 +1,7 @@
+import { describeGroups } from './groups';
 import { BACKOFF_REPS, describeStrengthWeek, DEFAULT_SCHEME_4, TOP_REPS, type CyclePhase } from './mesocycle';
 import { roundToIncrement } from './math';
-import type { BarSpeed, DeloadConfig, ProgressionType, SetType, StrengthWeek, WeekOverride } from './types';
+import type { BarSpeed, DeloadConfig, ProgressionType, SetGroup, SetType, StrengthWeek, WeekOverride } from './types';
 
 /** A completed set from history, enough for prescriptions. */
 export interface HistorySet {
@@ -15,6 +16,11 @@ export interface PlannedSet {
   targetWeight: number | null;
   targetReps: number | null;
   targetRepsMax: number | null;
+  /** Semaines en groupes libres : le % du 1RM de cette série, sa consigne, son repos, sa durée. */
+  percent?: number | null;
+  note?: string;
+  restSec?: number | null;
+  seconds?: number | null;
 }
 
 export type ProgressionHint = { kind: 'increase'; from: number; to: number } | null;
@@ -114,6 +120,12 @@ function prescribeTopSet(input: PrescriptionInput): Prescription {
   // No cycle running: the first week's shape.
   const base = isDeload ? input.deload.main : phase?.kind === 'work' ? phase.strength : (input.scheme[0] ?? fallback);
   const week = phase?.kind === 'work' || phase?.kind === 'deload' ? phase.week : null;
+  // Groupes libres : ceux de l'exercice cette semaine, sinon ceux de la semaine (un réglage chiffré de l'exercice
+  // les remplace par une forme top set + backoffs).
+  const o = week === null ? undefined : overrides.get(week);
+  const numeric = !!o && [o.topSets, o.topRepsMin, o.topRepsMax, o.topPercent, o.backoffSets, o.backoffReps, o.backoffPercent].some((v) => v !== null && v !== undefined);
+  const groups = o?.groups?.length ? o.groups : !numeric && base.groups?.length ? base.groups : null;
+  if (groups) return prescribeGroups(groups, input, isDeload);
   // The deload week has its own set counts; template counts shape the work weeks only.
   const counts = isDeload ? { topSetsOverride: null, backoffSetsOverride: null } : input;
   const plan = weekPlan(base, counts, week === null ? undefined : overrides.get(week));
@@ -127,6 +139,37 @@ function prescribeTopSet(input: PrescriptionInput): Prescription {
   const ratio = top !== null && backoff !== null && top + bw > 0 ? (backoff + bw) / (top + bw) : input.backoffPercent;
   const percents = ref === null || ref <= 0 ? null : { top: plan.topPercent, backoff: plan.backoffPercent };
   return buildTopSetPrescription(plan, top, backoff, Math.round(ratio * 1000) / 1000, isDeload, percents);
+}
+
+/** Une semaine en groupes libres : chaque série à son % du 1RM (lest pour un lesté), dans l'ordre écrit. */
+function prescribeGroups(groups: readonly SetGroup[], input: PrescriptionInput, isDeload: boolean): Prescription {
+  const ref = input.referenceE1rm !== null && input.referenceE1rm > 0 ? input.referenceE1rm : null;
+  const bw = input.bodyweight ?? 0;
+  const sets: PlannedSet[] = groups.flatMap((g) =>
+    Array.from({ length: g.sets }, (): PlannedSet => ({
+      setType: g.type,
+      targetWeight: ref !== null && g.percent != null ? loadAt(ref, g.percent, input.increment, input.bodyweight) : null,
+      targetReps: g.seconds ? null : g.reps,
+      targetRepsMax: g.seconds ? null : (g.repsMax ?? null),
+      percent: g.percent ?? null,
+      note: [g.everySec ? (g.everySec === 60 ? 'EMOM' : `toutes les ${g.everySec} s`) : '', g.note ?? ''].filter(Boolean).join(' · '),
+      restSec: g.restSec ?? g.everySec ?? null,
+      seconds: g.seconds ?? null,
+    })),
+  );
+  const withPct = groups.filter((g) => g.percent != null);
+  const top = groups.find((g) => g.type === 'top_set' && g.percent != null) ?? withPct[0];
+  const backoff = groups.find((g) => g.type === 'backoff' && g.percent != null) ?? withPct.find((g) => g !== top) ?? top;
+  const topLoad = ref !== null && top ? loadAt(ref, top.percent!, input.increment, input.bodyweight) : null;
+  const backoffLoad = ref !== null && backoff ? loadAt(ref, backoff.percent!, input.increment, input.bodyweight) : null;
+  const ratio = topLoad !== null && backoffLoad !== null && topLoad + bw > 0 ? (backoffLoad + bw) / (topLoad + bw) : input.backoffPercent;
+  return {
+    sets,
+    label: `${isDeload ? 'Deload · ' : ''}${describeGroups(groups)}`,
+    hint: null,
+    backoffPercent: Math.round(ratio * 1000) / 1000,
+    percents: ref !== null && top && backoff ? { top: top.percent!, backoff: backoff.percent! } : null,
+  };
 }
 
 function buildTopSetPrescription(

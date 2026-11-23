@@ -165,7 +165,7 @@ export function SessionPage() {
     const nextItem = doc.items.slice(doc.items.indexOf(item) + 1).find((i) => !isDone(i) && !members.includes(i));
     // Plus rien après : pas de repos « avant la fin ».
     if (!nextRow && !nextItem) return skipRest();
-    const seconds = item.restSec ?? restSeconds(doc.rest, item.category, item.intention, set.setType);
+    const seconds = set.guide?.restSec ?? item.restSec ?? restSeconds(doc.rest, item.category, item.intention, set.setType);
     const numbered = item.sets.filter((s) => s.setType !== 'warmup' && s.setType !== 'top_set');
     const k = nextRow ? numbered.indexOf(nextRow.set) : -1;
     const label = nextRow
@@ -571,14 +571,14 @@ function ExerciseCard(p: CardProps) {
       <CardHead item={item} doc={p.doc} onMore={p.onMore} />
       <div className="pf-cols pf-colhead" aria-hidden="true">
         <span>série</span>
-        <span>{item.percents ? 'plan' : ''}</span>
+        <span>{item.percents || item.sets.some((s) => s.guide?.percent != null) ? 'plan' : ''}</span>
         <span>{weighted ? 'lest' : 'kg'}</span>
         <span>reps</span>
         <span />
       </div>
       {item.sets.map((s) => {
         const label = s.setType === 'top_set' ? 'T' : s.setType === 'warmup' ? 'É' : s.setType === 'drop' ? 'D' : String(++n);
-        const percent = item.percents ? (s.setType === 'top_set' ? item.percents.top : s.setType === 'backoff' ? item.percents.backoff : null) : null;
+        const percent = s.guide ? s.guide.percent : item.percents ? (s.setType === 'top_set' ? item.percents.top : s.setType === 'backoff' ? item.percents.backoff : null) : null;
         const isNow = s === now;
         const focus = p.editing?.setId === s.id ? p.editing.field : null;
         return (
@@ -592,7 +592,7 @@ function ExerciseCard(p: CardProps) {
               {s.weight !== null ? kg(s.weight, weighted) : <span className="pf-ph">{kg(s.targetWeight, weighted)}</span>}
             </button>
             <button type="button" className={`pf-cell${focus === 'reps' ? ' is-focus' : ''}`} aria-label={`Répétitions, série ${label}`} onClick={() => p.onEdit({ setId: s.id, field: 'reps' })}>
-              {s.reps !== null ? s.reps : <span className="pf-ph">{s.targetReps ?? '—'}</span>}
+              {s.reps !== null ? s.reps : <span className="pf-ph">{s.targetReps ?? (s.guide?.seconds ? `${s.guide.seconds} s` : '—')}</span>}
             </button>
             <button
               type="button"
@@ -1070,9 +1070,9 @@ const TYPES: readonly { id: SessionSet['setType']; label: string }[] = [
   { id: 'drop', label: 'Drop set' },
 ];
 
-/** Sous une série : sa vitesse et ton commentaire, s'il y en a. */
+/** Sous une série : la consigne du programme (« pause 2 s », « EMOM »), sa vitesse et ton commentaire, s'il y en a. */
 function SetExtra({ set }: { set: SessionSet }) {
-  const bits = [set.speed !== null ? `vitesse ${set.speed}` : '', set.note ? `« ${set.note} »` : ''].filter(Boolean);
+  const bits = [set.guide?.note ?? '', set.speed !== null ? `vitesse ${set.speed}` : '', set.note ? `« ${set.note} »` : ''].filter(Boolean);
   return bits.length ? <div className="pf-setextra">{bits.join(' · ')}</div> : null;
 }
 

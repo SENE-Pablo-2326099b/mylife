@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button, Field, Glass, List, ListRow, Notice, Segmented, Sheet, Switch } from '@mylife/kit';
 import { disableRestPush, enableRestPush, restPushOn, restPushSupported } from '../session/restPush';
-import type { StrengthWeek } from '@mylife/training';
+import { describeGroup, describeGroups, type SetGroup, type StrengthWeek } from '@mylife/training';
 import { call } from '../data/client';
 import type { BlockDetail, LiftCell, LiftView, SettingsView, WeekScheme } from '../data/plan';
 import type { TemplateSummary } from '../data/program';
@@ -31,8 +31,26 @@ function BlockChips({ blocks, value, onPick }: { blocks: { id: string; name: str
   );
 }
 
+type TableWeek = { index: number; label: string; current?: boolean; adjusted?: boolean; top: string | null; topPct: string | null; back: string | null; backPct: string | null; groups?: SetGroup[] | null };
+const ROW: Record<SetGroup['type'], string> = { top_set: 'top set', backoff: 'backoffs', working: 'séries', warmup: 'échauff.', drop: 'dégress.' };
+
+/** Une semaine en lignes (groupe par groupe) : les siens, ou top set puis backoffs. */
+function cellsOf(w: TableWeek): { type: SetGroup['type']; text: string; pct: string | null; note: string }[] {
+  if (w.groups?.length)
+    return w.groups.map((g) => ({ type: g.type, text: `${g.everySec ? 'EMOM ' : ''}${g.sets}×${g.seconds ? `${g.seconds} s` : `${g.reps}${g.repsMax ? `-${g.repsMax}` : ''}`}`, pct: g.percent != null ? pctText(g.percent) : null, note: g.note ?? '' }));
+  return [
+    { type: 'top_set' as const, text: w.top ?? '—', pct: w.topPct, note: '' },
+    { type: 'backoff' as const, text: w.back ?? '—', pct: w.backPct, note: '' },
+  ];
+}
+
 /** Le tableau d'un bloc ou d'un lift : chaque case se touche pour régler la semaine. */
-function WeeksTable({ weeks, onPick }: { weeks: { index: number; label: string; current?: boolean; adjusted?: boolean; top: string | null; topPct: string | null; back: string | null; backPct: string | null }[]; onPick: (index: number) => void }) {
+function WeeksTable({ weeks, onPick }: { weeks: TableWeek[]; onPick: (index: number) => void }) {
+  const cols = weeks.map(cellsOf);
+  const rows = Array.from({ length: Math.max(2, ...cols.map((c) => c.length)) }, (_, i) => {
+    const types = new Set(cols.map((c) => c[i]?.type).filter(Boolean));
+    return types.size === 1 ? ROW[[...types][0]!] : `groupe ${i + 1}`;
+  });
   return (
     <div className="pf-tablewrap">
       <table className="pf-table is-edit">
@@ -47,17 +65,20 @@ function WeeksTable({ weeks, onPick }: { weeks: { index: number; label: string; 
           </tr>
         </thead>
         <tbody>
-          {(['top', 'back'] as const).map((row) => (
-            <tr key={row}>
-              <td className="pf-tl">{row === 'top' ? 'top set' : 'backoffs'}</td>
-              {weeks.map((w) => (
-                <td key={w.index} className={[w.current ? 'is-current' : '', w.adjusted ? 'is-adjusted' : ''].filter(Boolean).join(' ') || undefined}>
-                  <button type="button" className="pf-cellbtn" aria-label={`${w.label}, ${row === 'top' ? 'top set' : 'backoffs'} : régler`} onClick={() => onPick(w.index)}>
-                    {(row === 'top' ? w.top : w.back) ?? '—'}
-                    {(row === 'top' ? w.topPct : w.backPct) && <small>{row === 'top' ? w.topPct : w.backPct}</small>}
-                  </button>
-                </td>
-              ))}
+          {rows.map((row, i) => (
+            <tr key={i}>
+              <td className="pf-tl">{row}</td>
+              {weeks.map((w, k) => {
+                const c = cols[k]![i];
+                return (
+                  <td key={w.index} className={[w.current ? 'is-current' : '', w.adjusted ? 'is-adjusted' : ''].filter(Boolean).join(' ') || undefined}>
+                    <button type="button" className="pf-cellbtn" aria-label={`${w.label}, ${row} : régler`} title={c?.note || undefined} onClick={() => onPick(w.index)}>
+                      {c ? `${c.text}${c.note ? ' ·' : ''}` : '—'}
+                      {c?.pct && <small>{c.pct}</small>}
+                    </button>
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -168,6 +189,7 @@ export function ReglagesPage() {
           open={week !== null}
           title={week ? `${week.deload ? 'Décharge' : `Semaine ${week.index}`} · tous les lifts` : ''}
           values={week?.week ?? null}
+          groups={week?.groups ?? null}
           onClose={() => setWeek(null)}
           onSave={async (values) => {
             try {
@@ -207,7 +229,7 @@ function Mini({ label, value, text, onChange, step, min, max }: { label: string;
 }
 
 /** Régler une semaine : top set (séries, reps, %) et backoffs ; « Auto » revient au bloc (pour un lift). */
-function WeekSheet({ open, title, values, adjusted, preview, onClose, onSave, onAuto }: { open: boolean; title: string; values: StrengthWeek | null; adjusted?: boolean; preview?: (w: StrengthWeek) => string | null; onClose: () => void; onSave: (w: StrengthWeek) => void; onAuto?: () => void }) {
+function WeekSheet({ open, title, values, groups, adjusted, preview, onClose, onSave, onAuto }: { open: boolean; title: string; values: StrengthWeek | null; groups?: SetGroup[] | null; adjusted?: boolean; preview?: (w: StrengthWeek) => string | null; onClose: () => void; onSave: (w: StrengthWeek) => void; onAuto?: () => void }) {
   const [w, setW] = useState<StrengthWeek | null>(values);
   useEffect(() => setW(values), [values, open]);
   if (!w) return null;
@@ -217,6 +239,16 @@ function WeekSheet({ open, title, values, adjusted, preview, onClose, onSave, on
     <Sheet open={open} title={title} onClose={onClose}>
       <div className="stack" style={{ gap: 12 }}>
         {adjusted && <span className="pf-chip" style={{ alignSelf: 'flex-start' }}>ajustée</span>}
+        {groups?.length ? (
+          <>
+            <List>
+              {groups.map((g, i) => (
+                <ListRow key={i} title={describeGroup(g)} />
+              ))}
+            </List>
+            <Notice tone="warn">Enregistrer ci-dessous remplace ces groupes par un top set et des backoffs.</Notice>
+          </>
+        ) : null}
         <span className="pf-sec" style={{ margin: 0, padding: 0 }}>
           Top set
         </span>
@@ -314,6 +346,7 @@ export function LiftPage() {
           open={cell !== null}
           title={cell ? (cell.deload ? 'Décharge' : `Semaine ${cell.index}`) : ''}
           values={cell?.values ?? null}
+          groups={cell?.groups ?? null}
           adjusted={cell?.adjusted}
           preview={preview}
           onClose={() => setCell(null)}
@@ -418,7 +451,7 @@ export function BlocPage() {
           </span>
           <List>
             {b.weeks.map((w) => (
-              <ListRow key={w.index} lead={<span className="pf-chip is-neutral" style={{ minHeight: 24 }}>{w.label}</span>} title={<span className="t-small">{`${w.top} @ ${w.topPct}${w.back ? ` · ${w.back} @ ${w.backPct}` : ''}`}</span>} onClick={() => setWeek(w)} />
+              <ListRow key={w.index} lead={<span className="pf-chip is-neutral" style={{ minHeight: 24 }}>{w.label}</span>} title={<span className="t-small">{w.groups ? describeGroups(w.groups) : `${w.top} @ ${w.topPct}${w.back ? ` · ${w.back} @ ${w.backPct}` : ''}`}</span>} onClick={() => setWeek(w)} />
             ))}
           </List>
         </>
@@ -457,6 +490,7 @@ export function BlocPage() {
         open={week !== null}
         title={week ? (week.deload ? 'Décharge · tous les lifts' : `Semaine ${week.index} · tous les lifts`) : ''}
         values={week?.week ?? null}
+        groups={week?.groups ?? null}
         onClose={() => setWeek(null)}
         onSave={async (values) => {
           try {

@@ -1,5 +1,6 @@
-import type { Equipment, Intention, LoadType, Muscle } from '../types';
-import { PROGRAM_FORMAT, PROGRAM_VERSION, WEEKDAY_NAMES, type ParsedExercise, type ParsedProgram, type ProgramFile } from './format';
+import { groupToSpec } from '../groups';
+import type { Equipment, Intention, LoadType, Muscle, SetGroup } from '../types';
+import { PROGRAM_FORMAT, PROGRAM_VERSION, WEEKDAY_NAMES, type FileBlock, type ParsedExercise, type ParsedProgram, type ProgramFile } from './format';
 import { guessExercise, matchExercise, type LibraryEntry, type Match } from './match';
 
 /**
@@ -141,7 +142,40 @@ export interface ExportInput {
   /** Semaine type : jour (0 = lundi) → nom de la séance. */
   pattern: { weekday: number; session: string }[];
   oneRms: { name: string; kg: number }[];
-  blocks?: { name: string; type: string; weeks: number; deloadWeeks: number; start: string }[];
+  blocks?: ExportBlock[];
+}
+
+/** Un bloc tel qu'on l'exporte : ses semaines en groupes (toujours écrites), sa décharge, ses exceptions. */
+export interface ExportBlock {
+  id?: string;
+  name: string;
+  type: string;
+  weeks: number;
+  deloadWeeks: number;
+  start: string;
+  notes?: string;
+  macro?: { id: string; name: string; notes: string } | null;
+  plan?: SetGroup[][];
+  deload?: SetGroup[];
+  accessories?: { load: number; volume: number };
+  lifts?: { name: string; week: number; groups: SetGroup[] }[];
+}
+
+function blockToFile(b: ExportBlock): FileBlock {
+  const lifts: Record<string, { week: number; sets: string[] }[]> = {};
+  for (const l of b.lifts ?? []) (lifts[l.name] ??= []).push({ week: l.week, sets: l.groups.map(groupToSpec) });
+  return {
+    ...(b.id ? { id: b.id } : {}),
+    name: b.name,
+    type: b.type,
+    start: b.start,
+    weeks: b.plan?.length ? b.plan.map((w) => w.map(groupToSpec)) : b.weeks,
+    ...(b.deloadWeeks > 0
+      ? { deload: { weeks: b.deloadWeeks, ...(b.deload?.length ? { sets: b.deload.map(groupToSpec) } : {}), ...(b.accessories ? { accessories: b.accessories } : {}) } }
+      : { deloadWeeks: 0 }),
+    ...(Object.keys(lifts).length ? { lifts } : {}),
+    ...(b.notes ? { notes: b.notes } : {}),
+  };
 }
 
 /** Le programme actuel dans le format d'échange (à partager, à réimporter ailleurs). */
@@ -173,6 +207,22 @@ export function programToFile(input: ExportInput): ProgramFile {
       };
     }),
     ...(input.oneRms.length ? { oneRepMaxes: input.oneRms.map((r) => ({ exercise: r.name, kg: r.kg })) } : {}),
-    ...(input.blocks?.length ? { blocks: input.blocks.map((b) => ({ name: b.name, type: b.type, weeks: b.weeks, deloadWeeks: b.deloadWeeks, start: b.start })) } : {}),
+    ...cyclesToFile(input.blocks ?? []),
   };
+}
+
+/** Les blocs rangés sous leur macrocycle (dans l'ordre), les autres à part. */
+function cyclesToFile(blocks: readonly ExportBlock[]): Pick<ProgramFile, 'macrocycles' | 'blocks'> {
+  const macros: NonNullable<ProgramFile['macrocycles']> = [];
+  const loose: FileBlock[] = [];
+  for (const b of blocks) {
+    if (!b.macro) {
+      loose.push(blockToFile(b));
+      continue;
+    }
+    let m = macros.find((x) => x.id === b.macro!.id);
+    if (!m) macros.push((m = { id: b.macro.id, name: b.macro.name, ...(b.macro.notes ? { notes: b.macro.notes } : {}), blocks: [] }));
+    m.blocks.push(blockToFile(b));
+  }
+  return { ...(macros.length ? { macrocycles: macros } : {}), ...(loose.length ? { blocks: loose } : {}) };
 }

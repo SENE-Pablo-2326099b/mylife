@@ -300,6 +300,10 @@ export const MIGRATIONS: readonly string[] = [
   `
   ALTER TABLE workouts ADD COLUMN rating INTEGER;
   `,
+  // 14 : l'exception d'un exercice pour une semaine en groupes de séries libres (cycles importés), en JSON.
+  `
+  ALTER TABLE cycle_week_overrides ADD COLUMN groups TEXT;
+  `,
 ];
 
 export const SCHEMA_VERSION = MIGRATIONS.length;

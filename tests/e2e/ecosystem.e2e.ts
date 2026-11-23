@@ -447,6 +447,24 @@ describe('MyLife, une seule app', () => {
     const circuit = file.sessions.find((x: { name: string }) => x.name === 'Samedi – Circuit');
     expect(circuit.days).toEqual(['samedi']);
     expect(circuit.exercises.find((e: { format?: string }) => e.format === 'emom')).toMatchObject({ minutes: 10, reps: '5' });
+    // Des cycles seuls (macrocycle, semaines en groupes libres, décharge) : aperçu semaine par semaine, import, le bloc
+    // les montre ; les séances restent en place.
+    await page.goto(`${server.url}/sport/programme/importer`);
+    await page.getByRole('heading', { name: 'Importer' }).waitFor();
+    const cycles = { name: 'Force', macrocycles: [{ name: 'Saison', blocks: [{ name: 'Cycle E2E', type: 'accumulation', weeks: [['top 1x4 @80%', 'backoff 3x6 @70%', '2x3 @75% pause 2 s'], ['top 1x3 @85%', 'backoff EMOM 5x2 @72%']], deload: { weeks: 1, sets: ['3x3 @60%'] } }] }] };
+    await page.getByLabel('Programme à importer').fill(JSON.stringify(cycles));
+    await page.getByText('Programme lu · vérifié').waitFor();
+    await page.getByText('Saison · Cycle E2E').waitFor();
+    await page.getByRole('button', { name: 'Voir le détail ›' }).click();
+    await page.getByText('S1 · Top 1×4 @ 80 % + Backoffs 3×6 @ 70 % + 2×3 @ 75 % · pause 2 s').waitFor();
+    await page.getByText('Décharge · 3×3 @ 60 %').waitFor();
+    await shot(page, '07l2-sport-import-cycles');
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+    await page.getByRole('button', { name: 'Valider l’import' }).click();
+    await page.waitForURL(/\/sport\/programme$/);
+    await page.locator('.list-row', { hasText: 'Samedi – Circuit' }).first().waitFor({ timeout: 20_000 });
+    await page.locator('a.pf-bl', { hasText: 'Cycle E2E' }).click();
+    await page.getByText('Top 1×3 @ 85 % + Backoffs EMOM 5×2 @ 72 %').waitFor();
   });
 
   it('MyPerf refait : Exercices — la bibliothèque, une fiche, une variante créée et modifiée', async () => {

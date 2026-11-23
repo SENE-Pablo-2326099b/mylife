@@ -115,7 +115,9 @@ describe('Partager', () => {
     b.applyImport(TEXT, ALL, MONDAY);
     b.saveBlock(null, { name: 'Accu', workWeeks: 4, deloadWeeks: 1, startDate: '2026-01-05' }, MONDAY);
     const file = JSON.parse(b.exportProgram('Partagé'));
-    expect(file).toMatchObject({ format: 'myperf-program', version: 1, name: 'Partagé', blocks: [{ name: 'Accu', weeks: 4, deloadWeeks: 1, start: '2026-01-05' }] });
+    expect(file).toMatchObject({ format: 'myperf-program', version: 1, name: 'Partagé', blocks: [{ name: 'Accu', start: '2026-01-05', deload: { weeks: 1 } }] });
+    // Les semaines sont toujours écrites, en groupes (relisibles à l'identique).
+    expect(file.blocks![0]!.weeks).toEqual([['top 1x5 @80%', 'backoff 4x6 @70%'], ['top 1x4 @83%', 'backoff 4x6 @73%'], ['top 1x4 @85%', 'backoff 3x6 @75%'], ['top 1x2 @92.5%', 'backoff 3x5 @78%']]);
     const haut = file.sessions.find((s: { name: string }) => s.name === 'Mardi – Haut');
     expect(haut.days).toEqual(['mardi']);
     expect(haut.exercises.find((e: { name: string }) => /Tractions/.test(e.name))).toMatchObject({ format: 'emom', minutes: 10, reps: '5' });

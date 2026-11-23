@@ -1,4 +1,5 @@
-import { EQUIPMENTS, MUSCLES, type Equipment, type Muscle } from '../types';
+import { parseGroups } from '../groups';
+import { EQUIPMENTS, MUSCLES, type Equipment, type Muscle, type SetGroup } from '../types';
 
 /**
  * Format d'échange d'un programme MyPerf (import, export, programmes prêts). Pensé pour être produit par
@@ -48,8 +49,28 @@ export interface ProgramFile {
     }[];
   }[];
   oneRepMaxes?: { exercise: string; kg: number }[];
-  /** Blocs (périodisation), dans l'ordre ; ils s'enchaînent. */
-  blocks?: { name: string; type?: string; weeks: number; deloadWeeks?: number; start?: string }[];
+  /** Macrocycles (une saison, une préparation) et leurs blocs, dans l'ordre. */
+  macrocycles?: { id?: string; name: string; notes?: string; blocks: FileBlock[] }[];
+  /** Blocs hors macrocycle, dans l'ordre ; ils s'enchaînent. */
+  blocks?: FileBlock[];
+}
+
+/**
+ * Un bloc (mésocycle). `weeks` : un nombre (la forme du type de bloc) ou la liste des semaines (microcycles), chacune
+ * une liste libre de groupes de séries (« top 1x4 @80% », « backoff 4x6 @70% », « 2x3 @75% pause 2 s »…).
+ */
+export interface FileBlock {
+  id?: string;
+  name: string;
+  type?: string;
+  weeks: number | (string[] | { sets: string[] })[];
+  deloadWeeks?: number;
+  /** La semaine de décharge : ses groupes (lifts au %) et la réduction des accessoires. */
+  deload?: { weeks?: number; sets?: string[]; accessories?: { load: number; volume: number } };
+  start?: string;
+  notes?: string;
+  /** Exceptions par exercice : nom → semaines (n° de semaine, la décharge comprise) et leurs groupes. */
+  lifts?: Record<string, { week: number; sets: string[] }[]>;
 }
 
 /** Un exercice lu, prêt à être rapproché de la bibliothèque. */
@@ -80,12 +101,22 @@ export interface ParsedExercise {
 }
 
 export interface ParsedBlock {
+  id: string | null;
   name: string;
   kind: 'accumulation' | 'transmutation' | 'realization' | 'transition' | 'custom';
   weeks: number;
   deloadWeeks: number;
   /** Date de début (AAAA-MM-JJ) ; null : enchaîné après le précédent (ou cette semaine). */
   start: string | null;
+  notes: string;
+  macro: { id: string | null; name: string; notes: string } | null;
+  /** Semaine par semaine (S1 en premier), en groupes libres ; null : la forme du type de bloc. */
+  plan: SetGroup[][] | null;
+  /** La décharge des lifts au % ; null : celle par défaut. */
+  deload: SetGroup[] | null;
+  accessories: { load: number; volume: number } | null;
+  /** Exceptions par exercice (semaine 1 à travail + décharge). */
+  lifts: { name: string; week: number; groups: SetGroup[] }[];
 }
 
 export interface ParsedSession {
@@ -257,8 +288,12 @@ const K = {
   group: ['superset', 'group', 'groupe', 'circuit', 'bisets', 'biset'],
   progression: ['progression', 'progressiontype', 'method', 'methode'],
   blocks: ['blocks', 'blocs', 'mesocycles', 'cycles', 'phases'],
-  weeks: ['weeks', 'semaines', 'workweeks', 'duration'],
-  deload: ['deloadweeks', 'deload', 'decharge', 'semainesdedecharge'],
+  macros: ['macrocycles', 'macrocycle', 'macros', 'saisons', 'seasons'],
+  weeks: ['weeks', 'semaines', 'workweeks', 'duration', 'microcycles'],
+  deloadWeeks: ['deloadweeks', 'semainesdedecharge'],
+  deload: ['deload', 'decharge'],
+  lifts: ['lifts', 'exceptions', 'parexercice', 'overrides', 'exercices', 'exercises'],
+  id: ['id'],
   start: ['start', 'startdate', 'debut', 'datededebut', 'date'],
   kind: ['type', 'kind', 'objectif', 'goal'],
 } as const;
@@ -332,26 +367,94 @@ function extras(o: Record<string, unknown>, seconds: number | null): Pick<Parsed
   };
 }
 
-function readBlocks(raw: unknown, issues: string[]): ParsedBlock[] {
+const idOf = (o: Record<string, unknown>) => {
+  const v = str(pick(o, K.id));
+  return /^[A-Za-z0-9_.:-]{1,80}$/.test(v) ? v : null;
+};
+
+/** Les groupes d'une semaine, avec le nom du bloc et la semaine dans les messages. */
+function weekGroups(raw: unknown, where: string, issues: string[]): SetGroup[] {
+  const r = parseGroups(raw);
+  for (const e of r.issues) issues.push(`${where} : ${e}`);
+  return r.groups;
+}
+
+function readBlocks(raw: unknown, issues: string[], macro: ParsedBlock['macro'] = null): ParsedBlock[] {
   return (Array.isArray(raw) ? raw : []).flatMap((b, i): ParsedBlock[] => {
     if (!b || typeof b !== 'object') return [];
     const o = b as Record<string, unknown>;
-    const weeks = Math.round(num(pick(o, K.weeks)) ?? 0);
+    const name = str(pick(o, K.name)) || `Cycle ${i + 1}`;
+    const weeksRaw = pick(o, K.weeks);
+    const plan = Array.isArray(weeksRaw) ? weeksRaw.map((w, k) => weekGroups(w, `${name}, S${k + 1}`, issues)) : null;
+    const weeks = plan ? plan.length : Math.round(num(weeksRaw) ?? 0);
     if (weeks < 1 || weeks > 12) {
-      issues.push(`Bloc ${i + 1} : durée absente ou hors limites (1 à 12 semaines), ignoré.`);
+      issues.push(`${name} : durée absente ou hors limites (1 à 12 semaines), ignoré.`);
       return [];
     }
+    if (plan?.some((w) => !w.length)) {
+      issues.push(`${name} : une semaine sans série lisible, bloc ignoré.`);
+      return [];
+    }
+    // La décharge : un nombre de semaines, ou ses groupes (et la réduction des accessoires).
+    const d = pick(o, K.deload);
+    const dObj = d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, unknown>) : null;
+    const deloadWeeks = Math.max(0, Math.min(2, Math.round(num(pick(o, K.deloadWeeks)) ?? num(d) ?? (dObj ? (num(pick(dObj, K.weeks)) ?? 1) : Array.isArray(d) ? 1 : 1))));
+    const deloadGroups = Array.isArray(d) ? weekGroups(d, `${name}, décharge`, issues) : dObj && (dObj.sets || dObj.series || dObj.top || dObj.groups) ? weekGroups(dObj, `${name}, décharge`, issues) : null;
+    const acc = dObj?.accessories ?? dObj?.accessoires;
+    const accObj = acc && typeof acc === 'object' ? (acc as Record<string, unknown>) : null;
+    const load = accObj ? num(pick(accObj, ['load', 'charge'])) : null;
+    const volume = accObj ? num(pick(accObj, ['volume', 'series', 'sets'])) : null;
+    // Exceptions par exercice : { "Squat": [{ week, sets }] } ou [{ exercise, week, sets }].
+    const liftsRaw = pick(o, K.lifts);
+    const entries: [string, unknown][] = Array.isArray(liftsRaw)
+      ? liftsRaw.flatMap((x): [string, unknown][] => (x && typeof x === 'object' ? [[str(pick(x as Record<string, unknown>, K.exerciseRef)), [x]]] : []))
+      : liftsRaw && typeof liftsRaw === 'object'
+        ? Object.entries(liftsRaw as Record<string, unknown>)
+        : [];
+    const total = weeks + deloadWeeks;
+    const lifts = entries.flatMap(([lift, list]) =>
+      (Array.isArray(list) ? list : []).flatMap((x) => {
+        if (!lift || !x || typeof x !== 'object') return [];
+        const xo = x as Record<string, unknown>;
+        const wRaw = pick(xo, ['week', 'semaine', 's']);
+        const week = /^(deload|decharge)$/.test(key(wRaw)) ? weeks + 1 : Math.round(num(typeof wRaw === 'string' ? wRaw.replace(/^s/i, '') : wRaw) ?? 0);
+        if (week < 1 || week > total) {
+          issues.push(`${name}, ${lift} : semaine ${str(wRaw) || '?'} hors du bloc, ignorée.`);
+          return [];
+        }
+        const groups = weekGroups(xo, `${name}, ${lift} S${week}`, issues);
+        return groups.length ? [{ name: lift, week, groups }] : [];
+      }),
+    );
     const start = str(pick(o, K.start));
     return [
       {
-        name: str(pick(o, K.name)) || `Cycle ${i + 1}`,
+        id: idOf(o),
+        name,
         kind: KINDS[key(pick(o, K.kind))] ?? 'accumulation',
         weeks,
-        deloadWeeks: Math.max(0, Math.min(2, Math.round(num(pick(o, K.deload)) ?? 1))),
+        deloadWeeks,
         start: /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : null,
+        notes: str(pick(o, K.notes)),
+        macro,
+        plan,
+        deload: deloadGroups?.length ? deloadGroups : null,
+        accessories: load !== null && volume !== null && load > 0 && load <= 1 && volume > 0 && volume <= 1 ? { load, volume } : null,
+        lifts,
       },
     ];
   });
+}
+
+/** Macrocycles, puis blocs hors macrocycle. */
+function readCycles(o: Record<string, unknown>, issues: string[]): ParsedBlock[] {
+  const macros = pick(o, K.macros);
+  const inMacros = (Array.isArray(macros) ? macros : macros && typeof macros === 'object' ? [macros] : []).flatMap((m, i) => {
+    if (!m || typeof m !== 'object') return [];
+    const mo = m as Record<string, unknown>;
+    return readBlocks(pick(mo, K.blocks), issues, { id: idOf(mo), name: str(pick(mo, K.name)) || `Macrocycle ${i + 1}`, notes: str(pick(mo, K.notes)) });
+  });
+  return [...inMacros, ...readBlocks(pick(o, K.blocks), issues)];
 }
 
 function readSession(raw: unknown, index: number, issues: string[]): ParsedSession | null {
@@ -390,8 +493,9 @@ export function readProgram(raw: unknown): ParseResult {
       return name && kg !== null && kg > 0 ? { name, kg } : null;
     })
     .filter((r): r is { name: string; kg: number } => r !== null);
-  if (!sessions.length) return { program: null, issues: issues.length ? issues : ['Aucune séance trouvée.'], source: 'json' };
-  const blocks = readBlocks(pick(o, K.blocks), issues);
+  const blocks = readCycles(o, issues);
+  // Des cycles seuls (sans séance) se lisent aussi : on retravaille sa périodisation sans toucher aux séances.
+  if (!sessions.length && !blocks.length) return { program: null, issues: issues.length ? issues : ['Aucune séance trouvée.'], source: 'json' };
   return { program: { name: str(pick(o, K.name)) || 'Programme importé', notes: str(pick(o, K.notes)), sessions, oneRms, blocks }, issues, source: 'json' };
 }
 

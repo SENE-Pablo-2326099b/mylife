@@ -5,6 +5,7 @@ import {
   DEFAULT_REST,
   diffDays,
   generateScheme,
+  GROUP_LIMITS,
   MESO_KINDS,
   mesoKindInfo,
   planSession,
@@ -13,10 +14,12 @@ import {
   schemeForKind,
   STRATEGIES,
   totalWeeks,
+  weekFromGroups,
   type HistoryView,
   type Mesocycle,
   type Program,
   type RestSettings,
+  type SetGroup,
   type StrengthWeek,
 } from '@mylife/training';
 import { historyView, readProgram } from './queries';
@@ -45,6 +48,8 @@ export interface WeekScheme {
   topPct: string;
   back: string | null;
   backPct: string | null;
+  /** Semaine écrite en groupes libres (cycles importés) ; null : la forme top set + backoffs. */
+  groups: SetGroup[] | null;
 }
 
 /** Les semaines d'un bloc telles que tous les lifts au % les suivent (décharge comprise). */
@@ -60,6 +65,7 @@ export function blockWeeks(m: Mesocycle): WeekScheme[] {
     topPct: pct(week.topPercent),
     back: week.backoffSets > 0 ? `${week.backoffSets}×${week.backoffReps}` : null,
     backPct: week.backoffSets > 0 ? pct(week.backoffPercent) : null,
+    groups: week.groups?.length ? week.groups : null,
   }));
 }
 
@@ -251,6 +257,8 @@ export interface LiftCell {
   values: StrengthWeek;
   /** Charges que ça donne (lest net pour un lesté), si un 1RM est connu. */
   loads: { top: string | null; back: string | null };
+  /** Groupes libres de la semaine pour cet exercice (son exception, sinon ceux du bloc). */
+  groups: SetGroup[] | null;
 }
 
 export interface LiftView {
@@ -311,6 +319,7 @@ export function liftView(d: Db, exerciseId: string, blockId: string | null, date
         back: backs.length ? `${backs.length}×${backs[0]!.targetReps ?? '?'}` : values.backoffSets > 0 ? `${values.backoffSets}×${values.backoffReps}` : null,
         backPct: backs.length || values.backoffSets > 0 ? (percents ? pct(percents.backoff) : pct(values.backoffPercent)) : null,
         values,
+        groups: o?.groups?.length ? o.groups : o && [o.topSets, o.topRepsMin, o.topPercent, o.backoffSets, o.backoffReps, o.backoffPercent].some((x) => x !== null) ? null : (w.groups ?? null),
         loads: {
           top: tops[0]?.targetWeight != null ? kgText(tops[0].targetWeight, weighted) : null,
           back: backs[0]?.targetWeight != null ? kgText(backs[0].targetWeight, weighted) : null,
@@ -366,13 +375,64 @@ export function setLiftWeek(d: Db, blockId: string, exerciseId: string, weekInde
   const base = blockWeeks(block).find((w) => w.index === weekIndex)!.week;
   const w = cleanWeek(week, base);
   d.run(
-    `INSERT INTO cycle_week_overrides (id, mesocycle_id, exercise_id, week_index, top_sets, top_reps_min, top_reps_max, backoff_sets, backoff_reps, backoff_percent, intensity)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO cycle_week_overrides (id, mesocycle_id, exercise_id, week_index, top_sets, top_reps_min, top_reps_max, backoff_sets, backoff_reps, backoff_percent, intensity, groups)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
      ON CONFLICT(mesocycle_id, exercise_id, week_index) DO UPDATE SET top_sets = excluded.top_sets, top_reps_min = excluded.top_reps_min,
        top_reps_max = excluded.top_reps_max, backoff_sets = excluded.backoff_sets, backoff_reps = excluded.backoff_reps,
-       backoff_percent = excluded.backoff_percent, intensity = excluded.intensity`,
+       backoff_percent = excluded.backoff_percent, intensity = excluded.intensity, groups = NULL`,
     [newId(), blockId, exerciseId, weekIndex, w.topSets, w.topRepsMin, w.topRepsMax, w.backoffSets, w.backoffReps, w.backoffPercent, w.topPercent],
   );
+}
+
+/**
+ * L'exception d'un exercice pour une semaine, en groupes libres (cycles importés). Les colonnes chiffrées gardent la
+ * forme top set + backoffs qu'on en déduit (pour l'app d'avant) ; les groupes priment partout dans le module.
+ */
+export function setLiftGroups(d: Db, blockId: string, exerciseId: string, weekIndex: number, groups: readonly SetGroup[]): void {
+  const block = blocksOf(readProgram(d)).find((m) => m.id === blockId);
+  if (!block) throw new Error('Bloc introuvable');
+  if (!Number.isInteger(weekIndex) || weekIndex < 1 || weekIndex > totalWeeks(block)) throw new Error('Semaine invalide');
+  if (!groups.length || groups.length > GROUP_LIMITS.groups) throw new Error('Groupes de séries invalides');
+  const w = weekFromGroups(groups, blockWeeks(block).find((x) => x.index === weekIndex)!.week);
+  d.run(
+    `INSERT INTO cycle_week_overrides (id, mesocycle_id, exercise_id, week_index, top_sets, top_reps_min, top_reps_max, backoff_sets, backoff_reps, backoff_percent, intensity, groups)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(mesocycle_id, exercise_id, week_index) DO UPDATE SET top_sets = excluded.top_sets, top_reps_min = excluded.top_reps_min,
+       top_reps_max = excluded.top_reps_max, backoff_sets = excluded.backoff_sets, backoff_reps = excluded.backoff_reps,
+       backoff_percent = excluded.backoff_percent, intensity = excluded.intensity, groups = excluded.groups`,
+    [newId(), blockId, exerciseId, weekIndex, w.topSets, w.topRepsMin, w.topRepsMax, w.backoffSets, w.backoffReps, w.backoffPercent, w.topPercent, JSON.stringify(groups)],
+  );
+}
+
+/** Les semaines d'un bloc en groupes libres (S1 en premier), sa décharge, la réduction des accessoires. */
+export function setBlockPlan(d: Db, id: string, input: { plan: readonly SetGroup[][] | null; deload: readonly SetGroup[] | null; accessories: { load: number; volume: number } | null }): void {
+  const m = blocksOf(readProgram(d)).find((x) => x.id === id);
+  if (!m) throw new Error('Bloc introuvable');
+  if (input.plan && (input.plan.length !== m.workWeeks || input.plan.some((w) => !w.length || w.length > GROUP_LIMITS.groups))) throw new Error('Semaines invalides');
+  const fallback = m.scheme[m.scheme.length - 1] ?? DEFAULT_DELOAD.main;
+  writeBlock(d, {
+    ...m,
+    scheme: input.plan ? input.plan.map((g, i) => weekFromGroups(g, m.scheme[i] ?? fallback)) : m.scheme,
+    deload: {
+      main: input.deload?.length ? weekFromGroups(input.deload, m.deload.main) : m.deload.main,
+      loadFactor: input.accessories?.load ?? m.deload.loadFactor,
+      volumeFactor: input.accessories?.volume ?? m.deload.volumeFactor,
+    },
+  });
+}
+
+/** Le macrocycle d'un bloc : celui du fichier (par identifiant, sinon par nom), créé s'il n'existe pas. */
+export function ensureMacro(d: Db, macro: { id: string | null; name: string; notes: string }): string {
+  const name = macro.name.trim().slice(0, 60) || 'Macrocycle';
+  const byId = macro.id ? d.first<{ id: string }>('SELECT id FROM macrocycles WHERE id = ?', [macro.id]) : null;
+  const found = byId ?? d.first<{ id: string }>('SELECT id FROM macrocycles WHERE name = ? ORDER BY created_at LIMIT 1', [name]);
+  if (found) {
+    d.run('UPDATE macrocycles SET name = ?, notes = ? WHERE id = ?', [name, macro.notes.slice(0, 2000), found.id]);
+    return found.id;
+  }
+  const id = macro.id ?? newId();
+  d.run('INSERT INTO macrocycles (id, name, notes, created_at) VALUES (?, ?, ?, ?)', [id, name, macro.notes.slice(0, 2000), Date.now()]);
+  return id;
 }
 
 /** Le 1RM de référence saisi (lest net pour un lesté, comme l'app d'avant le note) ; null : revenir à l'estimation. */
@@ -453,6 +513,7 @@ function writeBlock(d: Db, m: Mesocycle) {
 
 export interface BlockPatch {
   name?: string;
+  notes?: string;
   kind?: string;
   startDate?: string;
   workWeeks?: number;
@@ -463,7 +524,7 @@ export interface BlockPatch {
  * Crée ou modifie un bloc. Un autre type pré-remplit les semaines ; une autre durée les recalcule en gardant celles
  * déjà réglées ; les blocs qui suivaient se décalent d'autant (ils restent enchaînés).
  */
-export function saveBlock(d: Db, id: string | null, patch: BlockPatch, date: string): string {
+export function saveBlock(d: Db, id: string | null, patch: BlockPatch, date: string, createAs?: string): string {
   const list = blocksOf(readProgram(d));
   const before = id ? list.find((x) => x.id === id) : draftBlock(list, date);
   if (!before) throw new Error('Bloc introuvable');
@@ -474,7 +535,7 @@ export function saveBlock(d: Db, id: string | null, patch: BlockPatch, date: str
   const name = (patch.name ?? before.name).trim();
   if (!name || name.length > 60) throw new Error('Nom invalide');
   const scheme = kind !== before.kind ? (schemeForKind(kind, workWeeks) ?? resizeScheme(before.scheme, workWeeks)) : workWeeks !== before.workWeeks ? resizeScheme(before.scheme, workWeeks, kind) : before.scheme;
-  const after: Mesocycle = { ...before, id: id ?? newId(), name, kind, startDate, workWeeks, deloadWeeks, scheme };
+  const after: Mesocycle = { ...before, id: id ?? createAs ?? newId(), name, kind, startDate, workWeeks, deloadWeeks, scheme, notes: patch.notes !== undefined ? patch.notes.slice(0, 2000) : before.notes };
   d.transaction(() => {
     writeBlock(d, after);
     if (id) {

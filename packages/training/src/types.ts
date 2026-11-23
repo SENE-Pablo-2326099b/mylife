@@ -84,7 +84,31 @@ export interface Exercise {
  * Loads are percentages of the reference 1RM — on total mass for weighted exercises
  * (bodyweight + lest), on the bar otherwise. Pre-filled values only: everything is editable.
  */
+/**
+ * Un groupe de séries d'une semaine, dans l'ordre voulu : top set, backoffs, séries pausées à un autre %, vagues,
+ * EMOM, séries droites… Une semaine (ou l'exception d'un exercice) est une liste libre de groupes.
+ */
+export interface SetGroup {
+  type: SetType;
+  sets: number;
+  /** Reps par série (ou bas de fourchette) ; ignoré pour une série au temps. */
+  reps: number;
+  repsMax?: number | null;
+  /** % du 1RM de référence (fraction : 0.8) ; absent : charge libre. */
+  percent?: number | null;
+  /** Série au temps (gainage, isométrie), en secondes. */
+  seconds?: number | null;
+  /** Repos après chaque série du groupe, en secondes. */
+  restSec?: number | null;
+  /** Une série toutes les N secondes (EMOM : 60). */
+  everySec?: number | null;
+  /** « pause 2 s », « tempo 3-1-1 », « vague 1 »… */
+  note?: string;
+}
+
 export interface StrengthWeek {
+  /** Groupes libres de la semaine : quand ils sont là, ils priment sur la forme top set + backoffs ci-dessous. */
+  groups?: SetGroup[];
   topSets: number;
   /** Top set reps: 1 to 5, never 6. */
   topRepsMin: number;
@@ -115,6 +139,8 @@ export interface DeloadConfig {
  */
 export interface WeekOverride {
   weekIndex: number;
+  /** Groupes libres de cet exercice cette semaine (priment sur tout le reste). */
+  groups?: SetGroup[] | null;
   topSets: number | null;
   topRepsMin: number | null;
   topRepsMax: number | null;

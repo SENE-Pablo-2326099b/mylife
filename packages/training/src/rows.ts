@@ -3,6 +3,7 @@
  * types du métier. Lecture défensive : une valeur inattendue retombe sur une valeur sûre au lieu de casser un écran.
  * Même lecture que les dépôts de l'app d'avant (apps/perf/src/db), pour que le module lise les mêmes données.
  */
+import { parseGroups } from './groups';
 import { DEFAULT_DELOAD } from './mesocycle';
 import { parseMesoKind } from './mesoTypes';
 import {
@@ -17,6 +18,7 @@ import {
   type Mesocycle,
   type Muscle,
   type ProgressionType,
+  type SetGroup,
   type SetType,
   type StrengthWeek,
   type Template,
@@ -81,7 +83,13 @@ export function parseStrengthWeek(w: Record<string, unknown>): StrengthWeek {
     backoffSets: num(w.backoffSets, 3),
     backoffReps: num(w.backoffReps, 6),
     backoffPercent: num(w.backoffPercent, round2(topPercent - 0.1)),
+    ...(Array.isArray(w.groups) && w.groups.length ? { groups: readGroups(w.groups) } : {}),
   };
+}
+
+/** Groupes libres gardés dans le JSON d'une semaine (ou la colonne `groups` d'un réglage), relus prudemment. */
+function readGroups(raw: unknown): SetGroup[] {
+  return parseGroups(Array.isArray(raw) ? raw : parseJson(raw)).groups;
 }
 
 export function parseScheme(json: unknown): StrengthWeek[] {
@@ -181,6 +189,7 @@ export function toWeekOverride(r: Row): WeekOverrideRow {
     backoffReps: numOrNull(r.backoff_reps),
     backoffPercent: numOrNull(r.backoff_percent),
     topPercent: numOrNull(r.intensity),
+    ...(r.groups ? { groups: readGroups(r.groups) } : {}),
   };
 }
 

@@ -43,6 +43,8 @@ export interface SessionSet {
   rounds: number | null;
   note: string;
   completed: boolean;
+  /** Ce que le programme dit de cette série (semaines en groupes libres) : son %, sa consigne, son repos, sa durée. */
+  guide: { percent: number | null; note: string; restSec: number | null; seconds: number | null } | null;
 }
 
 export interface SessionItem {
@@ -204,7 +206,13 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
     );
   }
 
-  /** La séance telle que l'écran la montre. */
+  /** Une série prévue en groupe libre : ce qu'il faut en montrer (rien pour une série au moule top set + backoffs). */
+function guideOf(p: { percent?: number | null; note?: string; restSec?: number | null; seconds?: number | null } | undefined): SessionSet['guide'] {
+  if (!p || (p.percent === undefined && !p.note && p.restSec == null && p.seconds == null)) return null;
+  return { percent: p.percent ?? null, note: p.note ?? '', restSec: p.restSec ?? null, seconds: p.seconds ?? null };
+}
+
+/** La séance telle que l'écran la montre. */
   function doc(id: string): SessionDoc | null {
     const w = d.first<Record<string, unknown>>('SELECT * FROM workouts WHERE id = ?', [id]);
     if (!w) return null;
@@ -241,6 +249,7 @@ export function sessionOps(d: Db, today: () => string = () => new Date().toISOSt
           rounds: (s.rounds as number | null) ?? null,
           note: String(s.note ?? ''),
           completed: bool(s.completed),
+          guide: guideOf(planned?.prescription.sets[Number(s.position)]),
         }),
       );
       const last = h.lastSets(exercise.id, progression);

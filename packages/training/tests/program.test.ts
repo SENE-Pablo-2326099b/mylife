@@ -174,8 +174,8 @@ describe('format étendu : EMOM, AMRAP, au temps, supersets, progression, blocs'
     expect(pompes!.progression).toBe('free');
     // Une durée (« 45s ») prime : c'est du « au temps », pas un EMOM.
     expect(gainage).toMatchObject({ seconds: 45, format: null });
-    expect(r.program!.blocks).toEqual([{ name: 'Accu', kind: 'accumulation', weeks: 4, deloadWeeks: 1, start: '2026-12-07' }]);
-    expect(r.issues.some((i) => /Bloc 2/.test(i))).toBe(true);
+    expect(r.program!.blocks).toEqual([{ id: null, name: 'Accu', kind: 'accumulation', weeks: 4, deloadWeeks: 1, start: '2026-12-07', notes: '', macro: null, plan: null, deload: null, accessories: null, lifts: [] }]);
+    expect(r.issues.some((i) => /^Sans durée : durée absente/.test(i))).toBe(true);
   });
 
   it('texte libre : « EMOM 10 min 5 reps », « AMRAP 8 min », supersets « A1 / A2 »', () => {

@@ -123,6 +123,6 @@ describe('module MyPerf : schéma', () => {
     const cols = (t: string) => d.all<{ name: string }>(`PRAGMA table_info(${t})`).map((c) => c.name);
     expect(cols('sets')).toEqual(expect.arrayContaining(['bar_speed', 'is_test', 'note', 'duration_s', 'distance_m', 'rounds', 'rpe', 'rir', 'speed']));
     expect(cols('template_exercises')).toEqual(expect.arrayContaining(['progression_type', 'format_id', 'strategy', 'group_json', 'rest_sec']));
-    expect(backend.schemaVersion()).toBe(13);
+    expect(backend.schemaVersion()).toBe(14);
   });
 });

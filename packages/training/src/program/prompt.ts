@@ -43,7 +43,25 @@ Format exact :
     }
   ],
   "oneRepMaxes": [{ "exercise": "Squat", "kg": 140 }],
-  "blocks": [{ "name": "Accumulation", "type": "accumulation", "weeks": 4, "deloadWeeks": 1, "start": "2026-12-07" }]
+  "macrocycles": [
+    {
+      "name": "Saison 2026",
+      "blocks": [
+        {
+          "name": "Cycle 1",
+          "type": "accumulation",
+          "start": "2026-12-07",
+          "weeks": [
+            ["top 1x4 @80%", "backoff 4x6 @70%"],
+            ["top 1x4 @83%", "backoff 4x6 @73%", "2x3 @75% pause 2 s"],
+            ["top 1x3 @86%", "backoff EMOM 6x2 @72%"]
+          ],
+          "deload": { "weeks": 1, "sets": ["top 1x3 @65%", "backoff 2x5 @55%"], "accessories": { "load": 0.6, "volume": 0.5 } },
+          "lifts": { "Squat": [{ "week": 3, "sets": ["top 1x2 @90%", "backoff 3x4 @78%"] }] }
+        }
+      ]
+    }
+  ]
 }
 
 Règles :
@@ -60,7 +78,10 @@ Règles :
 - "format" : "sets" (séries, par défaut), "emom" (une série chaque minute : "minutes" = durée totale, "reps" = reps par minute, "everySeconds" si ce n'est pas 60), "amrap" (max de tours en "minutes"), "for_time" (le plus vite possible). Un exercice tenu (gainage) : "reps": "45s".
 - "superset" : la même lettre ("A", "B"…) sur des exercices qui se suivent et s'enchaînent sans repos ; "sets" = nombre de tours.
 - "progression" : "percent" si les charges sont en % du 1RM ou suivent des blocs, "double" pour une fourchette de reps (8-12), "linear" si on ajoute une charge fixe à chaque séance, "free" sinon. Omets-la si ce n'est pas clair.
-- "blocks" : seulement si le programme est découpé en blocs ou cycles (nom, "type" parmi accumulation, transmutation, realization, transition, custom, "weeks" de travail, "deloadWeeks", "start" en AAAA-MM-JJ si écrit).
+- Périodisation, seulement si elle est écrite : "macrocycles" (une saison, une préparation) contiennent leurs "blocks" (mésocycles), dans l'ordre ; des blocs sans macrocycle vont dans "blocks" à la racine. Un bloc : "name", "type" parmi accumulation, transmutation, realization, transition, custom, "start" (AAAA-MM-JJ) si écrit, sinon il suit le précédent.
+- "weeks" d'un bloc : la liste de ses semaines de travail (microcycles), dans l'ordre, chacune une liste de groupes de séries pour les mouvements au % du 1RM, dans l'ordre exact du programme. Un groupe s'écrit « [type] [EMOM] séries x reps @pourcentage% [consigne] [repos durée] » : type parmi top, backoff, échauffement, drop (rien = séries droites) ; « 3x45s » pour des séries au temps ; « 1x3-5 » pour une fourchette ; « EMOM » (ou « E2MOM ») pour une série chaque minute ; la consigne en clair (« pause 2 s », « tempo 3-1-1 ») ; « repos 3 min » si écrit. N'importe quelle combinaison : top set + backoffs, séries pausées à un autre %, vagues, EMOM, séries droites. Si seules les durées sont écrites, "weeks" peut être un nombre.
+- "deload" : la ou les semaines de décharge ("weeks" : 0 à 2), leurs groupes dans "sets", et "accessories" (charge et volume des accessoires, en fraction : 0.6 = 60 %) si c'est écrit.
+- "lifts" : les exceptions d'un exercice (son nom → [{ "week": numéro de semaine du bloc, la décharge comprise, "sets": ses groupes }]), seulement si le programme en donne.
 
 Voici mon programme :
 `;
